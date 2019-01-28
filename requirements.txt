@@ -1,0 +1,4 @@
+praw
+sqlalchemy
+alembic
+pymysql
