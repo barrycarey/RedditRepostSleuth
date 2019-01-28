@@ -26,7 +26,7 @@ class PostIngest:
             post = Post()
             post.post_id = reddit_post.id
             post.url = reddit_post.url
-            post.author = reddit_post.author.name
+            post.author = reddit_post.author.name if reddit_post.author else None
             post.created_at = datetime.fromtimestamp(reddit_post.created)
             post.subreddit = reddit_post.subreddit.display_name
             post.title = reddit_post.title
@@ -38,6 +38,8 @@ class PostIngest:
                     post.post_type = reddit_post.post_hint
                 else:
                     print('Missing Post Hint')
+            if hasattr(reddit_post, 'crosspost_parent'):
+                post.crosspost_parent = reddit_post.crosspost_parent
 
             uow.posts.add(post)
             try:

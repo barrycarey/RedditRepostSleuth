@@ -19,4 +19,7 @@ class Post(Base):
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(100), nullable=False)
     title = Column(String(1000), nullable=False)
+    crosspost_parent = Column(String(200))
+    repost_of = Column(Integer)
+    image_hash = Column(String(64))
     checked_repost = Column(Boolean, default=False)

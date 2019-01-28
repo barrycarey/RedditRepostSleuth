@@ -2,3 +2,5 @@ praw
 sqlalchemy
 alembic
 pymysql
+pillow
+requests

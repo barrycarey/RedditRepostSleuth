@@ -1,9 +1,13 @@
+import threading
+from time import sleep
+
 import praw
 import os
 
 from sqlalchemy import create_engine
 
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 from redditrepostsleuth.service.postIngest import PostIngest
 
 reddit = praw.Reddit(
@@ -19,5 +23,11 @@ db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format(os.getenv('DB_USE
                                                                os.getenv('DB_HOST'),
                                                                'reddit'))
 
+hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
+threading.Thread(target=hashing.generate_hashes).start()
+threading.Thread(target=hashing.clear_deleted_images).start()
+
 ingest = PostIngest(reddit, SqlAlchemyUnitOfWorkManager(db_engine))
-ingest.run()
+threading.Thread(target=ingest.run).start()
+while True:
+    sleep(5)
