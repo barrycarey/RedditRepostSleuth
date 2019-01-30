@@ -31,8 +31,9 @@ repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), ha
 submission = reddit.submission(id='aktve7')
 #r = repost_service.handle_repost_request(submission)
 
-#comments = CommentMonitor(reddit, repost_service)
-#comments.monitor_for_summons()
+comments = CommentMonitor(reddit, repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
+
+threading.Thread(target=comments.monitor_for_summons).start()
 #threading.Thread(target=hashing.process_reposts).start()
 #threading.Thread(target=hashing.generate_hashes).start()
 #threading.Thread(target=hashing.clear_deleted_images).start()

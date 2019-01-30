@@ -1,4 +1,5 @@
 from redditrepostsleuth.db.repository.postrepository import PostRepository
+from redditrepostsleuth.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.db.uow.unitofwork import UnitOfWork
 
 
@@ -21,5 +22,9 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.session.rollback()
 
     @property
-    def posts(self):
+    def posts(self) -> PostRepository:
         return PostRepository(self.session)
+
+    @property
+    def summons(self) -> SummonsRepository:
+        return SummonsRepository(self.session)

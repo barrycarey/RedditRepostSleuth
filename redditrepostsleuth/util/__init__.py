@@ -1,6 +1,6 @@
 from praw.models import Submission
 from datetime import datetime
-from redditrepostsleuth.model.post import Post
+from redditrepostsleuth.model.db.databasemodels import Post
 
 
 def submission_to_post(submission: Submission) -> Post:

@@ -27,3 +27,15 @@ class Post(Base):
     repost_of = Column(Integer)
     image_hash = Column(String(64))
     checked_repost = Column(Boolean, default=False)
+
+class Summons(Base):
+
+    __tablename__ = 'reddit_bot_summons'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    comment_id = Column(String(100), unique=True)
+    comment_body = Column(String(1000))
+    comment_reply = Column(String(5000))
+    summons_received_at = Column(DateTime)
+    summons_replied_at = Column(DateTime)

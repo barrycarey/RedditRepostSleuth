@@ -8,7 +8,7 @@ from distance import hamming
 
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.model.post import Post
+from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.util.vptree import VPTree
 
 

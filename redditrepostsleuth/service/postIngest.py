@@ -3,7 +3,7 @@ from datetime import datetime
 from praw import Reddit
 from praw.models import Submission
 
-from redditrepostsleuth.model.post import Post
+from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 
 
