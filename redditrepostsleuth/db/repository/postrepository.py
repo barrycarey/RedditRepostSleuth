@@ -3,7 +3,7 @@ from typing import List
 from sqlalchemy import DateTime
 
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.db.model.post import Post
+from redditrepostsleuth.model.post import Post
 
 
 class PostRepository:

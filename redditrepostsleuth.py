@@ -10,6 +10,7 @@ from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnit
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 from redditrepostsleuth.service.postIngest import PostIngest
+from redditrepostsleuth.service.repostrequestservice import RepostRequestService
 
 reddit = praw.Reddit(
     client_id=os.getenv('redditclientid'),
@@ -25,11 +26,16 @@ db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format(os.getenv('DB_USE
                                                                'reddit'))
 
 hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
-comments = CommentMonitor(reddit)
-comments.monitor_for_summons()
-threading.Thread(target=hashing.process_reposts).start()
-threading.Thread(target=hashing.generate_hashes).start()
-threading.Thread(target=hashing.clear_deleted_images).start()
+repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
+
+submission = reddit.submission(id='aktve7')
+#r = repost_service.handle_repost_request(submission)
+
+#comments = CommentMonitor(reddit, repost_service)
+#comments.monitor_for_summons()
+#threading.Thread(target=hashing.process_reposts).start()
+#threading.Thread(target=hashing.generate_hashes).start()
+#threading.Thread(target=hashing.clear_deleted_images).start()
 
 ingest = PostIngest(reddit, SqlAlchemyUnitOfWorkManager(db_engine))
 threading.Thread(target=ingest.run).start()

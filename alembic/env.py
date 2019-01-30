@@ -4,7 +4,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from redditrepostsleuth.db.model.post import Base
+from redditrepostsleuth.model.post import Base
 
 from alembic import context
 
