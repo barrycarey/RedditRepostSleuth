@@ -1,5 +1,7 @@
 from typing import List
 
+from sqlalchemy import DateTime
+
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.model.post import Post
 
@@ -23,6 +25,15 @@ class PostRepository:
 
     def find_all_by_type(self, post_type: str, limit: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.post_type == post_type).limit(limit).all()
+
+    def find_all_by_repost_check(self, repost_check: bool, limit: int = None):
+        return self.db_session.query(Post).filter(Post.checked_repost == False, Post.post_type == 'image', Post.image_hash != None).order_by(Post.created_at.desc()).limit(limit).all()
+
+    def find_all_older_posts(self, created: DateTime):
+        return self.db_session.query(Post).filter(Post.created_at < created, Post.post_type == 'image').order_by(Post.created_at.desc()).all()
+
+    def find_all_images_with_hash(self):
+        return self.db_session.query(Post).filter(Post.image_hash != None).all()
 
     def remove(self, item: Post):
         self.db_session.delete(item)

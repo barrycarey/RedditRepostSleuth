@@ -24,6 +24,7 @@ db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format(os.getenv('DB_USE
                                                                'reddit'))
 
 hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
+hashing.repost_test()
 threading.Thread(target=hashing.generate_hashes).start()
 threading.Thread(target=hashing.clear_deleted_images).start()
 

@@ -4,6 +4,10 @@ from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 
 class Post(Base):
+
+    def __lt__(self, other):
+        return self.image_hash < other.image_hash
+
     def __repr__(self) -> str:
         return 'Post ID: {} - Type: {} - URL: {}'.format(self.post_id, self.post_type, self.url)
 

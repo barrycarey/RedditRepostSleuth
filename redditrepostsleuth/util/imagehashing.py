@@ -27,7 +27,7 @@ def generate_dhash(img: Image, hash_size: int = 16) -> str:
     # Grayscale and shrink the image
     try:
         image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
-    except (TypeError, OSError) as e:
+    except (TypeError, OSError, AttributeError) as e:
         log.error('Problem creating image hash for image.  Error: {}', str(e))
         return None
 
