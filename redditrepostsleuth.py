@@ -7,6 +7,7 @@ import os
 from sqlalchemy import create_engine
 
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 from redditrepostsleuth.service.postIngest import PostIngest
 
@@ -24,7 +25,9 @@ db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format(os.getenv('DB_USE
                                                                'reddit'))
 
 hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
-hashing.repost_test()
+comments = CommentMonitor(reddit)
+comments.monitor_for_summons()
+threading.Thread(target=hashing.process_reposts).start()
 threading.Thread(target=hashing.generate_hashes).start()
 threading.Thread(target=hashing.clear_deleted_images).start()
 
