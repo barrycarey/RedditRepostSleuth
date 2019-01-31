@@ -1,4 +1,5 @@
 from io import BytesIO
+from multiprocessing import Queue, Pool
 from typing import List
 from urllib import request
 from urllib.error import HTTPError
@@ -9,6 +10,7 @@ from distance import hamming
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.model.posthashingwrapper import PostHashingWrapper
 from redditrepostsleuth.util.vptree import VPTree
 
 
@@ -42,7 +44,7 @@ def generate_dhash(img: Image, hash_size: int = 16) -> str:
     try:
         image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
     except (TypeError, OSError, AttributeError) as e:
-        log.error('Problem creating image hash for image.  Error: {}', str(e))
+        log.error('Problem creating image hash for image.  Error: %s', str(e))
         return None
 
     pixels = list(image.getdata())
@@ -88,4 +90,3 @@ def find_matching_images_in_vp_tree(tree: VPTree, query_hash: str, hamming_dista
     """
     log.info('Searching VP Tree with hash %s', query_hash)
     return tree.get_all_in_range(query_hash, hamming_distance)
-

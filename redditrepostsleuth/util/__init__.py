@@ -1,6 +1,9 @@
 from praw.models import Submission
 from datetime import datetime
+
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.model.posthashingwrapper import PostHashingWrapper
 
 
 def submission_to_post(submission: Submission) -> Post:
@@ -8,6 +11,7 @@ def submission_to_post(submission: Submission) -> Post:
     Convert a PRAW Submission object into a Post object
     :param submission:
     """
+    log.debug('Converting submission %s to post', submission.id)
     post = Post()
     post.post_id = submission.id
     post.url = submission.url
@@ -19,12 +23,24 @@ def submission_to_post(submission: Submission) -> Post:
     if submission.is_self:
         post.post_type = 'text'
     else:
-        if hasattr(submission, 'post_hint'):
+        try:
             post.post_type = submission.post_hint
-        else:
+        except AttributeError as e:
             print('Missing Post Hint')
-    if hasattr(submission, 'crosspost_parent'):
-        post.crosspost_parent = submission.crosspost_parent
 
+    # TODO - Do this lookup at time of checking reposts.  It's slow and slows down ingest
+    """
+    try:
+        post.crosspost_parent = submission.crosspost_parent
+    except AttributeError as e:
+        pass
+
+    """
 
     return post
+
+def post_to_hash_wrapper(post: Post) -> PostHashingWrapper:
+    return PostHashingWrapper(
+        url=post.url,
+        id=post.post_id
+    )

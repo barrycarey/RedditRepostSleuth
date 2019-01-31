@@ -12,6 +12,8 @@ class PostRepository:
     def add(self, item):
         log.debug('Inserting: %s', item)
         self.db_session.add(item)
+    def bulk_save(self, items: List[Post]):
+        self.db_session.bulk_save_objects(items)
 
     def get_by_id(self, id: int) -> Post:
         return self.db_session.get(Post, id)
