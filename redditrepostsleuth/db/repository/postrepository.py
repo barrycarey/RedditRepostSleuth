@@ -38,4 +38,5 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.image_hash != None).all()
 
     def remove(self, item: Post):
+        log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)

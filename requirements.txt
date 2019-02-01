@@ -5,3 +5,6 @@ pymysql
 pillow
 requests
 distance
+celery[redis]
+numpy
+dataclasses

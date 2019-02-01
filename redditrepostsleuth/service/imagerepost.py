@@ -1,8 +1,10 @@
 import requests
+from celery import group
 
 from distance import hamming
 from praw.models import Submission
 
+from redditrepostsleuth.celery import image_hash
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -31,9 +33,39 @@ class ImageRepostProcessing:
                 for post in posts:
                     img = generate_img_by_post(post)
                     if not img:
+                        uow.posts.remove(post)
+                        uow.commit()
                         continue
-                    post.image_hash = generate_dhash(img)
-                    uow.commit()
+                    try:
+                        post.image_hash = generate_dhash(img)
+                    except ImageConversioinException as e:
+                        # TODO - Check Pillow for updates to this PNG conversion issue
+                        log.error('PIL error when converting image')
+                        uow.posts.remove(post)
+                        uow.commit()
+
+    def generate_hashes_celery(self):
+        while True:
+            #TODO - Cleanup
+            posts = []
+            with self.uowm.start() as uow:
+                posts = uow.posts.find_all_by_hash(None, limit=100)
+
+            jobs = []
+            for post in posts:
+                jobs.append(image_hash.s({'url': post.url, 'post_id': post.post_id, 'hash': None}))
+
+            job = group(jobs)
+            log.debug('Starting Celery job with 100 images')
+            image_hash.delay({'url': posts[0].url})
+            result = job.apply_async().join()
+            with self.uowm.start() as uow:
+                log.debug('Saving celery results to database')
+                for r in result:
+                    p = uow.posts.get_by_post_id(r['post_id'])
+                    if p:
+                        p.image_hash = r['hash']
+                        uow.commit()
 
     def find_all_occurrences(self, submission: Submission):
         """

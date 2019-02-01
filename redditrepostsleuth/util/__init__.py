@@ -3,7 +3,6 @@ from datetime import datetime
 
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.model.posthashingwrapper import PostHashingWrapper
 
 
 def submission_to_post(submission: Submission) -> Post:
@@ -39,8 +38,3 @@ def submission_to_post(submission: Submission) -> Post:
 
     return post
 
-def post_to_hash_wrapper(post: Post) -> PostHashingWrapper:
-    return PostHashingWrapper(
-        url=post.url,
-        id=post.post_id
-    )

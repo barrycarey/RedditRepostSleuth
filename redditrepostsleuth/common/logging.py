@@ -5,7 +5,7 @@ from redditrepostsleuth.common.logfilters import SingleLevelFilter
 
 log = logging.getLogger(__name__)
 log.setLevel('DEBUG')
-formatter = logging.Formatter('%(asctime)s - %(levelname)s: %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(threadName)s - %(levelname)s: %(message)s')
 
 general_handler = logging.StreamHandler(sys.stdout)
 general_filter = SingleLevelFilter(logging.INFO, False)
@@ -17,6 +17,12 @@ error_handler = logging.StreamHandler(sys.stderr)
 error_filter = SingleLevelFilter(logging.WARNING)
 error_handler.setFormatter(formatter)
 error_handler.addFilter(error_filter)
+
+error_file_handler = logging.FileHandler('error.log')
+error_file_handler.setLevel(logging.ERROR)
+error_file_handler.setFormatter(formatter)
+
 log.addHandler(error_handler)
+log.addHandler(error_file_handler)
 
 log.propagate = False

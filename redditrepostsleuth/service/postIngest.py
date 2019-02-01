@@ -28,12 +28,15 @@ class PostIngest:
     def ingest_new_posts(self):
         sr = self.reddit.subreddit('all')
         submission_queue = []
-        while True:
-            try:
-                for submission in sr.stream.submissions():
-                    self.submission_queue.put(submission)
-            except Forbidden as e:
-                pass
+        try:
+            while True:
+                try:
+                    for submission in sr.stream.submissions():
+                        self.submission_queue.put(submission)
+                except Forbidden as e:
+                    pass
+        except Exception as e:
+            log.exception('INGEST THREAD DIED', exc_info=True)
             """
             submission_queue.append(submission)
             if len(submission_queue) >= 25:
@@ -53,7 +56,15 @@ class PostIngest:
         while True:
             submissions = []
             while len(submissions) <= 100:
-                submissions.append(self.submission_queue.get())
+                try:
+                    submissions.append(self.submission_queue.get())
+                except Exception as e:
+                    log.exception('Problem getting post from queue.', exc_info=True)
+                    break
+
+            if not submissions:
+                continue
+
             log.debug('Flush queue to database')
             with self.uowm.start() as uow:
                 unique_subs = [sub for sub in submissions if uow.posts.get_by_post_id(sub.id) is None]

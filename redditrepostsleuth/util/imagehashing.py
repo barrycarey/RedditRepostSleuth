@@ -1,5 +1,4 @@
 from io import BytesIO
-from multiprocessing import Queue, Pool
 from typing import List
 from urllib import request
 from urllib.error import HTTPError
@@ -10,7 +9,7 @@ from distance import hamming
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.model.posthashingwrapper import PostHashingWrapper
+
 from redditrepostsleuth.util.vptree import VPTree
 
 
@@ -29,8 +28,16 @@ def generate_img_by_post(post: Post) -> Image:
 
 def generate_img_by_url(url: str) -> Image:
 
+    req = request.Request(
+        url,
+        data=None,
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+        }
+    )
+
     try:
-        response = request.urlopen(url)
+        response = request.urlopen(req)
         img = Image.open(BytesIO(response.read()))
     except (HTTPError, ConnectionError, OSError) as e:
         log.error('Failed to convert image %s. Error: %s ', url, str(e))
@@ -45,7 +52,7 @@ def generate_dhash(img: Image, hash_size: int = 16) -> str:
         image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
     except (TypeError, OSError, AttributeError) as e:
         log.error('Problem creating image hash for image.  Error: %s', str(e))
-        return None
+        raise ImageConversioinException(str(e))
 
     pixels = list(image.getdata())
 
