@@ -90,7 +90,7 @@ class PostIngest:
             if not submissions:
                 continue
 
-            jobs = [save_new_post.s(sub, self.reddit) for sub in submissions]
+            jobs = [save_new_post.s(sub.id, self.reddit) for sub in submissions]
             log.debug('Saving 100 submissions with celery')
             job = group(jobs)
             job.apply_async()
