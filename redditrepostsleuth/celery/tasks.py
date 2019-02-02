@@ -25,8 +25,12 @@ class SqlAlchemyTask(Task):
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True)
-def save_new_post(self, submission):
-    post = submission_to_post(submission)
+def save_new_post(self, sub_id, reddit):
+    sub = reddit.submission(id=sub_id)
+    if not sub:
+        print('No submission found')
+        return
+    post = submission_to_post(sub)
     with self.uowm.start() as uow:
         uow.posts.add(post)
         uow.commit()

@@ -2,6 +2,7 @@ from datetime import datetime
 from queue import Queue
 from typing import List
 
+from celery import group
 from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
@@ -89,8 +90,10 @@ class PostIngest:
             if not submissions:
                 continue
 
-            for sub in submissions:
-                save_new_post(sub)
+            jobs = [save_new_post.s(sub) for sub in submissions]
+            log.debug('Saving 100 submissions with celery')
+            job = group(jobs)
+            job.apply_async()
 
 
 
