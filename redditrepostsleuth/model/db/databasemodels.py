@@ -15,7 +15,7 @@ class Post(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
-    url = Column(String(1000), nullable=False)
+    url = Column(String(2000), nullable=False)
     perma_link = Column(String(1000))
     post_type = Column(String(20))
     author = Column(String(100), nullable=False)

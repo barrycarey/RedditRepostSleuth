@@ -1,6 +1,8 @@
 """ This module contains an implementation of a Vantage Point-tree (VP-tree)."""
 import numpy as np
 
+from redditrepostsleuth.common.logging import log
+
 
 class VPTree:
     """ VP-Tree data structure for efficient nearest neighbor search.
@@ -171,7 +173,6 @@ class VPTree:
 
             if node._is_leaf():
                 continue
-
             if node.left_min <= d <= node.left_max:
                 nodes_to_visit.insert(0, (node.left, 0))
             elif node.left_min - max_distance <= d <= node.left_max + max_distance:
@@ -200,7 +201,6 @@ class _AutoSortingList(list):
     size : int, optional
         Max queue size.
     """
-    str
     def __init__(self, max_size=None, *args):
         super(_AutoSortingList, self).__init__(*args)
         self.max_size = max_size

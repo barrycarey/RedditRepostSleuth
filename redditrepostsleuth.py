@@ -1,3 +1,4 @@
+import argparse
 import threading
 from time import sleep
 
@@ -13,6 +14,9 @@ from redditrepostsleuth.service.postIngest import PostIngest
 from redditrepostsleuth.service.repostrequestservice import RepostRequestService
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description="A Tool to monitor and respond to reposted content on Reddit")
+
     reddit = praw.Reddit(
         client_id=os.getenv('redditclientid'),
         client_secret=os.getenv('redditsecret'),
@@ -27,6 +31,7 @@ if __name__ == '__main__':
                                                                    'reddit'))
 
     hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
+    hashing.process_reposts()
 
     repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
 

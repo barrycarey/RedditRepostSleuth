@@ -9,6 +9,6 @@ def image_hash(data):
         img = generate_img_by_url(data['url'])
         data['hash'] = generate_dhash(img)
     except ImageConversioinException as e:
-        pass
+        data['delete'] = True
 
     return data

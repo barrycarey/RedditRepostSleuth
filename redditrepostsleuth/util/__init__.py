@@ -1,6 +1,8 @@
 from praw.models import Submission
 from datetime import datetime
 
+from prawcore import Forbidden
+
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 
@@ -24,7 +26,7 @@ def submission_to_post(submission: Submission) -> Post:
     else:
         try:
             post.post_type = submission.post_hint
-        except AttributeError as e:
+        except (AttributeError, Forbidden) as e:
             print('Missing Post Hint')
 
     # TODO - Do this lookup at time of checking reposts.  It's slow and slows down ingest

@@ -1,3 +1,6 @@
+import time
+from queue import Queue
+
 import requests
 from celery import group
 
@@ -20,6 +23,7 @@ class ImageRepostProcessing:
     def __init__(self, uowm: UnitOfWorkManager) -> None:
         self.uowm = uowm
         self.existing_images = [] # Maintain a list of existing images im memory
+        self.hash_save_queue = Queue(maxsize=0)
 
     def generate_hashes(self):
         """
@@ -31,41 +35,74 @@ class ImageRepostProcessing:
                 posts = uow.posts.find_all_by_hash(None, limit=200)
                 log.info('Loaded %s images without hashes', len(posts))
                 for post in posts:
-                    img = generate_img_by_post(post)
-                    if not img:
-                        uow.posts.remove(post)
-                        uow.commit()
-                        continue
+
                     try:
+                        img = generate_img_by_post(post)
                         post.image_hash = generate_dhash(img)
                     except ImageConversioinException as e:
                         # TODO - Check Pillow for updates to this PNG conversion issue
                         log.error('PIL error when converting image')
                         uow.posts.remove(post)
-                        uow.commit()
+                    uow.commit()
+
 
     def generate_hashes_celery(self):
+        """
+        Collect images from the database without a hash.  Batch them into 100 posts and submit to celery to have
+        hashes created
+        """
         while True:
             #TODO - Cleanup
             posts = []
-            with self.uowm.start() as uow:
-                posts = uow.posts.find_all_by_hash(None, limit=100)
+            try:
+                with self.uowm.start() as uow:
+                    posts = uow.posts.find_all_by_hash(None, limit=150)
 
-            jobs = []
-            for post in posts:
-                jobs.append(image_hash.s({'url': post.url, 'post_id': post.post_id, 'hash': None}))
+                jobs = []
+                for post in posts:
+                    jobs.append(image_hash.s({'url': post.url, 'post_id': post.post_id, 'hash': None, 'delete': False}))
 
-            job = group(jobs)
-            log.debug('Starting Celery job with 100 images')
-            image_hash.delay({'url': posts[0].url})
-            result = job.apply_async().join()
-            with self.uowm.start() as uow:
-                log.debug('Saving celery results to database')
+                job = group(jobs)
+                log.debug('Starting Celery job with 100 images')
+                pending_result = job.apply_async()
+                while pending_result.waiting():
+                    log.info('Not all tasks done')
+                    time.sleep(1)
+
+                result = pending_result.join_native()
                 for r in result:
-                    p = uow.posts.get_by_post_id(r['post_id'])
-                    if p:
-                        p.image_hash = r['hash']
-                        uow.commit()
+                    self.hash_save_queue.put(r)
+
+
+            except Exception as e:
+                print("")
+
+
+    def process_hash_queue(self):
+        while True:
+            results = []
+            while len(results) < 150:
+                try:
+                    results.append(self.hash_save_queue.get())
+                except Exception as e:
+                    log.exception('Exceptoin with hash queue', exc_info=True)
+                    continue
+
+            log.info('Flushing hash queue to database')
+
+            with self.uowm.start() as uow:
+                # TODO - Find a cleaner way to deal with this
+                for result in results:
+                    post = uow.posts.get_by_post_id(result['post_id'])
+                    if not post:
+                        continue
+                    if result['delete']:
+                        log.info('TASK RESULT: Deleting Post %s', result['post_id'])
+                        uow.posts.remove(post)
+                    else:
+                        log.info('TASK RESULT: Saving Post %s', result['post_id'])
+                        post.image_hash = result['hash']
+                    uow.commit()
 
     def find_all_occurrences(self, submission: Submission):
         """
@@ -98,6 +135,9 @@ class ImageRepostProcessing:
 
 
     def clear_deleted_images(self):
+        """
+        Cleanup images in database that have been deleted by the poster
+        """
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_type('image')
@@ -110,6 +150,7 @@ class ImageRepostProcessing:
                             uow.posts.remove(post)
                             uow.commit()
                     except Exception as e:
+                        log.exception('Exception with deleted image cleanup', exc_info=True)
                         print('')
 
     def process_reposts(self):
@@ -117,7 +158,7 @@ class ImageRepostProcessing:
             with self.uowm.start() as uow:
                 unchecked_posts = uow.posts.find_all_by_repost_check(False, limit=100)
                 self.existing_images = uow.posts.find_all_images_with_hash()
-
+                # TODO - Deal with crosspost
                 log.info('Building VP Tree with %s objects', len(self.existing_images))
                 tree = VPTree(self.existing_images, lambda x,y: hamming(x,y))
                 for repost in unchecked_posts:
@@ -127,18 +168,22 @@ class ImageRepostProcessing:
 
                     if len(r) == 1:
                         continue
-                    results = [x for x in r if x[0] < 10 and x[1].post_id != repost.post_id and x[1].crosspost_parent is None ]
+                    results = [x for x in r if x[0] < 10 and x[1].post_id != repost.post_id and x[1].crosspost_parent is None and repost.author != x[1].author]
                     if len(results) > 0:
                         print('Original: http://reddit.com' + repost.perma_link)
                         oldest = None
                         for i in results:
                             if oldest:
-                                if oldest.created_at < i[1].created_at:
+                                if i[1].created_at < oldest.created_at:
                                     oldest = i[1]
                             else:
-                                  if i[1].created_at < repost.created_at:
-                                      oldest = i[1]
+                                if i[1].created_at < repost.created_at:
+                                    oldest = i[1]
                         if oldest is not None:
-                            log.info('Found Repost.  http://reddit.com%s is a repost of http://reddit.com%s', repost.perma_link, oldest.perma_link)
+                            log.info('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at), repost.perma_link)
+                            log.info('Oldest Post - %s - (%s): http://reddit.com%s', oldest.post_id, str(oldest.created_at), oldest.perma_link)
+                            for p in results:
+                                log.info('%s - %s: http://reddit.com/%s', p[1].post_id, str(p[1].created_at), p[1].perma_link)
+                            #log.info('Found Repost.  http://reddit.com%s is a repost of http://reddit.com%s', repost.perma_link, oldest.perma_link)
                             repost.repost_of = oldest.id
                 uow.commit()
