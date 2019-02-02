@@ -2,7 +2,7 @@ import os
 
 from sqlalchemy import create_engine
 
-db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format(os.getenv('DB_USER'),
-                                                                   os.getenv('DB_PASS'),
-                                                                   os.getenv('DB_HOST'),
+db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format("dev",
+                                                                   "@Password",
+                                                                   "192.168.1.198",
                                                                    'reddit'))

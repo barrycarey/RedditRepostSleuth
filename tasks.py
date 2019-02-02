@@ -4,7 +4,7 @@ from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_d
 
 
 @celery.task
-def image_hash(data):
+def image_hash2(data):
     try:
         img = generate_img_by_url(data['url'])
         data['hash'] = generate_dhash(img)

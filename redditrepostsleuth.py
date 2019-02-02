@@ -2,11 +2,7 @@ import argparse
 import threading
 from time import sleep
 
-import praw
-import os
-
-from sqlalchemy import create_engine
-
+from redditrepostsleuth.common.config import reddit
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -25,20 +21,14 @@ if __name__ == '__main__':
     parser.add_argument('--deleted', action='store_true', help='Enables agent that that prunes deleted posts')
     args = parser.parse_args()
 
-    reddit = praw.Reddit(
-        client_id=os.getenv('redditclientid'),
-        client_secret=os.getenv('redditsecret'),
-        password=os.getenv('redditpass'),
-        user_agent='testscript by /u/fakebot3',
-        username=os.getenv('reddituser')
-    )
+
 
 
     if args.ingest:
         log.info('Starting Ingest Agent')
         ingest = PostIngest(reddit, SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
-        threading.Thread(target=ingest._flush_submission_queue, name='Flush Ingest').start()
+        threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
     hashing = None
     if args.repost:

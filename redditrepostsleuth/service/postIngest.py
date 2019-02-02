@@ -51,23 +51,26 @@ class PostIngest:
         """
         while True:
             submissions = []
-            while len(submissions) <= 100:
-                try:
-                    submissions.append(self.submission_queue.get())
-                except Exception as e:
-                    log.exception('Problem getting post from queue.', exc_info=True)
-                    break
+            try:
+                while len(submissions) <= 300:
+                    try:
+                        submissions.append(self.submission_queue.get())
+                    except Exception as e:
+                        log.exception('Problem getting post from queue.', exc_info=True)
+                        break
 
-            if not submissions:
-                continue
+                if not submissions:
+                    continue
 
-            log.debug('Flush queue to database')
-            with self.uowm.start() as uow:
-                unique_subs = [sub for sub in submissions if uow.posts.get_by_post_id(sub.id) is None]
-                posts = [submission_to_post(sub) for sub in unique_subs]
-                log.info('Commiting %s unique posts to database', len(unique_subs))
-                uow.posts.bulk_save(posts)
-                uow.commit()
+                log.debug('Flush queue to database')
+                with self.uowm.start() as uow:
+                    unique_subs = [sub for sub in submissions if uow.posts.get_by_post_id(sub.id) is None]
+                    posts = [submission_to_post(sub) for sub in unique_subs]
+                    log.info('Commiting %s unique posts to database', len(unique_subs))
+                    uow.posts.bulk_save(posts)
+                    uow.commit()
+            except Exception as e:
+                print("")
 
     def _flush_submission_queue_test(self):
         """
@@ -89,8 +92,14 @@ class PostIngest:
 
             if not submissions:
                 continue
+            """
+            jobs = [save_new_post.s(sub) for sub in submissions]
+            log.debug('Saving 100 submissions with celery')
+            job = group(jobs)
+            job.apply_async()
+            """
 
-            jobs = [save_new_post.s(sub.id, self.reddit) for sub in submissions]
+            jobs = [save_new_post.s(sub.id) for sub in submissions]
             log.debug('Saving 100 submissions with celery')
             job = group(jobs)
             job.apply_async()

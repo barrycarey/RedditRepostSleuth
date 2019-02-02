@@ -1,6 +1,7 @@
 from celery import Task
 
 from redditrepostsleuth.celery import celery
+from redditrepostsleuth.common.config import reddit
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -25,7 +26,7 @@ class SqlAlchemyTask(Task):
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True)
-def save_new_post(self, sub_id, reddit):
+def save_new_post(self, sub_id):
     sub = reddit.submission(id=sub_id)
     if not sub:
         print('No submission found')
