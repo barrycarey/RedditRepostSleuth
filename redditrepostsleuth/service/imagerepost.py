@@ -1,13 +1,10 @@
 import time
 from queue import Queue
-from typing import List
-
+from typing import List, Tuple
 
 import requests
 from celery import group
-
 from distance import hamming
-from praw import Reddit
 from praw.models import Submission
 
 from redditrepostsleuth.celery import image_hash
@@ -17,7 +14,7 @@ from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.repostresponse import RepostResponse
 from redditrepostsleuth.util import submission_to_post
-from redditrepostsleuth.util.imagehashing import generate_img_by_post, generate_dhash, find_matching_images_in_vp_tree, \
+from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
     find_matching_images, generate_img_by_url
 from redditrepostsleuth.util.vptree import VPTree
 
@@ -70,7 +67,7 @@ class ImageRepostProcessing:
                 try:
                     results.append(self.hash_save_queue.get())
                 except Exception as e:
-                    log.exception('Exceptoin with hash queue', exc_info=True)
+                    log.exception('Exception with hash queue', exc_info=True)
                     continue
 
             log.info('Flushing hash queue to database')
@@ -82,10 +79,10 @@ class ImageRepostProcessing:
                     if not post:
                         continue
                     if result['delete']:
-                        log.info('TASK RESULT: Deleting Post %s', result['post_id'])
+                        log.debug('TASK RESULT: Deleting Post %s', result['post_id'])
                         uow.posts.remove(post)
                     else:
-                        log.info('TASK RESULT: Saving Post %s', result['post_id'])
+                        log.debug('TASK RESULT: Saving Post %s', result['post_id'])
                         post.image_hash = result['hash']
                     uow.commit()
 
@@ -114,10 +111,8 @@ class ImageRepostProcessing:
                 uow.commit()
 
             return RepostResponse(message='I found {} occurrences of this image'.format(len(occurrences)),
-                                  occurrences=occurrences,
+                                  occurrences=self._sort_reposts(occurrences),
                                   posts_checked=len(existing_images))
-
-
 
     def clear_deleted_images(self):
         """
@@ -150,29 +145,36 @@ class ImageRepostProcessing:
                 for repost in unchecked_posts:
                     print('Checking Hash: ' + repost.image_hash)
                     repost.checked_repost = True
-                    r = find_matching_images_in_vp_tree(tree, repost.image_hash)
+                    r = find_matching_images_in_vp_tree(tree, repost.image_hash, hamming_distance=10)
 
                     if len(r) == 1:
                         continue
-                    results = [x for x in r if x[0] < 10 and x[1].post_id != repost.post_id and x[1].crosspost_parent is None and repost.author != x[1].author]
+
+                    results = self._filter_matching_images(r, repost)
+                    results = self._clean_reposts(results)
                     if len(results) > 0:
                         print('Original: http://reddit.com' + repost.perma_link)
-                        oldest = None
-                        for i in results:
-                            if oldest:
-                                if i[1].created_at < oldest.created_at:
-                                    oldest = i[1]
-                            else:
-                                if i[1].created_at < repost.created_at:
-                                    oldest = i[1]
-                        if oldest is not None:
-                            log.info('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at), repost.perma_link)
-                            log.info('Oldest Post - %s - (%s): http://reddit.com%s', oldest.post_id, str(oldest.created_at), oldest.perma_link)
-                            for p in results:
-                                log.info('%s - %s: http://reddit.com/%s', p[1].post_id, str(p[1].created_at), p[1].perma_link)
-                            #log.info('Found Repost.  http://reddit.com%s is a repost of http://reddit.com%s', repost.perma_link, oldest.perma_link)
-                            repost.repost_of = oldest.id
-                uow.commit()
+
+                        log.info('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at), repost.perma_link)
+                        log.info('Oldest Post - %s - (%s): http://reddit.com%s', results[0].post_id, str(results[0].created_at), results[0].perma_link)
+                        for p in results:
+                            log.info('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
+
+                        repost.repost_of = results[0].id
+                    uow.commit()
+
+    def _filter_matching_images(self, raw_list: List[Tuple[int, Post]], post_being_checked: Post) -> List[Post]:
+        """
+        Take a raw list if matched images.  Filter one ones meeting the following criteria.
+            Same Author as post being checked - Gets rid of people posting to multiple subreddits
+            If it has a crosspost parent - A cross post isn't considered a respost
+            Same post ID as post being checked - The image list will contain the original image being checked
+        :param raw_list: List of all matches
+        :param post_being_checked: The posts we're checking is a repost
+        """
+        # TODO - Clean this up
+        return [x[1] for x in raw_list if x[1].post_id != post_being_checked.post_id and x[1].crosspost_parent is None and post_being_checked.author != x[1].author]
+
 
     def _handle_reposts(self, post: List[Post]) -> List[Post]:
         """
