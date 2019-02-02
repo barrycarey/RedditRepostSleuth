@@ -1,16 +1,20 @@
 import time
 from queue import Queue
+from typing import List
+
 
 import requests
 from celery import group
 
 from distance import hamming
+from praw import Reddit
 from praw.models import Submission
 
 from redditrepostsleuth.celery import image_hash
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.repostresponse import RepostResponse
 from redditrepostsleuth.util import submission_to_post
 from redditrepostsleuth.util.imagehashing import generate_img_by_post, generate_dhash, find_matching_images_in_vp_tree, \
@@ -24,26 +28,6 @@ class ImageRepostProcessing:
         self.uowm = uowm
         self.existing_images = [] # Maintain a list of existing images im memory
         self.hash_save_queue = Queue(maxsize=0)
-
-    def generate_hashes(self):
-        """
-        Load images without a hash from the database and create hashes
-        """
-
-        while True:
-            with self.uowm.start() as uow:
-                posts = uow.posts.find_all_by_hash(None, limit=200)
-                log.info('Loaded %s images without hashes', len(posts))
-                for post in posts:
-
-                    try:
-                        img = generate_img_by_post(post)
-                        post.image_hash = generate_dhash(img)
-                    except ImageConversioinException as e:
-                        # TODO - Check Pillow for updates to this PNG conversion issue
-                        log.error('PIL error when converting image')
-                        uow.posts.remove(post)
-                    uow.commit()
 
 
     def generate_hashes_celery(self):
@@ -75,7 +59,8 @@ class ImageRepostProcessing:
 
 
             except Exception as e:
-                print("")
+                # TODO - Temp wide exception to catch any faults
+                log.exception('Error processing celery jobs', exc_info=True)
 
 
     def process_hash_queue(self):
@@ -138,6 +123,7 @@ class ImageRepostProcessing:
         """
         Cleanup images in database that have been deleted by the poster
         """
+        # TODO - Move it single function
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_type('image')
@@ -187,3 +173,28 @@ class ImageRepostProcessing:
                             #log.info('Found Repost.  http://reddit.com%s is a repost of http://reddit.com%s', repost.perma_link, oldest.perma_link)
                             repost.repost_of = oldest.id
                 uow.commit()
+
+    def _handle_reposts(self, post: List[Post]) -> List[Post]:
+        """
+        Take a list of reposts and process them
+        :param post: List of Posts
+        """
+        pass
+
+
+    def _clean_reposts(self, posts: List[Post]) -> List[Post]:
+        """
+        Take a list of reposts, remove any cross posts and deleted posts
+        :param posts: List of posts
+        """
+        posts = [post for post in posts if post.crosspost_parent is None]
+        posts = self._sort_reposts(posts)
+        return posts
+
+
+    def _sort_reposts(self, posts: List[Post], reverse=False) -> List[Post]:
+        """
+        Take a list of reposts and sort them by date
+        :param posts:
+        """
+        return sorted(posts, key=lambda x: x.created_at, reverse=reverse)
