@@ -6,6 +6,7 @@ from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
+from redditrepostsleuth.celery.tasks import save_new_post
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -27,7 +28,6 @@ class PostIngest:
 
     def ingest_new_posts(self):
         sr = self.reddit.subreddit('all')
-        submission_queue = []
         try:
             while True:
                 try:
@@ -37,12 +37,7 @@ class PostIngest:
                     pass
         except Exception as e:
             log.exception('INGEST THREAD DIED', exc_info=True)
-            """
-            submission_queue.append(submission)
-            if len(submission_queue) >= 25:
-                self._flush_submission_queue(submission_queue)
-                submission_queue.clear()
-            """
+
 
     def _flush_submission_queue(self):
         """
@@ -72,6 +67,31 @@ class PostIngest:
                 log.info('Commiting %s unique posts to database', len(unique_subs))
                 uow.posts.bulk_save(posts)
                 uow.commit()
+
+    def _flush_submission_queue_test(self):
+        """
+        with self.uowm.start() as uow:
+            unique_subs = [sub for sub in submissions if uow.posts.get_by_post_id(sub.id) is None]
+            posts = [submission_to_post(sub) for sub in unique_subs]
+            log.info('Commiting %s unique posts to database', len(unique_subs))
+            uow.posts.bulk_save(posts)
+            uow.commit()
+        """
+        while True:
+            submissions = []
+            while len(submissions) <= 100:
+                try:
+                    submissions.append(self.submission_queue.get())
+                except Exception as e:
+                    log.exception('Problem getting post from queue.', exc_info=True)
+                    break
+
+            if not submissions:
+                continue
+
+            for sub in submissions:
+                save_new_post(sub)
+
 
 
     def store_post(self, reddit_post: Submission):

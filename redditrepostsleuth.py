@@ -8,6 +8,7 @@ import os
 from sqlalchemy import create_engine
 
 from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
@@ -32,10 +33,6 @@ if __name__ == '__main__':
         username=os.getenv('reddituser')
     )
 
-    db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format(os.getenv('DB_USER'),
-                                                                   os.getenv('DB_PASS'),
-                                                                   os.getenv('DB_HOST'),
-                                                                   'reddit'))
 
     if args.ingest:
         log.info('Starting Ingest Agent')

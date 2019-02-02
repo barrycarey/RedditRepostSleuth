@@ -30,13 +30,12 @@ def submission_to_post(submission: Submission) -> Post:
             print('Missing Post Hint')
 
     # TODO - Do this lookup at time of checking reposts.  It's slow and slows down ingest
-    """
+
     try:
         post.crosspost_parent = submission.crosspost_parent
     except AttributeError as e:
         pass
 
-    """
 
     return post
 
