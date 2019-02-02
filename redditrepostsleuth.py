@@ -22,19 +22,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-
-
     if args.ingest:
         log.info('Starting Ingest Agent')
         ingest = PostIngest(reddit, SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
+        #threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
         threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
     hashing = None
-    if args.repost:
-        log.info('Starting Repost Agent')
+    if args.imagehashing:
+        log.info('Starting Hashing Agent')
         hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
-        hashing.process_reposts()
+        threading.Thread(target=hashing.generate_hashes_celery, name="Hashing").start()
+        threading.Thread(target=hashing.process_hash_queue, name="HashingFlush").start()
 
 
     if args.deleted:

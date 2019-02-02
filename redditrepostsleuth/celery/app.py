@@ -11,6 +11,8 @@ celery = Celery('tasks', backend='redis://user:@Password@192.168.1.198:6379/0',
              broker='redis://user:@Password@192.168.1.198:6379/0',
              )
 
+celery.conf.accept_content = ['pickle', 'json']
+
 
 if __name__ == '__main__':
     celery.start()

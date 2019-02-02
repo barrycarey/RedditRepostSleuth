@@ -1,11 +1,12 @@
 from celery import Task
+from praw.models import Submission
 
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.config import reddit
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.util import submission_to_post
+from redditrepostsleuth.util import submission_to_post, postdto_to_post
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash
 
 
@@ -25,13 +26,27 @@ class SqlAlchemyTask(Task):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
 
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
+def save_new_post(self, postdto):
+    #post = postdto_to_post(postdto)
+    with self.uowm.start() as uow:
+        uow.posts.add(postdto)
+        uow.commit()
+
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True)
-def save_new_post(self, sub_id):
+def update_cross_post_parent(self, sub_id):
     sub = reddit.submission(id=sub_id)
     if not sub:
         print('No submission found')
         return
-    post = submission_to_post(sub)
+
     with self.uowm.start() as uow:
-        uow.posts.add(post)
-        uow.commit()
+        post = uow.posts.get_by_post_id(sub.id)
+        if post:
+            try:
+                post.crosspost_parent = sub.crosspost_parent
+            except AttributeError as e:
+                pass
+            post.crosspost_checked = True
+            uow.commit()
+

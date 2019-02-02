@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from queue import Queue
 from typing import List
@@ -7,11 +8,11 @@ from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
-from redditrepostsleuth.celery.tasks import save_new_post
+from redditrepostsleuth.celery.tasks import save_new_post, update_cross_post_parent
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.util import submission_to_post
+from redditrepostsleuth.util import submission_to_post, submission_to_postdto
 
 
 class PostIngest:
@@ -85,10 +86,14 @@ class PostIngest:
             submissions = []
             while len(submissions) <= 100:
                 try:
-                    submissions.append(self.submission_queue.get())
+                    log.debug('Ingest Queue Size: %s', self.submission_queue.qsize())
+                    sub = self.submission_queue.get()
+                    save_new_post.delay(submission_to_post(sub))
+                    #save_new_post.delay(submission_to_postdto(sub))
+                    #submissions.append(self.submission_queue.get())
                 except Exception as e:
                     log.exception('Problem getting post from queue.', exc_info=True)
-                    break
+                    continue
 
             if not submissions:
                 continue
@@ -98,12 +103,26 @@ class PostIngest:
             job = group(jobs)
             job.apply_async()
             """
-
-            jobs = [save_new_post.s(sub.id) for sub in submissions]
-            log.debug('Saving 100 submissions with celery')
+            posts = [submission_to_postdto(sub) for sub in submissions]
+            jobs = [save_new_post.s(post) for post in posts]
+            log.debug('Saving 50 submissions with celery')
             job = group(jobs)
             job.apply_async()
 
+
+    def check_cross_posts(self):
+        """
+        Due to how slow pulling cross post parent is this method runs in a thread to update them in the database
+        :return:
+        """
+        while True:
+            with self.uowm.start() as uow:
+                posts = uow.posts.find_all_unchecked_crosspost(limit=100)
+                jobs = [update_cross_post_parent.s(post.post_id) for post in posts]
+                log.debug('Starting 200 cross post check tasks')
+                job = group(jobs)
+                job.apply_async()
+            time.sleep(30)
 
 
     def store_post(self, reddit_post: Submission):

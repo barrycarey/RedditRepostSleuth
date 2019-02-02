@@ -4,6 +4,7 @@ from urllib import request
 from urllib.error import HTTPError
 
 from PIL import Image
+from PIL.Image import DecompressionBombError
 from distance import hamming
 
 from redditrepostsleuth.common.exception import ImageConversioinException
@@ -39,7 +40,7 @@ def generate_img_by_url(url: str) -> Image:
     try:
         response = request.urlopen(req, timeout=10)
         img = Image.open(BytesIO(response.read()))
-    except (HTTPError, ConnectionError, OSError) as e:
+    except (HTTPError, ConnectionError, OSError, DecompressionBombError) as e:
         log.error('Failed to convert image %s. Error: %s ', url, str(e))
         raise ImageConversioinException(str(e))
 

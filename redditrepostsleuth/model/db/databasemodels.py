@@ -27,7 +27,7 @@ class Post(Base):
     repost_of = Column(Integer)
     image_hash = Column(String(64))
     checked_repost = Column(Boolean, default=False)
-    cross_post_checked = Column(Boolean, default=False)
+    crosspost_checked = Column(Boolean, default=False)
 
 class Summons(Base):
 
