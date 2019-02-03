@@ -41,7 +41,7 @@ def generate_img_by_url(url: str) -> Image:
         response = request.urlopen(req, timeout=10)
         img = Image.open(BytesIO(response.read()))
     except (HTTPError, ConnectionError, OSError, DecompressionBombError) as e:
-        log.error('Failed to convert image %s. Error: %s ', url, str(e))
+        #log.error('Failed to convert image %s. Error: %s ', url, str(e))
         raise ImageConversioinException(str(e))
 
     return img if img else None
@@ -52,7 +52,7 @@ def generate_dhash(img: Image, hash_size: int = 16) -> str:
     try:
         image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
     except (TypeError, OSError, AttributeError) as e:
-        log.error('Problem creating image hash for image.  Error: %s', str(e))
+        #log.error('Problem creating image hash for image.  Error: %s', str(e))
         raise ImageConversioinException(str(e))
 
     pixels = list(image.getdata())

@@ -1,11 +1,12 @@
 from celery import Task
-
+from datetime import datetime
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.config import reddit
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash
+from redditrepostsleuth.service.CachedVpTree import CashedVpTree
+from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree
 
 
 @celery.task
@@ -22,6 +23,17 @@ class SqlAlchemyTask(Task):
 
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
+
+class VpTreeTask(Task):
+    def __init__(self):
+        self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
+        self.vptree_cache = CashedVpTree(self.uowm)
+
+
+@celery.task(bind=True, base=VpTreeTask, serializer='pickle')
+def find_matching_images_task(self, hash):
+    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash)
+    return hash
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')

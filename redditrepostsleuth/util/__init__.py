@@ -5,6 +5,7 @@ from prawcore import Forbidden
 
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.postdto import PostDto
 
 
@@ -79,3 +80,9 @@ def postdto_to_post(postdto: PostDto):
     post.checked_repost = postdto.checked_repost
     post.crosspost_checked = postdto.crosspost_checked
     return post
+
+def post_to_hashwrapper(post: Post):
+    wrapper = HashWrapper()
+    wrapper.post_id = post.id
+    wrapper.image_hash = post.image_hash
+    return wrapper

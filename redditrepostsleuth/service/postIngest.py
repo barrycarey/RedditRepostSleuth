@@ -42,6 +42,7 @@ class PostIngest:
 
 
     def _flush_submission_queue(self):
+        # TODO - Not used I don't think
         """
         with self.uowm.start() as uow:
             unique_subs = [sub for sub in submissions if uow.posts.get_by_post_id(sub.id) is None]

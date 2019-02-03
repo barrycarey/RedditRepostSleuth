@@ -2,7 +2,7 @@
 import numpy as np
 
 from redditrepostsleuth.common.logging import log
-
+from datetime import datetime
 
 class VPTree:
     """ VP-Tree data structure for efficient nearest neighbor search.
@@ -31,6 +31,7 @@ class VPTree:
         self.right_min = np.inf
         self.right_max = 0
         self.dist_fn = dist_fn
+        self.built_at = datetime.now()
 
         if not len(points):
             raise ValueError('Points can not be empty.')

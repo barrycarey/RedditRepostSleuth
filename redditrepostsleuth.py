@@ -1,4 +1,5 @@
 import argparse
+import sys
 import threading
 from time import sleep
 
@@ -10,6 +11,8 @@ from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 from redditrepostsleuth.service.postIngest import PostIngest
 from redditrepostsleuth.service.repostrequestservice import RepostRequestService
+
+sys.setrecursionlimit(2500)
 
 if __name__ == '__main__':
 
@@ -40,7 +43,8 @@ if __name__ == '__main__':
         log.info('Starting Repost Agent')
         if hashing is None:
             hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
-        threading.Thread(target=hashing.process_reposts, name='Repost').start()
+        threading.Thread(target=hashing.process_repost_celery, name='Repost').start()
+        threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
 
     if args.deleted:
         if hashing is None:

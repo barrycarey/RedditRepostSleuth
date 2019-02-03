@@ -7,6 +7,7 @@ from datetime import datetime
 from praw.models import Submission, Comment
 
 from redditrepostsleuth.celery.tasks import save_new_comment
+from redditrepostsleuth.config import config
 from redditrepostsleuth.model.db.databasemodels import Comment as DbComment
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -28,7 +29,7 @@ class CommentMonitor:
             if comment is None:
                 continue
             #log.info('COMMENT %s: %s', datetime.fromtimestamp(comment.created_utc), comment.body)
-            if re.search('!repost', comment.body, re.IGNORECASE):
+            if re.search(config.summon_command, comment.body, re.IGNORECASE):
                 log.debug('Got a summons!')
                 with self.uowm.start() as uow:
                     if not uow.summons.get_by_comment_id(comment.id):
@@ -48,7 +49,7 @@ class CommentMonitor:
         if response.status == 'error':
             comment.reply(response.message)
         else:
-            reply = 'This content has been seen {} times. \n'.format(str(len(response.occurrences)))
+            reply = 'This image has been seen {} times. \n'.format(str(len(response.occurrences)))
             for post in response.occurrences:
                 reply += 'https://reddit.com' + post.perma_link
             comment.reply(reply)

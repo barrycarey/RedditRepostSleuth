@@ -8,11 +8,13 @@ from distance import hamming
 from praw.models import Submission
 
 from redditrepostsleuth.celery import image_hash
+from redditrepostsleuth.celery.tasks import find_matching_images_task
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.repostresponse import RepostResponse
+from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.util import submission_to_post
 from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
     find_matching_images, generate_img_by_url
@@ -21,10 +23,12 @@ from redditrepostsleuth.util.vptree import VPTree
 
 class ImageRepostProcessing:
 
-    def __init__(self, uowm: UnitOfWorkManager) -> None:
+    def __init__(self, uowm: UnitOfWorkManager, ) -> None:
         self.uowm = uowm
         self.existing_images = [] # Maintain a list of existing images im memory
         self.hash_save_queue = Queue(maxsize=0)
+        self.repost_queue = Queue(maxsize=0)
+        self.vptree_cache = CashedVpTree(uowm)
 
 
     def generate_hashes_celery(self):
@@ -101,6 +105,7 @@ class ImageRepostProcessing:
         with self.uowm.start() as uow:
             existing_images = uow.posts.find_all_images_with_hash()
             occurrences = find_matching_images(existing_images, image_hash)
+            occurrences = self._sort_reposts(occurrences)
 
             # Save this submission to database if it's not already there
             if not uow.posts.get_by_post_id(submission.id):
@@ -110,7 +115,7 @@ class ImageRepostProcessing:
                 uow.posts.add(post)
                 uow.commit()
 
-            return RepostResponse(message='I found {} occurrences of this image'.format(len(occurrences)),
+            return RepostResponse(message='I\'ve seen this image {} times.  \n\n The first time I saw it was here: https://www.reddit.com{}'.format(len(occurrences), occurrences[0].perma_link),
                                   occurrences=self._sort_reposts(occurrences),
                                   posts_checked=len(existing_images))
 
@@ -141,11 +146,10 @@ class ImageRepostProcessing:
         while True:
             with self.uowm.start() as uow:
                 unchecked_posts = uow.posts.find_all_by_repost_check(False, limit=100)
-                self.existing_images = uow.posts.find_all_images_with_hash()
-                # TODO - Deal with crosspost
-                log.info('Building VP Tree with %s objects', len(self.existing_images))
-                tree = VPTree(self.existing_images, lambda x,y: hamming(x,y))
+
+
                 for repost in unchecked_posts:
+                    tree = self.vptree_cache.get_tree
                     print('Checking Hash: ' + repost.image_hash)
                     repost.checked_repost = True
                     r = find_matching_images_in_vp_tree(tree, repost.image_hash, hamming_distance=10)
@@ -158,13 +162,52 @@ class ImageRepostProcessing:
                     if len(results) > 0:
                         print('Original: http://reddit.com' + repost.perma_link)
 
-                        log.info('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at), repost.perma_link)
-                        log.info('Oldest Post - %s - (%s): http://reddit.com%s', results[0].post_id, str(results[0].created_at), results[0].perma_link)
+                        log.error('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at), repost.perma_link)
+                        log.error('Oldest Post - %s - (%s): http://reddit.com%s', results[0].post_id, str(results[0].created_at), results[0].perma_link)
                         for p in results:
-                            log.info('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
+                            log.error('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
 
                         repost.repost_of = results[0].id
                     uow.commit()
+
+    def process_repost_celery(self):
+        offset = 0
+        limit = 10
+        while True:
+            with self.uowm.start() as uow:
+                posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
+                jobs = [find_matching_images_task.s(post.image_hash) for post in posts]
+                job = group(jobs)
+                pending_result = job.apply_async()
+                while pending_result.waiting():
+                    time.sleep(.2)
+                results = pending_result.join_native()
+                offset += limit
+                for r in results:
+                    self.repost_queue.put(r)
+                print('')
+
+    def process_repost_queue(self):
+        while True:
+            hash = None
+            try:
+                hash = self.repost_queue.get()
+            except Exception as e:
+                log.exception('Exception with hash queue', exc_info=True)
+                continue
+
+            if not hash:
+                continue
+
+            if not hash.occurances:
+                continue
+
+            with self.uowm.start() as uow:
+                post = uow.posts.get_by_post_id(hash.post_id)
+                if not post:
+                    log.error('Cannot find post with ID %s', hash.post_id)
+                    continue
+                post.ha
 
     def _filter_matching_images(self, raw_list: List[Tuple[int, Post]], post_being_checked: Post) -> List[Post]:
         """

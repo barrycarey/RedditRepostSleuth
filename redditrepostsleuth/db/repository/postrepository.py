@@ -29,14 +29,14 @@ class PostRepository:
     def find_all_by_type(self, post_type: str, limit: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.post_type == post_type).limit(limit).all()
 
-    def find_all_by_repost_check(self, repost_check: bool, limit: int = None):
-        return self.db_session.query(Post).filter(Post.checked_repost == False, Post.post_type == 'image', Post.image_hash != None).order_by(Post.created_at.desc()).limit(limit).all()
+    def find_all_by_repost_check(self, repost_check: bool, limit: int = None, offset: int = None):
+        return self.db_session.query(Post).filter(Post.checked_repost == False, Post.post_type == 'image', Post.image_hash != None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
     def find_all_older_posts(self, created: DateTime):
         return self.db_session.query(Post).filter(Post.created_at < created, Post.post_type == 'image').order_by(Post.created_at.desc()).all()
 
-    def find_all_images_with_hash(self):
-        return self.db_session.query(Post).filter(Post.image_hash != None).all()
+    def find_all_images_with_hash(self, limit: int = None, offset: int = None):
+        return self.db_session.query(Post).filter(Post.image_hash != None).offset(offset).limit(limit).all()
 
     def find_all_unchecked_crosspost(self, limit: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.crosspost_parent == None, Post.crosspost_checked == False).limit(limit).all()
