@@ -177,14 +177,17 @@ class ImageRepostProcessing:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
                 cleaned_posts = [post_to_hashwrapper(post) for post in posts]
+                r = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, cleaned_posts[0].image_hash)
                 jobs = [find_matching_images_task.s(post) for post in cleaned_posts]
                 job = group(jobs)
                 pending_result = job.apply_async()
                 while pending_result.waiting():
+                    log.info('Results not done')
                     time.sleep(.2)
                 results = pending_result.join_native()
                 offset += limit
                 for r in results:
+
                     self.repost_queue.put(r)
                 print('')
 
