@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -48,5 +48,5 @@ class Comment(Base):
 
     id = Column(Integer, primary_key=True)
     comment_id = Column(String(100), nullable=False, unique=True)
-    body = Column(String(20000, collation='utf8mb4_general_ci'))
+    body = Column(Text(collation='utf8mb4_general_ci'))
     ingested_at = Column(DateTime, default=func.utc_timestamp())
