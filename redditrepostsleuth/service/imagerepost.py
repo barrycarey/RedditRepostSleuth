@@ -177,7 +177,7 @@ class ImageRepostProcessing:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
                 cleaned_posts = [post_to_hashwrapper(post) for post in posts]
-                jobs = [find_matching_images_task.s(post.image_hash) for post in cleaned_posts]
+                jobs = [find_matching_images_task.s(post) for post in cleaned_posts]
                 job = group(jobs)
                 pending_result = job.apply_async()
                 while pending_result.waiting():

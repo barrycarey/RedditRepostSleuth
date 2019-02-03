@@ -32,7 +32,7 @@ class VpTreeTask(Task):
 
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
 def find_matching_images_task(self, hash):
-    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash)
+    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash.image_hash)
     return hash
 
 
