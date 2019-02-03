@@ -15,7 +15,7 @@ from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.repostresponse import RepostResponse
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
-from redditrepostsleuth.util import submission_to_post
+from redditrepostsleuth.util import submission_to_post, post_to_hashwrapper
 from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
     find_matching_images, generate_img_by_url
 from redditrepostsleuth.util.vptree import VPTree
@@ -176,7 +176,8 @@ class ImageRepostProcessing:
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
-                jobs = [find_matching_images_task.s(post.image_hash) for post in posts]
+                cleaned_posts = [post_to_hashwrapper(post) for post in posts]
+                jobs = [find_matching_images_task.s(post.image_hash) for post in cleaned_posts]
                 job = group(jobs)
                 pending_result = job.apply_async()
                 while pending_result.waiting():
@@ -207,7 +208,7 @@ class ImageRepostProcessing:
                 if not post:
                     log.error('Cannot find post with ID %s', hash.post_id)
                     continue
-                post.ha
+
 
     def _filter_matching_images(self, raw_list: List[Tuple[int, Post]], post_being_checked: Post) -> List[Post]:
         """
