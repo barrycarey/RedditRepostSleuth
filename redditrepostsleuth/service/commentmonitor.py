@@ -1,10 +1,13 @@
 import re
+from queue import Queue
 
 from praw import Reddit
 from datetime import datetime
 
 from praw.models import Submission, Comment
 
+from redditrepostsleuth.celery.tasks import save_new_comment
+from redditrepostsleuth.model.db.databasemodels import Comment as DbComment
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons
@@ -18,6 +21,7 @@ class CommentMonitor:
         self.reddit = reddit
         self.uowm = uowm
         self.response_service = response_service
+        self.comment_queue = Queue(maxsize=0)
 
     def monitor_for_summons(self):
         for comment in self.reddit.subreddit('all').stream.comments():
@@ -48,3 +52,18 @@ class CommentMonitor:
             for post in response.occurrences:
                 reply += 'https://reddit.com' + post.perma_link
             comment.reply(reply)
+
+    def ingest_new_comments(self):
+        for comment in self.reddit.subreddit('all').stream.comments():
+            self.comment_queue.put(comment)
+
+    def process_comment_queue(self):
+        while True:
+            try:
+                log.debug('Comment Queue Size: %s', self.comment_queue.qsize())
+                com = self.comment_queue.get()
+                comment = DbComment(body=com.body, comment_id=com.id)
+                save_new_comment.delay(comment)
+            except Exception as e:
+                log.exception('Problem getting post from queue.', exc_info=True)
+                continue

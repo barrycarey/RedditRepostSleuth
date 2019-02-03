@@ -83,10 +83,8 @@ class PostIngest:
             uow.commit()
         """
         while True:
-            submissions = []
-
             try:
-                log.debug('Ingest Queue Size: %s', self.submission_queue.qsize())
+                #log.debug('Ingest Queue Size: %s', self.submission_queue.qsize())
                 sub = self.submission_queue.get()
                 save_new_post.delay(submission_to_post(sub))
             except Exception as e:

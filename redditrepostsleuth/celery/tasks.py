@@ -31,6 +31,12 @@ def save_new_post(self, postdto):
         uow.posts.add(postdto)
         uow.commit()
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
+def save_new_comment(self, comment):
+    with self.uowm.start() as uow:
+        uow.comments.add(comment)
+        uow.commit()
+
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True)
 def update_cross_post_parent(self, sub_id):
     sub = reddit.submission(id=sub_id)

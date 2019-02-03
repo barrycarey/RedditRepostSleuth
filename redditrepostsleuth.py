@@ -50,7 +50,9 @@ if __name__ == '__main__':
     if args.summons:
         repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
         comments = CommentMonitor(reddit, repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
-        threading.Thread(target=comments.monitor_for_summons).start()
+        #threading.Thread(target=comments.monitor_for_summons).start()
+        threading.Thread(target=comments.ingest_new_comments).start()
+        threading.Thread(target=comments.process_comment_queue).start()
 
 
     while True:

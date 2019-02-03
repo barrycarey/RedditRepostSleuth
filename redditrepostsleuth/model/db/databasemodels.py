@@ -15,14 +15,14 @@ class Post(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
-    url = Column(String(2000), nullable=False)
-    perma_link = Column(String(1000))
+    url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
+    perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type = Column(String(20))
     author = Column(String(100), nullable=False)
     created_at = Column(DateTime)
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(100), nullable=False)
-    title = Column(String(1000), nullable=False)
+    title = Column(String(1000, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(200))
     repost_of = Column(Integer)
     image_hash = Column(String(64))
@@ -41,3 +41,12 @@ class Summons(Base):
     comment_reply = Column(String(5000))
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
+
+class Comment(Base):
+
+    __tablename__ = 'reddit_comments'
+
+    id = Column(Integer, primary_key=True)
+    comment_id = Column(String(100), nullable=False, unique=True)
+    body = Column(String(20000, collation='utf8mb4_general_ci'))
+    ingested_at = Column(DateTime, default=func.utc_timestamp())

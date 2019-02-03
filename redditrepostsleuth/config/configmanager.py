@@ -7,6 +7,7 @@ class ConfigManager:
     def __init__(self, config):
 
         print('Loading config: ' + config)
+        print(os.getcwd())
 
         config_file = os.path.join(os.getcwd(), config)
         if os.path.isfile(config_file):
