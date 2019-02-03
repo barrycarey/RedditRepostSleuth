@@ -1,12 +1,10 @@
 from celery import Task
-from praw.models import Submission
 
 from redditrepostsleuth.celery import celery
-from redditrepostsleuth.common.config import reddit
+from redditrepostsleuth.config import reddit
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.util import submission_to_post, postdto_to_post
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash
 
 

@@ -84,30 +84,14 @@ class PostIngest:
         """
         while True:
             submissions = []
-            while len(submissions) <= 100:
-                try:
-                    log.debug('Ingest Queue Size: %s', self.submission_queue.qsize())
-                    sub = self.submission_queue.get()
-                    save_new_post.delay(submission_to_post(sub))
-                    #save_new_post.delay(submission_to_postdto(sub))
-                    #submissions.append(self.submission_queue.get())
-                except Exception as e:
-                    log.exception('Problem getting post from queue.', exc_info=True)
-                    continue
 
-            if not submissions:
+            try:
+                log.debug('Ingest Queue Size: %s', self.submission_queue.qsize())
+                sub = self.submission_queue.get()
+                save_new_post.delay(submission_to_post(sub))
+            except Exception as e:
+                log.exception('Problem getting post from queue.', exc_info=True)
                 continue
-            """
-            jobs = [save_new_post.s(sub) for sub in submissions]
-            log.debug('Saving 100 submissions with celery')
-            job = group(jobs)
-            job.apply_async()
-            """
-            posts = [submission_to_postdto(sub) for sub in submissions]
-            jobs = [save_new_post.s(post) for post in posts]
-            log.debug('Saving 50 submissions with celery')
-            job = group(jobs)
-            job.apply_async()
 
 
     def check_cross_posts(self):

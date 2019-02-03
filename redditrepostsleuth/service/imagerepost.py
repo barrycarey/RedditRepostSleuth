@@ -37,7 +37,7 @@ class ImageRepostProcessing:
             posts = []
             try:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_by_hash(None, limit=150)
+                    posts = uow.posts.find_all_by_hash(None, limit=250)
 
                 jobs = []
                 for post in posts:
@@ -63,7 +63,7 @@ class ImageRepostProcessing:
     def process_hash_queue(self):
         while True:
             results = []
-            while len(results) < 150:
+            while len(results) < 25:
                 try:
                     results.append(self.hash_save_queue.get())
                 except Exception as e:
@@ -71,7 +71,7 @@ class ImageRepostProcessing:
                     continue
 
             log.info('Flushing hash queue to database')
-
+            # TODO - Move this to celery worker side
             with self.uowm.start() as uow:
                 # TODO - Find a cleaner way to deal with this
                 for result in results:

@@ -2,7 +2,7 @@ import argparse
 import threading
 from time import sleep
 
-from redditrepostsleuth.common.config import reddit
+from redditrepostsleuth.config import reddit
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -26,7 +26,7 @@ if __name__ == '__main__':
         log.info('Starting Ingest Agent')
         ingest = PostIngest(reddit, SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
-        #threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
+        threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
         threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
     hashing = None
@@ -36,6 +36,11 @@ if __name__ == '__main__':
         threading.Thread(target=hashing.generate_hashes_celery, name="Hashing").start()
         threading.Thread(target=hashing.process_hash_queue, name="HashingFlush").start()
 
+    if args.repost:
+        log.info('Starting Repost Agent')
+        if hashing is None:
+            hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
+        threading.Thread(target=hashing.process_reposts, name='Repost').start()
 
     if args.deleted:
         if hashing is None:
