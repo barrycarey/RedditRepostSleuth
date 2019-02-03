@@ -23,31 +23,29 @@ class ConfigManager:
     def _load_config_values(self):
 
         # General
-        self.delay = self.config['GENERAL'].getint('Delay', fallback=2)
-        self.report_combined = self.config['GENERAL'].get('ReportCombined', fallback=True)
+        self.summon_command = self.config['GENERAL'].get('summon_command', fallback='!repost')
 
-        # InfluxDB
-        self.influx_address = self.config['INFLUXDB']['Address']
-        self.influx_port = self.config['INFLUXDB'].getint('Port', fallback=8086)
-        self.influx_database = self.config['INFLUXDB'].get('Database', fallback='plex_data')
-        self.influx_ssl = self.config['INFLUXDB'].getboolean('SSL', fallback=False)
-        self.influx_verify_ssl = self.config['INFLUXDB'].getboolean('Verify_SSL', fallback=True)
-        self.influx_user = self.config['INFLUXDB'].get('Username', fallback='')
-        self.influx_password = self.config['INFLUXDB'].get('Password', fallback='', raw=True)
+        # Database
+        self.db_host = self.config['DATABASE']['host']
+        self.db_port = self.config['DATABASE'].getint('port', fallback=3306)
+        self.db_name = self.config['DATABASE']['name']
+        self.db_user = self.config['DATABASE']['user']
+        self.db_password = self.config['DATABASE']['password']
 
-        # Plex
-        self.plex_user = self.config['PLEX']['Username']
-        self.plex_password = self.config['PLEX'].get('Password', raw=True)
-        plex_https = self.config['PLEX'].getboolean('HTTPS', fallback=False)
-        self.conn_security = 'https' if plex_https else 'http'
-        self.plex_verify_ssl = self.config['PLEX'].getboolean('Verify_SSL', fallback=False)
-        servers = len(self.config['PLEX']['Servers'])
 
         # Logging
-        self.logging_level = self.config['LOGGING']['Level'].upper()
+        self.log_level = self.config['LOGGING'].get('level', fallback='INFO').upper()
+        self.log_file = self.config['LOGGING']['log_file']
+        self.log_file_level = self.config['LOGGING']['log_file_level']
 
-        if servers:
-            self.plex_server_addresses = self.config['PLEX']['Servers'].replace(' ', '').split(',')
-        else:
-            print('ERROR: No Plex Servers Provided.  Aborting')
-            sys.exit(1)
+        # CELERY
+        self.celery_broker = self.config['CELERY']['broker']
+        self.celery_backend = self.config['CELERY']['backend']
+
+        # Reddit
+        self.reddit_praw_config = self.config['REDDIT'].getboolean('use_praw_config', fallback=False)
+        self.reddit_client_id = self.config['REDDIT']['client_id']
+        self.reddit_client_secret = self.config['REDDIT']['client_secret']
+        self.reddit_useragent = self.config['REDDIT']['useragent']
+        self.reddit_username = self.config['REDDIT']['username']
+        self.reddit_password = self.config['REDDIT']['password']

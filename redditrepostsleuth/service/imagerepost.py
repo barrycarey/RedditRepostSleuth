@@ -134,6 +134,9 @@ class ImageRepostProcessing:
                         log.exception('Exception with deleted image cleanup', exc_info=True)
                         print('')
 
+    def clear_deleted_images_celery(self):
+        pass
+
     def process_reposts(self):
         while True:
             with self.uowm.start() as uow:

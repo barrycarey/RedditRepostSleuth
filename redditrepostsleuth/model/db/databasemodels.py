@@ -28,6 +28,7 @@ class Post(Base):
     image_hash = Column(String(64))
     checked_repost = Column(Boolean, default=False)
     crosspost_checked = Column(Boolean, default=False)
+    last_deleted_check = Column(DateTime)
 
 class Summons(Base):
 
