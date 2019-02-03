@@ -27,7 +27,7 @@ class CashedVpTree:
         if self.tree_built_at is None or (datetime.now() - self.tree_built_at).seconds > 1800:
             log.info('Building New VPTree')
             with self.uowm.start() as uow:
-                existing_images = uow.posts.find_all_images_with_hash(limit=10000)
+                existing_images = uow.posts.find_all_images_with_hash()
                 log.info('Tree will be built with %s images', len(existing_images))
                 log.info('Recurssion Depth: %s', print(sys.getrecursionlimit()))
                 self.vp_tree = VPTree([post_to_hashwrapper(post) for post in existing_images], lambda x,y: hamming(x,y))
