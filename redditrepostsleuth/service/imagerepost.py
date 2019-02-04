@@ -187,8 +187,9 @@ class ImageRepostProcessing:
                 results = pending_result.join_native()
                 offset += limit
                 for r in results:
-                    self.repost_queue.put(r)
-                print('')
+                    if len(r.occurances) > 1:
+                        self.repost_queue.put(r)
+
 
     def process_repost_queue(self):
         while True:
@@ -202,15 +203,24 @@ class ImageRepostProcessing:
             if not hash:
                 continue
 
-            if not hash.occurances:
-                continue
-
             with self.uowm.start() as uow:
-                post = uow.posts.get_by_post_id(hash.post_id)
-                if not post:
-                    log.error('Cannot find post with ID %s', hash.post_id)
-                    continue
+                repost = uow.posts.get_by_post_id(hash.post_id)
+                repost.checked_repost = True
+                occurances = [uow.posts.get_by_post_id(post[1].post_id) for post in hash.occurances]
+                results = self._filter_matching_images(occurances, repost)
+                results = self._clean_reposts(results)
+                if len(results) > 0:
+                    print('Original: http://reddit.com' + repost.perma_link)
 
+                    log.error('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at),
+                              repost.perma_link)
+                    log.error('Oldest Post - %s - (%s): http://reddit.com%s', results[0].post_id,
+                              str(results[0].created_at), results[0].perma_link)
+                    for p in results:
+                        log.error('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
+
+                    repost.repost_of = results[0].id
+                uow.commit()
 
     def _filter_matching_images(self, raw_list: List[Tuple[int, Post]], post_being_checked: Post) -> List[Post]:
         """

@@ -83,6 +83,6 @@ def postdto_to_post(postdto: PostDto):
 
 def post_to_hashwrapper(post: Post):
     wrapper = HashWrapper()
-    wrapper.post_id = post.id
+    wrapper.post_id = post.post_id
     wrapper.image_hash = post.image_hash
     return wrapper
