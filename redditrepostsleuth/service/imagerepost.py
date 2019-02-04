@@ -172,7 +172,7 @@ class ImageRepostProcessing:
 
     def process_repost_celery(self):
         offset = 0
-        limit = 10
+        limit = 40
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
@@ -182,10 +182,11 @@ class ImageRepostProcessing:
                 job = group(jobs)
                 pending_result = job.apply_async()
                 while pending_result.waiting():
-                    log.info('Results not done')
+                    #log.info('Results not done')
                     time.sleep(.2)
                 results = pending_result.join_native()
                 offset += limit
+                log.debug('Adding repost results to queue')
                 for r in results:
                     if len(r.occurances) > 1:
                         self.repost_queue.put(r)
@@ -204,8 +205,14 @@ class ImageRepostProcessing:
                 continue
 
             with self.uowm.start() as uow:
+
+
                 repost = uow.posts.get_by_post_id(hash.post_id)
                 repost.checked_repost = True
+                if len(hash.occurances) <= 1:
+                    log.debug('Post %s has no matches', hash.post_id)
+                    uow.commit()
+                    continue
                 occurances = [uow.posts.get_by_post_id(post[1].post_id) for post in hash.occurances]
                 results = self._filter_matching_images(occurances, repost)
                 results = self._clean_reposts(results)
@@ -222,7 +229,7 @@ class ImageRepostProcessing:
                     repost.repost_of = results[0].id
                 uow.commit()
 
-    def _filter_matching_images(self, raw_list: List[Tuple[int, Post]], post_being_checked: Post) -> List[Post]:
+    def _filter_matching_images(self, raw_list: List[Post], post_being_checked: Post) -> List[Post]:
         """
         Take a raw list if matched images.  Filter one ones meeting the following criteria.
             Same Author as post being checked - Gets rid of people posting to multiple subreddits
@@ -232,7 +239,7 @@ class ImageRepostProcessing:
         :param post_being_checked: The posts we're checking is a repost
         """
         # TODO - Clean this up
-        return [x[1] for x in raw_list if x[1].post_id != post_being_checked.post_id and x[1].crosspost_parent is None and post_being_checked.author != x[1].author]
+        return [x for x in raw_list if x.post_id != post_being_checked.post_id and x.crosspost_parent is None and post_being_checked.author != x.author]
 
 
     def _handle_reposts(self, post: List[Post]) -> List[Post]:
