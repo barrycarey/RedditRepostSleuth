@@ -29,6 +29,16 @@ class VpTreeTask(Task):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.vptree_cache = CashedVpTree(self.uowm)
 
+@celery.task(bind=True, base=SqlAlchemyTask, serializer='pickle', ignore_results=True)
+def hash_image_and_save(self, data):
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_post_id(data['post_id'])
+        try:
+            img = generate_img_by_url(data['url'])
+            post.image_hash = generate_dhash(img)
+        except ImageConversioinException as e:
+            uow.posts.remove(post)
+        uow.commit()
 
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
 def find_matching_images_task(self, hash):
