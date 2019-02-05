@@ -8,7 +8,7 @@ from distance import hamming
 from praw.models import Submission
 
 from redditrepostsleuth.celery import image_hash
-from redditrepostsleuth.celery.tasks import find_matching_images_task
+from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -41,15 +41,17 @@ class ImageRepostProcessing:
             posts = []
             try:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_by_hash(None, limit=250)
+                    posts = uow.posts.find_all_by_hash(None)
 
                 jobs = []
                 for post in posts:
-                    jobs.append(image_hash.s({'url': post.url, 'post_id': post.post_id, 'hash': None, 'delete': False}))
+                    jobs.append(hash_image_and_save.s({'url': post.url, 'post_id': post.post_id, 'hash': None, 'delete': False}))
 
                 job = group(jobs)
                 log.debug('Starting Celery job with 100 images')
-                pending_result = job.apply_async()
+                job.apply_async()
+
+                """
                 while pending_result.waiting():
                     log.info('Not all tasks done')
                     time.sleep(1)
@@ -57,7 +59,7 @@ class ImageRepostProcessing:
                 result = pending_result.join_native()
                 for r in result:
                     self.hash_save_queue.put(r)
-
+                """
 
             except Exception as e:
                 # TODO - Temp wide exception to catch any faults
