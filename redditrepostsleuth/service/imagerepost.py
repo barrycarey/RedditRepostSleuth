@@ -74,21 +74,25 @@ class ImageRepostProcessing:
                     log.exception('Exception with hash queue', exc_info=True)
                     continue
 
-            log.info('Flushing hash queue to database')
-            # TODO - Move this to celery worker side
-            with self.uowm.start() as uow:
-                # TODO - Find a cleaner way to deal with this
-                for result in results:
-                    post = uow.posts.get_by_post_id(result['post_id'])
-                    if not post:
-                        continue
-                    if result['delete']:
-                        log.debug('TASK RESULT: Deleting Post %s', result['post_id'])
-                        uow.posts.remove(post)
-                    else:
-                        log.debug('TASK RESULT: Saving Post %s', result['post_id'])
-                        post.image_hash = result['hash']
-                    uow.commit()
+            try:
+                log.info('Flushing hash queue to database')
+                # TODO - Move this to celery worker side
+                with self.uowm.start() as uow:
+                    # TODO - Find a cleaner way to deal with this
+                    for result in results:
+                        post = uow.posts.get_by_post_id(result['post_id'])
+                        if not post:
+                            continue
+                        if result['delete']:
+                            log.debug('TASK RESULT: Deleting Post %s', result['post_id'])
+                            uow.posts.remove(post)
+                        else:
+                            log.debug('TASK RESULT: Saving Post %s', result['post_id'])
+                            post.image_hash = result['hash']
+                        uow.commit()
+            except Exception as e:
+                log.error('Error flushing hash queue')
+                log.error(str(e))
 
     def find_all_occurrences(self, submission: Submission):
         """

@@ -24,6 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--deleted', action='store_true', help='Enables agent that that prunes deleted posts')
     args = parser.parse_args()
 
+    threads = []
 
     if args.ingest:
         log.info('Starting Ingest Agent')
@@ -55,9 +56,12 @@ if __name__ == '__main__':
         repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
         comments = CommentMonitor(reddit, repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
         #threading.Thread(target=comments.monitor_for_summons).start()
-        threading.Thread(target=comments.ingest_new_comments).start()
-        threading.Thread(target=comments.process_comment_queue).start()
+        threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
+        threading.Thread(target=comments.process_comment_queue, name='CommentIngestQueue').start()
 
 
     while True:
+        log.info('Running Threads:')
+        for thrd in threading.enumerate():
+            log.info(thrd.name)
         sleep(5)

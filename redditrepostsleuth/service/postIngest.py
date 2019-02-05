@@ -29,16 +29,17 @@ class PostIngest:
             self.store_post(post)
 
     def ingest_new_posts(self):
-        sr = self.reddit.subreddit('all')
-        try:
-            while True:
-                try:
-                    for submission in sr.stream.submissions():
-                        self.submission_queue.put(submission)
-                except Forbidden as e:
-                    pass
-        except Exception as e:
-            log.exception('INGEST THREAD DIED', exc_info=True)
+        while True:
+            sr = self.reddit.subreddit('all')
+            try:
+                while True:
+                    try:
+                        for submission in sr.stream.submissions():
+                            self.submission_queue.put(submission)
+                    except Forbidden as e:
+                        pass
+            except Exception as e:
+                log.exception('INGEST THREAD DIED', exc_info=True)
 
 
     def _flush_submission_queue(self):
