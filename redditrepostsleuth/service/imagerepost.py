@@ -41,7 +41,7 @@ class ImageRepostProcessing:
             posts = []
             try:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_by_hash(None)
+                    posts = uow.posts.find_all_without_hash()
 
                 jobs = []
                 for post in posts:
