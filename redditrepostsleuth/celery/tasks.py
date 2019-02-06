@@ -37,7 +37,8 @@ def hash_image_and_save(self, data):
             img = generate_img_by_url(data['url'])
             post.image_hash = generate_dhash(img)
         except ImageConversioinException as e:
-            uow.posts.remove(post)
+            if post:
+                uow.posts.remove(post)
         uow.commit()
 
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
