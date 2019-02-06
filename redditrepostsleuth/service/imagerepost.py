@@ -41,7 +41,7 @@ class ImageRepostProcessing:
             posts = []
             try:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_without_hash()
+                    posts = uow.posts.find_all_without_hash(limit=100)
 
                 jobs = []
                 for post in posts:
@@ -49,7 +49,10 @@ class ImageRepostProcessing:
 
                 job = group(jobs)
                 log.debug('Starting Celery job with 100 images')
-                job.apply_async()
+                pending = job.apply_async()
+                while pending.waiting():
+                    log.info('still waiting')
+                    time.sleep(.3)
 
                 """
                 while pending_result.waiting():
