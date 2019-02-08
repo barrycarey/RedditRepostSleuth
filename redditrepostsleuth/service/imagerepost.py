@@ -5,6 +5,7 @@ from typing import List, Tuple
 import requests
 from celery import group
 from distance import hamming
+from praw import Reddit
 from praw.models import Submission
 
 from redditrepostsleuth.celery import image_hash
@@ -23,7 +24,8 @@ from redditrepostsleuth.util.vptree import VPTree
 
 class ImageRepostProcessing:
 
-    def __init__(self, uowm: UnitOfWorkManager, ) -> None:
+    def __init__(self, uowm: UnitOfWorkManager) -> None:
+
         self.uowm = uowm
         self.existing_images = [] # Maintain a list of existing images im memory
         self.hash_save_queue = Queue(maxsize=0)
@@ -99,7 +101,7 @@ class ImageRepostProcessing:
                 log.error('Error flushing hash queue')
                 log.error(str(e))
 
-    def find_all_occurrences(self, submission: Submission):
+    def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False):
         """
         Take a given Reddit submission and find all matching posts
         :param submission:
@@ -113,8 +115,8 @@ class ImageRepostProcessing:
 
         with self.uowm.start() as uow:
             existing_images = uow.posts.find_all_images_with_hash()
-            occurrences = find_matching_images(existing_images, image_hash)
-            occurrences = self._sort_reposts(occurrences)
+            raw_occurrences = find_matching_images_in_vp_tree(self.vptree_cache.get_tree,
+                                                          image_hash)
 
             # Save this submission to database if it's not already there
             if not uow.posts.get_by_post_id(submission.id):
@@ -123,6 +125,9 @@ class ImageRepostProcessing:
                 post.image_hash = image_hash
                 uow.posts.add(post)
                 uow.commit()
+
+            if include_crosspost:
+                occurrences = [uow.posts.get_by_post_id(post.post_id) for post in raw_occurrences]
 
             return RepostResponse(message='I\'ve seen this image {} times.  \n\n The first time I saw it was here: https://www.reddit.com{}'.format(len(occurrences), occurrences[0].perma_link),
                                   occurrences=self._sort_reposts(occurrences),
@@ -264,7 +269,7 @@ class ImageRepostProcessing:
         Take a list of reposts, remove any cross posts and deleted posts
         :param posts: List of posts
         """
-        posts = [post for post in posts if post.crosspost_parent is None]
+        posts = self._remove_crossposts(posts)
         posts = self._sort_reposts(posts)
         return posts
 
@@ -275,3 +280,27 @@ class ImageRepostProcessing:
         :param posts:
         """
         return sorted(posts, key=lambda x: x.created_at, reverse=reverse)
+
+    def _remove_crossposts(self, posts: List[Post]) -> List[Post]:
+        results = []
+        for post in posts:
+            if post.checked_repost and post.crosspost_parent is None:
+                results.append(post)
+                continue
+
+            submission = self.reddit.submission(id=post.post_id)
+            if submission:
+                try:
+                    post.crosspost_parent = submission.crosspost_parent
+                except AttributeError:
+                    pass
+
+                with self.uowm.start() as uow:
+                    post.checked_repost = True
+                    uow.commit()
+
+                if post.crosspost_parent is None:
+                    results.append(post)
+
+
+        return results

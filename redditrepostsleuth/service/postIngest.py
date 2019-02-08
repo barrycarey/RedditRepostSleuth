@@ -101,12 +101,13 @@ class PostIngest:
         """
         while True:
             with self.uowm.start() as uow:
-                posts = uow.posts.find_all_unchecked_crosspost(limit=100)
+                posts = uow.posts.find_all_unchecked_crosspost(limit=10)
                 jobs = [update_cross_post_parent.s(post.post_id) for post in posts]
                 log.debug('Starting 200 cross post check tasks')
                 job = group(jobs)
-                job.apply_async()
-            time.sleep(30)
+                pending_results = job.apply_async()
+                pending_results.join_native()
+
 
 
     def store_post(self, reddit_post: Submission):

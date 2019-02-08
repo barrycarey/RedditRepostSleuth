@@ -9,7 +9,7 @@ from redditrepostsleuth.config import config
 from kombu.serialization import registry
 registry.enable('pickle')
 
-sys.setrecursionlimit(2500)
+sys.setrecursionlimit(10000)
 print(sys.getrecursionlimit())
 
 if os.name =='nt':

@@ -12,9 +12,10 @@ from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 from redditrepostsleuth.service.postIngest import PostIngest
 from redditrepostsleuth.service.repostrequestservice import RepostRequestService
 
-sys.setrecursionlimit(2500)
+sys.setrecursionlimit(10000)
 
 if __name__ == '__main__':
+
 
     parser = argparse.ArgumentParser(description="A Tool to monitor and respond to reposted content on Reddit")
     parser.add_argument('--ingest', action='store_true', help='Enables the post import agent')
@@ -22,6 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--repost', action='store_true', help='Enables agent that scans database for reposts')
     parser.add_argument('--imagehashing', action='store_true', help='Enables agent that calculates and saves hashes of posts')
     parser.add_argument('--deleted', action='store_true', help='Enables agent that that prunes deleted posts')
+    parser.add_argument('--crosspost', action='store_true', help='Process Cross Posts in Backgroun')
     args = parser.parse_args()
 
     threads = []
@@ -29,9 +31,9 @@ if __name__ == '__main__':
     if args.ingest:
         log.info('Starting Ingest Agent')
         ingest = PostIngest(reddit, SqlAlchemyUnitOfWorkManager(db_engine))
-        threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
-        #threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
-        threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
+        #threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
+        threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
+        #threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
     hashing = None
     if args.imagehashing:
