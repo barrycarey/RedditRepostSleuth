@@ -12,6 +12,7 @@ from redditrepostsleuth.celery import image_hash
 from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.repostresponse import RepostResponse
@@ -24,8 +25,8 @@ from redditrepostsleuth.util.vptree import VPTree
 
 class ImageRepostProcessing:
 
-    def __init__(self, uowm: UnitOfWorkManager) -> None:
-
+    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit) -> None:
+        self.reddit = reddit
         self.uowm = uowm
         self.existing_images = [] # Maintain a list of existing images im memory
         self.hash_save_queue = Queue(maxsize=0)
@@ -33,38 +34,26 @@ class ImageRepostProcessing:
         self.vptree_cache = CashedVpTree(uowm)
 
 
-    def generate_hashes_celery(self):
+    def generate_hashes(self):
         """
         Collect images from the database without a hash.  Batch them into 100 posts and submit to celery to have
         hashes created
         """
         while True:
-            #TODO - Cleanup
-            posts = []
             try:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_without_hash(limit=100)
+                    posts = uow.posts.find_all_without_hash(limit=config.generate_hash_batch_size)
 
                 jobs = []
                 for post in posts:
                     jobs.append(hash_image_and_save.s({'url': post.url, 'post_id': post.post_id, 'hash': None, 'delete': False}))
 
                 job = group(jobs)
-                log.debug('Starting Celery job with 100 images')
+                log.debug('Starting Generate Hash Job with %s images', config.generate_hash_batch_size)
                 pending = job.apply_async()
                 while pending.waiting():
-                    log.info('still waiting')
+                    log.debug('still waiting')
                     time.sleep(.3)
-
-                """
-                while pending_result.waiting():
-                    log.info('Not all tasks done')
-                    time.sleep(1)
-
-                result = pending_result.join_native()
-                for r in result:
-                    self.hash_save_queue.put(r)
-                """
 
             except Exception as e:
                 # TODO - Temp wide exception to catch any faults

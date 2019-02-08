@@ -38,14 +38,14 @@ if __name__ == '__main__':
     hashing = None
     if args.imagehashing:
         log.info('Starting Hashing Agent')
-        hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
-        threading.Thread(target=hashing.generate_hashes_celery, name="Hashing").start()
+        hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), reddit)
+        threading.Thread(target=hashing.generate_hashes, name="Hashing").start()
         threading.Thread(target=hashing.process_hash_queue, name="HashingFlush").start()
 
     if args.repost:
         log.info('Starting Repost Agent')
         if hashing is None:
-            hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine))
+            hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), reddit)
         threading.Thread(target=hashing.process_repost_celery, name='Repost').start()
         threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
 

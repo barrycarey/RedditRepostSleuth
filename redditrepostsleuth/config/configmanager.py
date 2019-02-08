@@ -25,6 +25,7 @@ class ConfigManager:
 
         # General
         self.summon_command = self.config['GENERAL'].get('summon_command', fallback='!repost')
+        self.generate_hash_batch_size = self.config['GENERAL'].getint('port', fallback=50)
 
         # Database
         self.db_host = self.config['DATABASE']['host']
