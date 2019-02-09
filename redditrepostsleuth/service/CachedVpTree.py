@@ -33,8 +33,11 @@ class CashedVpTree:
                 log.info('Tree will be built with %s images', len(existing_images))
                 log.info('Recurssion Depth: %s', print(sys.getrecursionlimit()))
                 self.building_tree = True
+                start = datetime.now()
                 self.vp_tree = VPTree([hash_tuple_to_hashwrapper(post) for post in existing_images], lambda x,y: hamming(x,y))
                 self.building_tree = False
+                delta = datetime.now() - start
+                print('Tree built in {} seconeds'.format(str(delta.seconds)))
                 self.tree_built_at = datetime.now()
                 return self.vp_tree
         else:

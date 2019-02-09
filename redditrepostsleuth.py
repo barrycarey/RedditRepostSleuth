@@ -77,7 +77,7 @@ if __name__ == '__main__':
             hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
         repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
         comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
-        threading.Thread(target=comments.monitor_for_summons).start()
+        threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
         threading.Thread(target=comments.handle_summons).start()
         #threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
         threading.Thread(target=comments.process_comment_queue, name='CommentIngestQueue').start()

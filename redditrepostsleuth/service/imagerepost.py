@@ -128,7 +128,7 @@ class ImageRepostProcessing:
 
     def process_repost_celery(self):
         offset = 0
-        limit = 40
+        limit = 10
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
@@ -136,7 +136,7 @@ class ImageRepostProcessing:
                 #r = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, cleaned_posts[0].image_hash)
                 jobs = [find_matching_images_task.s(post) for post in cleaned_posts]
                 job = group(jobs)
-                pending_result = job.apply_async()
+                pending_result = job.apply_async(queue='repost')
                 while pending_result.waiting():
                     #log.info('Results not done')
                     time.sleep(.2)

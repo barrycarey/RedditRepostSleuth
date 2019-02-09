@@ -28,6 +28,7 @@ class ConfigManager:
         self.generate_hash_batch_size = self.config['GENERAL'].getint('generate_hash_batch_size', fallback=50)
         self.delete_check_batch_size = self.config['GENERAL'].getint('delete_check_batch_size', fallback=50)
         self.vptree_cache_duration = self.config['GENERAL'].getint('vptree_cache_duration', fallback=1800)
+        self.hamming_distance = self.config['GENERAL'].getint('hamming_distance', fallback=10)
 
         # Database
         self.db_host = self.config['DATABASE']['host']
