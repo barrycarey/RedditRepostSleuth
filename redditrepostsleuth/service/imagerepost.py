@@ -121,34 +121,6 @@ class ImageRepostProcessing:
 
 
 
-    def process_reposts(self):
-        while True:
-            with self.uowm.start() as uow:
-                unchecked_posts = uow.posts.find_all_by_repost_check(False, limit=100)
-
-
-                for repost in unchecked_posts:
-                    tree = self.vptree_cache.get_tree
-                    print('Checking Hash: ' + repost.image_hash)
-                    repost.checked_repost = True
-                    r = find_matching_images_in_vp_tree(tree, repost.image_hash, hamming_distance=10)
-
-                    if len(r) == 1:
-                        continue
-
-                    results = self._filter_matching_images(r, repost)
-                    results = self._clean_reposts(results)
-                    if len(results) > 0:
-                        print('Original: http://reddit.com' + repost.perma_link)
-
-                        log.error('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at), repost.perma_link)
-                        log.error('Oldest Post - %s - (%s): http://reddit.com%s', results[0].post_id, str(results[0].created_at), results[0].perma_link)
-                        for p in results:
-                            log.error('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
-
-                        repost.repost_of = results[0].id
-                    uow.commit()
-
     def process_repost_celery(self):
         offset = 0
         limit = 40

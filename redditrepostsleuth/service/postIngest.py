@@ -25,7 +25,8 @@ class PostIngest:
                 while True:
                     try:
                         for submission in sr.stream.submissions():
-                            self.submission_queue.put(submission)
+                            log.debug('Saving post %s', submission.id)
+                            save_new_post.delay(submission_to_post(submission))
                     except Forbidden as e:
                         pass
             except Exception as e:
