@@ -36,7 +36,6 @@ class VPTree:
         if not len(points):
             raise ValueError('Points can not be empty.')
 
-        log.debug('Building tree with %s points', len(points))
 
         # Vantage point is point furthest from parent vp.
         vp_i = 0

@@ -86,3 +86,9 @@ def post_to_hashwrapper(post: Post):
     wrapper.post_id = post.post_id
     wrapper.image_hash = post.image_hash
     return wrapper
+
+def hash_tuple_to_hashwrapper(hash_tup):
+    wrapper = HashWrapper()
+    wrapper.post_id = hash_tup[0]
+    wrapper.image_hash = hash_tup[1]
+    return wrapper

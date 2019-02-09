@@ -7,6 +7,7 @@ from redditrepostsleuth.celery.tasks import check_deleted_posts
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.util.objectmapping import hash_tuple_to_hashwrapper
 
 
 class MaintenanceService:
@@ -22,8 +23,8 @@ class MaintenanceService:
             with self.uowm.start() as uow:
 
                 r2 = uow.posts.test_with_entities()
-                r1 = uow.posts.find_all_images_with_hash()
 
+                r1 = [hash_tuple_to_hashwrapper(post) for post in r2]
 
                 posts = uow.posts.find_all_for_delete_check(196, limit=config.delete_check_batch_size)
                 log.info('Starting %s delete check jobs', config.delete_check_batch_size)
