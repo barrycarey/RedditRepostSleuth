@@ -13,6 +13,7 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.repostresponse import RepostResponse
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
@@ -100,9 +101,11 @@ class ImageRepostProcessing:
             return RepostResponse(message="I failed to convert the image to a hash :(", status='error')
 
         with self.uowm.start() as uow:
-            existing_images = uow.posts.find_all_images_with_hash()
-            raw_occurrences = find_matching_images_in_vp_tree(self.vptree_cache.get_tree,
-                                                          image_hash)
+            existing_images = uow.posts.count_by_type('image')
+            wrapper = HashWrapper()
+            wrapper.post_id = submission.id
+            wrapper.image_hash = image_hash
+            r = find_matching_images_task.apply_async(queue='repost', args=(wrapper,)).get()
 
             # Save this submission to database if it's not already there
             if not uow.posts.get_by_post_id(submission.id):
@@ -112,12 +115,14 @@ class ImageRepostProcessing:
                 uow.posts.add(post)
                 uow.commit()
 
-            if include_crosspost:
-                occurrences = [uow.posts.get_by_post_id(post.post_id) for post in raw_occurrences]
+            occurrences = [uow.posts.get_by_post_id(post[1].post_id) for post in r.occurances]
+
+            occurrences = self._sort_reposts(occurrences)
 
             return RepostResponse(message='I\'ve seen this image {} times.  \n\n The first time I saw it was here: https://www.reddit.com{}'.format(len(occurrences), occurrences[0].perma_link),
                                   occurrences=self._sort_reposts(occurrences),
-                                  posts_checked=len(existing_images))
+                                  posts_checked=existing_images,
+                                  status='success')
 
 
 

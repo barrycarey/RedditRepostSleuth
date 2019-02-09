@@ -2,10 +2,14 @@ import argparse
 import sys
 import threading
 from time import sleep
+from datetime import datetime
 
+from redditrepostsleuth.celery.tasks import find_matching_images_task
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.model.hashwrapper import HashWrapper
+from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
@@ -16,7 +20,21 @@ from redditrepostsleuth.util.helpers import get_reddit_instance
 sys.setrecursionlimit(10000)
 
 if __name__ == '__main__':
+    """
+    tree = CashedVpTree(SqlAlchemyUnitOfWorkManager(db_engine))
+    start = datetime.now()
+    tree2 = tree.get_tree
+    delta = datetime.now() - start
+    print('Tree built in {} seconeds'.format(str(delta.seconds)))
+    sys.exit()
+    
 
+    wrapper = HashWrapper()
+    wrapper.post_id = 'amv5ru'
+    wrapper.image_hash = '78f460f9e0b968bc6068b8419f0c4c3438fce0d3c899fcb8b8509c004c1c7634'
+
+    r = find_matching_images_task.apply_async(queue='repost', args=(wrapper,)).get()
+    """
 
     parser = argparse.ArgumentParser(description="A Tool to monitor and respond to reposted content on Reddit")
     parser.add_argument('--ingest', action='store_true', help='Enables the post import agent')
@@ -55,10 +73,13 @@ if __name__ == '__main__':
         threading.Thread(target=maintenance.clear_deleted_images, name='Deleted Cleanup').start()
 
     if args.summons:
+        if hashing is None:
+            hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
         repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
         comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
-        #threading.Thread(target=comments.monitor_for_summons).start()
-        threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
+        threading.Thread(target=comments.monitor_for_summons).start()
+        threading.Thread(target=comments.handle_summons).start()
+        #threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
         threading.Thread(target=comments.process_comment_queue, name='CommentIngestQueue').start()
 
 

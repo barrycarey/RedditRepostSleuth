@@ -24,6 +24,7 @@ class MaintenanceService:
             limit = config.delete_check_batch_size
             while True:
                 with self.uowm.start() as uow:
+                    r = uow.posts.count_by_type('image')
                     log.debug('Offset: %s', offset)
                     posts = uow.posts.find_all_for_delete_check(196, limit=config.delete_check_batch_size)
                     if len(posts) == 0:

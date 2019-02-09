@@ -1,6 +1,6 @@
 from typing import List
 
-from sqlalchemy import DateTime, or_
+from sqlalchemy import DateTime, or_, func
 from datetime import datetime, timedelta
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
@@ -50,6 +50,11 @@ class PostRepository:
 
     def test_with_entities(self):
         return self.db_session.query(Post).filter(Post.post_type == 'image', Post.image_hash != None).with_entities(Post.post_id, Post.image_hash).all()
+
+    def count_by_type(self, post_type: str):
+        r = self.db_session.query(func.count(Post.id)).filter(Post.post_type == post_type).first()
+        return r[0] if r else None
+
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)

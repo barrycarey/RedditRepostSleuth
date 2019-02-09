@@ -1,14 +1,19 @@
 import requests
 from celery import Task
 from datetime import datetime
+
+from distance import hamming
+
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
+
 from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree
+from redditrepostsleuth.util.vptree import VPTree
 
 
 @celery.task
@@ -81,6 +86,10 @@ def save_new_comment(self, comment):
     with self.uowm.start() as uow:
         uow.comments.add(comment)
         uow.commit()
+
+@celery.task(serializer='pickle')
+def build_vp_tree(points):
+    return VPTree(points, lambda x,y: hamming(x,y))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True)
 def update_cross_post_parent(self, sub_id):

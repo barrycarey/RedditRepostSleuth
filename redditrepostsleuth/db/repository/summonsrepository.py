@@ -14,3 +14,6 @@ class SummonsRepository:
 
     def get_by_comment_id(self, id: str) -> Summons:
         return self.db_session.query(Summons).filter(Summons.comment_id == id).first()
+
+    def get_unreplied(self) -> Summons:
+        return self.db_session.query(Summons).filter(Summons.summons_replied_at == None).all()
