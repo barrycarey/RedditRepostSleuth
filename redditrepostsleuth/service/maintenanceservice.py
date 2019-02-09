@@ -20,6 +20,11 @@ class MaintenanceService:
         """
         while True:
             with self.uowm.start() as uow:
+
+                r2 = uow.posts.test_with_entities()
+                r1 = uow.posts.find_all_images_with_hash()
+
+
                 posts = uow.posts.find_all_for_delete_check(196, limit=config.delete_check_batch_size)
                 log.info('Starting %s delete check jobs', config.delete_check_batch_size)
                 for post in posts:

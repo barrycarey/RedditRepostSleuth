@@ -35,9 +35,9 @@ class VpTreeTask(Task):
 def check_deleted_posts(self, post_id):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(post_id)
-        post.last_deleted_check = datetime.utcnow()
         if not post:
             return
+        post.last_deleted_check = datetime.utcnow()
         log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
         try:
             r = requests.get(post.url)

@@ -48,6 +48,9 @@ class PostRepository:
         since = datetime.now() - timedelta(hours=hours)
         return self.db_session.query(Post).filter(or_(Post.last_deleted_check == None, Post.last_deleted_check < since)).limit(limit).all()
 
+    def test_with_entities(self):
+        return self.db_session.query(Post).filter(Post.image_hash != None).with_entities(Post.post_id, Post.url).all()
+
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
