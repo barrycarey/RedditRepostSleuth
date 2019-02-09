@@ -29,7 +29,7 @@ class CommentMonitor:
         for comment in self.reddit.subreddit('All').stream.comments():
             if comment is None:
                 continue
-            log.info('COMMENT %s: %s', datetime.fromtimestamp(comment.created_utc), comment.body)
+            #log.info('COMMENT %s: %s', datetime.fromtimestamp(comment.created_utc), comment.body)
             if re.search(config.summon_command, comment.body, re.IGNORECASE):
                 log.debug('Got a summons!')
                 with self.uowm.start() as uow:
