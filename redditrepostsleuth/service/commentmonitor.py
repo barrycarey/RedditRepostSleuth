@@ -61,7 +61,8 @@ class CommentMonitor:
     def process_comment_queue(self):
         while True:
             try:
-                log.debug('Comment Queue Size: %s', self.comment_queue.qsize())
+                if self.comment_queue.qsize() > 100:
+                    log.debug('Comment Queue Size: %s', self.comment_queue.qsize())
                 com = self.comment_queue.get()
                 comment = DbComment(body=com.body, comment_id=com.id)
                 save_new_comment.delay(comment)
