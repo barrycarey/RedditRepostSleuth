@@ -35,6 +35,7 @@ class VpTreeTask(Task):
 def check_deleted_posts(self, post_id):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(post_id)
+        post.last_deleted_check = datetime.utcnow()
         if not post:
             return
         log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
@@ -43,12 +44,12 @@ def check_deleted_posts(self, post_id):
             if r.status_code == 404:
                 log.debug('Deleting removed post (%s)', str(post))
                 uow.posts.remove(post)
-            else:
-                post.last_deleted_check = datetime.utcnow()
-            uow.commit()
+
         except Exception as e:
             log.exception('Exception with deleted image cleanup', exc_info=True)
             print('')
+
+        uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, serializer='pickle', ignore_results=True)
 def hash_image_and_save(self, data):

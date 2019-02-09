@@ -25,6 +25,3 @@ class MaintenanceService:
                 for post in posts:
                     check_deleted_posts.delay(post.post_id)
             time.sleep(30)
-
-    def clear_deleted_images_celery(self):
-        pass
