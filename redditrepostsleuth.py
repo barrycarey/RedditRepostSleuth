@@ -32,7 +32,7 @@ if __name__ == '__main__':
     if args.ingest:
         log.info('Starting Ingest Agent')
         ingest = PostIngest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
-        #threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
+        threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
         threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
         #threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
