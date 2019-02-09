@@ -1,14 +1,12 @@
 import time
 from queue import Queue
-from typing import List, Tuple
+from typing import List
 
 import requests
 from celery import group
-from distance import hamming
 from praw import Reddit
 from praw.models import Submission
 
-from redditrepostsleuth.celery import image_hash
 from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
@@ -17,10 +15,9 @@ from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.repostresponse import RepostResponse
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
-from redditrepostsleuth.util import submission_to_post, post_to_hashwrapper
 from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
-    find_matching_images, generate_img_by_url
-from redditrepostsleuth.util.vptree import VPTree
+    generate_img_by_url
+from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
 
 
 class ImageRepostProcessing:
@@ -122,28 +119,7 @@ class ImageRepostProcessing:
                                   occurrences=self._sort_reposts(occurrences),
                                   posts_checked=len(existing_images))
 
-    def clear_deleted_images(self):
-        """
-        Cleanup images in database that have been deleted by the poster
-        """
-        # TODO - Move it single function
-        while True:
-            with self.uowm.start() as uow:
-                posts = uow.posts.find_all_by_type('image')
-                for post in posts:
-                    log.debug('Checking URL %s', post.url)
-                    try:
-                        r = requests.get(post.url)
-                        if r.status_code == 404:
-                            log.debug('Deleting removed post (%s)', str(post))
-                            uow.posts.remove(post)
-                            uow.commit()
-                    except Exception as e:
-                        log.exception('Exception with deleted image cleanup', exc_info=True)
-                        print('')
 
-    def clear_deleted_images_celery(self):
-        pass
 
     def process_reposts(self):
         while True:

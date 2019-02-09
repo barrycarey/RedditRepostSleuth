@@ -6,7 +6,7 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 
-from redditrepostsleuth.util import post_to_hashwrapper
+from redditrepostsleuth.util.objectmapping import post_to_hashwrapper
 from redditrepostsleuth.util.vptree import VPTree
 
 

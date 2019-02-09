@@ -1,11 +1,13 @@
+import requests
 from celery import Task
 from datetime import datetime
 from redditrepostsleuth.celery import celery
-from redditrepostsleuth.config import reddit
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
+from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree
 
 
@@ -28,6 +30,25 @@ class VpTreeTask(Task):
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.vptree_cache = CashedVpTree(self.uowm)
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def check_deleted_posts(self, post_id):
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_post_id(post_id)
+        if not post:
+            return
+        log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
+        try:
+            r = requests.get(post.url)
+            if r.status_code == 404:
+                log.debug('Deleting removed post (%s)', str(post))
+                uow.posts.remove(post)
+            else:
+                post.last_deleted_check = datetime.utcnow()
+            uow.commit()
+        except Exception as e:
+            log.exception('Exception with deleted image cleanup', exc_info=True)
+            print('')
 
 @celery.task(bind=True, base=SqlAlchemyTask, serializer='pickle', ignore_results=True)
 def hash_image_and_save(self, data):
@@ -62,6 +83,7 @@ def save_new_comment(self, comment):
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True)
 def update_cross_post_parent(self, sub_id):
+    reddit = get_reddit_instance()
     sub = reddit.submission(id=sub_id)
     if not sub:
         print('No submission found')

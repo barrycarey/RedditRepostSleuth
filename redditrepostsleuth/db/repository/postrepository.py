@@ -1,7 +1,7 @@
 from typing import List
 
-from sqlalchemy import DateTime
-
+from sqlalchemy import DateTime, or_
+from datetime import datetime, timedelta
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 
@@ -43,6 +43,10 @@ class PostRepository:
 
     def find_all_unchecked_crosspost(self, limit: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.crosspost_parent == None, Post.crosspost_checked == False).limit(limit).all()
+
+    def find_all_for_delete_check(self, hours: int, limit: int = None) -> List[Post]:
+        since = datetime.now() - timedelta(hours=hours)
+        return self.db_session.query(Post).filter(or_(Post.last_deleted_check == None, Post.last_deleted_check < since)).limit(limit).all()
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)
