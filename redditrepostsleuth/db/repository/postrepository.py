@@ -44,9 +44,9 @@ class PostRepository:
     def find_all_unchecked_crosspost(self, limit: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.crosspost_parent == None, Post.crosspost_checked == False).limit(limit).all()
 
-    def find_all_for_delete_check(self, hours: int, limit: int = None) -> List[Post]:
+    def find_all_for_delete_check(self, hours: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(hours=hours)
-        return self.db_session.query(Post).filter(or_(Post.last_deleted_check == None, Post.last_deleted_check < since)).limit(limit).all()
+        return self.db_session.query(Post).filter(or_(Post.last_deleted_check == None, Post.last_deleted_check < since)).offset(offset).limit(limit).all()
 
     def test_with_entities(self):
         return self.db_session.query(Post).filter(Post.post_type == 'image', Post.image_hash != None).with_entities(Post.post_id, Post.image_hash).all()

@@ -20,14 +20,18 @@ class MaintenanceService:
         Cleanup images in database that have been deleted by the poster
         """
         while True:
-            with self.uowm.start() as uow:
+            offset = 0
+            limit = config.delete_check_batch_size
+            while True:
+                with self.uowm.start() as uow:
+                    log.debug('Offset: %s', offset)
+                    posts = uow.posts.find_all_for_delete_check(196, limit=config.delete_check_batch_size)
+                    if len(posts) == 0:
+                        log.info('Cleaned deleted images reach end of results')
+                        break
 
-                r2 = uow.posts.test_with_entities()
-
-                r1 = [hash_tuple_to_hashwrapper(post) for post in r2]
-
-                posts = uow.posts.find_all_for_delete_check(196, limit=config.delete_check_batch_size)
-                log.info('Starting %s delete check jobs', config.delete_check_batch_size)
-                for post in posts:
-                    check_deleted_posts.delay(post.post_id)
-            time.sleep(30)
+                    log.info('Starting %s delete check jobs', config.delete_check_batch_size)
+                    for post in posts:
+                        check_deleted_posts.delay(post.post_id)
+                offset += limit
+                time.sleep(15)
