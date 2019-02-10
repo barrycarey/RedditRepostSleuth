@@ -14,7 +14,7 @@ from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
-from redditrepostsleuth.model.repostresponse import RepostResponse
+from redditrepostsleuth.model.repostresponse import RepostResponseBase
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
     generate_img_by_url
@@ -98,7 +98,7 @@ class ImageRepostProcessing:
             img = generate_img_by_url(submission.url)
             image_hash = generate_dhash(img)
         except ImageConversioinException:
-            return RepostResponse(message="I failed to convert the image to a hash :(", status='error')
+            return RepostResponseBase(message="I failed to convert the image to a hash :(", status='error')
 
         with self.uowm.start() as uow:
             existing_images = uow.posts.count_by_type('image')
@@ -119,10 +119,10 @@ class ImageRepostProcessing:
 
             occurrences = self._sort_reposts(occurrences)
 
-            return RepostResponse(message='I\'ve seen this image {} times.  \n\n The first time I saw it was here: https://www.reddit.com{}'.format(len(occurrences), occurrences[0].perma_link),
-                                  occurrences=self._sort_reposts(occurrences),
-                                  posts_checked=existing_images,
-                                  status='success')
+            return RepostResponseBase(message='I\'ve seen this image {} times.  \n\n The first time I saw it was here: https://www.reddit.com{}'.format(len(occurrences), occurrences[0].perma_link),
+                                      occurrences=self._sort_reposts(occurrences),
+                                      posts_checked=existing_images,
+                                      status='success')
 
 
 

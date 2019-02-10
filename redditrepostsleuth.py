@@ -14,7 +14,7 @@ from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
 from redditrepostsleuth.service.postIngest import PostIngest
-from redditrepostsleuth.service.repostrequestservice import RepostRequestService
+from redditrepostsleuth.service.requestservice import RequestService
 from redditrepostsleuth.util.helpers import get_reddit_instance
 
 sys.setrecursionlimit(10000)
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     if args.summons:
         if hashing is None:
             hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-        repost_service = RepostRequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
+        repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
         comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
         threading.Thread(target=comments.handle_summons).start()

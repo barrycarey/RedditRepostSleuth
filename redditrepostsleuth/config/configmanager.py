@@ -29,6 +29,7 @@ class ConfigManager:
         self.delete_check_batch_size = self.config['GENERAL'].getint('delete_check_batch_size', fallback=50)
         self.vptree_cache_duration = self.config['GENERAL'].getint('vptree_cache_duration', fallback=1800)
         self.hamming_distance = self.config['GENERAL'].getint('hamming_distance', fallback=10)
+        self.subreddit_summons = self.config['GENERAL'].get('subreddit_summons', fallback='all')
 
         # Database
         self.db_host = self.config['DATABASE']['host']

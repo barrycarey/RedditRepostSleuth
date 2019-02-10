@@ -10,7 +10,8 @@ class SummonsRepository:
         self.db_session.add(item)
 
     def get_by_id(self, id: int) -> Summons:
-        return self.db_session.get(Summons, id)
+        result = self.db_session.query(Summons).filter(Summons.id == id).first()
+        return result
 
     def get_by_comment_id(self, id: str) -> Summons:
         return self.db_session.query(Summons).filter(Summons.comment_id == id).first()
