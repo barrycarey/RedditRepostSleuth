@@ -70,5 +70,5 @@ class Reposts(Base):
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
     post_id = Column(String(100), nullable=False)
-    repost_of = Column(Integer, nullable=False)
+    repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())

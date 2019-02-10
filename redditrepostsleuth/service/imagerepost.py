@@ -3,11 +3,11 @@ from queue import Queue
 from typing import List
 
 import requests
-from celery import group
+from celery import group, chain
 from praw import Reddit
 from praw.models import Submission
 
-from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save
+from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -125,7 +125,7 @@ class ImageRepostProcessing:
 
     def process_repost_celery(self):
         offset = 0
-        limit = 30
+        limit = 5
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
@@ -145,6 +145,28 @@ class ImageRepostProcessing:
                     if len(r.occurances) > 1:
                         self.repost_queue.put(r)
 
+    def process_repost_celery_new(self):
+        offset = 0
+        limit = 3
+        while True:
+            with self.uowm.start() as uow:
+                raw_posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
+                wrapped_posts = []
+                for post in raw_posts:
+                    parent = self._get_crosspost_parent(post)
+                    if parent:
+                        log.debug('Post %s has a crosspost parent %s.  Skipping', post.post_id, parent)
+                        post.crosspost_parent = parent
+                        uow.commit()
+                        continue
+                    wrapped_posts.append(post_to_hashwrapper(post))
+
+            log.info('Starting %s jobs', len(wrapped_posts))
+            for post in wrapped_posts:
+                log.info('Creating chained task')
+                #find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
+
+                (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
 
     def process_repost_queue(self):
         while True:
@@ -209,7 +231,7 @@ class ImageRepostProcessing:
         Take a list of reposts, remove any cross posts and deleted posts
         :param posts: List of posts
         """
-        #posts = self._remove_crossposts(posts)
+        posts = self._remove_crossposts(posts)
         posts = self._sort_reposts(posts)
         return posts
 
@@ -220,6 +242,18 @@ class ImageRepostProcessing:
         :param posts:
         """
         return sorted(posts, key=lambda x: x.created_at, reverse=reverse)
+
+    def _get_crosspost_parent(self, post: Post):
+        submission = self.reddit.submission(id=post.post_id)
+        if submission:
+            try:
+                result = submission.crosspost_parent
+                log.debug('Post %s has corsspost parent %s', post.post_id, result)
+                return result
+            except AttributeError:
+                log.debug('No crosspost parent for post %s', post.post_id)
+                return None
+        log.error('Failed to find submission with ID %s', post.post_id)
 
     def _remove_crossposts(self, posts: List[Post]) -> List[Post]:
         results = []
@@ -235,12 +269,13 @@ class ImageRepostProcessing:
                 except AttributeError:
                     pass
 
-                with self.uowm.start() as uow:
-                    post.checked_repost = True
-                    uow.commit()
+
 
                 if post.crosspost_parent is None:
                     results.append(post)
+                else:
+                    with self.uowm.start() as uow:
+                        uow.commit()
 
 
         return results

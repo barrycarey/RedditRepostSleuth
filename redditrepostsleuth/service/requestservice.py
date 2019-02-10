@@ -8,7 +8,7 @@ from datetime import datetime
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, REPOST_ALL, LINK_ALL, \
-    WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND
+    WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
@@ -64,15 +64,23 @@ class RequestService:
         # TODO - Add check for existing watch
         response = RepostResponseBase(summons_id=summons.id)
         comment = self.reddit.comment(id=summons.comment_id)
-        watch = RepostWatch(post_id=summons.post_id, user=comment.author.name)
-        watch.response_type = sub_command if sub_command else 'message'
-        log.info('Creating watch request on post %s for user %s', summons.post_id, comment.author.name)
         with self.uowm.start() as uow:
+            watch = uow.repostwatch.find_existing_watch(comment.author.name, summons.post_id)
+            if watch:
+                log.info('Found duplicate watch')
+                response.message = WATCH_DUPLICATE
+                self._send_response(comment, response)
+                return
+
+            watch = RepostWatch(post_id=summons.post_id, user=comment.author.name)
+            watch.response_type = sub_command if sub_command else 'message'
+            log.info('Creating watch request on post %s for user %s', summons.post_id, comment.author.name)
+            response.message = WATCH_ENABLED.format(response=watch.response_type)
+
             uow.repostwatch.add(watch)
             # TODO - Probably need to catch exception here
             uow.commit()
 
-        response.message = WATCH_ENABLED.format(response=watch.response_type)
         self._send_response(comment, response)
 
     def process_unwatch_request(self, summons: Summons):

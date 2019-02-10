@@ -65,8 +65,8 @@ if __name__ == '__main__':
         log.info('Starting Repost Agent')
         if hashing is None:
             hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-        threading.Thread(target=hashing.process_repost_celery, name='Repost').start()
-        threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
+        threading.Thread(target=hashing.process_repost_celery_new, name='Repost').start()
+        #threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
 
     if args.deleted:
         maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine))
