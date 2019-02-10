@@ -37,7 +37,8 @@ if __name__ == '__main__':
     """
 
     parser = argparse.ArgumentParser(description="A Tool to monitor and respond to reposted content on Reddit")
-    parser.add_argument('--ingest', action='store_true', help='Enables the post import agent')
+    parser.add_argument('--ingestposts', action='store_true', help='Enables the post import agent')
+    parser.add_argument('--ingestcomments', action='store_true', help='Enables the comment import agent')
     parser.add_argument('--summons', action='store_true', help='Enables agent to monitor for and respond to summons')
     parser.add_argument('--repost', action='store_true', help='Enables agent that scans database for reposts')
     parser.add_argument('--imagehashing', action='store_true', help='Enables agent that calculates and saves hashes of posts')
@@ -47,11 +48,11 @@ if __name__ == '__main__':
 
     threads = []
 
-    if args.ingest:
+    if args.ingestposts:
         log.info('Starting Ingest Agent')
         ingest = PostIngest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
-        threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
+        #threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
         #threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
     hashing = None

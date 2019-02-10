@@ -125,7 +125,7 @@ class ImageRepostProcessing:
 
     def process_repost_celery(self):
         offset = 0
-        limit = 5
+        limit = 10
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
@@ -146,27 +146,35 @@ class ImageRepostProcessing:
                         self.repost_queue.put(r)
 
     def process_repost_celery_new(self):
+        # TODO - Add logic for when we reach end of results
         offset = 0
-        limit = 3
+        limit = 10
         while True:
-            with self.uowm.start() as uow:
-                raw_posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
-                wrapped_posts = []
-                for post in raw_posts:
-                    parent = self._get_crosspost_parent(post)
-                    if parent:
-                        log.debug('Post %s has a crosspost parent %s.  Skipping', post.post_id, parent)
-                        post.crosspost_parent = parent
-                        uow.commit()
-                        continue
-                    wrapped_posts.append(post_to_hashwrapper(post))
+            try:
+                with self.uowm.start() as uow:
+                    raw_posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
+                    wrapped_posts = []
+                    for post in raw_posts:
+                        parent = self._get_crosspost_parent(post)
+                        if parent:
+                            log.debug('Post %s has a crosspost parent %s.  Skipping', post.post_id, parent)
+                            post.crosspost_parent = parent
+                            post.checked_repost = True
+                            uow.commit()
+                            continue
+                        wrapped_posts.append(post_to_hashwrapper(post))
 
-            log.info('Starting %s jobs', len(wrapped_posts))
-            for post in wrapped_posts:
-                log.info('Creating chained task')
-                #find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
+                log.info('Starting %s jobs', len(wrapped_posts))
+                for post in wrapped_posts:
+                    log.info('Creating chained task')
+                    #find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
 
-                (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
+                    (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
+
+                time.sleep(30)
+
+            except Exception as e:
+                log.exception('Repost thread died', exc_info=True)
 
     def process_repost_queue(self):
         while True:
