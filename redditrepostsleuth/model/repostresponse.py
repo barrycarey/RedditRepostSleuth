@@ -1,13 +1,14 @@
 from dataclasses import dataclass, field
 from typing import List
 
-from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.model.db.databasemodels import Post, Summons
 
 
 @dataclass
 class RepostResponseBase:
-    status: str
-    message: str
+    status: str = None
+    message: str = None
+    summons_id: int = None
 
 @dataclass
 class RepostResponse(RepostResponseBase):

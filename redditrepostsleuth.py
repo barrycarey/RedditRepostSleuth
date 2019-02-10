@@ -75,7 +75,7 @@ if __name__ == '__main__':
     if args.summons:
         if hashing is None:
             hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-        repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing)
+        repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing, get_reddit_instance())
         comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
         threading.Thread(target=comments.handle_summons).start()
@@ -84,7 +84,9 @@ if __name__ == '__main__':
 
 
     while True:
+        """
         log.info('Running Threads:')
         for thrd in threading.enumerate():
             log.info(thrd.name)
+        """
         sleep(5)

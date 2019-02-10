@@ -88,7 +88,7 @@ class ImageRepostProcessing:
                 log.error('Error flushing hash queue')
                 log.error(str(e))
 
-    def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False):
+    def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False) -> List[Post]:
         """
         Take a given Reddit submission and find all matching posts
         :param submission:
@@ -98,7 +98,7 @@ class ImageRepostProcessing:
             img = generate_img_by_url(submission.url)
             image_hash = generate_dhash(img)
         except ImageConversioinException:
-            return RepostResponseBase(message="I failed to convert the image to a hash :(", status='error')
+            raise ImageConversioinException('Failed to convert image to hash')
 
         with self.uowm.start() as uow:
             existing_images = uow.posts.count_by_type('image')
@@ -108,7 +108,8 @@ class ImageRepostProcessing:
             r = find_matching_images_task.apply_async(queue='repost', args=(wrapper,)).get()
 
             # Save this submission to database if it's not already there
-            if not uow.posts.get_by_post_id(submission.id):
+            post = uow.posts.get_by_post_id(submission.id)
+            if not post:
                 log.debug('Saving post %s to database', submission.id)
                 post = submission_to_post(submission)
                 post.image_hash = image_hash
@@ -116,19 +117,15 @@ class ImageRepostProcessing:
                 uow.commit()
 
             occurrences = [uow.posts.get_by_post_id(post[1].post_id) for post in r.occurances]
-
+            occurrences = self._filter_matching_images(occurrences, post)
             occurrences = self._sort_reposts(occurrences)
 
-            return RepostResponseBase(message='I\'ve seen this image {} times.  \n\n The first time I saw it was here: https://www.reddit.com{}'.format(len(occurrences), occurrences[0].perma_link),
-                                      occurrences=self._sort_reposts(occurrences),
-                                      posts_checked=existing_images,
-                                      status='success')
-
+            return occurrences
 
 
     def process_repost_celery(self):
         offset = 0
-        limit = 10
+        limit = 30
         while True:
             with self.uowm.start() as uow:
                 posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
@@ -136,6 +133,7 @@ class ImageRepostProcessing:
                 #r = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, cleaned_posts[0].image_hash)
                 jobs = [find_matching_images_task.s(post) for post in cleaned_posts]
                 job = group(jobs)
+                log.debug('Starting %s repost check jobs', limit)
                 pending_result = job.apply_async(queue='repost')
                 while pending_result.waiting():
                     #log.info('Results not done')
@@ -211,7 +209,7 @@ class ImageRepostProcessing:
         Take a list of reposts, remove any cross posts and deleted posts
         :param posts: List of posts
         """
-        posts = self._remove_crossposts(posts)
+        #posts = self._remove_crossposts(posts)
         posts = self._sort_reposts(posts)
         return posts
 
