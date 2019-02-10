@@ -1,5 +1,6 @@
 from redditrepostsleuth.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.db.repository.postrepository import PostRepository
+from redditrepostsleuth.db.repository.repostwatchrepository import RepostWatchRepository
 from redditrepostsleuth.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.db.uow.unitofwork import UnitOfWork
 
@@ -33,3 +34,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def comments(self) -> CommentRepository:
         return CommentRepository(self.session)
+
+    @property
+    def repostwatch(self) -> RepostWatchRepository:
+        return RepostWatchRepository(self.session)

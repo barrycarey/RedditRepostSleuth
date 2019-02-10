@@ -30,6 +30,8 @@ class ConfigManager:
         self.vptree_cache_duration = self.config['GENERAL'].getint('vptree_cache_duration', fallback=1800)
         self.hamming_distance = self.config['GENERAL'].getint('hamming_distance', fallback=10)
         self.subreddit_summons = self.config['GENERAL'].get('subreddit_summons', fallback='all')
+        post_types = self.config['GENERAL'].get('supported_post_types', fallback='image')
+        self.supported_post_types = post_types.split(',')
 
         # Database
         self.db_host = self.config['DATABASE']['host']

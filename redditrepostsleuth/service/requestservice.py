@@ -1,3 +1,4 @@
+import re
 from typing import List
 
 from praw import Reddit
@@ -6,9 +7,10 @@ from datetime import datetime
 
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, REPOST_ALL, LINK_ALL
+from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, REPOST_ALL, LINK_ALL, \
+    WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Summons, Post
+from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
 
@@ -20,29 +22,74 @@ class RequestService:
         self.reddit = reddit
 
     def handle_repost_request(self, summons: Summons):
+
+        parsed_command = re.search('!repost\s(?P<command>[^\s]+)(?P<subcommand>\s[^\s]+)?', summons.comment_body, re.IGNORECASE)
+
         log.info('Processing request for comment %s. Body: %s', summons.comment_id, summons.comment_body)
         submission = self.reddit.submission(id=summons.post_id)
         comment = self.reddit.comment(id=summons.comment_id)
         response = RepostResponseBase(summons_id=summons.id)
-        if hasattr(submission, 'post_hint'):
-            if submission.post_hint == 'image':
-                log.info('Summons is for an image post')
-                self.process_image_repost_request(submission, comment, summons)
-            elif submission.post_hint == 'link':
-                self.process_link_repost_request(submission, comment, summons)
-            else:
-                log.error('Unsupported post type %s', submission.post_hint)
-                response.status = 'error'
-                response.message = UNSUPPORTED_POST_TYPE
-                self._send_response(comment, response)
-                return
-
-        else:
+        if not hasattr(submission, 'post_hint'):
             log.error('Submission has no post hint.  Cannot process summons')
             response.status = 'error'
             response.message = UNSUPPORTED_POST_TYPE
             self._send_response(comment, response)
             return
+
+        # TODO handle case when no command is passed
+        if parsed_command.group('command').lower() == 'watch':
+            self.process_watch_request(summons, sub_command=parsed_command.group('subcommand'))
+        elif parsed_command.group('command').lower() == 'unwatch':
+            self.process_unwatch_request(summons)
+        else:
+            log.error('Unknown command')
+            response.message = UNKNOWN_COMMAND
+            self._send_response(comment, response)
+
+        """
+        if submission.post_hint == 'image':
+            log.info('Summons is for an image post')
+            self.process_image_repost_request(submission, comment, summons)
+        elif submission.post_hint == 'link':
+            self.process_link_repost_request(submission, comment, summons)
+        else:
+            log.error('Unsupported post type %s', submission.post_hint)
+            response.status = 'error'
+            response.message = UNSUPPORTED_POST_TYPE
+            self._send_response(comment, response)
+            return
+        """
+
+    def process_watch_request(self, summons: Summons, sub_command: str = None):
+        # TODO - Add check for existing watch
+        response = RepostResponseBase(summons_id=summons.id)
+        comment = self.reddit.comment(id=summons.comment_id)
+        watch = RepostWatch(post_id=summons.post_id, user=comment.author.name)
+        watch.response_type = sub_command if sub_command else 'message'
+        log.info('Creating watch request on post %s for user %s', summons.post_id, comment.author.name)
+        with self.uowm.start() as uow:
+            uow.repostwatch.add(watch)
+            # TODO - Probably need to catch exception here
+            uow.commit()
+
+        response.message = WATCH_ENABLED.format(response=watch.response_type)
+        self._send_response(comment, response)
+
+    def process_unwatch_request(self, summons: Summons):
+        response = RepostResponseBase(summons_id=summons.id)
+        comment = self.reddit.comment(id=summons.comment_id)
+        with self.uowm.start() as uow:
+            log.debug('Looking up existing watch for post %s from user %s', summons.post_id, comment.author.name)
+            watch = uow.repostwatch.find_existing_watch(comment.author.name, summons.post_id)
+            if not watch:
+                log.debug('Unable to locate existing repost watch')
+                response.message = WATCH_NOT_FOUND
+                self._send_response(comment, response)
+                return
+            uow.repostwatch.remove(watch)
+            uow.commit()
+            response.message = WATCH_DISABLED
+            self._send_response(comment, response)
 
     def process_link_repost_request(self, submission: Submission, comment: Comment, summons: Summons):
         response = RepostResponseBase(summons_id=summons.id)

@@ -48,11 +48,14 @@ class CommentMonitor:
         Continually check the summons table for new requests.  Handle them as they are found
         """
         while True:
-            with self.uowm.start() as uow:
-                summons = uow.summons.get_unreplied()
-                for s in summons:
-                    self.request_service.handle_repost_request(s)
-            time.sleep(2)
+            try:
+                with self.uowm.start() as uow:
+                    summons = uow.summons.get_unreplied()
+                    for s in summons:
+                        self.request_service.handle_repost_request(s)
+                time.sleep(2)
+            except Exception as e:
+                log.exception('Exception in handle summons thread')
 
 
     def ingest_new_comments(self):
