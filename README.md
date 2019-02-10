@@ -24,6 +24,11 @@ Repost Sleuth responds to various commands.  See command section below
 * Set watches on a post and get notifications if someone else posts the same thing
 * More to come
 
+### Commands
+**!repost all message|comment** - Find all matching posts and list them in a comment reply or via PM
+**!repost watch message|comment** - Monitor this post and notify you if we see it posted somewhere else
+**!repost unwatch** - Disable an active repost monitors for this post
+
 ### Technology
 
 Repost Sleuth makes heavy use of Celery with a Redis backend.  Celery allows a large number of CPU bound tasks to be run in parallel with a number of benefits  
