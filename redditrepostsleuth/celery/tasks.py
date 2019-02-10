@@ -7,6 +7,7 @@ from distance import hamming
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.exception import ImageConversioinException
+from redditrepostsleuth.config import config
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
@@ -70,7 +71,7 @@ def hash_image_and_save(self, data):
 
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
 def find_matching_images_task(self, hash):
-    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash.image_hash)
+    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash.image_hash, hamming_distance=config.hamming_distance)
     return hash
 
 

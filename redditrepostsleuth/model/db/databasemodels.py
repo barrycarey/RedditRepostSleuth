@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -37,10 +37,12 @@ class Summons(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     comment_id = Column(String(100), unique=True)
-    comment_body = Column(String(1000))
+    comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
     comment_reply = Column(String(5000))
+    comment_reply_id = Column(String(100))
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
+
 
 class Comment(Base):
 
@@ -50,3 +52,22 @@ class Comment(Base):
     comment_id = Column(String(100), nullable=False, unique=True)
     body = Column(Text(collation='utf8mb4_general_ci'))
     ingested_at = Column(DateTime, default=func.utc_timestamp())
+
+class RepostWatch(Base):
+
+    __tablename__ = 'reddit_repost_watch'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    response_type = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=func.utc_timestamp())
+    last_detection = Column(DateTime)
+
+class Reposts(Base):
+
+    __tablename__ = 'reddit_reposts'
+    id = Column(Integer, primary_key=True)
+    hamming_distance = Column(Integer)
+    post_id = Column(String(100), nullable=False)
+    repost_of = Column(Integer, nullable=False)
+    detected_at = Column(DateTime, default=func.utc_timestamp())
