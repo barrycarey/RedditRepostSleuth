@@ -21,7 +21,8 @@ celery = Celery('tasks', backend=config.celery_backend,
 celery.conf.update(
     task_serializer='pickle',
     result_serializer='pickle',
-    accept_content=['pickle', 'json']
+    accept_content=['pickle', 'json'],
+
 )
 
 

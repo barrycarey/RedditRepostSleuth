@@ -171,7 +171,7 @@ class ImageRepostProcessing:
 
                     (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
                 log.info('Waiting 30 seconds until next repost batch')
-                #time.sleep(30)
+                time.sleep(30)
 
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)

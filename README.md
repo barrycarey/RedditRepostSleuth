@@ -26,8 +26,11 @@ Repost Sleuth responds to various commands.  See command section below
 
 ### Commands
 **!repost all message|comment** - Find all matching posts and list them in a comment reply or via PM
+
 **!repost watch message|comment** - Monitor this post and notify you if we see it posted somewhere else
+
 **!repost unwatch** - Disable an active repost monitors for this post
+
 **!repost stats** - Get stats about the bot
 
 ### Technology
