@@ -29,7 +29,7 @@ class CashedVpTree:
         if self.tree_built_at is None or (datetime.now() - self.tree_built_at).seconds > config.vptree_cache_duration:
             log.info('Building New VPTree')
             with self.uowm.start() as uow:
-                existing_images = uow.posts.test_with_entities(limit=1000)
+                existing_images = uow.posts.test_with_entities()
                 log.info('Tree will be built with %s images', len(existing_images))
                 log.info('Recurssion Depth: %s', print(sys.getrecursionlimit()))
                 self.building_tree = True
