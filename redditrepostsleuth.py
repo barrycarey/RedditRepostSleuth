@@ -60,7 +60,6 @@ if __name__ == '__main__':
     if args.ingestcomments:
         log.info('Starting Comment Ingest Agent')
         threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
-        threading.Thread(target=comments.process_comment_queue, name='CommentIngestQueue').start()
 
     if args.imagehashing:
         log.info('Starting Hashing Agent')

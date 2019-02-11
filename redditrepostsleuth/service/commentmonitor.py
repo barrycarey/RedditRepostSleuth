@@ -20,7 +20,6 @@ class CommentMonitor:
         self.reddit = reddit
         self.uowm = uowm
         self.request_service = request_service
-        self.comment_queue = Queue(maxsize=0)
 
     def monitor_for_summons(self):
         """
@@ -59,17 +58,10 @@ class CommentMonitor:
 
 
     def ingest_new_comments(self):
-        for comment in self.reddit.subreddit('all').stream.comments():
-            self.comment_queue.put(comment)
-
-    def process_comment_queue(self):
         while True:
             try:
-                if self.comment_queue.qsize() == 0:
-                    log.debug('Comment Queue Size: %s', self.comment_queue.qsize())
-                com = self.comment_queue.get()
-                comment = DbComment(body=com.body, comment_id=com.id)
-                save_new_comment.delay(comment)
+                for comment in self.reddit.subreddit('all').stream.comments():
+                    save_new_comment.apply_async((comment,), queue='commentingest')
             except Exception as e:
-                log.exception('Problem getting post from queue.', exc_info=True)
-                continue
+                log.exception('Problem in comment ingest thread', exc_info=True)
+

@@ -10,7 +10,7 @@ from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Reposts
+from redditrepostsleuth.model.db.databasemodels import Reposts, Comment
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 
@@ -63,6 +63,14 @@ def remove_cross_posts(self, post: HashWrapper):
                 pass
 
     return post
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def save_new_comment(self, comment):
+    with self.uowm.start() as uow:
+        new_comment = Comment(body=comment.body, comment_id=comment.id)
+        uow.comments.add(new_comment)
+        uow.commit()
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def hash_image_and_save(self, post_id):
@@ -167,11 +175,6 @@ def save_new_post(self, postdto):
             return
         uow.commit()
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
-def save_new_comment(self, comment):
-    with self.uowm.start() as uow:
-        uow.comments.add(comment)
-        uow.commit()
 
 @celery.task(serializer='pickle')
 def build_vp_tree(points):
