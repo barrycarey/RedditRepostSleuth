@@ -16,7 +16,8 @@ from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 
 from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree
-from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts
+from redditrepostsleuth.util.objectmapping import post_to_hashwrapper
+from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, get_crosspost_parent
 from redditrepostsleuth.util.vptree import VPTree
 
 
@@ -29,6 +30,16 @@ def image_hash(data):
         data['delete'] = True
 
     return data
+
+@celery.task
+def image_hash_from_url(url):
+    try:
+        img = generate_img_by_url(url)
+        return generate_dhash(img)
+    except ImageConversioinException as e:
+        log.exception('Error getting image hash in task', exc_info=True)
+        return
+
 
 class SqlAlchemyTask(Task):
 
@@ -128,9 +139,35 @@ def find_matching_images_task(self, hash):
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
 def save_new_post(self, postdto):
+    # TODO - This whole mess needs to be cleaned up
     #post = postdto_to_post(postdto)
     with self.uowm.start() as uow:
         uow.posts.add(postdto)
+        if config.check_repost_on_ingest and postdto.post_type == 'image':
+            log.debug('----> Repost on ingest enabled.  Check repost for %s', postdto.post_id)
+
+            try:
+                img = generate_img_by_url(postdto.url)
+                postdto.image_hash = generate_dhash(img)
+            except ImageConversioinException as e:
+                log.exception('Error getting image hash in task', exc_info=True)
+
+            parent = get_crosspost_parent(postdto, get_reddit_instance())
+            if parent:
+                postdto.checked_repost = True
+                postdto.crosspost_parent = parent
+                uow.commit()
+                return
+            uow.commit()
+
+            if not postdto.image_hash:
+                log.error('Unable to get image hash. Skipping ingest repost check')
+                return
+
+            wrapped = post_to_hashwrapper(postdto)
+            log.debug('Starting repost check for post %s', postdto.post_id)
+            (find_matching_images_task.s(wrapped) | process_reposts.s()).apply_async(queue='repost')
+            return
         uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')

@@ -33,6 +33,6 @@ class MaintenanceService:
 
                     log.info('Starting %s delete check jobs', config.delete_check_batch_size)
                     for post in posts:
-                        check_deleted_posts.delay(post.post_id)
+                        check_deleted_posts.apply_async((post.post_id,), queue='deletecheck')
                 offset += limit
                 time.sleep(15)

@@ -51,8 +51,9 @@ class PostRepository:
         since = datetime.now() - timedelta(hours=hours)
         return self.db_session.query(Post).filter(or_(Post.last_deleted_check == None, Post.last_deleted_check < since)).offset(offset).limit(limit).all()
 
-    def test_with_entities(self):
-        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.image_hash != None).with_entities(Post.post_id, Post.image_hash).all()
+    # TODO - Rename this
+    def test_with_entities(self, limit: int = None):
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.image_hash != None).with_entities(Post.post_id, Post.image_hash).limit(limit).all()
 
     def count_by_type(self, post_type: str):
         r = self.db_session.query(func.count(Post.id)).filter(Post.post_type == post_type).first()

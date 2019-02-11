@@ -148,7 +148,7 @@ class ImageRepostProcessing:
     def process_repost_celery_new(self):
         # TODO - Add logic for when we reach end of results
         offset = 0
-        limit = 10
+        limit = 40
         while True:
             try:
                 with self.uowm.start() as uow:
@@ -170,8 +170,8 @@ class ImageRepostProcessing:
                     #find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
 
                     (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
-
-                time.sleep(30)
+                log.info('Waiting 30 seconds until next repost batch')
+                #time.sleep(30)
 
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)

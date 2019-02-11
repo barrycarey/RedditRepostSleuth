@@ -1,5 +1,8 @@
 from typing import List
 
+from praw import Reddit
+
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 
 
@@ -34,3 +37,15 @@ def sort_reposts(posts: List[Post], reverse=False) -> List[Post]:
     :param posts:
     """
     return sorted(posts, key=lambda x: x.created_at, reverse=reverse)
+
+def get_crosspost_parent(post: Post, reddit: Reddit):
+    submission = reddit.submission(id=post.post_id)
+    if submission:
+        try:
+            result = submission.crosspost_parent
+            log.debug('Post %s has corsspost parent %s', post.post_id, result)
+            return result
+        except AttributeError:
+            log.debug('No crosspost parent for post %s', post.post_id)
+            return None
+    log.error('Failed to find submission with ID %s', post.post_id)
