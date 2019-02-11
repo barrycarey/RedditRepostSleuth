@@ -62,10 +62,8 @@ if __name__ == '__main__':
         threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
         threading.Thread(target=comments.process_comment_queue, name='CommentIngestQueue').start()
 
-    hashing = None
     if args.imagehashing:
         log.info('Starting Hashing Agent')
-
         threading.Thread(target=hashing.generate_hashes, name="Hashing").start()
         threading.Thread(target=hashing.process_hash_queue, name="HashingFlush").start()
 
