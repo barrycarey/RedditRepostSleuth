@@ -29,7 +29,7 @@ def submission_to_post(submission: Submission) -> Post:
         try:
             post.post_type = submission.post_hint
         except (AttributeError, Forbidden) as e:
-            print('Missing Post Hint')
+            pass
 
     # TODO - Do this lookup at time of checking reposts.  It's slow and slows down ingest
     """
