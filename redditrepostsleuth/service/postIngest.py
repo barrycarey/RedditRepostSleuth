@@ -25,7 +25,7 @@ class PostIngest:
                 while True:
                     try:
                         for submission in sr.stream.submissions():
-                            #log.debug('Saving post %s', submission.id)
+                            log.debug('Saving post %s', submission.id)
                             save_new_post.apply_async((submission_to_post(submission),), queue='postingest')
                     except Forbidden as e:
                         pass
