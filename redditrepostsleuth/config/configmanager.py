@@ -31,6 +31,10 @@ class ConfigManager:
         self.hamming_distance = self.config['GENERAL'].getint('hamming_distance', fallback=10)
         self.subreddit_summons = self.config['GENERAL'].get('subreddit_summons', fallback='all')
         self.check_repost_on_ingest = self.config['GENERAL'].getboolean('check_repost_on_ingest', fallback=False)
+        self.generate_hash_batch_delay = self.config['GENERAL'].getint('generate_hash_batch_delay', fallback=15)
+        self.delete_check_batch_delay = self.config['GENERAL'].getint('delete_check_batch_delay', fallback=15)
+        self.check_repost_batch_size = self.config['GENERAL'].getint('check_repost_batch_size', fallback=2)
+        self.check_repost_batch_delay = self.config['GENERAL'].getint('check_repost_batch_delay', fallback=20)
         post_types = self.config['GENERAL'].get('supported_post_types', fallback='image')
         self.supported_post_types = post_types.split(',')
 

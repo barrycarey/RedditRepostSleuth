@@ -31,15 +31,6 @@ def image_hash(data):
 
     return data
 
-@celery.task
-def image_hash_from_url(url):
-    try:
-        img = generate_img_by_url(url)
-        return generate_dhash(img)
-    except ImageConversioinException as e:
-        log.exception('Error getting image hash in task', exc_info=True)
-        return
-
 
 class SqlAlchemyTask(Task):
 
@@ -72,6 +63,21 @@ def remove_cross_posts(self, post: HashWrapper):
                 pass
 
     return post
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def hash_image_and_save(self, post_id):
+    log.debug('Hashing post %s', post_id)
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_post_id(post_id)
+        if not post:
+            log.error('Cannot find post with ID %s', post_id)
+        try:
+            img = generate_img_by_url(post.url)
+            post.image_hash = generate_dhash(img)
+        except ImageConversioinException as e:
+            return
+        uow.commit()
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def process_reposts(self, post: HashWrapper):
@@ -120,17 +126,7 @@ def check_deleted_posts(self, post_id):
 
         uow.commit()
 
-@celery.task(bind=True, base=SqlAlchemyTask, serializer='pickle', ignore_results=True)
-def hash_image_and_save(self, data):
-    with self.uowm.start() as uow:
-        post = uow.posts.get_by_post_id(data['post_id'])
-        try:
-            img = generate_img_by_url(data['url'])
-            post.image_hash = generate_dhash(img)
-        except ImageConversioinException as e:
-            if post:
-                uow.posts.remove(post)
-        uow.commit()
+
 
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
 def find_matching_images_task(self, hash):

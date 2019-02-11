@@ -38,26 +38,28 @@ class ImageRepostProcessing:
         hashes created
         """
         while True:
-            try:
-                with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_without_hash(limit=config.generate_hash_batch_size)
+            offset = 0
+            while True:
+                try:
+                    with self.uowm.start() as uow:
+                        posts = uow.posts.find_all_without_hash(limit=config.generate_hash_batch_size, offset=offset)
 
-                jobs = []
-                for post in posts:
-                    jobs.append(hash_image_and_save.s({'url': post.url, 'post_id': post.post_id, 'hash': None, 'delete': False}))
+                    if not posts:
+                        log.info('Ran out of images to hash')
+                        break
 
-                job = group(jobs)
-                log.debug('Starting Generate Hash Job with %s images', config.generate_hash_batch_size)
-                pending = job.apply_async()
-                while pending.waiting():
-                    log.debug('still waiting')
-                    time.sleep(.3)
+                    for post in posts:
+                        hash_image_and_save.apply_async((post.post_id,), queue='hashing')
+                    log.info('Started %s hashing jobs', config.generate_hash_batch_size)
+                    offset += config.generate_hash_batch_size
+                    time.sleep(config.generate_hash_batch_delay)
 
-            except Exception as e:
-                # TODO - Temp wide exception to catch any faults
-                log.exception('Error processing celery jobs', exc_info=True)
+                except Exception as e:
+                    # TODO - Temp wide exception to catch any faults
+                    log.exception('Error processing celery jobs', exc_info=True)
 
 
+    # TODO - Not Used
     def process_hash_queue(self):
         while True:
             results = []
@@ -148,11 +150,10 @@ class ImageRepostProcessing:
     def process_repost_celery_new(self):
         # TODO - Add logic for when we reach end of results
         offset = 0
-        limit = 2
         while True:
             try:
                 with self.uowm.start() as uow:
-                    raw_posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
+                    raw_posts = uow.posts.find_all_by_repost_check(False, limit=config.check_repost_batch_size, offset=offset)
                     wrapped_posts = []
                     for post in raw_posts:
                         parent = self._get_crosspost_parent(post)
@@ -171,6 +172,7 @@ class ImageRepostProcessing:
 
                     (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
                 log.info('Waiting 30 seconds until next repost batch')
+                offset += config.check_repost_batch_size
                 time.sleep(30)
 
             except Exception as e:

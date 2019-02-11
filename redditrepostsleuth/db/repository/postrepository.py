@@ -26,8 +26,8 @@ class PostRepository:
         query = self.db_session.query(Post).filter(Post.image_hash == hash_str, Post.post_type == 'image').limit(limit).all()
         return query
 
-    def find_all_without_hash(self, limit: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.image_hash == None, Post.post_type == 'image').limit(limit).all()
+    def find_all_without_hash(self, limit: int = None, offset: int = None) -> List[Post]:
+        return self.db_session.query(Post).filter(Post.image_hash == None, Post.post_type == 'image').offset(offset).limit(limit).all()
 
     def find_all_by_url(self, url: str, limit: int = None):
         return self.db_session.query(Post).filter(Post.url == url).limit(limit).order_by(Post.created_at).all()

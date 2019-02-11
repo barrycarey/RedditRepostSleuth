@@ -25,7 +25,6 @@ class MaintenanceService:
             while True:
                 with self.uowm.start() as uow:
                     r = uow.posts.count_by_type('image')
-                    log.debug('Offset: %s', offset)
                     posts = uow.posts.find_all_for_delete_check(196, limit=config.delete_check_batch_size)
                     if len(posts) == 0:
                         log.info('Cleaned deleted images reach end of results')
@@ -35,4 +34,4 @@ class MaintenanceService:
                     for post in posts:
                         check_deleted_posts.apply_async((post.post_id,), queue='deletecheck')
                 offset += limit
-                time.sleep(15)
+                time.sleep(config.delete_check_batch_delay)
