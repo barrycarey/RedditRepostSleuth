@@ -9,3 +9,4 @@ celery[redis]
 numpy
 dataclasses
 flower
+eventlet

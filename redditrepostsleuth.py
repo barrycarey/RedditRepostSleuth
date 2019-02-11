@@ -47,18 +47,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     threads = []
-
+    hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+    repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing, get_reddit_instance())
+    comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     if args.ingestposts:
-        log.info('Starting Ingest Agent')
+        log.info('Starting Post Ingest Agent')
         ingest = PostIngest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
         #threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
         #threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
+    if args.ingestcomments:
+        log.info('Starting Comment Ingest Agent')
+        threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
+        threading.Thread(target=comments.process_comment_queue, name='CommentIngestQueue').start()
+
     hashing = None
     if args.imagehashing:
         log.info('Starting Hashing Agent')
-        hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+
         threading.Thread(target=hashing.generate_hashes, name="Hashing").start()
         threading.Thread(target=hashing.process_hash_queue, name="HashingFlush").start()
 
@@ -76,12 +83,11 @@ if __name__ == '__main__':
     if args.summons:
         if hashing is None:
             hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-        repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing, get_reddit_instance())
-        comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
+
+
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
         threading.Thread(target=comments.handle_summons).start()
-        #threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
-        threading.Thread(target=comments.process_comment_queue, name='CommentIngestQueue').start()
+
 
 
     while True:

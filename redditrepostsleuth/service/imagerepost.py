@@ -148,7 +148,7 @@ class ImageRepostProcessing:
     def process_repost_celery_new(self):
         # TODO - Add logic for when we reach end of results
         offset = 0
-        limit = 40
+        limit = 15
         while True:
             try:
                 with self.uowm.start() as uow:
