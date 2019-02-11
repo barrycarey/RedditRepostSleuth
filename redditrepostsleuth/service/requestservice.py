@@ -99,6 +99,12 @@ class RequestService:
             response.message = WATCH_DISABLED
             self._send_response(comment, response)
 
+    def process_repost_request(self, submission: Submission, comment: Comment, summons: Summons):
+        if submission.post_hint == 'image':
+            self.process_image_repost_request(submission, comment, summons)
+        elif submission.post_hint == 'link':
+            self.process_link_repost_request(submission, comment, submission)
+
     def process_link_repost_request(self, submission: Submission, comment: Comment, summons: Summons):
         response = RepostResponseBase(summons_id=summons.id)
         with self.uowm.start() as uow:

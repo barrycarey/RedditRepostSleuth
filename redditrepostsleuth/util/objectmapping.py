@@ -14,7 +14,7 @@ def submission_to_post(submission: Submission) -> Post:
     Convert a PRAW Submission object into a Post object
     :param submission:
     """
-    log.debug('Converting submission %s to post', submission.id)
+    #log.debug('Converting submission %s to post', submission.id)
     post = Post()
     post.post_id = submission.id
     post.url = submission.url

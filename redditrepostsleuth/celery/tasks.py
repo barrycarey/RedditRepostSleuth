@@ -95,9 +95,10 @@ def process_reposts(self, post: HashWrapper):
                       str(results[0].created_at), results[0].perma_link)
             for p in results:
                 log.error('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
-                new_repost = Reposts(post_id=post.post_id, repost_of=p.post_id)
-                uow.repost.add(new_repost)
-                uow.commit()
+
+            new_repost = Reposts(post_id=post.post_id, repost_of=results[0].post_id)
+            uow.repost.add(new_repost)
+            uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def check_deleted_posts(self, post_id):
