@@ -4,3 +4,4 @@ class HashWrapper:
         self.image_hash = None
         self.occurances = []
         self.crosspost_parent = None
+        self.created_at = None

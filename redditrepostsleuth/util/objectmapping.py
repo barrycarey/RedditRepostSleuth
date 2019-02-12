@@ -85,6 +85,7 @@ def post_to_hashwrapper(post: Post):
     wrapper = HashWrapper()
     wrapper.post_id = post.post_id
     wrapper.image_hash = post.image_hash
+    wrapper.created_at = post.created_at
     return wrapper
 
 def hash_tuple_to_hashwrapper(hash_tup):

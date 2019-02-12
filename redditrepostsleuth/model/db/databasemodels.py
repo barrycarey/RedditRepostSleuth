@@ -29,6 +29,7 @@ class Post(Base):
     checked_repost = Column(Boolean, default=False)
     crosspost_checked = Column(Boolean, default=False)
     last_deleted_check = Column(DateTime)
+    url_hash = Column(String(32)) # Needed to index URLs for faster lookups
 
 class Summons(Base):
 

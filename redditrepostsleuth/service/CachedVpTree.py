@@ -20,6 +20,8 @@ class CashedVpTree:
         self.building_tree = False
         self.tree_built_at = None
         self.vp_tree = None
+        self.aged_vp_tree = None
+        self.aged_vp_tree_newest = None
 
     @property
     def get_tree(self):
@@ -31,7 +33,6 @@ class CashedVpTree:
             with self.uowm.start() as uow:
                 existing_images = uow.posts.test_with_entities()
                 log.info('Tree will be built with %s images', len(existing_images))
-                log.info('Recurssion Depth: %s', print(sys.getrecursionlimit()))
                 self.building_tree = True
                 start = datetime.now()
                 self.vp_tree = VPTree([hash_tuple_to_hashwrapper(post) for post in existing_images], lambda x,y: hamming(x,y))
@@ -43,3 +44,14 @@ class CashedVpTree:
         else:
             log.info('Returning cached VP Tree')
             return self.vp_tree
+
+    def get_aged_tree(self, date):
+        log.info('Building new Aged VP Tree')
+        with self.uowm.start() as uow:
+            existing_images = uow.posts.find_all_older(date)
+            log.info('Tree will be built with %s images', len(existing_images))
+            start = datetime.now()
+            tree = VPTree([hash_tuple_to_hashwrapper(post) for post in existing_images], lambda x,y: hamming(x,y))
+            delta = datetime.now() - start
+            print('Tree built in {} seconeds'.format(str(delta.seconds)))
+            return tree

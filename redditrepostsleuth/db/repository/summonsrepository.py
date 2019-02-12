@@ -1,3 +1,5 @@
+from sqlalchemy import func
+
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Summons
 
@@ -18,3 +20,7 @@ class SummonsRepository:
 
     def get_unreplied(self) -> Summons:
         return self.db_session.query(Summons).filter(Summons.summons_replied_at == None).all()
+
+    def get_count(self):
+        r = self.db_session.query(func.count(Summons.id)).first()
+        return r[0] if r else None

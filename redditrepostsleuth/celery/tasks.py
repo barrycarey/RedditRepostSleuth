@@ -115,6 +115,12 @@ def process_reposts(self, post: HashWrapper):
             uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def process_link_repost(self, post_id):
+    with self.uowm.start() as uow:
+        pass
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def check_deleted_posts(self, post_id):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(post_id)
@@ -141,6 +147,10 @@ def find_matching_images_task(self, hash):
     hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash.image_hash, hamming_distance=config.hamming_distance)
     return hash
 
+@celery.task(bind=True, base=VpTreeTask, serializer='pickle')
+def find_matching_images_aged_task(self, hash):
+    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_aged_tree(hash.created_at), hash.image_hash, hamming_distance=config.hamming_distance)
+    return hash
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
 def save_new_post(self, postdto):

@@ -35,6 +35,8 @@ class ConfigManager:
         self.delete_check_batch_delay = self.config['GENERAL'].getint('delete_check_batch_delay', fallback=15)
         self.check_repost_batch_size = self.config['GENERAL'].getint('check_repost_batch_size', fallback=2)
         self.check_repost_batch_delay = self.config['GENERAL'].getint('check_repost_batch_delay', fallback=20)
+        self.link_repost_batch_size = self.config['GENERAL'].getint('link_repost_batch_size', fallback=20)
+        self.link_repost_batch_delay = self.config['GENERAL'].getint('link_repost_batch_delay', fallback=20)
         post_types = self.config['GENERAL'].get('supported_post_types', fallback='image')
         self.supported_post_types = post_types.split(',')
 

@@ -8,7 +8,7 @@ from datetime import datetime
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, REPOST_ALL, LINK_ALL, \
-    WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE
+    WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE, STATS
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
@@ -41,6 +41,8 @@ class RequestService:
             self.process_watch_request(summons, sub_command=parsed_command.group('subcommand'))
         elif parsed_command.group('command').lower() == 'unwatch':
             self.process_unwatch_request(summons)
+        elif parsed_command.group('command').lower() == 'stats':
+            self.process_stat_request(summons)
         else:
             log.error('Unknown command')
             response.message = UNKNOWN_COMMAND
@@ -59,6 +61,34 @@ class RequestService:
             self._send_response(comment, response)
             return
         """
+
+    def process_stat_request(self, summons: Summons):
+        response = RepostResponseBase(summons_id=summons.id)
+        comment = self.reddit.comment(id=summons.comment_id)
+        response = RepostResponseBase(summons_id=summons.id)
+        with self.uowm.start() as uow:
+            video_count = uow.posts.count_by_type('video')
+            video_count += uow.posts.count_by_type('hosted:video')
+            video_count += uow.posts.count_by_type('rich:video')
+            image_count = uow.posts.count_by_type('image')
+            text_count = uow.posts.count_by_type('text')
+            link_count = uow.posts.count_by_type('link')
+            summons_count = uow.summons.get_count()
+            post_count = uow.posts.get_count()
+            oldest_post = uow.posts.get_oldest_post()
+
+        response.message = STATS.format(
+            post_count=post_count,
+            images=image_count,
+            links=link_count,
+            video=video_count,
+            text=text_count,
+            oldest=str(oldest_post.created_at),
+            reposts=0,
+            summoned=summons_count
+        )
+
+        self._send_response(comment, response)
 
     def process_watch_request(self, summons: Summons, sub_command: str = None):
         # TODO - Add check for existing watch
@@ -99,13 +129,13 @@ class RequestService:
             response.message = WATCH_DISABLED
             self._send_response(comment, response)
 
-    def process_repost_request(self, submission: Submission, comment: Comment, summons: Summons):
+    def process_repost_request(self, submission: Submission, comment: Comment, summons: Summons, sub_command: str = None):
         if submission.post_hint == 'image':
             self.process_image_repost_request(submission, comment, summons)
         elif submission.post_hint == 'link':
-            self.process_link_repost_request(submission, comment, submission)
+            self.process_link_repost_request(submission, comment, summons)
 
-    def process_link_repost_request(self, submission: Submission, comment: Comment, summons: Summons):
+    def process_link_repost_request(self, submission: Submission, comment: Comment, summons: Summons, sub_command: str = None):
         response = RepostResponseBase(summons_id=summons.id)
         with self.uowm.start() as uow:
             search_count = uow.posts.count_by_type('link')
@@ -119,7 +149,7 @@ class RequestService:
                 response.message = REPOST_NO_RESULT.format(total=search_count)
             self._send_response(comment, response)
 
-    def process_image_repost_request(self, submission: Submission, comment: Comment, summons: Summons):
+    def process_image_repost_request(self, submission: Submission, comment: Comment, summons: Summons, sub_command: str = None):
         result = None
         with self.uowm.start() as uow:
             post_count = uow.posts.count_by_type('image')

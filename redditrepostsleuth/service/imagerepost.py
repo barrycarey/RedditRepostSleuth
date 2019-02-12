@@ -6,8 +6,10 @@ import requests
 from celery import group, chain
 from praw import Reddit
 from praw.models import Submission
+from prawcore import Forbidden
 
-from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts
+from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts, \
+    find_matching_images_aged_task
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -19,6 +21,7 @@ from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
     generate_img_by_url
 from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
+from redditrepostsleuth.util.reposthelpers import sort_reposts
 
 
 class ImageRepostProcessing:
@@ -59,37 +62,6 @@ class ImageRepostProcessing:
                     log.exception('Error processing celery jobs', exc_info=True)
 
 
-    # TODO - Not Used
-    def process_hash_queue(self):
-        while True:
-            results = []
-            while len(results) < 25:
-                try:
-                    results.append(self.hash_save_queue.get())
-                except Exception as e:
-                    log.exception('Exception with hash queue', exc_info=True)
-                    continue
-
-            try:
-                log.info('Flushing hash queue to database')
-                # TODO - Move this to celery worker side
-                with self.uowm.start() as uow:
-                    # TODO - Find a cleaner way to deal with this
-                    for result in results:
-                        post = uow.posts.get_by_post_id(result['post_id'])
-                        if not post:
-                            continue
-                        if result['delete']:
-                            log.debug('TASK RESULT: Deleting Post %s', result['post_id'])
-                            uow.posts.remove(post)
-                        else:
-                            log.debug('TASK RESULT: Saving Post %s', result['post_id'])
-                            post.image_hash = result['hash']
-                        uow.commit()
-            except Exception as e:
-                log.error('Error flushing hash queue')
-                log.error(str(e))
-
     def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False) -> List[Post]:
         """
         Take a given Reddit submission and find all matching posts
@@ -124,30 +96,47 @@ class ImageRepostProcessing:
 
             return occurrences
 
+    def process_image_repost_rising(self):
+        pass
 
-    def process_repost_celery(self):
-        offset = 0
-        limit = 10
+    def hash_link_urls(self):
         while True:
-            with self.uowm.start() as uow:
-                posts = uow.posts.find_all_by_repost_check(False, limit=limit, offset=offset)
-                cleaned_posts = [post_to_hashwrapper(post) for post in posts]
-                #r = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, cleaned_posts[0].image_hash)
-                jobs = [find_matching_images_task.s(post) for post in cleaned_posts]
-                job = group(jobs)
-                log.debug('Starting %s repost check jobs', limit)
-                pending_result = job.apply_async(queue='repost')
-                while pending_result.waiting():
-                    #log.info('Results not done')
-                    time.sleep(.2)
-                results = pending_result.join_native()
-                offset += limit
-                log.debug('Adding repost results to queue')
-                for r in results:
-                    if len(r.occurances) > 1:
-                        self.repost_queue.put(r)
+            offset = 0
+            while True
+                try:
+                    with self.uowm.start() as uow:
 
-    def process_repost_celery_new(self):
+                except Exception as e:
+                    log.exception('Problem')
+
+
+    def process_link_reposts(self):
+        while True:
+            offset = 0
+            while True:
+                try:
+                    with self.uowm.start() as uow:
+                        posts = uow.posts.find_all_by_type_repost('link', offset=offset, limit=config.link_repost_batch_size)
+                        if not posts:
+                            log.info('Ran out of links to check for repost')
+                            time.sleep(5)
+                            break
+                        for post in posts:
+                            log.info('Checking URL %s for repost', post.url)
+                            matching_links = [match for match in uow.posts.find_all_by_url(post.url) if match.post_id != post.post_id]
+                            if not matching_links:
+                                post.checked_repost = True
+                                uow.commit()
+                            matching_links = sort_reposts(matching_links)
+                            log.info('Found %s matching links', len(matching_links))
+
+                    offset += config.link_repost_batch_size
+
+
+                except Exception as e:
+                    log.exception('Error in Link repost thread', exc_info=True)
+
+    def process_image_reposts(self):
         # TODO - Add logic for when we reach end of results
         offset = 0
         while True:
@@ -171,6 +160,37 @@ class ImageRepostProcessing:
                     #find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
 
                     (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
+                log.info('Waiting 30 seconds until next repost batch')
+                offset += config.check_repost_batch_size
+                time.sleep(config.check_repost_batch_delay)
+
+            except Exception as e:
+                log.exception('Repost thread died', exc_info=True)
+
+    def process_repost_oldest(self):
+        offset = 0
+        while True:
+            try:
+                with self.uowm.start() as uow:
+                    raw_posts = uow.posts.find_all_by_repost_check_oldest(False, limit=config.check_repost_batch_size,
+                                                                   offset=offset)
+                    wrapped_posts = []
+                    for post in raw_posts:
+                        parent = self._get_crosspost_parent(post)
+                        if parent:
+                            log.debug('Post %s has a crosspost parent %s.  Skipping', post.post_id, parent)
+                            post.crosspost_parent = parent
+                            post.checked_repost = True
+                            uow.commit()
+                            continue
+                        wrapped_posts.append(post_to_hashwrapper(post))
+
+                log.info('Starting %s jobs', len(wrapped_posts))
+                for post in wrapped_posts:
+                    log.info('Creating chained task')
+                    # find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
+
+                    (find_matching_images_aged_task.s(post) | process_reposts.s()).apply_async(queue='repost')
                 log.info('Waiting 30 seconds until next repost batch')
                 offset += config.check_repost_batch_size
                 time.sleep(30)
@@ -260,7 +280,7 @@ class ImageRepostProcessing:
                 result = submission.crosspost_parent
                 log.debug('Post %s has corsspost parent %s', post.post_id, result)
                 return result
-            except AttributeError:
+            except (AttributeError,Forbidden):
                 log.debug('No crosspost parent for post %s', post.post_id)
                 return None
         log.error('Failed to find submission with ID %s', post.post_id)
