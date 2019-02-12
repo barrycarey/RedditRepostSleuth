@@ -38,6 +38,9 @@ def sort_reposts(posts: List[Post], reverse=False) -> List[Post]:
     """
     return sorted(posts, key=lambda x: x.created_at, reverse=reverse)
 
+def remove_newer_posts(posts: List[Post], repost_check: Post):
+    return [post for post in posts if post.created_at < repost_check.created_at]
+
 def get_crosspost_parent(post: Post, reddit: Reddit):
     submission = reddit.submission(id=post.post_id)
     if submission:

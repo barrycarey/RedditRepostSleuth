@@ -35,6 +35,9 @@ class PostRepository:
     def find_all_by_url(self, url: str, limit: int = None):
         return self.db_session.query(Post).filter(Post.url == url).limit(limit).all()
 
+    def find_all_by_url_hash(self, hash: str, limit: int = None):
+        return self.db_session.query(Post).filter(Post.url_hash == hash).limit(limit).all()
+
     def find_all_by_type(self, post_type: str, limit: int = None, offset: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.post_type == post_type).offset(offset).limit(limit).all()
 

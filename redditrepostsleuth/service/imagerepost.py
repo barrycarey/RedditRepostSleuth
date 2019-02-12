@@ -16,14 +16,14 @@ from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.model.db.databasemodels import Post, Reposts
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.util.imagehashing import generate_dhash, find_matching_images_in_vp_tree, \
     generate_img_by_url
 from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
-from redditrepostsleuth.util.reposthelpers import sort_reposts
+from redditrepostsleuth.util.reposthelpers import sort_reposts, remove_newer_posts
 
 
 class ImageRepostProcessing:
@@ -107,15 +107,17 @@ class ImageRepostProcessing:
             while True:
                 try:
                     with self.uowm.start() as uow:
-                        posts = uow.posts.find_all_links_without_hash(limit=500, offset=offset)
+                        posts = uow.posts.find_all_links_without_hash(limit=10000, offset=offset)
                         if not posts:
                             log.info('No links to hash')
                             time.sleep(5)
+                            break
+                        log.info('Starting URL hash batch')
                         for post in posts:
                             hash_link_url.apply_async((post.id,), queue='linkhash')
 
 
-                    offset += 500
+                    offset += 1000
                 except Exception as e:
                     log.exception('Problem')
 
@@ -133,12 +135,32 @@ class ImageRepostProcessing:
                             break
                         for post in posts:
                             log.info('Checking URL %s for repost', post.url)
-                            matching_links = [match for match in uow.posts.find_all_by_url(post.url) if match.post_id != post.post_id]
+                            if post.url_hash is None:
+                                continue
+
+                            matching_links = [match for match in uow.posts.find_all_by_url_hash(post.url_hash) if match.post_id != post.post_id]
                             if not matching_links:
                                 post.checked_repost = True
                                 uow.commit()
-                            matching_links = sort_reposts(matching_links)
+                                continue
+                            matching_links = remove_newer_posts(matching_links, post)
+                            matching_links = sort_reposts(matching_links, reverse=False)
+                            if not matching_links:
+                                post.checked_repost = True
+                                uow.commit()
+                                continue
                             log.info('Found %s matching links', len(matching_links))
+                            parent = self._get_crosspost_parent(post)
+                            if parent:
+                                log.debug('Post %s has a crosspost parent %s.  Skipping', post.post_id, parent)
+                                post.crosspost_parent = parent
+                                post.checked_repost = True
+                                uow.commit()
+                                continue
+                            repost = Reposts(post_id=post.post_id, repost_of=matching_links[0].post_id)
+                            uow.repost.add(repost)
+                            post.checked_repost = True
+                            uow.commit()
 
                     offset += config.link_repost_batch_size
 
