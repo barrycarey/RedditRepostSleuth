@@ -8,8 +8,10 @@ from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
+from hashlib import md5
+
 from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts, \
-    find_matching_images_aged_task
+    find_matching_images_aged_task, hash_link_url
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -102,10 +104,18 @@ class ImageRepostProcessing:
     def hash_link_urls(self):
         while True:
             offset = 0
-            while True
+            while True:
                 try:
                     with self.uowm.start() as uow:
+                        posts = uow.posts.find_all_links_without_hash(limit=500, offset=offset)
+                        if not posts:
+                            log.info('No links to hash')
+                            time.sleep(5)
+                        for post in posts:
+                            hash_link_url.apply_async((post.id,), queue='linkhash')
 
+
+                    offset += 500
                 except Exception as e:
                     log.exception('Problem')
 

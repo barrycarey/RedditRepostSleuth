@@ -69,7 +69,7 @@ if __name__ == '__main__':
         log.info('Starting Repost Agent')
         if hashing is None:
             hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-        threading.Thread(target=hashing.process_link_reposts, name='LinkRepost').start()
+        threading.Thread(target=hashing.hash_link_urls, name='LinkRepost').start()
         #threading.Thread(target=hashing.process_repost_oldest, name='Repost').start()
         #threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
 

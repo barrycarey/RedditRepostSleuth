@@ -3,7 +3,7 @@ from celery import Task
 from datetime import datetime
 
 from distance import hamming
-
+from hashlib import md5
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.exception import ImageConversioinException
@@ -119,6 +119,15 @@ def process_link_repost(self, post_id):
     with self.uowm.start() as uow:
         pass
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def hash_link_url(self, id):
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_id(id)
+        if not post:
+            log.error('Didnt get post with id %s', id)
+        url_hash = md5(post.url.encode('utf-8'))
+        post.url_hash = url_hash.hexdigest()
+        uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def check_deleted_posts(self, post_id):

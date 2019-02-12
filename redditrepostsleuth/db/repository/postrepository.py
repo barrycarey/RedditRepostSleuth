@@ -19,7 +19,7 @@ class PostRepository:
         return self.db_session.query(Post).order_by(Post.created_at).first()
 
     def get_by_id(self, id: int) -> Post:
-        return self.db_session.get(Post, id)
+        return self.db_session.query(Post).filter(Post.id == id).first()
 
     def get_by_post_id(self, id: str) -> Post:
         log.debug('Looking up post with ID %s', id)
@@ -79,7 +79,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == post_type, Post.checked_repost == 0).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
     def find_all_links_without_hash(self, limit: int = None, offset: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.post_type == 'link', Post.)
+        return self.db_session.query(Post).filter(Post.post_type == 'link', Post.url_hash == None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)
