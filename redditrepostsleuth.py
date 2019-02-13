@@ -44,7 +44,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     threads = []
-    image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+    image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), repost=True, hashing=True)
     link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
@@ -52,8 +52,6 @@ if __name__ == '__main__':
         log.info('Starting Post Ingest Agent')
         ingest = PostIngest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
-        #threading.Thread(target=ingest.check_cross_posts, name='Post Ingest').start()
-        #threading.Thread(target=ingest._flush_submission_queue_test, name='Flush Ingest').start()
 
     if args.ingestcomments:
         log.info('Starting Comment Ingest Agent')
@@ -61,11 +59,12 @@ if __name__ == '__main__':
 
     if args.imagehashing:
         log.info('Starting Hashing Agent')
-        threading.Thread(target=image_repost_service.generate_hashes, name="Hashing").start()
+
 
     if args.repost:
         log.info('Starting Repost Agent')
         link_repost_service.start()
+        image_repost_service.start()
         #threading.Thread(target=hashing.process_repost_oldest, name='Repost').start()
         #threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
 
