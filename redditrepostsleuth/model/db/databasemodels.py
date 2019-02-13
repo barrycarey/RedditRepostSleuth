@@ -73,3 +73,4 @@ class Reposts(Base):
     post_id = Column(String(100), nullable=False)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
+    post_type = Column(String(20))

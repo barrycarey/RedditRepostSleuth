@@ -9,3 +9,4 @@ WATCH_NOT_FOUND = 'I was not able to locate an existing repost watch for this po
 WATCH_DUPLICATE = 'You already have a watch setup for this post'
 UNKNOWN_COMMAND = 'I don\'t understand your command. You can use \'!repost commands\' to see a list of commands I understand'
 STATS = '**Total Posts indexed:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n**Reposts Found:** {reposts}\n\n**Times Summoned:** {summoned}'
+SIGNATURE = 'Wiki | About Me | [Report a Bug](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=RepostSleuthBot%20Bug)'

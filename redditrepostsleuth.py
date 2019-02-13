@@ -12,6 +12,7 @@ from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
+from redditrepostsleuth.service.linkrepostservice import LinkRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
 from redditrepostsleuth.service.postIngest import PostIngest
 from redditrepostsleuth.service.requestservice import RequestService
@@ -47,8 +48,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     threads = []
-    hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-    repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), hashing, get_reddit_instance())
+    image_repost_service = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+    link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+    repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')
@@ -63,14 +65,14 @@ if __name__ == '__main__':
 
     if args.imagehashing:
         log.info('Starting Hashing Agent')
-        threading.Thread(target=hashing.generate_hashes, name="Hashing").start()
+        threading.Thread(target=image_repost_service.generate_hashes, name="Hashing").start()
 
     if args.repost:
         log.info('Starting Repost Agent')
-        if hashing is None:
-            hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-        threading.Thread(target=hashing.hash_link_urls, name='LinkHash').start()
-        threading.Thread(target=hashing.process_link_reposts, name='LinkRepost').start()
+        if image_repost_service is None:
+            image_repost_service = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+        threading.Thread(target=link_repost_service.hash_urls, name='LinkHash').start()
+        threading.Thread(target=link_repost_service.process_reposts, name='LinkRepost').start()
         #threading.Thread(target=hashing.process_repost_oldest, name='Repost').start()
         #threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
 
@@ -79,8 +81,8 @@ if __name__ == '__main__':
         threading.Thread(target=maintenance.clear_deleted_images, name='Deleted Cleanup').start()
 
     if args.summons:
-        if hashing is None:
-            hashing = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+        if image_repost_service is None:
+            image_repost_service = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
 
 
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
