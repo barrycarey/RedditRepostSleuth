@@ -110,7 +110,7 @@ def process_reposts(self, post: HashWrapper):
             for p in results:
                 log.error('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
 
-            new_repost = Reposts(post_id=post.post_id, repost_of=results[0].post_id)
+            new_repost = Reposts(post_id=post.post_id, repost_of=results[0].post_id, post_type='image')
             uow.repost.add(new_repost)
             uow.commit()
 
