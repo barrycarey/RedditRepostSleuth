@@ -50,8 +50,10 @@ def generate_img_by_url(url: str) -> Image:
 def generate_dhash(img: Image, hash_size: int = 16) -> dict:
 
     result = {
-        'hash': None,
-        'bits_set': None
+        'dhash_v': None,
+        'dhash_v_bits_set': None,
+        'dhash_h': None,
+        'dhash_h_bits_set': None
     }
 
     # Grayscale and shrink the image
@@ -64,17 +66,17 @@ def generate_dhash(img: Image, hash_size: int = 16) -> dict:
     pixels = list(image.getdata())
 
     # Compare Adjacent Pixels
-    difference = []
+    difference_h = []
     for row in list(range(hash_size)):
         for col in list(range(hash_size)):
             pixel_left = image.getpixel((col, row))
             pixel_right = image.getpixel((col + 1, row))
-            difference.append(pixel_left > pixel_right)
+            difference_h.append(pixel_left > pixel_right)
 
     # Convert to binary array to hexadecimal string
     decimal_value = 0
     hex_string = []
-    for index, value in enumerate(difference):
+    for index, value in enumerate(difference_h):
         if value:
             decimal_value += 2 ** (index % 8)
         if (index % 8) == 7:
@@ -82,9 +84,36 @@ def generate_dhash(img: Image, hash_size: int = 16) -> dict:
             decimal_value = 0
     log.debug('Generate Hash: %s', ''.join(hex_string))
 
-    count = Counter(difference)
-    result['bits_set'] = count[True]
-    result['hash'] = ''.join(hex_string)
+    count = Counter(difference_h)
+    result['dhash_h_bits_set'] = count[True]
+    result['dhash_h'] = ''.join(hex_string)
+
+    # Compare Adjacent Pixels
+    difference_h = []
+    for col in list(range(hash_size)):
+        for row in list(range(hash_size)):
+            pixel_left = image.getpixel((col, row))
+            pixel_right = image.getpixel((col, row + 1))
+            difference_h.append(pixel_left > pixel_right)
+
+    # Convert to binary array to hexadecimal string
+    decimal_value = 0
+    hex_string = []
+    for index, value in enumerate(difference_h):
+        if value:
+            decimal_value += 2 ** (index % 8)
+        if (index % 8) == 7:
+            hex_string.append(hex(decimal_value)[2:].rjust(2, '0'))
+            decimal_value = 0
+    log.debug('Generate Hash: %s', ''.join(hex_string))
+
+    count = Counter(difference_h)
+    result['dhash_v_bits_set'] = count[True]
+    result['dhash_v'] = ''.join(hex_string)
+
+
+
+
     return result
 
 def get_bit_count(img: Image, hash_size: int = 16) -> int:

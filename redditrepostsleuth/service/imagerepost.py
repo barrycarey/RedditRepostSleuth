@@ -8,6 +8,8 @@ from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
+import imagehash
+
 from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts, \
     find_matching_images_aged_task, set_bit_count
 from redditrepostsleuth.common.exception import ImageConversioinException
@@ -65,6 +67,19 @@ class ImageRepostService(RepostServiceBase):
                     # TODO - Temp wide exception to catch any faults
                     log.exception('Error processing celery jobs', exc_info=True)
 
+    def hash_test(self):
+        while True:
+            offset = 0
+            with self.uowm.start() as uow:
+                posts = uow.posts.find_all_without_hash(limit=10, offset=offset)
+                for post in posts:
+                    try:
+                        img = generate_img_by_url(post.url)
+                    except ImageConversioinException as e:
+                        continue
+                    dhash_h = imagehash.dhash(img, hash_size=16)
+                    dhash_v = imagehash.dhash_vertical(img, hash_size=16)
+                    ahash = imagehash.average_hash(img, hash_size=16)
 
     def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False) -> List[Post]:
         """

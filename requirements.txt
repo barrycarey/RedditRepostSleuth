@@ -10,3 +10,4 @@ numpy
 dataclasses
 flower
 eventlet
+ImageHash
