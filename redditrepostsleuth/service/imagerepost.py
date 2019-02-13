@@ -168,14 +168,14 @@ class ImageRepostService(RepostServiceBase):
         offset = 0
         while True:
             with self.uowm.start() as uow:
-                posts = uow.posts.find_all_without_bits_set(limit=1500, offset=offset)
+                posts = uow.posts.find_all_without_bits_set(limit=2000, offset=offset)
                 if not posts:
                     sys.exit()
                 chunks = self.chunks(posts, 25)
                 print('sending chunk jobs')
                 for chunk in chunks:
                     set_bit_count.apply_async((chunk,), queue='bitset')
-                offset += 1500
+                offset += 2000
             time.sleep(20)
 
     def chunks(self, l, n):

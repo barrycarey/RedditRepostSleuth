@@ -26,11 +26,17 @@ class Post(Base):
     crosspost_parent = Column(String(200))
     repost_of = Column(Integer)
     image_hash = Column(String(64))
+    dhash_v = Column(String(64))
+    dhash_h = Column(String(64))
+    ahash = Column(String(64))
     checked_repost = Column(Boolean, default=False)
     crosspost_checked = Column(Boolean, default=False)
     last_deleted_check = Column(DateTime)
     url_hash = Column(String(32)) # Needed to index URLs for faster lookups
     images_bits_set = Column(Integer, index=True)
+    ahash_set_bits = Column(Integer)
+    dhash_v_set_bits = Column(Integer)
+    dhash_h_set_bits = Column(Integer)
 
 class Summons(Base):
 
