@@ -59,6 +59,8 @@ def set_bit_count(self, posts):
                 img = generate_img_by_url(post.url)
             except Exception:
                 log.error('Problem getting imgage')
+                uow.posts.remove(post)
+                uow.commit()
                 continue
             post.images_bits_set = get_bit_count(img)
             uow.posts.update(post)
