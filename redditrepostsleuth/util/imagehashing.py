@@ -42,7 +42,7 @@ def generate_img_by_url(url: str) -> Image:
         response = request.urlopen(req, timeout=10)
         img = Image.open(BytesIO(response.read()))
     except (HTTPError, ConnectionError, OSError, DecompressionBombError) as e:
-        #log.error('Failed to convert image %s. Error: %s ', url, str(e))
+        log.error('Failed to convert image %s. Error: %s ', url, str(e))
         raise ImageConversioinException(str(e))
 
     return img if img else None
