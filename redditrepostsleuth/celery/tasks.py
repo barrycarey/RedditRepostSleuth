@@ -54,7 +54,10 @@ def set_bit_count(self, posts):
         for post in posts:
             if not post.image_hash or post.images_bits_set:
                 continue
-            img = generate_img_by_url(post.url)
+            try:
+                img = generate_img_by_url(post.url)
+            except Exception:
+                continue
             post.images_bits_set = get_bit_count(img)
             uow.posts.update(post)
         uow.commit()
