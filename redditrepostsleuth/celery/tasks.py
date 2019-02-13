@@ -179,36 +179,51 @@ def find_matching_images_aged_task(self, hash):
     return hash
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
-def save_new_post(self, postdto):
+def save_new_post(self, post):
     # TODO - This whole mess needs to be cleaned up
     #post = postdto_to_post(postdto)
     with self.uowm.start() as uow:
-        uow.posts.add(postdto)
-        if config.check_repost_on_ingest and postdto.post_type == 'image':
-            log.debug('----> Repost on ingest enabled.  Check repost for %s', postdto.post_id)
+        uow.posts.add(post)
+        # This whole block can go
+        if config.check_repost_on_ingest and post.post_type == 'image':
+            log.debug('----> Repost on ingest enabled.  Check repost for %s', post.post_id)
 
             try:
-                img = generate_img_by_url(postdto.url)
-                postdto.image_hash = generate_dhash(img)
+                img = generate_img_by_url(post.url)
+                post.image_hash = generate_dhash(img)
             except ImageConversioinException as e:
                 log.exception('Error getting image hash in task', exc_info=True)
 
-            parent = get_crosspost_parent(postdto, get_reddit_instance())
+            parent = get_crosspost_parent(post, get_reddit_instance())
             if parent:
-                postdto.checked_repost = True
-                postdto.crosspost_parent = parent
+                post.checked_repost = True
+                post.crosspost_parent = parent
                 uow.commit()
                 return
             uow.commit()
 
-            if not postdto.image_hash:
+            if not post.image_hash:
                 log.error('Unable to get image hash. Skipping ingest repost check')
                 return
 
-            wrapped = post_to_hashwrapper(postdto)
-            log.debug('Starting repost check for post %s', postdto.post_id)
+            wrapped = post_to_hashwrapper(post)
+            log.debug('Starting repost check for post %s', post.post_id)
             (find_matching_images_task.s(wrapped) | process_reposts.s()).apply_async(queue='repost')
             return
+
+        if post.post_type == 'image':
+            try:
+                img = generate_img_by_url(post.url)
+                result = generate_dhash(img)
+                post.image_hash = result['hash']
+                post.images_bits_set = result['bits_set']
+                log.info('Set bits and has for post %s', post.post_id)
+            except ImageConversioinException as e:
+                pass
+        elif post.post_type == 'link':
+            url_hash = md5(post.url.encode('utf-8'))
+            post.url_hash = url_hash.hexdigest()
+            log.info('Set URL hash for post %s', post.post_id)
         uow.commit()
 
 

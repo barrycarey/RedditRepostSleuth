@@ -168,7 +168,7 @@ class ImageRepostService(RepostServiceBase):
         offset = 0
         while True:
             with self.uowm.start() as uow:
-                posts = uow.posts.find_all_without_bits_set('image', limit=1000, offset=offset)
+                posts = uow.posts.find_all_without_bits_set(limit=1000, offset=offset)
                 if not posts:
                     sys.exit()
                 chunks = self.chunks(posts, 100)
