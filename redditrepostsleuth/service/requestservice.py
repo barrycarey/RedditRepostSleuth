@@ -7,8 +7,10 @@ from datetime import datetime
 
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, REPOST_ALL, LINK_ALL, \
-    WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE, STATS
+from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
+    LINK_ALL, \
+    WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE, STATS, SIGNATURE, \
+    IMAGE_REPOST_SHORT
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
@@ -43,6 +45,8 @@ class RequestService:
             self.process_unwatch_request(summons)
         elif parsed_command.group('command').lower() == 'stats':
             self.process_stat_request(summons)
+        elif parsed_command.group('command').lower() == 'check':
+            self.process_repost_request(summons)
         else:
             log.error('Unknown command')
             response.message = UNKNOWN_COMMAND
@@ -129,13 +133,16 @@ class RequestService:
             response.message = WATCH_DISABLED
             self._send_response(comment, response)
 
-    def process_repost_request(self, submission: Submission, comment: Comment, summons: Summons, sub_command: str = None):
+    def process_repost_request(self, summons: Summons, sub_command: str = None):
+        submission = self.reddit.submission(id=summons.post_id)
         if submission.post_hint == 'image':
-            self.process_image_repost_request(submission, comment, summons)
+            self.process_image_repost_request(summons, sub_command=sub_command)
         elif submission.post_hint == 'link':
-            self.process_link_repost_request(submission, comment, summons)
+            self.process_link_repost_request(summons, sub_command=sub_command)
 
-    def process_link_repost_request(self, submission: Submission, comment: Comment, summons: Summons, sub_command: str = None):
+    def process_link_repost_request(self, summons: Summons, sub_command: str = None):
+        submission = self.reddit.submission(id=summons.post_id)
+        comment = self.reddit.comment(id=summons.comment_id)
         response = RepostResponseBase(summons_id=summons.id)
         with self.uowm.start() as uow:
             search_count = uow.posts.count_by_type('link')
@@ -149,16 +156,18 @@ class RequestService:
                 response.message = REPOST_NO_RESULT.format(total=search_count)
             self._send_response(comment, response)
 
-    def process_image_repost_request(self, submission: Submission, comment: Comment, summons: Summons, sub_command: str = None):
+    def process_image_repost_request(self, summons: Summons, sub_command: str = None):
+        submission = self.reddit.submission(id=summons.post_id)
+        comment = self.reddit.comment(id=summons.comment_id)
+        response = RepostResponseBase(summons_id=summons.id)
         result = None
         with self.uowm.start() as uow:
             post_count = uow.posts.count_by_type('image')
-        response = RepostResponseBase(summons_id=summons.id)
+
         try:
             result = self.image_service.find_all_occurrences(submission)
         except ImageConversioinException as e:
             log.error('Failed to convert image for repost checking.  Summons: %s', summons)
-            response.status = 'error'
             response.message = 'Internal error while checking for reposts. \n\nPlease send me a PM to report this issue'
             self._send_response(comment, response)
             return
@@ -166,16 +175,20 @@ class RequestService:
         if not result:
             response.message = REPOST_NO_RESULT.format(total=post_count)
         else:
-            response.message = REPOST_ALL.format(occurrences=len(result),
-                                                 search_total=post_count,
-                                                 original_href='https://reddit.com' + result[0].perma_link,
-                                                 link_text=result[0].perma_link)
-            response.message += self._build_markdown_list(result)
+            if not sub_command or sub_command.lower() == 'all':
+                response.message = IMAGE_REPOST_ALL.format(occurrences=len(result),
+                                                           search_total=post_count,
+                                                           original_href='https://reddit.com' + result[0].perma_link,
+                                                           link_text=result[0].perma_link)
+                response.message += self._build_markdown_list(result)
+            else:
+                response.message = IMAGE_REPOST_SHORT.format(count=len(result), orig_url='https://reddit.com' + result[0].perma_link)
             self._send_response(comment, response)
 
     def _send_response(self, comment: Comment, response: RepostResponseBase):
         try:
             log.info('Sending response to summons comment %s. MESSAGE: %s', comment.id, response.message)
+            response.message += SIGNATURE
             reply = comment.reply(response.message)
             if reply.id:
                 self._save_response(response)
