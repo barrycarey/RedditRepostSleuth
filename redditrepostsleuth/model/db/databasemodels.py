@@ -30,6 +30,7 @@ class Post(Base):
     crosspost_checked = Column(Boolean, default=False)
     last_deleted_check = Column(DateTime)
     url_hash = Column(String(32)) # Needed to index URLs for faster lookups
+    images_bits_set = Column(Integer, index=True)
 
 class Summons(Base):
 

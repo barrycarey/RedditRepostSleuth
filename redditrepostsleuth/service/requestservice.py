@@ -175,7 +175,7 @@ class RequestService:
         if not result:
             response.message = REPOST_NO_RESULT.format(total=post_count)
         else:
-            if not sub_command or sub_command.lower() == 'all':
+            if sub_command and sub_command.lower() == 'all':
                 response.message = IMAGE_REPOST_ALL.format(occurrences=len(result),
                                                            search_total=post_count,
                                                            original_href='https://reddit.com' + result[0].perma_link,
