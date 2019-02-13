@@ -12,11 +12,11 @@ from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPO
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
+from redditrepostsleuth.service.imagerepost import ImageRepostService
 
 
 class RequestService:
-    def __init__(self, uowm: UnitOfWorkManager, image_service: ImageRepostProcessing, reddit: Reddit):
+    def __init__(self, uowm: UnitOfWorkManager, image_service: ImageRepostService, reddit: Reddit):
         self.uowm = uowm
         self.image_service = image_service
         self.reddit = reddit

@@ -15,6 +15,9 @@ class PostRepository:
     def bulk_save(self, items: List[Post]):
         self.db_session.bulk_save_objects(items)
 
+    def update(self, item: Post):
+        self.db_session.merge(item)
+
     def get_oldest_post(self, limit: int = None):
         return self.db_session.query(Post).order_by(Post.created_at).first()
 

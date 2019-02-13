@@ -2,16 +2,12 @@ import argparse
 import sys
 import threading
 from time import sleep
-from datetime import datetime
 
-from redditrepostsleuth.celery.tasks import find_matching_images_task
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.hashwrapper import HashWrapper
-from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
-from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
+from redditrepostsleuth.service.imagerepost import ImageRepostService
 from redditrepostsleuth.service.linkrepostservice import LinkRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
 from redditrepostsleuth.service.postIngest import PostIngest
@@ -48,7 +44,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     threads = []
-    image_repost_service = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+    image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
@@ -69,10 +65,7 @@ if __name__ == '__main__':
 
     if args.repost:
         log.info('Starting Repost Agent')
-        if image_repost_service is None:
-            image_repost_service = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-        threading.Thread(target=link_repost_service.hash_urls, name='LinkHash').start()
-        threading.Thread(target=link_repost_service.process_reposts, name='LinkRepost').start()
+        link_repost_service.start()
         #threading.Thread(target=hashing.process_repost_oldest, name='Repost').start()
         #threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
 
@@ -82,7 +75,7 @@ if __name__ == '__main__':
 
     if args.summons:
         if image_repost_service is None:
-            image_repost_service = ImageRepostProcessing(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+            image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
 
 
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()

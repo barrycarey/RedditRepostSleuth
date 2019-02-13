@@ -6,7 +6,7 @@ from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.model.db.databasemodels import Post
 from datetime import datetime
 
-from redditrepostsleuth.service.imagerepost import ImageRepostProcessing
+from redditrepostsleuth.service.imagerepost import ImageRepostService
 
 
 class TestImageRepostProcessing(TestCase):
@@ -18,7 +18,7 @@ class TestImageRepostProcessing(TestCase):
     @mock.patch('praw.models.Submission')
     def test_find_all_occurrences_failed_image_conversion(self, uowm, gen_image, submission):
         gen_image.return_value = ImageConversioinException('error')
-        repost_service = ImageRepostProcessing(uowm)
+        repost_service = ImageRepostService(uowm)
         result = repost_service.find_all_occurrences(submission)
         self.assertEqual(result.status, 'error')
 
@@ -33,7 +33,7 @@ class TestImageRepostProcessing(TestCase):
         posts = get_list_of_posts()
         posts[0].crosspost_parent = '1111'
         removed_post = posts[0]
-        repost_service = ImageRepostProcessing(uowm)
+        repost_service = ImageRepostService(uowm)
         result = repost_service._clean_reposts(posts)
         self.assertFalse(removed_post in result)
 
@@ -42,7 +42,7 @@ class TestImageRepostProcessing(TestCase):
     def test__sort_reposts(self, uowm, reddit):
         oldest_date = datetime.strptime('2019-01-30 23:49:44', '%Y-%m-%d %H:%M:%S')
         posts = get_list_of_posts()
-        repost = ImageRepostProcessing(uowm)
+        repost = ImageRepostService(uowm)
         result = repost._sort_reposts(posts)
         self.assertEqual(result[0].created_at, oldest_date)
 

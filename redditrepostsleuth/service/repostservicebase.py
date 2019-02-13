@@ -14,5 +14,8 @@ class RepostServiceBase:
         """
         raise NotImplementedError
 
-    def process_reposts(self):
+    def repost_check(self):
+        raise NotImplementedError
+
+    def start(self):
         raise NotImplementedError

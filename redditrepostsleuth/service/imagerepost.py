@@ -1,3 +1,4 @@
+import threading
 import time
 from queue import Queue
 from typing import List
@@ -15,22 +16,29 @@ from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
+from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url
 from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
 
 
-class ImageRepostProcessing:
+class ImageRepostService(RepostServiceBase):
 
-    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit) -> None:
+    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, hashing: bool = False, repost: bool = False) -> None:
+        super().__init__(uowm)
         self.reddit = reddit
-        self.uowm = uowm
-        self.existing_images = [] # Maintain a list of existing images im memory
-        self.hash_save_queue = Queue(maxsize=0)
-        self.repost_queue = Queue(maxsize=0)
         self.vptree_cache = CashedVpTree(uowm)
+        self.hashing = hashing
+        self.repost = repost
 
+    def start(self):
+        if self.hashing:
+            log.info('Starting image hashing thread')
+            threading.Thread(target=self.hash_images, name='Repost').start()
+        if self.repost:
+            log.info('Starting image repost thread')
+            threading.Thread(target=self.repost_check, name='Repost Queue').start()
 
-    def generate_hashes(self):
+    def hash_images(self):
         """
         Collect images from the database without a hash.  Batch them into 100 posts and submit to celery to have
         hashes created
@@ -91,12 +99,8 @@ class ImageRepostProcessing:
 
             return occurrences
 
-    def process_image_repost_rising(self):
-        pass
 
-
-
-    def process_image_reposts(self):
+    def repost_check(self):
         # TODO - Add logic for when we reach end of results
         offset = 0
         while True:
@@ -158,42 +162,6 @@ class ImageRepostProcessing:
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)
 
-    def process_repost_queue(self):
-        while True:
-            hash = None
-            try:
-                hash = self.repost_queue.get()
-            except Exception as e:
-                log.exception('Exception with hash queue', exc_info=True)
-                continue
-
-            if not hash:
-                continue
-
-            with self.uowm.start() as uow:
-
-
-                repost = uow.posts.get_by_post_id(hash.post_id)
-                repost.checked_repost = True
-                if len(hash.occurances) <= 1:
-                    log.debug('Post %s has no matches', hash.post_id)
-                    uow.commit()
-                    continue
-                occurances = [uow.posts.get_by_post_id(post[1].post_id) for post in hash.occurances]
-                results = self._filter_matching_images(occurances, repost)
-                results = self._clean_reposts(results)
-                if len(results) > 0:
-                    print('Original: http://reddit.com' + repost.perma_link)
-
-                    log.error('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at),
-                              repost.perma_link)
-                    log.error('Oldest Post - %s - (%s): http://reddit.com%s', results[0].post_id,
-                              str(results[0].created_at), results[0].perma_link)
-                    for p in results:
-                        log.error('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
-
-                    repost.repost_of = results[0].id
-                uow.commit()
 
     def _filter_matching_images(self, raw_list: List[Post], post_being_checked: Post) -> List[Post]:
         """
