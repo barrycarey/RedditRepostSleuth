@@ -1,3 +1,4 @@
+from collections import Counter
 from io import BytesIO
 from typing import List
 from urllib import request
@@ -77,6 +78,29 @@ def generate_dhash(img: Image, hash_size: int = 16) -> str:
     log.debug('Generate Hash: %s', ''.join(hex_string))
 
     return ''.join(hex_string)
+
+def get_bit_count(img: Image, hash_size: int = 16) -> int:
+
+    # Grayscale and shrink the image
+    try:
+        image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
+    except (TypeError, OSError, AttributeError) as e:
+        #log.error('Problem creating image hash for image.  Error: %s', str(e))
+        raise ImageConversioinException(str(e))
+
+    pixels = list(image.getdata())
+
+    # Compare Adjacent Pixels
+    difference = []
+    for row in list(range(hash_size)):
+        for col in list(range(hash_size)):
+            pixel_left = image.getpixel((col, row))
+            pixel_right = image.getpixel((col + 1, row))
+            difference.append(pixel_left > pixel_right)
+
+    count = Counter(difference)
+
+    return count[True]
 
 def find_matching_images(images: List[Post], query_hash: str, hamming_distance: int = 10):
     """

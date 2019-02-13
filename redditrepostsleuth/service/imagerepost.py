@@ -8,7 +8,7 @@ from praw.models import Submission
 from prawcore import Forbidden
 
 from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts, \
-    find_matching_images_aged_task
+    find_matching_images_aged_task, set_bit_count
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -17,7 +17,7 @@ from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
-from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url
+from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count
 from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
 
 
@@ -162,6 +162,23 @@ class ImageRepostService(RepostServiceBase):
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)
 
+
+    def set_bits(self):
+        offset = 0
+        while True:
+            with self.uowm.start() as uow:
+                posts = uow.posts.find_all_by_type('image', limit=100, offset=offset)
+                chunks = self.chunks(posts, 25)
+                print('sending chunk jobs')
+                for chunk in chunks:
+                    set_bit_count.apply_async((chunk,), queue='bitset')
+                offset += 100
+            time.sleep(5)
+
+    def chunks(self, l, n):
+        """Yield successive n-sized chunks from l."""
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
 
     def _filter_matching_images(self, raw_list: List[Post], post_being_checked: Post) -> List[Post]:
         """

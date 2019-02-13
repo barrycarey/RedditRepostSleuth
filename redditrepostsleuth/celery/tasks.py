@@ -15,7 +15,8 @@ from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 
 from redditrepostsleuth.util.helpers import get_reddit_instance
-from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree
+from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree, \
+    get_bit_count
 from redditrepostsleuth.util.objectmapping import post_to_hashwrapper
 from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, get_crosspost_parent
 from redditrepostsleuth.util.vptree import VPTree
@@ -46,6 +47,17 @@ class RedditTask(Task):
     def __init__(self):
         self.reddit = get_reddit_instance()
 
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def set_bit_count(self, posts):
+    with self.uowm.start() as uow:
+        for post in posts:
+            if not post.image_hash or post.images_bits_set:
+                continue
+            img = generate_img_by_url(post.url)
+            post.images_bits_set = get_bit_count(img)
+            uow.posts.update(post)
+        uow.commit()
 
 @celery.task(bind=True, base=RedditTask)
 def remove_cross_posts(self, post: HashWrapper):
