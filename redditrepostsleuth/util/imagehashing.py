@@ -47,7 +47,12 @@ def generate_img_by_url(url: str) -> Image:
 
     return img if img else None
 
-def generate_dhash(img: Image, hash_size: int = 16) -> str:
+def generate_dhash(img: Image, hash_size: int = 16) -> dict:
+
+    result = {
+        'hash': None,
+        'bits_set': None
+    }
 
     # Grayscale and shrink the image
     try:
@@ -77,7 +82,10 @@ def generate_dhash(img: Image, hash_size: int = 16) -> str:
             decimal_value = 0
     log.debug('Generate Hash: %s', ''.join(hex_string))
 
-    return ''.join(hex_string)
+    count = Counter(difference)
+    result['bits_set'] = count[True]
+    result['hash'] = ''.join(hex_string)
+    return result
 
 def get_bit_count(img: Image, hash_size: int = 16) -> int:
 

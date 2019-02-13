@@ -87,6 +87,9 @@ class PostRepository:
     def find_all_links_without_hash(self, limit: int = None, offset: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.post_type == 'link', Post.url_hash == None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
+    def find_all_without_bits_set(self, limit: int = None, offset: int = None) -> Post:
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.images_bits_set == None).offset(offset).limit(limit).all()
+
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)

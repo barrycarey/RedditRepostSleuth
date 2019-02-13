@@ -96,7 +96,9 @@ def hash_image_and_save(self, post_id):
             log.error('Cannot find post with ID %s', post_id)
         try:
             img = generate_img_by_url(post.url)
-            post.image_hash = generate_dhash(img)
+            result = generate_dhash(img)
+            post.image_hash = result['hash']
+            post.images_bits_set = result['bits_set']
         except ImageConversioinException as e:
             return
         uow.commit()
