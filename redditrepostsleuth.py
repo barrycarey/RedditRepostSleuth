@@ -48,7 +48,7 @@ if __name__ == '__main__':
     link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
-    #image_repost_service.hash_test()
+    image_repost_service.hash_test()
     #image_repost_service.set_bits()
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')

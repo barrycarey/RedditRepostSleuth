@@ -1,6 +1,7 @@
 import sys
 import threading
 import time
+from collections import Counter
 from queue import Queue
 from typing import List
 
@@ -80,11 +81,18 @@ class ImageRepostService(RepostServiceBase):
 
                     try:
                         dhash_h = imagehash.dhash(img, hash_size=16)
+                        flat = dhash_h.hash.flatten()
+                        test2 = generate_dhash(img)
+
+                        count1 = Counter(flat)
+                        count2 = Counter(test2)
+
                         dhash_v = imagehash.dhash_vertical(img, hash_size=16)
                         ahash = imagehash.average_hash(img, hash_size=16)
                     except Exception as e:
                         continue
-                    print("")
+                    test = [a for a in dhash_v.hash]
+                    print(len(str(dhash_h)), len(str(dhash_v)), len(str(ahash)))
 
     def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False) -> List[Post]:
         """

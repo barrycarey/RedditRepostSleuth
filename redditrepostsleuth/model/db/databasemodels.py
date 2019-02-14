@@ -37,6 +37,7 @@ class Post(Base):
     ahash_set_bits = Column(Integer)
     dhash_v_set_bits = Column(Integer)
     dhash_h_set_bits = Column(Integer)
+    image_bits_set = Column(Integer)
 
 class Summons(Base):
 
