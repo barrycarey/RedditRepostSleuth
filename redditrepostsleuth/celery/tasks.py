@@ -16,7 +16,7 @@ from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 
 from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree, \
-    get_bit_count
+    get_bit_count, set_image_hashes
 from redditrepostsleuth.util.objectmapping import post_to_hashwrapper
 from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, get_crosspost_parent
 from redditrepostsleuth.util.vptree import VPTree
@@ -47,6 +47,15 @@ class RedditTask(Task):
     def __init__(self):
         self.reddit = get_reddit_instance()
 
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def temp_hash_image(self, posts):
+    with self.uowm.start() as uow:
+        for post in posts:
+            set_image_hashes(post)
+            uow.posts.update(post)
+        log.debug('Saving batch of hashes')
+        uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def set_bit_count(self, posts):
@@ -217,12 +226,9 @@ def save_new_post(self, post):
 
         if post.post_type == 'image':
             try:
-                img = generate_img_by_url(post.url)
-                result = generate_dhash(img)
-                post.image_hash = result['hash']
-                post.images_bits_set = result['bits_set']
-                log.info('Set bits and has for post %s', post.post_id)
+                set_image_hashes(post)
             except ImageConversioinException as e:
+                log.error('Failed to get image hashes on new post')
                 pass
         elif post.post_type == 'link':
             url_hash = md5(post.url.encode('utf-8'))

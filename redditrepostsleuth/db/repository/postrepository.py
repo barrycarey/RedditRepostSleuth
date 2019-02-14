@@ -33,7 +33,7 @@ class PostRepository:
         return query
 
     def find_all_without_hash(self, limit: int = None, offset: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.image_hash == None, Post.post_type == 'image').offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.ahash == None, Post.dhash_h == None, Post.dhash_v == None).offset(offset).limit(limit).all()
 
     def find_all_by_url(self, url: str, limit: int = None):
         return self.db_session.query(Post).filter(Post.url == url).limit(limit).all()

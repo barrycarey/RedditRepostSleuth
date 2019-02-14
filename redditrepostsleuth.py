@@ -44,11 +44,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     threads = []
-    image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), repost=True, hashing=True)
+    image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), repost=False, hashing=True)
     link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
-    image_repost_service.hash_test()
+    #image_repost_service.hash_test()
     #image_repost_service.set_bits()
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')
@@ -65,10 +65,9 @@ if __name__ == '__main__':
 
     if args.repost:
         log.info('Starting Repost Agent')
-        link_repost_service.start()
+        #link_repost_service.start()
         image_repost_service.start()
-        #threading.Thread(target=hashing.process_repost_oldest, name='Repost').start()
-        #threading.Thread(target=hashing.process_repost_queue, name='Repost Queue').start()
+
 
     if args.deleted:
         maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine))

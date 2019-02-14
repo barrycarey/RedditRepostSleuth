@@ -12,7 +12,7 @@ from prawcore import Forbidden
 import imagehash
 
 from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts, \
-    find_matching_images_aged_task, set_bit_count
+    find_matching_images_aged_task, set_bit_count, temp_hash_image
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -21,7 +21,7 @@ from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
-from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count
+from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count, set_image_hashes
 from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
 
 # TODO - Deal with images that PIL can't convert.  Tons in database
@@ -58,9 +58,12 @@ class ImageRepostService(RepostServiceBase):
                         log.info('Ran out of images to hash')
                         break
 
-                    for post in posts:
-                        hash_image_and_save.apply_async((post.post_id,), queue='hashing')
+                    chunks = self.chunks(posts, 25)
+                    print('sending chunk jobs')
+                    for chunk in chunks:
+                        temp_hash_image.apply_async((chunk,), queue='hashing')
                     log.info('Started %s hashing jobs', config.generate_hash_batch_size)
+
                     offset += config.generate_hash_batch_size
                     time.sleep(config.generate_hash_batch_delay)
 
@@ -72,28 +75,12 @@ class ImageRepostService(RepostServiceBase):
         while True:
             offset = 0
             with self.uowm.start() as uow:
-                posts = uow.posts.find_all_by_type('image', limit=10, offset=offset)
+                posts = uow.posts.find_all_by_type('image', limit=25, offset=offset)
                 for post in posts:
-                    try:
-                        img = generate_img_by_url(post.url)
-                    except ImageConversioinException as e:
-                        continue
-
-                    try:
-                        dhash_h = imagehash.dhash(img, hash_size=16)
-                        flat = dhash_h.hash.flatten()
-                        test2 = generate_dhash(img)
-
-                        count1 = Counter(flat)
-                        count2 = Counter(test2)
-
-                        dhash_v = imagehash.dhash_vertical(img, hash_size=16)
-                        ahash = imagehash.average_hash(img, hash_size=16)
-                    except Exception as e:
-                        continue
-                    test = [a for a in dhash_v.hash]
-                    print(len(str(dhash_h)), len(str(dhash_v)), len(str(ahash)))
-
+                    set_image_hashes(post)
+                log.info('Saving hashes')
+                uow.commit()
+                offset += 25
     def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False) -> List[Post]:
         """
         Take a given Reddit submission and find all matching posts

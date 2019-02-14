@@ -4,6 +4,7 @@ from typing import List
 from urllib import request
 from urllib.error import HTTPError
 
+import imagehash
 from PIL import Image
 from PIL.Image import DecompressionBombError
 from distance import hamming
@@ -41,8 +42,8 @@ def generate_img_by_url(url: str) -> Image:
     try:
         response = request.urlopen(req, timeout=10)
         img = Image.open(BytesIO(response.read()))
-    except (HTTPError, ConnectionError, OSError, DecompressionBombError) as e:
-        #log.error('Failed to convert image %s. Error: %s ', url, str(e))
+    except (HTTPError, ConnectionError, OSError, DecompressionBombError, UnicodeEncodeError) as e:
+        log.error('Failed to convert image %s. Error: %s ', url, str(e))
         raise ImageConversioinException(str(e))
 
     return img if img else None
@@ -88,7 +89,7 @@ def generate_dhash(img: Image, hash_size: int = 16) -> dict:
     return result
 
 def get_bit_count(img: Image, hash_size: int = 16) -> int:
-
+    # TODO: Remove
     # Grayscale and shrink the image
     try:
         image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
@@ -109,6 +110,29 @@ def get_bit_count(img: Image, hash_size: int = 16) -> int:
     count = Counter(difference)
 
     return count[True]
+
+def set_image_hashes(post: Post) -> Post:
+    log.debug('Hashing image post %s', post.post_id)
+    try:
+        img = generate_img_by_url(post.url)
+    except ImageConversioinException as e:
+        return post
+
+    try:
+        dhash_h = imagehash.dhash(img, hash_size=16)
+        dhash_v = imagehash.dhash_vertical(img, hash_size=16)
+        ahash = imagehash.average_hash(img, hash_size=16)
+        post.dhash_h = str(dhash_h)
+        post.dhash_v = str(dhash_v)
+        post.ahash = str(ahash)
+        post.dhash_h_set_bits = Counter(dhash_h.hash.flatten())[True]
+        post.dhash_v_set_bits = Counter(dhash_v.hash.flatten())[True]
+        post.ahash_set_bits = Counter(ahash.hash.flatten())[True]
+        post.image_bits_set = post.dhash_h_set_bits + post.dhash_v_set_bits + post.ahash_set_bits
+    except Exception as e:
+        log.exception('Error creating hash', exc_info=True)
+
+    return post
 
 def find_matching_images(images: List[Post], query_hash: str, hamming_distance: int = 10):
     """
