@@ -23,7 +23,7 @@ from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count
 from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
 
-
+# TODO - Deal with images that PIL can't convert.  Tons in database
 class ImageRepostService(RepostServiceBase):
 
     def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, hashing: bool = False, repost: bool = False) -> None:
@@ -71,15 +71,20 @@ class ImageRepostService(RepostServiceBase):
         while True:
             offset = 0
             with self.uowm.start() as uow:
-                posts = uow.posts.find_all_without_hash(limit=10, offset=offset)
+                posts = uow.posts.find_all_by_type('image', limit=10, offset=offset)
                 for post in posts:
                     try:
                         img = generate_img_by_url(post.url)
                     except ImageConversioinException as e:
                         continue
-                    dhash_h = imagehash.dhash(img, hash_size=16)
-                    dhash_v = imagehash.dhash_vertical(img, hash_size=16)
-                    ahash = imagehash.average_hash(img, hash_size=16)
+
+                    try:
+                        dhash_h = imagehash.dhash(img, hash_size=16)
+                        dhash_v = imagehash.dhash_vertical(img, hash_size=16)
+                        ahash = imagehash.average_hash(img, hash_size=16)
+                    except Exception as e:
+                        continue
+                    print("")
 
     def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False) -> List[Post]:
         """
