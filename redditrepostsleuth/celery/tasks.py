@@ -1,3 +1,5 @@
+import random
+
 import requests
 from celery import Task
 from datetime import datetime
@@ -8,6 +10,7 @@ from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.config import config
+from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Reposts, Comment
@@ -164,8 +167,9 @@ def check_deleted_posts(self, posts):
     with self.uowm.start() as uow:
         for post in posts:
             log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
+            headers = {'User-Agent': random.choice(USER_AGENTS)}
             try:
-                r = requests.head(post.url, timeout=10)
+                r = requests.head(post.url, timeout=10, headers=headers)
                 if r.status_code == 404:
                     log.debug('Deleting removed post (%s)', str(post))
                     uow.posts.remove(post)
