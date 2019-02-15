@@ -170,6 +170,7 @@ def check_deleted_posts(self, posts):
                     log.debug('Deleting removed post (%s)', str(post))
                     uow.posts.remove(post)
                 post.last_deleted_check = datetime.utcnow()
+                uow.posts.update(post)
             except Exception as e:
                 log.exception('Exception with deleted image cleanup', exc_info=True)
                 print('')
