@@ -183,6 +183,12 @@ def check_deleted_posts(self, posts):
                     log.error('Failed to verify SSL for: %s', post.url)
                     post.last_deleted_check = datetime.utcnow()
                     uow.posts.update(post)
+
+                elif isinstance(e, ConnectionError):
+                    log.error('Failed to connect to: %s', post.url)
+                    post.bad_url = True
+                    post.last_deleted_check = datetime.utcnow()
+                    uow.posts.update(post)
                 else:
                     #uow.rollback()
                     log.exception('Exception with deleted image cleanup for URL: %s ', post.url, exc_info=True)
