@@ -21,6 +21,7 @@ from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
+from redditrepostsleuth.util.helpers import chunk_list
 from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count, set_image_hashes
 from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
 
@@ -58,7 +59,7 @@ class ImageRepostService(RepostServiceBase):
                         log.info('Ran out of images to hash')
                         break
 
-                    chunks = self.chunks(posts, 25)
+                    chunks = chunk_list(posts, 25)
                     print('sending chunk jobs')
                     for chunk in chunks:
                         temp_hash_image.apply_async((chunk,), queue='hashing')
@@ -193,10 +194,7 @@ class ImageRepostService(RepostServiceBase):
                 offset += 2000
             time.sleep(20)
 
-    def chunks(self, l, n):
-        """Yield successive n-sized chunks from l."""
-        for i in range(0, len(l), n):
-            yield l[i:i + n]
+
 
     def _filter_matching_images(self, raw_list: List[Post], post_being_checked: Post) -> List[Post]:
         """

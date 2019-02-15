@@ -160,22 +160,19 @@ def hash_link_url(self, id):
         uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def check_deleted_posts(self, post_id):
+def check_deleted_posts(self, posts):
     with self.uowm.start() as uow:
-        post = uow.posts.get_by_post_id(post_id)
-        if not post:
-            return
-        post.last_deleted_check = datetime.utcnow()
-        log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
-        try:
-            r = requests.head(post.url, timeout=5)
-            if r.status_code == 404:
-                log.debug('Deleting removed post (%s)', str(post))
-                uow.posts.remove(post)
-
-        except Exception as e:
-            log.exception('Exception with deleted image cleanup', exc_info=True)
-            print('')
+        for post in posts:
+            log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
+            try:
+                r = requests.head(post.url, timeout=5)
+                if r.status_code == 404:
+                    log.debug('Deleting removed post (%s)', str(post))
+                    uow.posts.remove(post)
+                post.last_deleted_check = datetime.utcnow()
+            except Exception as e:
+                log.exception('Exception with deleted image cleanup', exc_info=True)
+                print('')
 
         uow.commit()
 

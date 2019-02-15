@@ -12,3 +12,8 @@ def get_reddit_instance() -> Reddit:
                         user_agent=config.reddit_useragent,
                         username=config.reddit_username
                     )
+
+def chunk_list(l, n):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
