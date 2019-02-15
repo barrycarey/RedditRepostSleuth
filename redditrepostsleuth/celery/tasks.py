@@ -165,17 +165,23 @@ def check_deleted_posts(self, posts):
         for post in posts:
             log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
             try:
-                r = requests.head(post.url, timeout=5)
+                r = requests.head(post.url, timeout=10)
                 if r.status_code == 404:
                     log.debug('Deleting removed post (%s)', str(post))
                     uow.posts.remove(post)
                 post.last_deleted_check = datetime.utcnow()
                 uow.posts.update(post)
             except Exception as e:
-                log.exception('Exception with deleted image cleanup', exc_info=True)
+                uow.rollback()
+                log.exception('Exception with deleted image cleanup for URL: %s ', post.url, exc_info=True)
                 print('')
 
-        uow.commit()
+        try:
+            uow.commit()
+        except Exception as e:
+            uow.rollback()
+            log.error('Commit failed: %s', str(e))
+
 
 
 

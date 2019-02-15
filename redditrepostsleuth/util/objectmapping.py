@@ -19,7 +19,7 @@ def submission_to_post(submission: Submission) -> Post:
     post.post_id = submission.id
     post.url = submission.url
     post.author = submission.author.name if submission.author else None
-    post.created_at = datetime.fromtimestamp(submission.created)
+    post.created_at = datetime.fromtimestamp(submission.created_utc)
     post.subreddit = submission.subreddit.display_name
     post.title = submission.title
     post.perma_link = submission.permalink
