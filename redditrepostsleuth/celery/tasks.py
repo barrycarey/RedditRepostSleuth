@@ -6,6 +6,9 @@ from datetime import datetime
 
 from distance import hamming
 from hashlib import md5
+
+from requests.exceptions import SSLError, ConnectionError
+
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.exception import ImageConversioinException
@@ -169,16 +172,21 @@ def check_deleted_posts(self, posts):
             log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
             headers = {'User-Agent': random.choice(USER_AGENTS)}
             try:
-                r = requests.head(post.url, timeout=10, headers=headers)
-                if r.status_code == 404:
+                r = requests.head(post.url, timeout=20, headers=headers)
+                if r.status_code == 404 and post.post_type == 'image':
                     log.debug('Deleting removed post (%s)', str(post))
                     uow.posts.remove(post)
                 post.last_deleted_check = datetime.utcnow()
                 uow.posts.update(post)
-            except Exception as e:
-                uow.rollback()
-                log.exception('Exception with deleted image cleanup for URL: %s ', post.url, exc_info=True)
-                print('')
+            except (ConnectionError, SSLError) as e:
+                if isinstance(e, SSLError):
+                    log.error('Failed to verify SSL for: %s', post.url)
+                    post.last_deleted_check = datetime.utcnow()
+                    uow.posts.update(post)
+                else:
+                    #uow.rollback()
+                    log.exception('Exception with deleted image cleanup for URL: %s ', post.url, exc_info=True)
+                    print('')
 
         try:
             uow.commit()

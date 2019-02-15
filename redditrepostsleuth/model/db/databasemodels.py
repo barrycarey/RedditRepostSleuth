@@ -38,6 +38,7 @@ class Post(Base):
     dhash_v_set_bits = Column(Integer)
     dhash_h_set_bits = Column(Integer)
     image_bits_set = Column(Integer)
+    bad_url = Column(Boolean, default=False)
     # TODO: Noramlize bits set column names
 
 class Summons(Base):
