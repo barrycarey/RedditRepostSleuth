@@ -7,7 +7,7 @@ from datetime import datetime
 from distance import hamming
 from hashlib import md5
 
-from requests.exceptions import SSLError, ConnectionError
+from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
@@ -178,13 +178,13 @@ def check_deleted_posts(self, posts):
                     uow.posts.remove(post)
                 post.last_deleted_check = datetime.utcnow()
                 uow.posts.update(post)
-            except (ConnectionError, SSLError) as e:
+            except (ConnectionError, SSLError, ReadTimeout) as e:
                 if isinstance(e, SSLError):
                     log.error('Failed to verify SSL for: %s', post.url)
                     post.last_deleted_check = datetime.utcnow()
                     uow.posts.update(post)
 
-                elif isinstance(e, ConnectionError):
+                elif isinstance(e, ConnectionError) or isinstance(e, ReadTimeout):
                     log.error('Failed to connect to: %s', post.url)
                     post.bad_url = True
                     post.last_deleted_check = datetime.utcnow()

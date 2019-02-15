@@ -31,7 +31,7 @@ class MaintenanceService:
                         break
 
                     log.info('Starting %s delete check jobs', config.delete_check_batch_size)
-                    chunks = chunk_list(posts, 50)
+                    chunks = chunk_list(posts, 25)
                     for chunk in chunks:
                         check_deleted_posts.apply_async((chunk,), queue='deletecheck')
                 offset += limit
