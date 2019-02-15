@@ -90,6 +90,9 @@ class PostRepository:
     def find_all_without_bits_set(self, limit: int = None, offset: int = None) -> Post:
         return self.db_session.query(Post).filter(Post.post_type == 'image', Post.images_bits_set == None).offset(offset).limit(limit).all()
 
+    def find_image_hashes_in_rage(self, lower: int, upper: int):
+        return self.db_session.query(Post).filter(Post.image_bits_set.between(lower, upper)).with_entities(Post.post_id, Post.dhash_h).all()
+
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
