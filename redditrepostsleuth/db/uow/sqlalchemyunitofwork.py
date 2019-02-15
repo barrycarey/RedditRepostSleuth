@@ -1,3 +1,5 @@
+from sqlalchemy.orm import scoped_session
+
 from redditrepostsleuth.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.db.repository.postrepository import PostRepository
 from redditrepostsleuth.db.repository.repostrepository import RepostRepository
@@ -9,7 +11,7 @@ from redditrepostsleuth.db.uow.unitofwork import UnitOfWork
 class SqlAlchemyUnitOfWork(UnitOfWork):
 
     def __init__(self, session_factory):
-        self.session_factory = session_factory
+        self.session_factory = scoped_session(session_factory)
 
     def __enter__(self):
         self.session = self.session_factory()
