@@ -28,13 +28,19 @@ class DuplicateImageService:
                 log.info('Deleting existing index file')
                 os.remove(config.index_file_name)
             with self.uowm.start() as uow:
+                log.info('Loading all images from database')
+                start = datetime.now()
                 existing_images = uow.posts.find_all_images_with_hash_return_id_hash()
+                delta = datetime.now() - start
+                log.info('Loaded %s images in %s seconds', len(existing_images), delta.seconds)
             log.info('Index will be built with %s hashes', len(existing_images))
             for image in existing_images:
                 vector = list(bytearray(image[1], encoding='utf-8'))
                 self.index.add_item(image[0], vector)
             self.index.build(config.index_tree_count)
             self.index.save(config.index_file_name)
+            delta = datetime.now() - start
+            log.info('Total index build time was %s seconds', delta.seconds)
 
     def _load_index_file(self):
         """
@@ -53,7 +59,7 @@ class DuplicateImageService:
                 log.info('Index is fresh, using it')
                 self.index_last_build = created_at
                 self.index.load(config.index_file_name)
-                self.index.build(config.index_tree_count)
+
 
     def _clean_results(self, results, orig_id):
         with self.uowm.start() as uow:
@@ -84,7 +90,7 @@ class DuplicateImageService:
         search_array = bytearray(post.dhash_h, encoding='utf-8')
         r = self.index.get_nns_by_vector(list(search_array), 50, search_k=20000, include_distances=True)
         results = list(zip(r[0], r[1]))
-        self._clean_results(results, post.id)
+        return self._clean_results(results, post.id)
 
     @property
     def annoy(self):

@@ -46,6 +46,7 @@ class ConfigManager:
         self.index_file_name = self.config['IMAGES'].get('index_file_name', fallback='images.ann')
         self.annoy_match_cutoff = self.config['IMAGES'].getfloat('annoy_match_cutoff', fallback=0.25)
         self.hamming_cutoff = self.config['IMAGES'].getint('hamming_cutoff', fallback=10)
+        self.annoy_total_neighbors = self.config['IMAGES'].getint('annoy_total_neighbors', fallback=50)
 
         # Database
         self.db_host = self.config['DATABASE']['host']

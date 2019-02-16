@@ -70,7 +70,7 @@ class PostRepository:
 
     # TODO - Rename this
     def find_all_images_with_hash_return_id_hash(self, limit: int = None, offset: int = None):
-        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).with_entities(Post.post_id, Post.dhash_h).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).with_entities(Post.id, Post.dhash_h).offset(offset).limit(limit).all()
 
     def count_by_type(self, post_type: str):
         r = self.db_session.query(func.count(Post.id)).filter(Post.post_type == post_type).first()
