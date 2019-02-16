@@ -59,16 +59,41 @@ class CashedVpTree:
 
 class CashedVpTreeTiered:
 
-    def __init(self, uowm: UnitOfWorkManager):
+    def __init__(self, uowm: UnitOfWorkManager):
         self.uowm = uowm
         self.tree_built_at = None
-        self.tree_100 = None
-        self.tree_200 = None
-        self.tree_300 = None
-        self.tree_400 = None
-        self.tree_500 = None
-        self.tree_600 = None
-        self.tree_700 = None
+        sys.setrecursionlimit(10000)
+        self.trees = {
+            '100': {
+                'tree': None,
+                'range': (0,100)
+            },
+            '200': {
+                'tree': None,
+                'range': (101, 200)
+            },
+            '300': {
+                'tree': None,
+                'range': (201, 300)
+            },
+            '400': {
+                'tree': None,
+                'range': (301, 400)
+            },
+            '500': {
+                'tree': None,
+                'range': (401, 500)
+            },
+            '600': {
+                'tree': None,
+                'range': (501, 600)
+            },
+            '700': {
+                'tree': None,
+                'range': (601, 700)
+            },
+        }
+
         # TODO: different queue for each tree
 
     @property
@@ -76,23 +101,17 @@ class CashedVpTreeTiered:
         if self.tree_built_at is None or (datetime.now() - self.tree_built_at).seconds > config.vptree_cache_duration:
             log.info('Building New VPTree')
             with self.uowm.start() as uow:
-                range_100 = uow.posts.find_image_hashes_in_rage(0, 100)
-                range_200 = uow.posts.find_image_hashes_in_rage(101, 200)
-                range_300 = uow.posts.find_image_hashes_in_rage(201, 300)
-                range_400 = uow.posts.find_image_hashes_in_rage(301, 400)
-                range_500 = uow.posts.find_image_hashes_in_rage(401, 500)
-                range_600 = uow.posts.find_image_hashes_in_rage(501, 600)
-                range_700 = uow.posts.find_image_hashes_in_rage(601, 700)
-                self.tree_100 = VPTree([hash_tuple_to_hashwrapper(post) for post in range_100], lambda x,y: hamming(x,y))
-                self.tree_200 = VPTree([hash_tuple_to_hashwrapper(post) for post in range_200],
-                                       lambda x, y: hamming(x, y))
-                self.tree_300 = VPTree([hash_tuple_to_hashwrapper(post) for post in range_300],
-                                       lambda x, y: hamming(x, y))
-                self.tree_400 = VPTree([hash_tuple_to_hashwrapper(post) for post in range_400],
-                                       lambda x, y: hamming(x, y))
-                self.tree_500 = VPTree([hash_tuple_to_hashwrapper(post) for post in range_500],
-                                       lambda x, y: hamming(x, y))
-                self.tree_600 = VPTree([hash_tuple_to_hashwrapper(post) for post in range_600],
-                                       lambda x, y: hamming(x, y))
-                self.tree_700 = VPTree([hash_tuple_to_hashwrapper(post) for post in range_700],
-                                       lambda x, y: hamming(x, y))
+                total_start = datetime.now()
+                for tree, value in self.trees.items():
+
+                    start = datetime.now()
+                    items = uow.posts.find_image_hashes_in_rage(value['range'][0], value['range'][1])
+                    log.info('Building VPTree for range %s with %s items', tree, len(items))
+                    value['tree'] = VPTree([hash_tuple_to_hashwrapper(post) for post in items], lambda x,y: hamming(x,y))
+                    delta = datetime.now() - start
+                    print('Tree built in {} seconeds'.format(str(delta.seconds)))
+                delta = datetime.now() - total_start
+                print('Total tree build time in {} seconds'.format(str(delta.seconds)))
+                self.tree_built_at = datetime.now()
+
+        return self.trees

@@ -169,7 +169,7 @@ def hash_link_url(self, id):
 def check_deleted_posts(self, posts):
     with self.uowm.start() as uow:
         for post in posts:
-            log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
+            #log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
             headers = {'User-Agent': random.choice(USER_AGENTS)}
             try:
                 r = requests.head(post.url, timeout=20, headers=headers)
@@ -195,6 +195,7 @@ def check_deleted_posts(self, posts):
                     print('')
 
         try:
+            log.info('Saving batch of delete checks')
             uow.commit()
         except Exception as e:
             uow.rollback()

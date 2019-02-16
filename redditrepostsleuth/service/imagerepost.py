@@ -95,7 +95,7 @@ class ImageRepostService(RepostServiceBase):
             raise ImageConversioinException('Failed to convert image to hash')
 
         with self.uowm.start() as uow:
-            existing_images = uow.posts.count_by_type('image')
+            #existing_images = uow.posts.count_by_type('image')
             wrapper = HashWrapper()
             wrapper.post_id = submission.id
             wrapper.image_hash = image_hash
@@ -116,6 +116,24 @@ class ImageRepostService(RepostServiceBase):
 
             return occurrences
 
+    def check_single_repost(self, post_id: str):
+        submission = self.reddit.submission(id=post_id)
+        try:
+            img = generate_img_by_url(submission.url)
+            image_hash = imagehash.dhash(img, hash_size=16)
+        except ImageConversioinException:
+            raise ImageConversioinException('Failed to convert image to hash')
+
+        with self.uowm.start() as uow:
+            #existing_images = uow.posts.count_by_type('image')
+            wrapper = HashWrapper()
+            wrapper.post_id = submission.id
+            wrapper.image_hash = str(image_hash)
+            r = find_matching_images_task.apply_async(queue='repost', args=(wrapper,)).get()
+            return
+        with self.uowm.start() as uow:
+            post = uow.posts.get_by_post_id(post_id)
+            (find_matching_images_task.s(post_to_hashwrapper(post)) | process_reposts.s()).apply_async(queue='repost')
 
     def repost_check(self):
         # TODO - Add logic for when we reach end of results
