@@ -2,9 +2,11 @@ import sys
 import threading
 import time
 from collections import Counter
+from datetime import datetime
 from queue import Queue
 from typing import List
 
+from distance import hamming
 from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
@@ -22,10 +24,15 @@ from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.helpers import chunk_list
-from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count, set_image_hashes
-from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper
+from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count, set_image_hashes, \
+    find_matching_images_in_vp_tree
+from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper, hash_tuple_to_hashwrapper
+
 
 # TODO - Deal with images that PIL can't convert.  Tons in database
+from redditrepostsleuth.util.vptree import VPTree
+
+
 class ImageRepostService(RepostServiceBase):
 
     def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, hashing: bool = False, repost: bool = False) -> None:
@@ -117,19 +124,23 @@ class ImageRepostService(RepostServiceBase):
             return occurrences
 
     def check_single_repost(self, post_id: str):
-        submission = self.reddit.submission(id=post_id)
-        try:
-            img = generate_img_by_url(submission.url)
-            image_hash = imagehash.dhash(img, hash_size=16)
-        except ImageConversioinException:
-            raise ImageConversioinException('Failed to convert image to hash')
+
 
         with self.uowm.start() as uow:
-            #existing_images = uow.posts.count_by_type('image')
-            wrapper = HashWrapper()
-            wrapper.post_id = submission.id
-            wrapper.image_hash = str(image_hash)
-            r = find_matching_images_task.apply_async(queue='repost', args=(wrapper,)).get()
+            post = uow.posts.get_by_post_id(post_id)
+            existing_images = uow.posts.find_image_hashes_in_rage(post.image_bits_set - 20, post.image_bits_set + 20)
+            #existing_images = uow.posts.test_with_entities()
+            wrapped = [hash_tuple_to_hashwrapper(post) for post in existing_images]
+            start = datetime.now()
+            tree = VPTree(wrapped, lambda x, y: hamming(x, y))
+            delta = datetime.now() - start
+
+            print('VPTree Time: ' + str(delta.seconds))
+            r = find_matching_images_in_vp_tree(tree, post.dhash_h, 10)
+            log.info('Found %s matches', len(r))
+            for result in r:
+                post = uow.posts.get_by_post_id(result[1].post_id)
+                log.info('Post %s - %s', post.post_id, post.url)
             return
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(post_id)

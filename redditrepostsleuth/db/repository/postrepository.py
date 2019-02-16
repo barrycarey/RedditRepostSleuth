@@ -70,7 +70,7 @@ class PostRepository:
 
     # TODO - Rename this
     def test_with_entities(self, limit: int = None):
-        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.image_hash != None).with_entities(Post.post_id, Post.dhash_h).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).with_entities(Post.post_id, Post.dhash_h).limit(limit).all()
 
     def count_by_type(self, post_type: str):
         r = self.db_session.query(func.count(Post.id)).filter(Post.post_type == post_type).first()
