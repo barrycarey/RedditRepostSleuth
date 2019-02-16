@@ -11,3 +11,4 @@ dataclasses
 flower
 eventlet
 ImageHash
+annoy

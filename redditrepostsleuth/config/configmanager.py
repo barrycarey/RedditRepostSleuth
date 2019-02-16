@@ -40,6 +40,13 @@ class ConfigManager:
         post_types = self.config['GENERAL'].get('supported_post_types', fallback='image')
         self.supported_post_types = post_types.split(',')
 
+        # IMAGES
+        self.index_tree_count = self.config['IMAGES'].getint('index_tree_count', fallback=20)
+        self.index_keep_alive = self.config['IMAGES'].getint('index_keep_alive', fallback=20)
+        self.index_file_name = self.config['IMAGES'].get('index_file_name', fallback='images.ann')
+        self.annoy_match_cutoff = self.config['IMAGES'].getfloat('annoy_match_cutoff', fallback=0.25)
+        self.hamming_cutoff = self.config['IMAGES'].getint('hamming_cutoff', fallback=10)
+
         # Database
         self.db_host = self.config['DATABASE']['host']
         self.db_port = self.config['DATABASE'].getint('port', fallback=3306)

@@ -31,7 +31,7 @@ class CashedVpTree:
         if self.tree_built_at is None or (datetime.now() - self.tree_built_at).seconds > config.vptree_cache_duration:
             log.info('Building New VPTree')
             with self.uowm.start() as uow:
-                existing_images = uow.posts.test_with_entities()
+                existing_images = uow.posts.find_all_images_with_hash_return_id_hash()
                 log.info('Tree will be built with %s images', len(existing_images))
                 self.building_tree = True
                 start = datetime.now()

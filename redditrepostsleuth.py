@@ -14,7 +14,7 @@ from redditrepostsleuth.service.postIngest import PostIngest
 from redditrepostsleuth.service.requestservice import RequestService
 from redditrepostsleuth.util.helpers import get_reddit_instance
 
-sys.setrecursionlimit(10000)
+sys.setrecursionlimit(50000)
 
 if __name__ == '__main__':
     """
@@ -49,7 +49,8 @@ if __name__ == '__main__':
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     #image_repost_service.hash_test()
-    image_repost_service.check_single_repost('ap0q8h')
+    image_repost_service.check_single_repost('apxpec')
+    sys.exit()
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')
