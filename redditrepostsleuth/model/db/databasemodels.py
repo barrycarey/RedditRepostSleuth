@@ -16,6 +16,7 @@ class Post(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
+    short_url = Column(String(300))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type = Column(String(20))
     author = Column(String(100), nullable=False)
@@ -91,6 +92,14 @@ class ImageRepost(Base):
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
     annoy_distance = Column(Float)
+    post_id = Column(String(100), nullable=False)
+    repost_of = Column(String(100), nullable=False)
+    detected_at = Column(DateTime, default=func.utc_timestamp())
+
+class LinkRepost(Base):
+
+    __tablename__ = 'link_reposts'
+    id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
