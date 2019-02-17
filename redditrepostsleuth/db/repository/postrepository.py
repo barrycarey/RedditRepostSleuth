@@ -45,7 +45,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == post_type).offset(offset).limit(limit).all()
 
     def find_all_by_repost_check(self, repost_check: bool, limit: int = None, offset: int = None):
-        return self.db_session.query(Post).filter(Post.checked_repost == False, Post.post_type == 'image', Post.image_hash != None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.checked_repost == False, Post.post_type == 'image', Post.dhash_h != None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
     # TODO: Clean this up
     def find_all_by_repost_check_oldest(self, repost_check: bool, limit: int = None, offset: int = None):
@@ -71,6 +71,9 @@ class PostRepository:
     # TODO - Rename this
     def find_all_images_with_hash_return_id_hash(self, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).with_entities(Post.id, Post.dhash_h).offset(offset).limit(limit).all()
+
+    def find_all_images_with_hash_return_id_hash2(self, limit: int = None, offset: int = None):
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).with_entities(Post.id, Post.dhash_h, Post.dhash_v).offset(offset).limit(limit).all()
 
     def count_by_type(self, post_type: str):
         r = self.db_session.query(func.count(Post.id)).filter(Post.post_type == post_type).first()

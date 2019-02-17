@@ -2,3 +2,4 @@ Stats:
 Most shared link
 Only repost check rising on all
 created at changed to UTC on 2/14 11:00pm
+Check index created date and skip check posts that are newer - Need to address timezones to do this.  Created at is UTC starting from 2/14

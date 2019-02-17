@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -84,3 +84,13 @@ class Reposts(Base):
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
     post_type = Column(String(20))
+
+class ImageRepost(Base):
+
+    __tablename__ = 'image_reposts'
+    id = Column(Integer, primary_key=True)
+    hamming_distance = Column(Integer)
+    annoy_distance = Column(Float)
+    post_id = Column(String(100), nullable=False)
+    repost_of = Column(String(100), nullable=False)
+    detected_at = Column(DateTime, default=func.utc_timestamp())

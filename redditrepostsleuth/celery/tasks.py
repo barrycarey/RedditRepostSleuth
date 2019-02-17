@@ -1,4 +1,5 @@
 import random
+from typing import List
 
 import requests
 from celery import Task
@@ -16,9 +17,11 @@ from redditrepostsleuth.config import config
 from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Reposts, Comment
+from redditrepostsleuth.model.db.databasemodels import Reposts, Comment, Post, ImageRepost
 from redditrepostsleuth.model.hashwrapper import HashWrapper
+from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
+from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
 
 from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree, \
@@ -43,11 +46,18 @@ class SqlAlchemyTask(Task):
 
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
+        self.reddit = get_reddit_instance()
 
 class VpTreeTask(Task):
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.vptree_cache = CashedVpTree(self.uowm)
+
+class AnnoyTask(Task):
+    def __init__(self):
+        self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
+        self.dup_service = DuplicateImageService(self.uowm)
+        self.reddit = get_reddit_instance()
 
 class RedditTask(Task):
     def __init__(self):
@@ -151,6 +161,69 @@ def process_reposts(self, post: HashWrapper):
             uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def process_repost_annoy(self, repost: ImageRepostWrapper):
+    print('Processing task for repost ' + repost.checked_post.post_id)
+    with self.uowm.start() as uow:
+
+        if not repost.checked_post.crosspost_checked:
+            log.debug('Checking repost cross post for ID %s', repost.checked_post.post_id)
+            parent = get_crosspost_parent(repost.checked_post, self.reddit)
+            repost.checked_post.crosspost_checked = True
+            if parent:
+                repost.checked_post.crosspost_parent = parent
+                repost.checked_post.checked_repost = True
+                uow.posts.update(repost.checked_post)
+                uow.commit()
+                return
+
+        repost.checked_post.checked_repost = True
+        if not repost.matches:
+            log.debug('Post %s has no matches', repost.checked_post.post_id)
+            uow.posts.update(repost.checked_post)
+            uow.commit()
+            return
+
+        # Get the post object for each match
+        for match in repost.matches:
+            match.post = uow.posts.get_by_id(match.match_id)
+
+        log.debug('Matches before cleaning: %s', len(repost.matches))
+        clean_reposts(repost)
+        log.debug('Matches after cleaning: %s', len(repost.matches))
+
+        if len(repost.matches) > 0:
+            final_matches = []
+            for match in repost.matches:
+                if match.post.crosspost_checked:
+                    log.debug('Crosspost already checked, adding to final results')
+                    final_matches.append(match)
+                    continue
+                match.post.crosspost_parent = get_crosspost_parent(match.post, self.reddit)
+                match.post.crosspost_checked = True
+                if match.post.crosspost_parent:
+                    log.debug('Matching post %s is a crosspost, removing from matches', match.post.post_id)
+                else:
+                    final_matches.append(match)
+
+                uow.posts.update(match.post)
+                uow.commit()
+
+            if final_matches:
+                log.debug('Checked Image: %s', repost.checked_post.url)
+                for match in final_matches:
+                    log.debug('Matching Image (%s) (Hamming: %s - Annoy: %s): %s', match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
+                log.info('Creating repost. Post %s is a repost of %s', repost.checked_post.url, final_matches[0].post.url)
+
+                new_repost = ImageRepost(post_id=repost.checked_post.post_id,
+                                         repost_of=final_matches[0].post.post_id,
+                                         hamming_distance=match.hamming_distance,
+                                         annoy_distance=match.annoy_distance)
+                uow.repost.add(new_repost)
+                uow.commit()
+        uow.posts.update(repost.checked_post)
+        uow.commit()
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def process_link_repost(self, post_id):
     with self.uowm.start() as uow:
         pass
@@ -202,17 +275,19 @@ def check_deleted_posts(self, posts):
             log.error('Commit failed: %s', str(e))
 
 
-
-
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
 def find_matching_images_task(self, hash):
     hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash.image_hash, hamming_distance=config.hamming_distance)
     return hash
 
-@celery.task(bind=True, base=VpTreeTask, serializer='pickle')
-def find_matching_images_aged_task(self, hash):
-    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_aged_tree(hash.created_at), hash.image_hash, hamming_distance=config.hamming_distance)
-    return hash
+
+@celery.task(bind=True, base=AnnoyTask, serializer='pickle')
+def find_matching_images_annoy(self, post: Post) -> ImageRepostWrapper:
+    result = ImageRepostWrapper()
+    result.checked_post = post
+    result.matches = self.dup_service.check_duplicate(post)
+    log.debug('Found %s matching images', len(result.matches))
+    return result
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
 def save_new_post(self, post):

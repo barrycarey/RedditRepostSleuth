@@ -14,7 +14,7 @@ from prawcore import Forbidden
 import imagehash
 
 from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts, \
-    find_matching_images_aged_task, set_bit_count, temp_hash_image
+    set_bit_count, temp_hash_image, find_matching_images_annoy, process_repost_annoy
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -177,33 +177,21 @@ class ImageRepostService(RepostServiceBase):
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)
 
-    def process_repost_oldest(self):
+    def check_repost_annoy(self):
         offset = 0
         while True:
             try:
                 with self.uowm.start() as uow:
-                    raw_posts = uow.posts.find_all_by_repost_check_oldest(False, limit=config.check_repost_batch_size,
-                                                                   offset=offset)
-                    wrapped_posts = []
-                    for post in raw_posts:
-                        parent = self._get_crosspost_parent(post)
-                        if parent:
-                            log.debug('Post %s has a crosspost parent %s.  Skipping', post.post_id, parent)
-                            post.crosspost_parent = parent
-                            post.checked_repost = True
-                            uow.commit()
+                    posts = uow.posts.find_all_by_repost_check(False, limit=config.check_repost_batch_size, offset=offset)
+                    for post in posts:
+                        if post.crosspost_parent:
                             continue
-                        wrapped_posts.append(post_to_hashwrapper(post))
 
-                log.info('Starting %s jobs', len(wrapped_posts))
-                for post in wrapped_posts:
-                    log.info('Creating chained task')
-                    # find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
+                        (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async(queue='repost')
 
-                    (find_matching_images_aged_task.s(post) | process_reposts.s()).apply_async(queue='repost')
-                log.info('Waiting 30 seconds until next repost batch')
-                offset += config.check_repost_batch_size
-                time.sleep(30)
+                    log.info('Waiting %s seconds until next repost batch', config.check_repost_batch_delay)
+                    offset += config.check_repost_batch_size
+                    time.sleep(config.check_repost_batch_delay)
 
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)

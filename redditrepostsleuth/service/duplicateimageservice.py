@@ -1,14 +1,18 @@
 import os
+from typing import List
 
 from distance import hamming
 
+from redditrepostsleuth.common.exception import FutureDataRepostCheckException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from datetime import datetime
+from datetime import datetime, timedelta
 from annoy import AnnoyIndex
 
 from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.service.imagematch import ImageMatch
+from redditrepostsleuth.util.objectmapping import annoy_result_to_image_match
 
 
 class DuplicateImageService:
@@ -61,36 +65,48 @@ class DuplicateImageService:
                 self.index.load(config.index_file_name)
 
 
-    def _clean_results(self, results, orig_id):
+    def _clean_results(self, results: List[ImageMatch], orig_id: int):
         with self.uowm.start() as uow:
             original = uow.posts.get_by_id(orig_id)
 
         final_results = []
         for result in results:
-            if result[1] > 0.265:
-                log.debug('Skipping result with distance %s', result[1])
+            if result.annoy_distance > 0.265:
+                #log.debug('Skipping result with distance %s', result[1])
                 continue
             # Skip original query (result[0] is DB ID)
-            if result[0] == orig_id:
+            if result.match_id == result.original_id:
                 continue
 
             with self.uowm.start() as uow:
-                post = uow.posts.get_by_id(result[0])
+                post = uow.posts.get_by_id(result.match_id)
 
-            hamming_distance = hamming(original.dhash_h, post.dhash_h)
-            log.debug('Distance query image %s and %s is %s', original.post_id, post.post_id, hamming_distance)
-            if hamming_distance <= config.hamming_distance:
+            if original.author == post.author:
+                log.debug('Skipping post with same Author')
+                continue
+
+            if post.created_at > original.created_at:
+                log.debug('Skipping match that is newer than the post we are checking. Original: %s - Match: %s', original.created_at, post.created_at)
+
+            result.hamming_distance = hamming(original.dhash_h, post.dhash_h)
+
+            if result.hamming_distance <= config.hamming_distance:
+                log.debug('Match %s: Annoy %s - Ham: %s', result.match_id, result.hamming_distance, result.annoy_distance)
                 final_results.append(result)
+            else:
+                #log.debug('Passed annoy and failed hamming. (Anny: %s - Ham: %s) - %s', result[1], hamming_distance, result[0])
+                pass
 
         return final_results
 
 
-    def check_duplicate(self, post: Post):
+    def check_duplicate(self, post: Post) -> List[ImageMatch]:
         self._build_index()
         search_array = bytearray(post.dhash_h, encoding='utf-8')
         r = self.index.get_nns_by_vector(list(search_array), 50, search_k=20000, include_distances=True)
         results = list(zip(r[0], r[1]))
-        return self._clean_results(results, post.id)
+        matches = [annoy_result_to_image_match(match, post.id) for match in results]
+        return self._clean_results(matches, post.id)
 
     @property
     def annoy(self):

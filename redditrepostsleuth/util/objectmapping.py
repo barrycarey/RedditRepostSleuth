@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from praw.models import Submission
 from datetime import datetime
 
@@ -7,6 +9,7 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.postdto import PostDto
+from redditrepostsleuth.service.imagematch import ImageMatch
 
 
 def submission_to_post(submission: Submission) -> Post:
@@ -93,3 +96,10 @@ def hash_tuple_to_hashwrapper(hash_tup):
     wrapper.post_id = hash_tup[0]
     wrapper.image_hash = hash_tup[1]
     return wrapper
+
+def annoy_result_to_image_match(result: Tuple[int, float], orig_id: int) -> ImageMatch:
+    match = ImageMatch()
+    match.original_id = orig_id
+    match.match_id = result[0]
+    match.annoy_distance = result[1]
+    return match

@@ -49,7 +49,8 @@ if __name__ == '__main__':
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     #image_repost_service.hash_test()
-    image_repost_service.check_single_repost('apxpec')
+    #image_repost_service.check_single_repost('apxpec')
+    image_repost_service.check_repost_annoy()
     sys.exit()
 
     if args.ingestposts:
