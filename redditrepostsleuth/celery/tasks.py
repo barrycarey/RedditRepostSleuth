@@ -8,6 +8,7 @@ from datetime import datetime
 from distance import hamming
 from hashlib import md5
 
+from redlock import RedLockError
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
 from redditrepostsleuth.celery import celery
@@ -281,7 +282,7 @@ def find_matching_images_task(self, hash):
     return hash
 
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle')
+@celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
 def find_matching_images_annoy(self, post: Post) -> ImageRepostWrapper:
     result = ImageRepostWrapper()
     result.checked_post = post

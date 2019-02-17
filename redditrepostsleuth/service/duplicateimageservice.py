@@ -1,4 +1,6 @@
 import os
+import random
+import time
 from typing import List
 
 from distance import hamming
@@ -12,6 +14,7 @@ from annoy import AnnoyIndex
 
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.service.imagematch import ImageMatch
+from redditrepostsleuth.util import redlock
 from redditrepostsleuth.util.objectmapping import annoy_result_to_image_match
 
 
@@ -24,49 +27,71 @@ class DuplicateImageService:
 
     def _build_index(self):
         """
-        If index has nto been created or it is too old, create a new index
-        """
-        if self.index_last_build is None or (datetime.now() - self.index_last_build).seconds > config.index_keep_alive:
-            log.info('Building new Annoy index')
-            if os.path.isfile(config.index_file_name):
-                log.info('Deleting existing index file')
-                os.remove(config.index_file_name)
-            with self.uowm.start() as uow:
-                log.info('Loading all images from database')
-                start = datetime.now()
-                existing_images = uow.posts.find_all_images_with_hash_return_id_hash()
-                delta = datetime.now() - start
-                log.info('Loaded %s images in %s seconds', len(existing_images), delta.seconds)
-            log.info('Index will be built with %s hashes', len(existing_images))
-            for image in existing_images:
-                vector = list(bytearray(image[1], encoding='utf-8'))
-                self.index.add_item(image[0], vector)
-            self.index.build(config.index_tree_count)
-            self.index.save(config.index_file_name)
-            delta = datetime.now() - start
-            log.info('Total index build time was %s seconds', delta.seconds)
+        Check if the index has expired.  Build a new one if it has.
 
-    def _load_index_file(self):
+        This gets tricky since celery can be running many processes.  We don't wait every process trying to build a new index
+        at the same time.  To prevent this we use RedLock to create a lock in Redis. Every new task that comes in will try
+        to get the index file. If that files doesn't exist it will try to build it. If any process fails to get the lock
+        the task fails and is retryed in 3 minutes.
+        """
+
+
+        if self.index_last_build is None or (datetime.now() - self.index_last_build).seconds > config.index_keep_alive:
+
+            if self._load_index_file():
+                log.error('Index file returned true')
+                return
+
+            time.sleep(random.randint(10,45)) # Keep multiple processes from grabbing lock all at once
+            with redlock.create_lock('Index Lock', ttl=config.index_build_lock_ttl):
+                log.info('%s - Got Lock', os.getpid())
+                log.info('Building new Annoy index')
+                self.index = AnnoyIndex(64)
+                if os.path.isfile(config.index_file_name):
+                    log.info('Deleting existing index file')
+                    os.remove(config.index_file_name)
+                with self.uowm.start() as uow:
+                    log.info('Loading all images from database')
+                    start = datetime.now()
+                    existing_images = uow.posts.find_all_images_with_hash_return_id_hash()
+                    delta = datetime.now() - start
+                    log.info('Loaded %s images in %s seconds', len(existing_images), delta.seconds)
+                log.info('Index will be built with %s hashes', len(existing_images))
+                for image in existing_images:
+                    vector = list(bytearray(image[1], encoding='utf-8'))
+                    self.index.add_item(image[0], vector)
+                self.index.build(config.index_tree_count)
+                self.index.save(config.index_file_name)
+                self.index_last_build = datetime.now()
+                delta = datetime.now() - start
+                log.info('Total index build time was %s seconds', delta.seconds)
+
+    def _load_index_file(self) -> bool:
         """
         Check if index file exists.  If it does, check it's age.  If it's fresh enough use it, if not build one
         :return:
         """
-        log.info('Attempting to load Annoy index file')
+        log.info('%s - Attempting to load Annoy index file', os.getpid())
         if os.path.isfile(config.index_file_name):
-            log.info('Found Annoy index')
+            log.info('%s = Found Annoy index', os.getpid())
             created_at = datetime.fromtimestamp(os.stat(config.index_file_name).st_ctime)
             delta = datetime.now() - created_at
             log.info('Indexed created %s seconds ago', delta.seconds)
             if delta.seconds > config.index_keep_alive:
                 log.info('Index is too old.  Not using')
-                return None
+                return False
             else:
                 log.info('Index is fresh, using it')
+                self.index = AnnoyIndex(64)
                 self.index_last_build = created_at
                 self.index.load(config.index_file_name)
+                return True
+        else:
+            log.info('No existing index file found')
+            return False
 
 
-    def _clean_results(self, results: List[ImageMatch], orig_id: int):
+    def _clean_results(self, results: List[ImageMatch], orig_id: int) -> List[ImageMatch]:
         with self.uowm.start() as uow:
             original = uow.posts.get_by_id(orig_id)
 
@@ -103,6 +128,7 @@ class DuplicateImageService:
 
     def check_duplicate(self, post: Post) -> List[ImageMatch]:
         self._build_index()
+        log.debug('%s - Checking %s for duplicates', os.getpid(), post.post_id)
         search_array = bytearray(post.dhash_h, encoding='utf-8')
         r = self.index.get_nns_by_vector(list(search_array), 50, search_k=20000, include_distances=True)
         results = list(zip(r[0], r[1]))
