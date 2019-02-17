@@ -56,6 +56,7 @@ class DuplicateImageService:
             log.info('Found Annoy index')
             created_at = datetime.fromtimestamp(os.stat(config.index_file_name).st_ctime)
             delta = datetime.now() - created_at
+            log.info('Indexed created %s seconds ago', delta.seconds)
             if delta.seconds > config.index_keep_alive:
                 log.info('Index is too old.  Not using')
                 return None
