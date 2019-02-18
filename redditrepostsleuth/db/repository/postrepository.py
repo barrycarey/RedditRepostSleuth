@@ -10,7 +10,7 @@ class PostRepository:
     def __init__(self, db_session):
         self.db_session = db_session
     def add(self, item):
-        #log.debug('Inserting: %s', item)
+        log.debug('Inserting: %s', item)
         self.db_session.add(item)
     def bulk_save(self, items: List[Post]):
         self.db_session.bulk_save_objects(items)

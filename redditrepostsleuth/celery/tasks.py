@@ -21,10 +21,12 @@ from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnit
 from redditrepostsleuth.model.db.databasemodels import Reposts, Comment, Post, ImageRepost
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.model.influxevent import InfluxEvent
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.service.eventlogging import EventLogging
 
-from redditrepostsleuth.util.helpers import get_reddit_instance
+from redditrepostsleuth.util.helpers import get_reddit_instance, get_influx_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree, \
     get_bit_count, set_image_hashes
 from redditrepostsleuth.util.objectmapping import post_to_hashwrapper
@@ -48,6 +50,7 @@ class SqlAlchemyTask(Task):
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.reddit = get_reddit_instance()
+        self.event_logger = EventLogging()
 
 class VpTreeTask(Task):
     def __init__(self):
@@ -59,10 +62,12 @@ class AnnoyTask(Task):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.dup_service = DuplicateImageService(self.uowm)
         self.reddit = get_reddit_instance()
+        self.event_logger = EventLogging()
 
 class RedditTask(Task):
     def __init__(self):
         self.reddit = get_reddit_instance()
+        self.event_logger = EventLogging()
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
@@ -115,6 +120,7 @@ def save_new_comment(self, comment):
         new_comment = Comment(body=comment.body, comment_id=comment.id)
         uow.comments.add(new_comment)
         uow.commit()
+        self.event_logger.save_event(InfluxEvent(event_type='ingest_comment'))
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
@@ -176,6 +182,7 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
                 repost.checked_post.checked_repost = True
                 uow.posts.update(repost.checked_post)
                 uow.commit()
+                self.event_logger.save_event(InfluxEvent(event_type='repost_check', post_id=repost.checked_post.post_id))
                 return
 
         repost.checked_post.checked_repost = True
@@ -183,6 +190,7 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
             log.debug('Post %s has no matches', repost.checked_post.post_id)
             uow.posts.update(repost.checked_post)
             uow.commit()
+            self.event_logger.save_event(InfluxEvent(event_type='repost_check', post_id=repost.checked_post.post_id))
             return
 
         # Get the post object for each match
@@ -225,11 +233,8 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
                 uow.commit()
         uow.posts.update(repost.checked_post)
         uow.commit()
+        self.event_logger.save_event(InfluxEvent(event_type='repost_check', post_id=repost.checked_post.post_id))
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def process_link_repost(self, post_id):
-    with self.uowm.start() as uow:
-        pass
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def hash_link_url(self, id):
@@ -240,6 +245,7 @@ def hash_link_url(self, id):
         url_hash = md5(post.url.encode('utf-8'))
         post.url_hash = url_hash.hexdigest()
         uow.commit()
+        self.event_logger.save_event(InfluxEvent(event_type='hash_url', post_id=post.post_id))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def check_deleted_posts(self, posts):
@@ -270,6 +276,7 @@ def check_deleted_posts(self, posts):
                     log.exception('Exception with deleted image cleanup for URL: %s ', post.url, exc_info=True)
                     print('')
 
+            self.event_logger.save_event(InfluxEvent(event_type='delete_check', post_id=post.post_id))
         try:
             log.info('Saving batch of delete checks')
             uow.commit()
@@ -290,6 +297,7 @@ def find_matching_images_annoy(self, post: Post) -> ImageRepostWrapper:
     result.checked_post = post
     result.matches = self.dup_service.check_duplicate(post)
     log.debug('Found %s matching images', len(result.matches))
+    self.event_logger.save_event(InfluxEvent(event_type='find_matching_images', post_id=post.post_id))
     return result
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
@@ -310,6 +318,7 @@ def save_new_post(self, post):
             post.url_hash = url_hash.hexdigest()
             log.info('Set URL hash for post %s', post.post_id)
         uow.commit()
+        self.event_logger.save_event(InfluxEvent(event_type='ingest_post', post_id=post.post_id))
 
 
 @celery.task(serializer='pickle')

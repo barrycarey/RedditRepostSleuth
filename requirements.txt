@@ -13,3 +13,4 @@ eventlet
 ImageHash
 annoy
 RedLock
+influxdb

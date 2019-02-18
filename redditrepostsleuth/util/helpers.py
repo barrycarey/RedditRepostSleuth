@@ -1,4 +1,4 @@
-
+from influxdb import InfluxDBClient
 from praw import Reddit
 
 from redditrepostsleuth.config import config
@@ -12,6 +12,18 @@ def get_reddit_instance() -> Reddit:
                         user_agent=config.reddit_useragent,
                         username=config.reddit_username
                     )
+
+def get_influx_instance() -> InfluxDBClient:
+    return InfluxDBClient(
+            config.influx_address,
+            config.influx_port,
+            database=config.influx_database,
+            ssl=config.influx_ssl,
+            verify_ssl=config.influx_verify_ssl,
+            username=config.influx_user,
+            password=config.influx_password,
+            timeout=5
+        )
 
 def chunk_list(l, n):
     """Yield successive n-sized chunks from l."""

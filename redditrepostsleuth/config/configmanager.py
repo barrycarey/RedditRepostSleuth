@@ -66,6 +66,15 @@ class ConfigManager:
         self.celery_broker = self.config['CELERY']['broker']
         self.celery_backend = self.config['CELERY']['backend']
 
+        # InfluxDB
+        self.influx_address = self.config['INFLUXDB']['Address']
+        self.influx_port = self.config['INFLUXDB'].getint('Port', fallback=8086)
+        self.influx_database = self.config['INFLUXDB'].get('Database', fallback='speedtests')
+        self.influx_user = self.config['INFLUXDB'].get('Username', fallback='')
+        self.influx_password = self.config['INFLUXDB'].get('Password', fallback='')
+        self.influx_ssl = self.config['INFLUXDB'].getboolean('SSL', fallback=False)
+        self.influx_verify_ssl = self.config['INFLUXDB'].getboolean('Verify_SSL', fallback=True)
+
         # Reddit
         self.reddit_praw_config = self.config['REDDIT'].getboolean('use_praw_config', fallback=False)
         self.reddit_client_id = self.config['REDDIT']['client_id']
