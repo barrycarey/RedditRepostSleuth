@@ -219,8 +219,8 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
 
                 new_repost = ImageRepost(post_id=repost.checked_post.post_id,
                                          repost_of=final_matches[0].post.post_id,
-                                         hamming_distance=match.hamming_distance,
-                                         annoy_distance=match.annoy_distance)
+                                         hamming_distance=final_matches[0].hamming_distance,
+                                         annoy_distance=final_matches[0].annoy_distance)
                 uow.repost.add(new_repost)
                 uow.commit()
         uow.posts.update(repost.checked_post)

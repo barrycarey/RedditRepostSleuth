@@ -223,7 +223,7 @@ class RequestService:
     def _build_markdown_list(self, matches: List[ImageMatch]) -> str:
         result = ''
         for match in matches:
-            result += '* [{}]({})\n'.format(match.post.shortlink, match.post.shortlink)
+            result += '* {} - [{}]({})\n'.format(match.post.created_at, match.post.shortlink, match.post.shortlink)
         return result
 
     def _save_post(self, post: Post):
