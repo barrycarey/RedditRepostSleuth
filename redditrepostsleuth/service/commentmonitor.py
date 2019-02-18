@@ -37,7 +37,8 @@ class CommentMonitor:
                             post_id=comment.submission.id,
                             comment_id=comment.id,
                             comment_body=comment.body,
-                            summons_received_at=datetime.fromtimestamp(comment.created_utc)
+                            summons_received_at=datetime.fromtimestamp(comment.created_utc),
+                            requestor=comment.author.name
                         )
                         uow.summons.add(summons)
                         uow.commit()

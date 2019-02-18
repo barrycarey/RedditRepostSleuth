@@ -163,6 +163,7 @@ def process_reposts(self, post: HashWrapper):
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def process_repost_annoy(self, repost: ImageRepostWrapper):
+    # TODO: Break down into smaller chunks
     print('Processing task for repost ' + repost.checked_post.post_id)
     with self.uowm.start() as uow:
 
@@ -193,6 +194,7 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
         log.debug('Matches after cleaning: %s', len(repost.matches))
 
         if len(repost.matches) > 0:
+            # TODO: Move all crosspost logic to reposthelpers
             final_matches = []
             for match in repost.matches:
                 if match.post.crosspost_checked:
@@ -243,7 +245,7 @@ def hash_link_url(self, id):
 def check_deleted_posts(self, posts):
     with self.uowm.start() as uow:
         for post in posts:
-            #log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
+            log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
             headers = {'User-Agent': random.choice(USER_AGENTS)}
             try:
                 r = requests.head(post.url, timeout=20, headers=headers)
@@ -296,32 +298,6 @@ def save_new_post(self, post):
     #post = postdto_to_post(postdto)
     with self.uowm.start() as uow:
         uow.posts.add(post)
-        # This whole block can go
-        if config.check_repost_on_ingest and post.post_type == 'image':
-            log.debug('----> Repost on ingest enabled.  Check repost for %s', post.post_id)
-
-            try:
-                img = generate_img_by_url(post.url)
-                post.image_hash = generate_dhash(img)
-            except ImageConversioinException as e:
-                log.exception('Error getting image hash in task', exc_info=True)
-
-            parent = get_crosspost_parent(post, get_reddit_instance())
-            if parent:
-                post.checked_repost = True
-                post.crosspost_parent = parent
-                uow.commit()
-                return
-            uow.commit()
-
-            if not post.image_hash:
-                log.error('Unable to get image hash. Skipping ingest repost check')
-                return
-
-            wrapped = post_to_hashwrapper(post)
-            log.debug('Starting repost check for post %s', post.post_id)
-            (find_matching_images_task.s(wrapped) | process_reposts.s()).apply_async(queue='repost')
-            return
 
         if post.post_type == 'image':
             try:

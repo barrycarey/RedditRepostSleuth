@@ -116,7 +116,8 @@ def set_image_hashes(post: Post) -> Post:
     try:
         img = generate_img_by_url(post.url)
     except ImageConversioinException as e:
-        return post
+        log.exception('Problem converting image', exc_info=True)
+        raise
 
     try:
         dhash_h = imagehash.dhash(img, hash_size=16)
@@ -130,7 +131,9 @@ def set_image_hashes(post: Post) -> Post:
         post.ahash_set_bits = Counter(ahash.hash.flatten())[True]
         post.image_bits_set = post.dhash_h_set_bits + post.dhash_v_set_bits + post.ahash_set_bits
     except Exception as e:
+        # TODO: Specific exception
         log.exception('Error creating hash', exc_info=True)
+        raise
 
     return post
 

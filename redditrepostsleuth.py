@@ -50,8 +50,7 @@ if __name__ == '__main__':
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
-    image_repost_service.check_repost_annoy()
-    sys.exit()
+
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')
@@ -68,7 +67,7 @@ if __name__ == '__main__':
 
     if args.repost:
         log.info('Starting Repost Agent')
-        #link_repost_service.start()
+        link_repost_service.start()
         image_repost_service.start()
 
 
@@ -77,10 +76,6 @@ if __name__ == '__main__':
         threading.Thread(target=maintenance.clear_deleted_images, name='Deleted Cleanup').start()
 
     if args.summons:
-        if image_repost_service is None:
-            image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-
-
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
         threading.Thread(target=comments.handle_summons).start()
 

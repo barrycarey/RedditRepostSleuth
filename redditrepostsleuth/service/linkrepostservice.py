@@ -9,7 +9,7 @@ from prawcore import Forbidden
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Post, Reposts
+from redditrepostsleuth.model.db.databasemodels import Post, Reposts, LinkRepost
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.reposthelpers import remove_newer_posts, sort_reposts
 from redditrepostsleuth.celery.tasks import hash_link_url
@@ -62,7 +62,7 @@ class LinkRepostService(RepostServiceBase):
                         log.info('http://reddit.com%s is a repost of http://reddit.com%s', post.perma_link, matching_links[0].perma_link)
 
                         with self.uowm.start() as uow:
-                            repost = Reposts(post_id=post.post_id, repost_of=matching_links[0].post_id, post_type=post.post_type)
+                            repost = LinkRepost(post_id=post.post_id, repost_of=matching_links[0].post_id)
                             uow.repost.add(repost)
                             post.checked_repost = True
                             uow.commit()

@@ -16,7 +16,7 @@ class Post(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
-    short_url = Column(String(300))
+    shortlink = Column(String(300))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type = Column(String(20))
     author = Column(String(100), nullable=False)
@@ -48,12 +48,14 @@ class Summons(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
+    requestor = Column(String(100))
     comment_id = Column(String(100), unique=True)
     comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
     comment_reply = Column(String(5000))
     comment_reply_id = Column(String(100))
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
+
 
 
 class Comment(Base):

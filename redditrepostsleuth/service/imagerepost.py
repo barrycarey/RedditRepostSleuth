@@ -21,7 +21,9 @@ from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
+from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
+from redditrepostsleuth.service.imagematch import ImageMatch
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.helpers import chunk_list
 from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count, set_image_hashes, \
@@ -30,6 +32,7 @@ from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_ha
 
 
 # TODO - Deal with images that PIL can't convert.  Tons in database
+from redditrepostsleuth.util.reposthelpers import sort_reposts
 from redditrepostsleuth.util.vptree import VPTree
 
 
@@ -38,7 +41,6 @@ class ImageRepostService(RepostServiceBase):
     def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, hashing: bool = False, repost: bool = False) -> None:
         super().__init__(uowm)
         self.reddit = reddit
-        self.vptree_cache = CashedVpTree(uowm)
         self.hashing = hashing
         self.repost = repost
 
@@ -89,95 +91,33 @@ class ImageRepostService(RepostServiceBase):
                 log.info('Saving hashes')
                 uow.commit()
                 offset += 25
-    def find_all_occurrences(self, submission: Submission, include_crosspost: bool = False) -> List[Post]:
+    def find_all_occurrences(self, submission: Submission) -> ImageRepostWrapper:
         """
         Take a given Reddit submission and find all matching posts
         :param submission:
         :return:
         """
-        try:
-            img = generate_img_by_url(submission.url)
-            image_hash = generate_dhash(img)
-        except ImageConversioinException:
-            raise ImageConversioinException('Failed to convert image to hash')
+        # TODO: Decide if I want to remove crossposts from this list
 
         with self.uowm.start() as uow:
-            #existing_images = uow.posts.count_by_type('image')
-            wrapper = HashWrapper()
-            wrapper.post_id = submission.id
-            wrapper.image_hash = image_hash
-            r = find_matching_images_task.apply_async(queue='repost', args=(wrapper,)).get()
-
-            # Save this submission to database if it's not already there
             post = uow.posts.get_by_post_id(submission.id)
             if not post:
-                log.debug('Saving post %s to database', submission.id)
-                post = submission_to_post(submission)
-                post.image_hash = image_hash
+                post =  submission_to_post(submission)
                 uow.posts.add(post)
                 uow.commit()
 
-            occurrences = [uow.posts.get_by_post_id(post[1].post_id) for post in r.occurances]
-            occurrences = self._filter_matching_images(occurrences, post)
-            occurrences = self._sort_reposts(occurrences)
+        try:
+            set_image_hashes(post)
+        except Exception as e:
+            # TODO: Specific exception
+            log.exception('Problem in find_all_occurrences.  Exception type %s', str(type(e)), exc_info=True)
+            ImageConversioinException('Failed to convert image to hash')
 
-            return occurrences
+        results = find_matching_images_annoy.apply_async(queue='repost', args=(post,)).get()
+        results.matches = sort_reposts(results.matches)
+        return results
 
-    def check_single_repost(self, post_id: str):
-
-
-        with self.uowm.start() as uow:
-            post = uow.posts.get_by_post_id(post_id)
-            existing_images = uow.posts.find_image_hashes_in_rage(post.image_bits_set - 20, post.image_bits_set + 20)
-            #existing_images = uow.posts.test_with_entities()
-            wrapped = [hash_tuple_to_hashwrapper(post) for post in existing_images]
-            start = datetime.now()
-            tree = VPTree(wrapped, lambda x, y: hamming(x, y))
-            delta = datetime.now() - start
-
-            print('VPTree Time: ' + str(delta.seconds))
-            r = find_matching_images_in_vp_tree(tree, post.dhash_h, 10)
-            log.info('Found %s matches', len(r))
-            for result in r:
-                post = uow.posts.get_by_post_id(result[1].post_id)
-                log.info('Post %s - %s', post.post_id, post.url)
-            return
-        with self.uowm.start() as uow:
-            post = uow.posts.get_by_post_id(post_id)
-            (find_matching_images_task.s(post_to_hashwrapper(post)) | process_reposts.s()).apply_async(queue='repost')
-
-    def repost_check(self):
-        # TODO - Add logic for when we reach end of results
-        offset = 0
-        while True:
-            try:
-                with self.uowm.start() as uow:
-                    raw_posts = uow.posts.find_all_by_repost_check(False, limit=config.check_repost_batch_size, offset=offset)
-                    wrapped_posts = []
-                    for post in raw_posts:
-                        parent = self._get_crosspost_parent(post)
-                        if parent:
-                            log.debug('Post %s has a crosspost parent %s.  Skipping', post.post_id, parent)
-                            post.crosspost_parent = parent
-                            post.checked_repost = True
-                            uow.commit()
-                            continue
-                        wrapped_posts.append(post_to_hashwrapper(post))
-
-                log.info('Starting %s jobs', len(wrapped_posts))
-                for post in wrapped_posts:
-                    log.info('Creating chained task')
-                    #find_matching_images_task.apply_async((post,), queue='repost', link=process_reposts.s())
-
-                    (find_matching_images_task.s(post) | process_reposts.s()).apply_async(queue='repost')
-                log.info('Waiting 30 seconds until next repost batch')
-                offset += config.check_repost_batch_size
-                time.sleep(config.check_repost_batch_delay)
-
-            except Exception as e:
-                log.exception('Repost thread died', exc_info=True)
-
-    def check_repost_annoy(self):
+    def check_repost(self):
         offset = 0
         while True:
             try:
@@ -195,21 +135,6 @@ class ImageRepostService(RepostServiceBase):
 
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)
-
-
-    def set_bits(self):
-        offset = 0
-        while True:
-            with self.uowm.start() as uow:
-                posts = uow.posts.find_all_without_bits_set(limit=2000, offset=offset)
-                if not posts:
-                    sys.exit()
-                chunks = self.chunks(posts, 25)
-                print('sending chunk jobs')
-                for chunk in chunks:
-                    set_bit_count.apply_async((chunk,), queue='bitset')
-                offset += 2000
-            time.sleep(20)
 
 
 

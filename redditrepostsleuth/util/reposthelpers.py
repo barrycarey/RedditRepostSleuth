@@ -8,6 +8,9 @@ from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.service.imagematch import ImageMatch
 
 # TODO: Should be able to safely remove this now
+from redditrepostsleuth.util.helpers import get_reddit_instance
+
+
 def filter_matching_images(raw_list: List[ImageMatch], post_being_checked: Post) -> List[Post]:
     """
     Take a raw list if matched images.  Filter one ones meeting the following criteria.
@@ -41,6 +44,17 @@ def sort_reposts(posts: List[ImageMatch], reverse=False) -> List[ImageMatch]:
 def remove_newer_posts(posts: List[Post], repost_check: Post):
     return [post for post in posts if post.created_at < repost_check.created_at]
 
+
+def check_for_image_crosspost(matches: List[ImageMatch], reddit: Reddit = None) -> List[ImageMatch]:
+    if not reddit:
+        reddit = get_reddit_instance()
+    for match in matches:
+        if match.post.crosspost_checked:
+            continue
+        match.post.crosspost_parent = get_crosspost_parent(match.post, reddit)
+        match.post.crosspost_checked = True
+    return matches
+
 def get_crosspost_parent(post: Post, reddit: Reddit):
     submission = reddit.submission(id=post.post_id)
     if submission:
@@ -52,3 +66,19 @@ def get_crosspost_parent(post: Post, reddit: Reddit):
             log.debug('No crosspost parent for post %s', post.post_id)
             return None
     log.error('Failed to find submission with ID %s', post.post_id)
+
+def set_shortlink(post: Post) -> Post:
+    """
+    Take a post and set its short link if it doesn't exist
+    :param post:
+    :return:
+    """
+    if not post.shortlink:
+        reddit = get_reddit_instance()
+        try:
+            post.shortlink = reddit.submission(post.post_id).shortlink
+        except Exception as e:
+            # TODO: Specific exception
+            log.error('Failed to set shortlink for post %s. Exception type: %s', post.post_id, type(e))
+
+    return post

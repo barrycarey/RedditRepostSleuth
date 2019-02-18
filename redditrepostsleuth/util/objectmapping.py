@@ -21,6 +21,7 @@ def submission_to_post(submission: Submission) -> Post:
     post = Post()
     post.post_id = submission.id
     post.url = submission.url
+    post.shortlink = submission.shortlink
     post.author = submission.author.name if submission.author else None
     post.created_at = datetime.fromtimestamp(submission.created_utc)
     post.subreddit = submission.subreddit.display_name

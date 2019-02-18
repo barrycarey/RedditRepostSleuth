@@ -92,33 +92,39 @@ class DuplicateImageService:
 
 
     def _clean_results(self, results: List[ImageMatch], orig_id: int) -> List[ImageMatch]:
+        """
+        Take a list of matches and filter out the results.
+        :param results: List of ImageMatch
+        :param orig_id: ID of the post we are checked for reposts
+        :return:
+        """
         with self.uowm.start() as uow:
             original = uow.posts.get_by_id(orig_id)
 
         final_results = []
-        for result in results:
-            if result.annoy_distance > 0.265:
+        for match in results:
+            if match.annoy_distance > 0.265:
                 #log.debug('Skipping result with distance %s', result[1])
                 continue
             # Skip original query (result[0] is DB ID)
-            if result.match_id == result.original_id:
+            if match.match_id == match.original_id:
                 continue
 
             with self.uowm.start() as uow:
-                post = uow.posts.get_by_id(result.match_id)
+                match.post = uow.posts.get_by_id(match.match_id)
 
-            if original.author == post.author:
+            if original.author == match.post.author:
                 log.debug('Skipping post with same Author')
                 continue
 
-            if post.created_at > original.created_at:
-                log.debug('Skipping match that is newer than the post we are checking. Original: %s - Match: %s', original.created_at, post.created_at)
+            if match.post.created_at > original.created_at:
+                log.debug('Skipping match that is newer than the post we are checking. Original: %s - Match: %s', original.created_at, match.post.created_at)
 
-            result.hamming_distance = hamming(original.dhash_h, post.dhash_h)
+            match.hamming_distance = hamming(original.dhash_h, match.post.dhash_h)
 
-            if result.hamming_distance <= config.hamming_distance:
-                log.debug('Match %s: Annoy %s - Ham: %s', result.match_id, result.hamming_distance, result.annoy_distance)
-                final_results.append(result)
+            if match.hamming_distance <= config.hamming_distance:
+                log.debug('Match %s: Annoy %s - Ham: %s', match.match_id, match.hamming_distance, match.annoy_distance)
+                final_results.append(match)
             else:
                 #log.debug('Passed annoy and failed hamming. (Anny: %s - Ham: %s) - %s', result[1], hamming_distance, result[0])
                 pass
@@ -127,6 +133,7 @@ class DuplicateImageService:
 
 
     def check_duplicate(self, post: Post) -> List[ImageMatch]:
+        # TODO: Load and append post object to each match
         self._build_index()
         log.debug('%s - Checking %s for duplicates', os.getpid(), post.post_id)
         search_array = bytearray(post.dhash_h, encoding='utf-8')

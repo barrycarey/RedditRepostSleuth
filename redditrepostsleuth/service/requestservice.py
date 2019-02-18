@@ -14,7 +14,9 @@ from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPO
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.service.imagematch import ImageMatch
 from redditrepostsleuth.service.imagerepost import ImageRepostService
+from redditrepostsleuth.util.reposthelpers import set_shortlink
 
 
 class RequestService:
@@ -40,13 +42,16 @@ class RequestService:
 
         # TODO handle case when no command is passed
         if parsed_command.group('command').lower() == 'watch':
-            self.process_watch_request(summons, sub_command=parsed_command.group('subcommand'))
+            self.process_watch_request(summons, sub_command=parsed_command.group('subcommand').strip())
         elif parsed_command.group('command').lower() == 'unwatch':
             self.process_unwatch_request(summons)
         elif parsed_command.group('command').lower() == 'stats':
             self.process_stat_request(summons)
         elif parsed_command.group('command').lower() == 'check':
-            self.process_repost_request(summons)
+            sub_command = parsed_command.group('subcommand')
+            if sub_command:
+                sub_command.strip()
+            self.process_repost_request(summons, sub_command=sub_command)
         else:
             log.error('Unknown command')
             response.message = UNKNOWN_COMMAND
@@ -145,7 +150,7 @@ class RequestService:
         comment = self.reddit.comment(id=summons.comment_id)
         response = RepostResponseBase(summons_id=summons.id)
         with self.uowm.start() as uow:
-            search_count = uow.posts.count_by_type('link')
+            search_count = uow.posts.get_count()
             posts = uow.posts.find_all_by_url(submission.url)
             if len(posts) > 0:
                 response.message = LINK_ALL.format(occurrences=len(posts),
@@ -167,7 +172,7 @@ class RequestService:
         try:
             result = self.image_service.find_all_occurrences(submission)
         except ImageConversioinException as e:
-            log.error('Failed to convert image for repost checking.  Summons: %s', summons)
+            log.error('Summons Failure: Failed to convert image for repost checking.  Summons: %s', summons)
             response.message = 'Internal error while checking for reposts. \n\nPlease send me a PM to report this issue'
             self._send_response(comment, response)
             return
@@ -175,20 +180,28 @@ class RequestService:
         if not result:
             response.message = REPOST_NO_RESULT.format(total=post_count)
         else:
-            if sub_command and sub_command.lower() == 'all':
-                response.message = IMAGE_REPOST_ALL.format(occurrences=len(result),
-                                                           search_total=post_count,
-                                                           original_href='https://reddit.com' + result[0].perma_link,
-                                                           link_text=result[0].perma_link)
-                response.message += self._build_markdown_list(result)
-            else:
-                response.message = IMAGE_REPOST_SHORT.format(count=len(result), orig_url='https://reddit.com' + result[0].perma_link)
-            self._send_response(comment, response)
+            # TODO: This is temp until database is backfilled with short links
+            with self.uowm.start() as uow:
+                for match in result.matches:
+                    if not match.post.shortlink:
+                        set_shortlink(match.post)
+                        uow.posts.update(match.post)
+                        uow.commit()
 
-    def _send_response(self, comment: Comment, response: RepostResponseBase):
+            if sub_command and sub_command.lower() == 'all':
+                response.message = IMAGE_REPOST_ALL.format(occurrences=len(result.matches),
+                                                           search_total=post_count,
+                                                           original_link='https://reddit.com' + result.matches[0].post.perma_link,
+                                                           link_text=result.matches[0].post.perma_link)
+                response.message += self._build_markdown_list(result.matches)
+            else:
+                response.message = IMAGE_REPOST_SHORT.format(count=len(result.matches), orig_url=result.matches[0].post.shortlink)
+            self._send_response(comment, response, shortlink=submission.shortlink)
+
+    def _send_response(self, comment: Comment, response: RepostResponseBase, shortlink: str = ''):
         try:
             log.info('Sending response to summons comment %s. MESSAGE: %s', comment.id, response.message)
-            response.message += SIGNATURE
+            response.message += SIGNATURE.format()
             reply = comment.reply(response.message)
             if reply.id:
                 self._save_response(response)
@@ -207,9 +220,13 @@ class RequestService:
                 uow.commit()
                 log.debug('Committed summons response to database')
 
-    def _build_markdown_list(self, posts: List[Post]) -> str:
+    def _build_markdown_list(self, matches: List[ImageMatch]) -> str:
         result = ''
-        for post in posts:
-            result += '* [{}]({})\n'.format('https://reddit.com' + post.perma_link,
-                                  'https://reddit.com' + post.perma_link)
+        for match in matches:
+            result += '* [{}]({})\n'.format(match.post.shortlink, match.post.shortlink)
         return result
+
+    def _save_post(self, post: Post):
+        with self.uowm.start() as uow:
+            uow.posts.update(post)
+            uow.commit()
