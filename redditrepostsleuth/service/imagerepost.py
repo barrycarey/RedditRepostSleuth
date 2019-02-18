@@ -117,12 +117,14 @@ class ImageRepostService(RepostServiceBase):
         results.matches = sort_reposts(results.matches)
         return results
 
-    def check_repost(self):
+    def repost_check(self):
         offset = 0
         while True:
             try:
                 with self.uowm.start() as uow:
                     posts = uow.posts.find_all_by_repost_check(False, limit=config.check_repost_batch_size, offset=offset)
+                    if not posts:
+                        break
                     for post in posts:
                         if post.crosspost_parent:
                             continue

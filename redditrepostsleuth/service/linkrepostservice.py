@@ -23,7 +23,7 @@ class LinkRepostService(RepostServiceBase):
 
     def start(self):
         threading.Thread(target=self.hash_urls, name='LinkHash').start()
-        threading.Thread(target=self.repost_check, name='LinkRepost').start()
+        #threading.Thread(target=self.repost_check, name='LinkRepost').start()
 
     def find_all_occurrences(self, submission: Submission):
         pass
