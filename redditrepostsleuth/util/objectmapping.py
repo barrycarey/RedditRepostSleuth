@@ -27,11 +27,13 @@ def submission_to_post(submission: Submission) -> Post:
     post.subreddit = submission.subreddit.display_name
     post.title = submission.title
     post.perma_link = submission.permalink
+    post.crosspost_parent = submission.__dict__.get('crosspost_parent', None)
+    post.crosspost_checked = True
     if submission.is_self:
         post.post_type = 'text'
     else:
         try:
-            post.post_type = submission.post_hint
+            post.post_type = submission.__dict__.get('post_hint', None)
         except (AttributeError, Forbidden) as e:
             pass
 
