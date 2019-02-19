@@ -28,7 +28,7 @@ class MaintenanceService:
             limit = config.delete_check_batch_size
             while True:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_for_delete_check(504, limit=config.delete_check_batch_size)
+                    posts = uow.posts.find_all_for_delete_check(504, limit=config.delete_check_batch_size, offset=offset)
                     if len(posts) == 0:
                         log.info('Cleaned deleted images reach end of results')
                         break
