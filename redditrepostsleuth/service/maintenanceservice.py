@@ -36,7 +36,11 @@ class MaintenanceService:
                     log.info('Starting %s delete check jobs', config.delete_check_batch_size)
                     chunks = chunk_list(posts, 25)
                     for chunk in chunks:
-                        check_deleted_posts.apply_async((chunk,), queue='deletecheck')
+                        try:
+                            check_deleted_posts.apply_async((chunk,), queue='deletecheck')
+                        except Exception as e:
+                            log.error('Failed to send delete batch to Redis')
+
                 offset += limit
                 time.sleep(config.delete_check_batch_delay)
 
