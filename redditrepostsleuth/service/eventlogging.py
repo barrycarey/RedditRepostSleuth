@@ -13,7 +13,7 @@ class EventLogging:
     def save_event(self, event: InfluxEvent):
         try:
             self._influx_client.write_points(event.get_influx_event())
-            log.debug('Wrote to Influx: %s', event.get_influx_event())
+            #log.debug('Wrote to Influx: %s', event.get_influx_event())
         except (InfluxDBClientError, ConnectionError, InfluxDBServerError) as e:
             if hasattr(e, 'code') and e.code == 404:
                 log.error('Database %s Does Not Exist.  Attempting To Create', config.influx_database)
