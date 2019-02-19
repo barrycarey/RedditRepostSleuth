@@ -22,6 +22,7 @@ from redditrepostsleuth.model.db.databasemodels import Reposts, Comment, Post, I
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.model.influxevent import InfluxEvent
+from redditrepostsleuth.model.ingestsubmissionevent import IngestSubmissionEvent
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.service.eventlogging import EventLogging
@@ -44,6 +45,9 @@ def image_hash(data):
 
     return data
 
+class EventLoggerTask(Task):
+    def __init__(self):
+        self.event_logger = EventLogging()
 
 class SqlAlchemyTask(Task):
 
@@ -276,10 +280,12 @@ def check_deleted_posts(self, posts):
                     log.exception('Exception with deleted image cleanup for URL: %s ', post.url, exc_info=True)
                     print('')
 
-            self.event_logger.save_event(InfluxEvent(event_type='delete_check', post_id=post.post_id))
+
         try:
             log.info('Saving batch of delete checks')
             uow.commit()
+            for post in posts:
+                self.event_logger.save_event(InfluxEvent(event_type='delete_check', post_id=post.post_id))
         except Exception as e:
             uow.rollback()
             log.error('Commit failed: %s', str(e))
@@ -318,7 +324,7 @@ def save_new_post(self, post):
             post.url_hash = url_hash.hexdigest()
             log.info('Set URL hash for post %s', post.post_id)
         uow.commit()
-        self.event_logger.save_event(InfluxEvent(event_type='ingest_post', post_id=post.post_id))
+        self.event_logger.save_event(IngestSubmissionEvent(event_type='ingest_post', post_id=post.post_id, queue='post', post_type=post.post_type))
 
 
 @celery.task(serializer='pickle')
