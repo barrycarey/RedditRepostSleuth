@@ -22,7 +22,8 @@ def get_influx_instance() -> InfluxDBClient:
             verify_ssl=config.influx_verify_ssl,
             username=config.influx_user,
             password=config.influx_password,
-            timeout=5
+            timeout=5,
+            pool_size=50
         )
 
 def chunk_list(l, n):
