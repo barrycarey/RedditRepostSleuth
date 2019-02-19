@@ -28,7 +28,7 @@ class MaintenanceService:
             limit = config.delete_check_batch_size
             while True:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_for_delete_check(504, limit=config.delete_check_batch_size, offset=offset)
+                    posts = uow.posts.find_all_for_delete_check(168, limit=config.delete_check_batch_size, offset=offset)
                     if len(posts) == 0:
                         log.info('Cleaned deleted images reach end of results')
                         break
@@ -54,5 +54,5 @@ class MaintenanceService:
             ids = ['t3_' + post.post_id for post in posts]
             update_cross_post_parent.apply_async((ids,), queue='crosspost')
             self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
-            time.sleep(1.3)
+            time.sleep(.7)
             offset += 100
