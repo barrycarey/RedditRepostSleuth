@@ -1,10 +1,11 @@
 from datetime import datetime
 
 class InfluxEvent:
-    def __init__(self, event_type=None, status: str = None):
+    def __init__(self, event_type=None, status: str = None, queue: str = None):
         self.event_type = event_type
         self.status = status
         self.event_time = datetime.utcnow()
+        self.queue = queue
 
 
     def get_influx_event(self):
@@ -17,7 +18,8 @@ class InfluxEvent:
             'time': self.event_time,
             'tags': {
                 'event_type': self.event_type,
-                'status': self.status
+                'status': self.status,
+                'queue': self.queue
             }
         }]
 
