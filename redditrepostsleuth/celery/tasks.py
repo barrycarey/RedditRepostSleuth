@@ -186,7 +186,7 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
                 repost.checked_post.checked_repost = True
                 uow.posts.update(repost.checked_post)
                 uow.commit()
-                self.event_logger.save_event(InfluxEvent(event_type='repost_check', post_id=repost.checked_post.post_id))
+                self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
                 return
 
         repost.checked_post.checked_repost = True
@@ -194,7 +194,7 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
             log.debug('Post %s has no matches', repost.checked_post.post_id)
             uow.posts.update(repost.checked_post)
             uow.commit()
-            self.event_logger.save_event(InfluxEvent(event_type='repost_check', post_id=repost.checked_post.post_id))
+            self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
             return
 
         # Get the post object for each match
@@ -237,7 +237,7 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
                 uow.commit()
         uow.posts.update(repost.checked_post)
         uow.commit()
-        self.event_logger.save_event(InfluxEvent(event_type='repost_check', post_id=repost.checked_post.post_id))
+        self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
@@ -285,10 +285,11 @@ def check_deleted_posts(self, posts):
             log.info('Saving batch of delete checks')
             uow.commit()
             for post in posts:
-                self.event_logger.save_event(InfluxEvent(event_type='delete_check', post_id=post.post_id))
+                self.event_logger.save_event(InfluxEvent(event_type='delete_check', status='success'))
         except Exception as e:
             uow.rollback()
             log.error('Commit failed: %s', str(e))
+            self.event_logger.save_event(InfluxEvent(event_type='delete_check', status='error'))
 
 
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
@@ -323,8 +324,17 @@ def save_new_post(self, post):
             url_hash = md5(post.url.encode('utf-8'))
             post.url_hash = url_hash.hexdigest()
             log.info('Set URL hash for post %s', post.post_id)
-        uow.commit()
-        self.event_logger.save_event(IngestSubmissionEvent(event_type='ingest_post', post_id=post.post_id, queue='post', post_type=post.post_type))
+
+        try:
+            uow.commit()
+            self.event_logger.save_event(
+                IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
+                                      post_type=post.post_type))
+        except Exception as e:
+            self.event_logger.save_event(
+                IngestSubmissionEvent(event_type='ingest_post', status='error', post_id=post.post_id, queue='post',
+                                      post_type=post.post_type))
+
 
 
 @celery.task(serializer='pickle')

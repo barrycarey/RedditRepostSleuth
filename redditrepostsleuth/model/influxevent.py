@@ -1,8 +1,9 @@
 from datetime import datetime
 
 class InfluxEvent:
-    def __init__(self, event_type=None, post_id=None):
+    def __init__(self, event_type=None, status: str = None):
         self.event_type = event_type
+        self.status = status
         self.event_time = datetime.utcnow()
 
 
@@ -10,8 +11,8 @@ class InfluxEvent:
         return [{
             'measurement': 'repost_sleuth_stats',
             'fields': {
-                'event_type': self.event_type,
                 'event_time': str(self.event_time),
+                'status': self.status
             },
             'time': self.event_time,
             'tags': {
