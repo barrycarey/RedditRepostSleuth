@@ -284,12 +284,15 @@ def check_deleted_posts(self, posts):
         try:
             log.info('Saving batch of delete checks')
             uow.commit()
-            for post in posts:
-                self.event_logger.save_event(InfluxEvent(event_type='delete_check', status='success'))
+            status = 'success'
+
         except Exception as e:
             uow.rollback()
             log.error('Commit failed: %s', str(e))
-            self.event_logger.save_event(InfluxEvent(event_type='delete_check', status='error'))
+            status = 'error'
+
+        for post in posts:
+            self.event_logger.save_event(InfluxEvent(event_type='delete_check', status=status))
 
 
 @celery.task(bind=True, base=VpTreeTask, serializer='pickle')
