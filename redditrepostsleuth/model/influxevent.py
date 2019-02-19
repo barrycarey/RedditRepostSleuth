@@ -12,11 +12,12 @@ class InfluxEvent:
             'measurement': 'repost_sleuth_stats',
             'fields': {
                 'event_time': str(self.event_time),
-                'status': self.status
+
             },
             'time': self.event_time,
             'tags': {
-                'event_type': self.event_type
+                'event_type': self.event_type,
+                'status': self.status
             }
         }]
 
