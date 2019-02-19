@@ -256,7 +256,12 @@ def hash_link_url(self, id):
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def check_deleted_posts(self, posts):
     with self.uowm.start() as uow:
-        for post in posts:
+        for i in posts:
+            post = uow.posts.get_by_id(i.id)
+            log.error('Last Delete Check: %s', post.last_deleted_check)
+            if post.last_deleted_check:
+                log.error('Skipping post with non null delete check')
+                continue
             log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
             headers = {'User-Agent': random.choice(USER_AGENTS)}
             try:
@@ -363,6 +368,8 @@ def update_cross_post_parent(self, ids):
                 InfluxEvent(event_type='crosspost_check', status='success', queue='post'))
         except Exception as e:
             log.exception('Problem saving cross post')
-            self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='post'))
+            self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='post', rate_limit=self.reddit.auth.limits['remaining']))
+
+        print(self.reddit.auth.limits)
 
 

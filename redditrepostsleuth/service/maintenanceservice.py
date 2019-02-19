@@ -41,6 +41,7 @@ class MaintenanceService:
                 time.sleep(config.delete_check_batch_delay)
 
     def check_crossposts(self):
+
         offset = 0
         while True:
             with self.uowm.start() as uow:
@@ -49,5 +50,5 @@ class MaintenanceService:
             ids = ['t3_' + post.post_id for post in posts]
             update_cross_post_parent.apply_async((ids,), queue='crosspost')
             self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
-            time.sleep(.3)
+            time.sleep(1.3)
             offset += 100
