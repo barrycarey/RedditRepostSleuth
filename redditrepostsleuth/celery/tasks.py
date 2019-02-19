@@ -71,7 +71,9 @@ class AnnoyTask(Task):
 class RedditTask(Task):
     def __init__(self):
         self.reddit = get_reddit_instance()
+        self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.event_logger = EventLogging()
+
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
@@ -344,21 +346,23 @@ def save_new_post(self, post):
 def build_vp_tree(points):
     return VPTree(points, lambda x,y: hamming(x,y))
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True)
-def update_cross_post_parent(self, sub_id):
-    reddit = get_reddit_instance()
-    sub = reddit.submission(id=sub_id)
-    if not sub:
-        print('No submission found')
-        return
-
+@celery.task(bind=True, base=RedditTask, ignore_reseults=True)
+def update_cross_post_parent(self, ids):
+    submissions = self.reddit.info(fullnames=ids)
     with self.uowm.start() as uow:
-        post = uow.posts.get_by_post_id(sub.id)
-        if post:
-            try:
-                post.crosspost_parent = sub.crosspost_parent
-            except AttributeError as e:
-                pass
+        for submission in submissions:
+            post = uow.posts.get_by_post_id(submission.id)
+            if not post:
+                continue
+            post.crosspost_parent = submission.__dict__.get('crosspost_parent', None)
             post.crosspost_checked = True
+        try:
             uow.commit()
+            log.info('Saved crosspost batch')
+            self.event_logger.save_event(
+                InfluxEvent(event_type='crosspost_check', status='success', queue='post'))
+        except Exception as e:
+            log.exception('Problem saving cross post')
+            self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='post'))
+
 

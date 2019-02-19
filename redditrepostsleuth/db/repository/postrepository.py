@@ -25,7 +25,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.id == id).first()
 
     def get_by_post_id(self, id: str) -> Post:
-        log.debug('Looking up post with ID %s', id)
+        #log.debug('Looking up post with ID %s', id)
         return self.db_session.query(Post).filter(Post.post_id == id).first()
 
     def find_all_by_hash(self, hash_str: str, limit: int = None) -> List[Post]:
@@ -58,8 +58,8 @@ class PostRepository:
     def find_all_images_with_hash(self, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.image_hash != None).offset(offset).limit(limit).all()
 
-    def find_all_unchecked_crosspost(self, limit: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.crosspost_parent == None, Post.crosspost_checked == False).limit(limit).all()
+    def find_all_unchecked_crosspost(self, limit: int = None, offset: int = None) -> List[Post]:
+        return self.db_session.query(Post).filter(Post.crosspost_checked == False).offset(offset).limit(limit).all()
 
     def find_all_for_delete_check(self, hours: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(hours=hours)

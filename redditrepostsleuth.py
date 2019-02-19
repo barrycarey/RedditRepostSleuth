@@ -7,6 +7,7 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
+from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.service.imagerepost import ImageRepostService
 from redditrepostsleuth.service.linkrepostservice import LinkRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
@@ -48,9 +49,10 @@ if __name__ == '__main__':
     link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
+    maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
-
+    maintenance.check_crossposts()
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')
@@ -72,7 +74,7 @@ if __name__ == '__main__':
 
 
     if args.deleted:
-        maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine))
+
         threading.Thread(target=maintenance.clear_deleted_images, name='Deleted Cleanup').start()
 
     if args.summons:
