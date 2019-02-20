@@ -1,9 +1,10 @@
+import json
 import time
 from datetime import timedelta, datetime
 
 import requests
 
-from redditrepostsleuth.celery.tasks import check_deleted_posts, update_cross_post_parent
+from redditrepostsleuth.celery.tasks import check_deleted_posts, update_cross_post_parent, update_crosspost_parent_api
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -56,3 +57,17 @@ class MaintenanceService:
             self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
             time.sleep(.7)
             offset += 100
+
+
+    def check_crosspost_api(self):
+        offset = 0
+        with self.uowm.start() as uow:
+            while True:
+                posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=1000)
+                chunks = chunk_list(posts, 100)
+                for chunk in chunks:
+                    log.debug('Sending batch of cross post checks')
+                    ids = ','.join(['t3_' + post.post_id for post in chunk])
+                    self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
+                    update_crosspost_parent_api.apply_async((ids,), queue='crosspost2')
+                offset += 100

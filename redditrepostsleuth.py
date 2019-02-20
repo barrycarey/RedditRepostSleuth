@@ -52,7 +52,7 @@ if __name__ == '__main__':
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
-    #maintenance.check_crossposts()
+    maintenance.check_crosspost_api()
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')

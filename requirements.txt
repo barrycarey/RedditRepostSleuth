@@ -14,3 +14,4 @@ ImageHash
 annoy
 RedLock
 influxdb
+requests

@@ -1,3 +1,4 @@
+import json
 import random
 from typing import List
 
@@ -369,3 +370,18 @@ def update_cross_post_parent(self, ids):
         print(self.reddit.auth.limits)
 
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def update_crosspost_parent_api(self, ids):
+    r = requests.post('http://sr2.plxbx.com:8888/crosspost', data={'data': ids})
+    results = json.loads(r.text)
+    if len(results) < 100:
+        log.error('No corsspost results. %s', len(results))
+    with self.uowm.start() as uow:
+        for result in results:
+            post = uow.posts.get_by_post_id(result['id'])
+            post.crosspost_parent = result['crosspost_parent']
+            post.crosspost_checked = True
+        uow.commit()
+        self.event_logger.save_event(
+            InfluxEvent(event_type='crosspost_check', status='success', queue='post'))
+        log.debug('Saved batch of crosspost')
