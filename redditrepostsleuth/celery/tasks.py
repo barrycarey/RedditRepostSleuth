@@ -126,8 +126,11 @@ def save_new_comment(self, comment):
     with self.uowm.start() as uow:
         new_comment = Comment(body=comment.body, comment_id=comment.id)
         uow.comments.add(new_comment)
-        uow.commit()
-        self.event_logger.save_event(InfluxEvent(event_type='ingest_comment'))
+        try:
+            uow.commit()
+            self.event_logger.save_event(InfluxEvent(event_type='ingest_comment', status='success'))
+        except Exception as e:
+            self.event_logger.save_event(InfluxEvent(event_type='ingest_comment', status='error'))
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)

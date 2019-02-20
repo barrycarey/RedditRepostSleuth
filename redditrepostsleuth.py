@@ -11,7 +11,7 @@ from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.service.imagerepost import ImageRepostService
 from redditrepostsleuth.service.linkrepostservice import LinkRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
-from redditrepostsleuth.service.postIngest import PostIngest
+from redditrepostsleuth.service.ingest import Ingest
 from redditrepostsleuth.service.requestservice import RequestService
 from redditrepostsleuth.util.helpers import get_reddit_instance
 
@@ -41,43 +41,46 @@ if __name__ == '__main__':
     parser.add_argument('--repost', action='store_true', help='Enables agent that scans database for reposts')
     parser.add_argument('--imagehashing', action='store_true', help='Enables agent that calculates and saves hashes of posts')
     parser.add_argument('--deleted', action='store_true', help='Enables agent that that prunes deleted posts')
-    parser.add_argument('--crosspost', action='store_true', help='Process Cross Posts in Backgroun')
+    parser.add_argument('--crosspost', action='store_true', help='Process Cross Posts in Backgroung')
     args = parser.parse_args()
 
-    threads = []
+
     image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), repost=True, hashing=True)
     link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
+    ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
-    maintenance.check_crosspost_api()
+    #maintenance.check_crosspost_api()
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')
-        ingest = PostIngest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
         threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
 
     if args.ingestcomments:
         log.info('Starting Comment Ingest Agent')
-        threading.Thread(target=comments.ingest_new_comments, name='CommentIngest').start()
+        threading.Thread(target=ingest.ingest_new_comments, name='CommentIngest').start()
 
     if args.imagehashing:
         log.info('Starting Hashing Agent')
-
 
     if args.repost:
         log.info('Starting Repost Agent')
         link_repost_service.start()
         image_repost_service.start()
 
-
     if args.deleted:
-
+        log.info('Starting Delete Check Agent')
         threading.Thread(target=maintenance.clear_deleted_images, name='Deleted Cleanup').start()
 
+    if args.crosspost:
+        log.info('Starting Crosspost Check Agent')
+        threading.Thread(target=maintenance.check_crosspost_api, name='Crosspost Check').start()
+
     if args.summons:
+        log.info('Starting Summons Agent')
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
         threading.Thread(target=comments.handle_summons).start()
 
