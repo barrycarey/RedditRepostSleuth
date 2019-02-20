@@ -9,7 +9,7 @@ from distance import hamming
 from hashlib import md5
 
 from redlock import RedLockError
-from requests.exceptions import SSLError, ConnectionError, ReadTimeout
+from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidSchema, InvalidURL
 
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
@@ -258,10 +258,6 @@ def check_deleted_posts(self, posts):
     with self.uowm.start() as uow:
         for i in posts:
             post = uow.posts.get_by_id(i.id)
-            log.error('Last Delete Check: %s', post.last_deleted_check)
-            if post.last_deleted_check:
-                log.error('Skipping post with non null delete check')
-                continue
             log.debug('Deleted Check: Post ID %s, URL %s', post.post_id, post.url)
             headers = {'User-Agent': random.choice(USER_AGENTS)}
             try:
@@ -271,13 +267,13 @@ def check_deleted_posts(self, posts):
                     uow.posts.remove(post)
                 post.last_deleted_check = datetime.utcnow()
                 uow.posts.update(post)
-            except (ConnectionError, SSLError, ReadTimeout) as e:
+            except (ConnectionError, SSLError, ReadTimeout, InvalidSchema, InvalidURL) as e:
                 if isinstance(e, SSLError):
                     log.error('Failed to verify SSL for: %s', post.url)
                     post.last_deleted_check = datetime.utcnow()
                     uow.posts.update(post)
 
-                elif isinstance(e, ConnectionError) or isinstance(e, ReadTimeout):
+                elif isinstance(e, ConnectionError) or isinstance(e, ReadTimeout) or isinstance(e, InvalidSchema) or isinstance(e, InvalidURL):
                     log.error('Failed to connect to: %s', post.url)
                     post.bad_url = True
                     post.last_deleted_check = datetime.utcnow()
