@@ -66,7 +66,7 @@ class MaintenanceService:
                         ids = ','.join(['t3_' + post.post_id for post in chunk])
                         self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
                         update_crosspost_parent_api.apply_async((ids,), queue='crosspost2')
-                    offset += 100
+                    offset += 1000
                     time.sleep(5)
                 except Exception as e:
                     continue

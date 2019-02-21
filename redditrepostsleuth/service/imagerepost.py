@@ -112,7 +112,6 @@ class ImageRepostService(RepostServiceBase):
                     if not posts:
                         break
                     for post in posts:
-
                         (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async(queue='repost')
 
                     log.info('Waiting %s seconds until next repost batch', config.check_repost_batch_delay)
