@@ -5,3 +5,4 @@ created at changed to UTC on 2/14 11:00pm
 Check index created date and skip check posts that are newer - Need to address timezones to do this.  Created at is UTC starting from 2/14
 deal with deleted images on imgur and reddit that return default image and 200 instead of 404
 Setup splunk to capture logs so we can go back and see how matching on images was done
+Search for generic deleted images https://i.redd.it/d4rko4qeilg21.jpg

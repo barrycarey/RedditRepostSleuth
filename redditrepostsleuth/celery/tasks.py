@@ -1,6 +1,6 @@
 import json
+import logging
 import random
-from typing import List
 
 import requests
 from celery import Task
@@ -20,20 +20,19 @@ from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Reposts, Comment, Post, ImageRepost
+from redditrepostsleuth.model.events.repostevent import RepostEvent
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.model.influxevent import InfluxEvent
-from redditrepostsleuth.model.ingestsubmissionevent import IngestSubmissionEvent
+from redditrepostsleuth.model.events.influxevent import InfluxEvent
+from redditrepostsleuth.model.events.ingestsubmissionevent import IngestSubmissionEvent
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.service.eventlogging import EventLogging
 
-from redditrepostsleuth.util.helpers import get_reddit_instance, get_influx_instance
+from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree, \
     get_bit_count, set_image_hashes
-from redditrepostsleuth.util.objectmapping import post_to_hashwrapper
-from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, get_crosspost_parent, \
-    get_crosspost_parent_batch, sort_reposts
+from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, sort_reposts
 from redditrepostsleuth.util.vptree import VPTree
 
 
@@ -75,6 +74,17 @@ class RedditTask(Task):
         self.reddit = get_reddit_instance()
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.event_logger = EventLogging()
+
+class RepostLogger(Task):
+    def __init__(self):
+        self.repost_log = logging.getLogger('error_log')
+        self.repost_log.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s: %(message)s')
+        handler = logging.FileHandler('repost.log')
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(formatter)
+        self.repost_log.addHandler(handler)
 
 
 
@@ -210,12 +220,23 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
                                      hamming_distance=final_matches[0].hamming_distance,
                                      annoy_distance=final_matches[0].annoy_distance)
             uow.repost.add(new_repost)
-
+            repost.matches = final_matches
+            log_repost.apply_async((repost,), queue='repostlog')
 
         uow.posts.update(repost.checked_post)
-        uow.commit()
-        self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
 
+        uow.commit()
+
+        self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
+        self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success', repost_of=final_matches[0].post.post_id, post_type=repost.checked_post.post_type))
+
+
+@celery.task(bind=True, base=RepostLogger, ignore_results=True, serializer='pickle')
+def log_repost(self, repost: ImageRepostWrapper):
+    self.repost_log.info('---------------------------------------------')
+    self.repost_log.info('Original (%s): %s - %s', repost.checked_post.created_at, repost.checked_post.post_id, repost.checked_post.shortlink)
+    for match in repost.matches:
+        self.repost_log.info('Match (%s): %s - %s (Ham: %s - Annoy %s)', match.post.created_at, match.post.post_id, match.post.shortlink, match.hamming_distance, match.annoy_distance)
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def hash_link_url(self, id):
@@ -285,7 +306,7 @@ def find_matching_images_annoy(self, post: Post) -> ImageRepostWrapper:
     result.checked_post = post
     result.matches = self.dup_service.check_duplicate(post)
     log.debug('Found %s matching images', len(result.matches))
-    self.event_logger.save_event(InfluxEvent(event_type='find_matching_images', post_id=post.post_id))
+    self.event_logger.save_event(InfluxEvent(event_type='find_matching_images'))
     return result
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')

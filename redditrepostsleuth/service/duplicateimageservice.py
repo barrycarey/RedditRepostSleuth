@@ -41,7 +41,7 @@ class DuplicateImageService:
                 log.error('Index file returned true')
                 return
 
-            time.sleep(random.randint(10,45)) # Keep multiple processes from grabbing lock all at once
+            time.sleep(random.randint(20,60)) # Keep multiple processes from grabbing lock all at once
             with redlock.create_lock('Index Lock', ttl=config.index_build_lock_ttl):
                 log.info('%s - Got Lock', os.getpid())
                 log.info('Building new Annoy index')

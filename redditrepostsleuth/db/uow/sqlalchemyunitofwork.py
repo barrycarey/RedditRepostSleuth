@@ -26,6 +26,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     def rollback(self):
         self.session.rollback()
 
+
     @property
     def posts(self) -> PostRepository:
         return PostRepository(self.session)

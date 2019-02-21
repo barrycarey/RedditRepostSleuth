@@ -2,7 +2,7 @@ from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
-from redditrepostsleuth.model.influxevent import InfluxEvent
+from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.util.helpers import get_influx_instance
 
 

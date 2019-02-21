@@ -1,17 +1,12 @@
-import json
 import time
-from datetime import timedelta, datetime
-
-import requests
 
 from redditrepostsleuth.celery.tasks import check_deleted_posts, update_cross_post_parent, update_crosspost_parent_api
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.model.influxevent import InfluxEvent
+from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.service.eventlogging import EventLogging
-from redditrepostsleuth.util.helpers import chunk_list, get_reddit_instance
-from redditrepostsleuth.util.objectmapping import hash_tuple_to_hashwrapper
+from redditrepostsleuth.util.helpers import chunk_list
 
 
 class MaintenanceService:
