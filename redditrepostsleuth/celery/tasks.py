@@ -14,7 +14,7 @@ from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidS
 
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.exception import ImageConversioinException
+from redditrepostsleuth.common.exception import ImageConversioinException, CrosspostRepostCheck
 from redditrepostsleuth.config import config
 from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.db import db_engine
@@ -219,6 +219,10 @@ def check_deleted_posts(self, posts):
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
 def find_matching_images_annoy(self, post: Post) -> ImageRepostWrapper:
+    if post.crosspost_parent:
+        log.info('Post %sis a crosspost, skipping repost check', post.post_id)
+        raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
+
     result = ImageRepostWrapper()
     result.checked_post = post
     result.matches = self.dup_service.check_duplicate(post)
@@ -246,6 +250,8 @@ def save_new_post(self, post):
 
         try:
             uow.commit()
+            ingest_repost_check.apply_async((post,), queue='ingestrepost')
+            log.info('started ')
             self.event_logger.save_event(
                 IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
                                       post_type=post.post_type))
@@ -255,6 +261,12 @@ def save_new_post(self, post):
                                       post_type=post.post_type))
 
 
+
+@celery.task(ignore_results=True)
+def ingest_repost_check(post):
+    if post.post_type == 'image':
+        log.info('Starting ingest image repost check')
+        (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async(queue='repost')
 
 @celery.task(bind=True, base=RedditTask, ignore_reseults=True)
 def update_cross_post_parent(self, ids):

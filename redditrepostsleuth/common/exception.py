@@ -10,3 +10,7 @@ class ImageConversioinException(RepostSleuthException):
 class FutureDataRepostCheckException(RepostSleuthException):
     def __init__(self, message):
         super(FutureDataRepostCheckException, self).__init__(message)
+
+class CrosspostRepostCheck(RepostSleuthException):
+    def __init__(self, message):
+        super(CrosspostRepostCheck, self).__init__(message)

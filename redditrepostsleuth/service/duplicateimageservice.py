@@ -64,6 +64,7 @@ class DuplicateImageService:
                 self.index_last_build = datetime.now()
                 delta = datetime.now() - start
                 log.info('Total index build time was %s seconds', delta.seconds)
+                time.sleep(15)
 
     def _load_index_file(self) -> bool:
         """
