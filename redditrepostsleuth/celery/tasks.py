@@ -97,40 +97,7 @@ def temp_hash_image(self, posts):
         log.debug('Saving batch of hashes')
         uow.commit()
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
-def set_bit_count(self, posts):
-    with self.uowm.start() as uow:
-        for post in posts:
-            log.debug('Getting bits for post %s', post.post_id)
-            if not post.image_hash or post.images_bits_set:
-                continue
-            try:
-                img = generate_img_by_url(post.url)
-            except Exception:
-                log.error('Problem getting imgage')
-                uow.posts.remove(post)
-                uow.commit()
-                continue
-            post.images_bits_set = get_bit_count(img)
-            uow.posts.update(post)
-        uow.commit()
 
-@celery.task(bind=True, base=RedditTask)
-def remove_cross_posts(self, post: HashWrapper):
-    if len(post.occurances < 2):
-        log.info('Returning hash wrapper with 1 occurance')
-        return post
-
-    for post in post.occurances:
-        submission = self.reddit.submission(id=post.post_id)
-        if submission:
-            try:
-                post.crosspost_parent = submission.crosspost_parent
-                log.info('Adding cross post parent %s to post %s', post.crosspost_parent, post.post_id)
-            except AttributeError:
-                pass
-
-    return post
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def save_new_comment(self, comment):
@@ -143,50 +110,6 @@ def save_new_comment(self, comment):
         except Exception as e:
             self.event_logger.save_event(InfluxEvent(event_type='ingest_comment', status='error'))
 
-
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def hash_image_and_save(self, post_id):
-    log.debug('Hashing post %s', post_id)
-    with self.uowm.start() as uow:
-        post = uow.posts.get_by_post_id(post_id)
-        if not post:
-            log.error('Cannot find post with ID %s', post_id)
-        try:
-            img = generate_img_by_url(post.url)
-            result = generate_dhash(img)
-            post.image_hash = result['hash']
-            post.images_bits_set = result['bits_set']
-        except ImageConversioinException as e:
-            return
-        uow.commit()
-
-
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def process_reposts(self, post: HashWrapper):
-    print('Processing task for repost ' + post.post_id)
-    with self.uowm.start() as uow:
-        repost = uow.posts.get_by_post_id(post.post_id)
-        repost.checked_repost = True
-        if len(post.occurances) <= 1:
-            log.debug('Post %s has no matches', post.post_id)
-            uow.commit()
-            return
-        occurances = [uow.posts.get_by_post_id(p[1].post_id) for p in post.occurances]
-        results = filter_matching_images(occurances, repost)
-        results = clean_reposts(results)
-        if len(results) > 0:
-            print('Original: http://reddit.com' + repost.perma_link)
-
-            log.error('Checked Repost - %s - (%s): http://reddit.com%s', repost.post_id, str(repost.created_at),
-                      repost.perma_link)
-            log.error('Oldest Post - %s - (%s): http://reddit.com%s', results[0].post_id,
-                      str(results[0].created_at), results[0].perma_link)
-            for p in results:
-                log.error('%s - %s: http://reddit.com/%s', p.post_id, str(p.created_at), p.perma_link)
-
-            new_repost = Reposts(post_id=post.post_id, repost_of=results[0].post_id, post_type='image')
-            uow.repost.add(new_repost)
-            uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def process_repost_annoy(self, repost: ImageRepostWrapper):
@@ -294,12 +217,6 @@ def check_deleted_posts(self, posts):
             self.event_logger.save_event(InfluxEvent(event_type='delete_check', status=status))
 
 
-@celery.task(bind=True, base=VpTreeTask, serializer='pickle')
-def find_matching_images_task(self, hash):
-    hash.occurances = find_matching_images_in_vp_tree(self.vptree_cache.get_tree, hash.image_hash, hamming_distance=config.hamming_distance)
-    return hash
-
-
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
 def find_matching_images_annoy(self, post: Post) -> ImageRepostWrapper:
     result = ImageRepostWrapper()
@@ -338,10 +255,6 @@ def save_new_post(self, post):
                                       post_type=post.post_type))
 
 
-
-@celery.task(serializer='pickle')
-def build_vp_tree(points):
-    return VPTree(points, lambda x,y: hamming(x,y))
 
 @celery.task(bind=True, base=RedditTask, ignore_reseults=True)
 def update_cross_post_parent(self, ids):
