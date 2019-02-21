@@ -305,7 +305,9 @@ def update_crosspost_parent_api(self, ids):
         uow.commit()
         self.event_logger.save_event(
             InfluxEvent(event_type='crosspost_check', status='success', queue='post'))
+        """
         for id in ids:
             self.event_logger.save_event(
                 InfluxEvent(event_type='crosspost_check_item', status='success', queue='post'))
+        """
         log.debug('Saved batch of crosspost')

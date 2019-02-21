@@ -60,6 +60,9 @@ class MaintenanceService:
             while True:
                 try:
                     posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=1000)
+                    if not posts:
+                        log.info('Ran out of posts to crosspost check')
+                        break
                     chunks = chunk_list(posts, 100)
                     for chunk in chunks:
                         log.debug('Sending batch of cross post checks')
@@ -67,6 +70,6 @@ class MaintenanceService:
                         self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
                         update_crosspost_parent_api.apply_async((ids,), queue='crosspost2')
                     offset += 1000
-                    time.sleep(5)
+                    time.sleep(3)
                 except Exception as e:
                     continue
