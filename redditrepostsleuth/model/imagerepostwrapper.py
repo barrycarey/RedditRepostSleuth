@@ -1,7 +1,7 @@
 from typing import List
 
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.service.imagematch import ImageMatch
+from redditrepostsleuth.model.imagematch import ImageMatch
 
 
 class ImageRepostWrapper:

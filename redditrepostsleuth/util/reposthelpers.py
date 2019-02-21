@@ -5,7 +5,7 @@ from praw import Reddit
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.service.imagematch import ImageMatch
+from redditrepostsleuth.model.imagematch import ImageMatch
 
 # TODO: Should be able to safely remove this now
 from redditrepostsleuth.util.helpers import get_reddit_instance
@@ -82,3 +82,14 @@ def set_shortlink(post: Post) -> Post:
             log.error('Failed to set shortlink for post %s. Exception type: %s', post.post_id, type(e))
 
     return post
+
+def get_crosspost_parent_batch(ids: List[str], reddit: Reddit):
+    submissions = reddit.info(fullnames=ids)
+    result = []
+    for submission in submissions:
+        result.append({
+            'id': submission.id,
+            'crosspost_Parent': submission.__dict__.get('crosspost_parent', None)
+        })
+    log.info('Crosspost Parent Results: %s', result)
+    return result

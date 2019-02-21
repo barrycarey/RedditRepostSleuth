@@ -45,7 +45,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == post_type).offset(offset).limit(limit).all()
 
     def find_all_by_repost_check(self, repost_check: bool, limit: int = None, offset: int = None):
-        return self.db_session.query(Post).filter(Post.checked_repost == False, Post.post_type == 'image', Post.dhash_h != None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.checked_repost == repost_check, Post.post_type == 'image', Post.crosspost_parent == None, Post.dhash_h != None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
     # TODO: Clean this up
     def find_all_by_repost_check_oldest(self, repost_check: bool, limit: int = None, offset: int = None):
@@ -59,7 +59,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.image_hash != None).offset(offset).limit(limit).all()
 
     def find_all_unchecked_crosspost(self, limit: int = None, offset: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.crosspost_checked == False).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'link', Post.crosspost_checked == False).offset(offset).limit(limit).all()
 
     def find_all_for_delete_check(self, hours: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(hours=hours)

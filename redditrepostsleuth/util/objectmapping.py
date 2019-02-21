@@ -5,11 +5,10 @@ from datetime import datetime
 
 from prawcore import Forbidden
 
-from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.postdto import PostDto
-from redditrepostsleuth.service.imagematch import ImageMatch
+from redditrepostsleuth.model.imagematch import ImageMatch
 
 
 def submission_to_post(submission: Submission) -> Post:

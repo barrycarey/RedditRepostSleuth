@@ -55,7 +55,7 @@ class MaintenanceService:
             ids = ['t3_' + post.post_id for post in posts]
             update_cross_post_parent.apply_async((ids,), queue='crosspost')
             self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
-            time.sleep(.7)
+            time.sleep(.2)
             offset += 100
 
 
@@ -63,12 +63,15 @@ class MaintenanceService:
         offset = 0
         with self.uowm.start() as uow:
             while True:
-                posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=1000)
-                chunks = chunk_list(posts, 100)
-                for chunk in chunks:
-                    log.debug('Sending batch of cross post checks')
-                    ids = ','.join(['t3_' + post.post_id for post in chunk])
-                    self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
-                    update_crosspost_parent_api.apply_async((ids,), queue='crosspost2')
-                offset += 100
-                time.sleep(5)
+                try:
+                    posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=1000)
+                    chunks = chunk_list(posts, 100)
+                    for chunk in chunks:
+                        log.debug('Sending batch of cross post checks')
+                        ids = ','.join(['t3_' + post.post_id for post in chunk])
+                        self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
+                        update_crosspost_parent_api.apply_async((ids,), queue='crosspost2')
+                    offset += 100
+                    time.sleep(5)
+                except Exception as e:
+                    continue

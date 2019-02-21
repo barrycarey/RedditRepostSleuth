@@ -1,9 +1,10 @@
+import time
 from queue import Queue
 
 from celery import group
 from praw import Reddit
 from prawcore import Forbidden
-
+import webbrowser
 from redditrepostsleuth.celery.tasks import save_new_post, update_cross_post_parent, save_new_comment
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -25,6 +26,7 @@ class Ingest:
                         for submission in sr.stream.submissions():
                             log.debug('Saving post %s', submission.id)
                             post = submission_to_post(submission)
+
                             save_new_post.apply_async((post,), queue='postingest')
                     except Forbidden as e:
                         pass

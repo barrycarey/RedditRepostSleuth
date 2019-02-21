@@ -2,7 +2,7 @@ import re
 from typing import List
 
 from praw import Reddit
-from praw.models import Submission, Comment
+from praw.models import Comment
 from datetime import datetime
 
 from redditrepostsleuth.common.exception import ImageConversioinException
@@ -14,7 +14,7 @@ from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPO
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.service.imagematch import ImageMatch
+from redditrepostsleuth.model.imagematch import ImageMatch
 from redditrepostsleuth.service.imagerepost import ImageRepostService
 from redditrepostsleuth.util.reposthelpers import set_shortlink
 

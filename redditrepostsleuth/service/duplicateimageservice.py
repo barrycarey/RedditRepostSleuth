@@ -5,15 +5,14 @@ from typing import List
 
 from distance import hamming
 
-from redditrepostsleuth.common.exception import FutureDataRepostCheckException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from datetime import datetime, timedelta
+from datetime import datetime
 from annoy import AnnoyIndex
 
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.service.imagematch import ImageMatch
+from redditrepostsleuth.model.imagematch import ImageMatch
 from redditrepostsleuth.util import redlock
 from redditrepostsleuth.util.objectmapping import annoy_result_to_image_match
 

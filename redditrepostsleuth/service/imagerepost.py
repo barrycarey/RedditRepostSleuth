@@ -1,39 +1,25 @@
-import sys
 import threading
 import time
-from collections import Counter
-from datetime import datetime
-from queue import Queue
 from typing import List
 
-from distance import hamming
 from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
-import imagehash
-
-from redditrepostsleuth.celery.tasks import find_matching_images_task, hash_image_and_save, process_reposts, \
-    set_bit_count, temp_hash_image, find_matching_images_annoy, process_repost_annoy
+from redditrepostsleuth.celery.tasks import temp_hash_image, find_matching_images_annoy, process_repost_annoy
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.service.CachedVpTree import CashedVpTree
-from redditrepostsleuth.service.imagematch import ImageMatch
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.helpers import chunk_list
-from redditrepostsleuth.util.imagehashing import generate_dhash, generate_img_by_url, get_bit_count, set_image_hashes, \
-    find_matching_images_in_vp_tree
-from redditrepostsleuth.util.objectmapping import submission_to_post, post_to_hashwrapper, hash_tuple_to_hashwrapper
-
+from redditrepostsleuth.util.imagehashing import set_image_hashes
+from redditrepostsleuth.util.objectmapping import submission_to_post
 
 # TODO - Deal with images that PIL can't convert.  Tons in database
 from redditrepostsleuth.util.reposthelpers import sort_reposts
-from redditrepostsleuth.util.vptree import VPTree
 
 
 class ImageRepostService(RepostServiceBase):
@@ -126,8 +112,6 @@ class ImageRepostService(RepostServiceBase):
                     if not posts:
                         break
                     for post in posts:
-                        if post.crosspost_parent:
-                            continue
 
                         (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async(queue='repost')
 

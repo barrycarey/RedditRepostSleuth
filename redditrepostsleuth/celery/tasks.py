@@ -32,7 +32,8 @@ from redditrepostsleuth.util.helpers import get_reddit_instance, get_influx_inst
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree, \
     get_bit_count, set_image_hashes
 from redditrepostsleuth.util.objectmapping import post_to_hashwrapper
-from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, get_crosspost_parent
+from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, get_crosspost_parent, \
+    get_crosspost_parent_batch, sort_reposts
 from redditrepostsleuth.util.vptree import VPTree
 
 
@@ -183,18 +184,6 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
     print('Processing task for repost ' + repost.checked_post.post_id)
     with self.uowm.start() as uow:
 
-        if not repost.checked_post.crosspost_checked:
-            log.debug('Checking repost cross post for ID %s', repost.checked_post.post_id)
-            parent = get_crosspost_parent(repost.checked_post, self.reddit)
-            repost.checked_post.crosspost_checked = True
-            if parent:
-                repost.checked_post.crosspost_parent = parent
-                repost.checked_post.checked_repost = True
-                uow.posts.update(repost.checked_post)
-                uow.commit()
-                self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
-                return
-
         repost.checked_post.checked_repost = True
         if not repost.matches:
             log.debug('Post %s has no matches', repost.checked_post.post_id)
@@ -207,40 +196,22 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
         for match in repost.matches:
             match.post = uow.posts.get_by_id(match.match_id)
 
-        log.debug('Matches before cleaning: %s', len(repost.matches))
-        clean_reposts(repost)
-        log.debug('Matches after cleaning: %s', len(repost.matches))
-
         if len(repost.matches) > 0:
-            # TODO: Move all crosspost logic to reposthelpers
-            final_matches = []
-            for match in repost.matches:
-                if match.post.crosspost_checked:
-                    log.debug('Crosspost already checked, adding to final results')
-                    final_matches.append(match)
-                    continue
-                match.post.crosspost_parent = get_crosspost_parent(match.post, self.reddit)
-                match.post.crosspost_checked = True
-                if match.post.crosspost_parent:
-                    log.debug('Matching post %s is a crosspost, removing from matches', match.post.post_id)
-                else:
-                    final_matches.append(match)
 
-                uow.posts.update(match.post)
-                uow.commit()
+            final_matches = sort_reposts(repost.matches)
 
-            if final_matches:
-                log.debug('Checked Image: %s', repost.checked_post.url)
-                for match in final_matches:
-                    log.debug('Matching Image (%s) (Hamming: %s - Annoy: %s): %s', match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
-                log.info('Creating repost. Post %s is a repost of %s', repost.checked_post.url, final_matches[0].post.url)
+            log.debug('Checked Image (%s): %s', repost.checked_post.created_at, repost.checked_post.url)
+            for match in final_matches:
+                log.debug('Matching Image (%s) (Hamming: %s - Annoy: %s): %s', match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
+            log.info('Creating repost. Post %s is a repost of %s', repost.checked_post.url, final_matches[0].post.url)
 
-                new_repost = ImageRepost(post_id=repost.checked_post.post_id,
-                                         repost_of=final_matches[0].post.post_id,
-                                         hamming_distance=final_matches[0].hamming_distance,
-                                         annoy_distance=final_matches[0].annoy_distance)
-                uow.repost.add(new_repost)
-                uow.commit()
+            new_repost = ImageRepost(post_id=repost.checked_post.post_id,
+                                     repost_of=final_matches[0].post.post_id,
+                                     hamming_distance=final_matches[0].hamming_distance,
+                                     annoy_distance=final_matches[0].annoy_distance)
+            uow.repost.add(new_repost)
+
+
         uow.posts.update(repost.checked_post)
         uow.commit()
         self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
@@ -383,6 +354,7 @@ def update_crosspost_parent_api(self, ids):
         for result in results:
             post = uow.posts.get_by_post_id(result['id'])
             post.crosspost_parent = result['crosspost_parent']
+            post.shortlink = result['shortlink']
             post.crosspost_checked = True
         uow.commit()
         self.event_logger.save_event(
