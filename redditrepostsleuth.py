@@ -18,21 +18,6 @@ from redditrepostsleuth.util.helpers import get_reddit_instance
 sys.setrecursionlimit(50000)
 
 if __name__ == '__main__':
-    """
-    tree = CashedVpTree(SqlAlchemyUnitOfWorkManager(db_engine))
-    start = datetime.now()
-    tree2 = tree.get_tree
-    delta = datetime.now() - start
-    print('Tree built in {} seconeds'.format(str(delta.seconds)))
-    sys.exit()
-    
-
-    wrapper = HashWrapper()
-    wrapper.post_id = 'amv5ru'
-    wrapper.image_hash = '78f460f9e0b968bc6068b8419f0c4c3438fce0d3c899fcb8b8509c004c1c7634'
-
-    r = find_matching_images_task.apply_async(queue='repost', args=(wrapper,)).get()
-    """
 
     parser = argparse.ArgumentParser(description="A Tool to monitor and respond to reposted content on Reddit")
     parser.add_argument('--ingestposts', action='store_true', help='Enables the post import agent')
@@ -42,6 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--imagehashing', action='store_true', help='Enables agent that calculates and saves hashes of posts')
     parser.add_argument('--deleted', action='store_true', help='Enables agent that that prunes deleted posts')
     parser.add_argument('--crosspost', action='store_true', help='Process Cross Posts in Backgroung')
+    parser.add_argument('--celerymon', action='store_true', help='Process Cross Posts in Backgroung')
     args = parser.parse_args()
 
 
@@ -51,11 +37,12 @@ if __name__ == '__main__':
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
-    threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
-    threading.Thread(target=maintenance.log_queue_size, name='Queue Update').start()
+
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
-    link_repost_service.repost_check()
+    if args.celerymon:
+        threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
+        threading.Thread(target=maintenance.log_queue_size, name='Queue Update').start()
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')
