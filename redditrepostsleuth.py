@@ -51,9 +51,11 @@ if __name__ == '__main__':
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
+    threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
+    threading.Thread(target=maintenance.log_queue_size, name='Queue Update').start()
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
-    #maintenance.check_crosspost_api()
+    #maintenance.log_queue_size()
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')

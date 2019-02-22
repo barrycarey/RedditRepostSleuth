@@ -65,6 +65,8 @@ class ConfigManager:
         # CELERY
         self.celery_broker = self.config['CELERY']['broker']
         self.celery_backend = self.config['CELERY']['backend']
+        self.redis_host = self.config['CELERY']['redis_host']
+        self.redis_password = self.config['CELERY']['redis_password']
 
         # InfluxDB
         self.influx_address = self.config['INFLUXDB']['Address']

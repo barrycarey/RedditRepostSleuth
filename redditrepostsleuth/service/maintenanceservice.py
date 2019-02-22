@@ -1,9 +1,14 @@
+import json
 import time
+
+import redis
+import requests
 
 from redditrepostsleuth.celery.tasks import check_deleted_posts, update_cross_post_parent, update_crosspost_parent_api
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.model.events.celerytask import CeleryTaskEvent, CeleryQueueSize
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.util.helpers import chunk_list
@@ -76,4 +81,31 @@ class MaintenanceService:
 
     def log_celery_events_to_influx(self):
         while True:
-            pass
+            logged_tasks = []
+            count = 0
+            while True:
+                try:
+                    if count >= 1000:
+                        break
+                    r = requests.get('http://localhost:5555/api/tasks')
+                    result = json.loads(r.text)
+                    for k, v in result.items():
+                        if v['uuid'] in logged_tasks:
+                            continue
+                        self.event_logger.save_event(CeleryTaskEvent(v, event_type='celery_task'))
+                        logged_tasks.append(v['uuid'])
+                    time.sleep(1.5)
+                    count += 1
+                except Exception as e:
+                    log.error('Celery events thread crashed')
+
+    def log_queue_size(self):
+        queues = ['repost', 'celery', 'crosspost2', 'repost_log', 'commentingest', 'postingest', '']
+        while True:
+            try:
+                client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)
+                for queue in queues:
+                    self.event_logger.save_event(CeleryQueueSize(queue, client.llen(queue), event_type='queue_update'))
+                time.sleep(1)
+            except Exception as e:
+                log.error('Queue update task failed')
