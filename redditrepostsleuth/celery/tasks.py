@@ -1,40 +1,33 @@
 import json
 import logging
 import random
+from datetime import datetime
+from hashlib import md5
 
 import requests
 from celery import Task
-from datetime import datetime
-
-from distance import hamming
-from hashlib import md5
-
 from redlock import RedLockError
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidSchema, InvalidURL
 
 from redditrepostsleuth.celery import celery
-from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.exception import ImageConversioinException, CrosspostRepostCheck
-from redditrepostsleuth.config import config
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Reposts, Comment, Post, ImageRepost
-from redditrepostsleuth.model.events.celerytask import DeleteCheckEvent
-from redditrepostsleuth.model.events.repostevent import RepostEvent
-from redditrepostsleuth.model.hashwrapper import HashWrapper
-from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost
+from redditrepostsleuth.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.model.events.ingestsubmissionevent import IngestSubmissionEvent
+from redditrepostsleuth.model.events.repostevent import RepostEvent
+from redditrepostsleuth.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.service.eventlogging import EventLogging
-
 from redditrepostsleuth.util.helpers import get_reddit_instance
-from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, find_matching_images_in_vp_tree, \
-    get_bit_count, set_image_hashes
-from redditrepostsleuth.util.reposthelpers import filter_matching_images, clean_reposts, sort_reposts
-from redditrepostsleuth.util.vptree import VPTree
+from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, set_image_hashes
+from redditrepostsleuth.util.objectmapping import post_to_repost_match
+from redditrepostsleuth.util.reposthelpers import sort_reposts, clean_repost_matches
 
 
 @celery.task
@@ -103,6 +96,47 @@ def temp_hash_image(self, posts):
         uow.commit()
 
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def link_repost_check(self, posts):
+    with self.uowm.start() as uow:
+        for post in posts:
+            repost = RepostWrapper()
+            repost.checked_post = post
+            repost.matches = [post_to_repost_match(match, post.id) for match in uow.posts.find_all_by_url_hash(post.url_hash) if match.post_id != post.post_id]
+            repost.matches = clean_repost_matches(repost.matches)
+            if not repost.matches:
+                log.debug('Not matching linkes for post %s', post.post_id)
+                post.checked_repost = True
+                uow.posts.update(post)
+                uow.commit()
+                continue
+
+            log.info('Found %s matching links', len(repost.matches))
+
+            log.debug('Checked Link %s (%s): %s', post.post_id, post.created_at, post.url)
+            for match in repost.matches:
+                log.debug('Matching Link: %s (%s)  - %s', match.post.post_id, match.post.created_at, match.post.url)
+            log.info('Creating Link Repost. Post %s is a repost of %s', post.url, repost.matches[0].post.url)
+
+            with self.uowm.start() as uow:
+                new_repost = LinkRepost(post_id=post.post_id, repost_of=repost.matches[0].post.post_id)
+                repost.matches[0].post.repost_count += 1
+                post.checked_repost = True
+                uow.repost.add(new_repost)
+                uow.posts.update(post)
+                uow.commit()
+
+
+            self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
+                                                     repost_of=repost.matches[0].post.post_id,
+                                                     post_type=post.post_type))
+
+
+            log_repost.apply_async((repost,), queue='repostlog')
+
+        self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=len(posts)))
+
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def save_new_comment(self, comment):
@@ -117,7 +151,7 @@ def save_new_comment(self, comment):
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def process_repost_annoy(self, repost: ImageRepostWrapper):
+def process_repost_annoy(self, repost: RepostWrapper):
     # TODO: Break down into smaller chunks
     print('Processing task for repost ' + repost.checked_post.post_id)
     with self.uowm.start() as uow:
@@ -133,6 +167,8 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
         # Get the post object for each match
         for match in repost.matches:
             match.post = uow.posts.get_by_id(match.match_id)
+
+        repost.matches = clean_repost_matches(repost.matches)
 
         if len(repost.matches) > 0:
 
@@ -162,7 +198,7 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
 
 
 @celery.task(bind=True, base=RepostLogger, ignore_results=True, serializer='pickle')
-def log_repost(self, repost: ImageRepostWrapper):
+def log_repost(self, repost: RepostWrapper):
     self.repost_log.info('---------------------------------------------')
     self.repost_log.info('Original (%s): %s - %s', repost.checked_post.created_at, repost.checked_post.post_id, repost.checked_post.shortlink)
     for match in repost.matches:
@@ -220,16 +256,16 @@ def check_deleted_posts(self, posts):
             log.error('Commit failed: %s', str(e))
             status = 'error'
 
-        self.event_logger.save_event(DeleteCheckEvent(count=len(posts), event_type='delete_check', status=status))
+        self.event_logger.save_event(BatchedEvent(count=len(posts), event_type='delete_check', status=status))
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
-def find_matching_images_annoy(self, post: Post) -> ImageRepostWrapper:
+def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
     if post.crosspost_parent:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
-    result = ImageRepostWrapper()
+    result = RepostWrapper()
     result.checked_post = post
     result.matches = self.dup_service.check_duplicate(post)
     log.debug('Found %s matching images', len(result.matches))
@@ -275,6 +311,8 @@ def ingest_repost_check(post):
     if post.post_type == 'image':
         #log.info('Starting ingest image repost check')
         (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async(queue='repost')
+    elif post.post_type == 'link':
+        link_repost_check.apply_async(([post],), queue='repost')
 
 @celery.task(bind=True, base=RedditTask, ignore_reseults=True)
 def update_cross_post_parent(self, ids):

@@ -4,14 +4,15 @@ from praw import Reddit
 
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.model.repostmatch import RepostMatch
+from redditrepostsleuth.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.model.imagematch import ImageMatch
 
 # TODO: Should be able to safely remove this now
 from redditrepostsleuth.util.helpers import get_reddit_instance
 
 
-def filter_matching_images(raw_list: List[ImageMatch], post_being_checked: Post) -> List[Post]:
+def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
     """
     Take a raw list if matched images.  Filter one ones meeting the following criteria.
         Same Author as post being checked - Gets rid of people posting to multiple subreddits
@@ -24,17 +25,18 @@ def filter_matching_images(raw_list: List[ImageMatch], post_being_checked: Post)
     return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
 
 
-def clean_reposts(repost: ImageRepostWrapper, reddit: Reddit = None) -> ImageRepostWrapper:
+def clean_repost_matches(matches: List[RepostMatch]) -> List[RepostMatch]:
     """
     Take a list of reposts, remove any cross posts and deleted posts
     :param posts: List of posts
     """
     #repost.matches = filter_matching_images(repost.matches, repost.checked_post)
-    repost.matches = sort_reposts(repost.matches)
-    return repost
+    matches = [match for match in matches if not match.post.crosspost_parent]
+    matches = sort_reposts(matches)
+    return matches
 
 
-def sort_reposts(posts: List[ImageMatch], reverse=False) -> List[ImageMatch]:
+def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
     """
     Take a list of reposts and sort them by date
     :param posts:

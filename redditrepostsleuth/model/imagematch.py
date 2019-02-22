@@ -1,10 +1,10 @@
 from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.model.repostmatch import RepostMatch
 
 
-class ImageMatch:
+class ImageMatch(RepostMatch):
     def __init__(self):
-        self.original_id: int = None
-        self.match_id: int = None
+        super().__init__()
+
         self.hamming_distance: int = None
         self.annoy_distance: float = None
-        self.post: Post = None

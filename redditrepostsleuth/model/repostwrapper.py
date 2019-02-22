@@ -1,10 +1,10 @@
 from typing import List
 
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.model.imagematch import ImageMatch
+from redditrepostsleuth.model.repostmatch import RepostMatch
 
 
-class ImageRepostWrapper:
+class RepostWrapper:
     def __init__(self):
         self.checked_post: Post = None
-        self.matches: List[ImageMatch] = []
+        self.matches: List[RepostMatch] = []

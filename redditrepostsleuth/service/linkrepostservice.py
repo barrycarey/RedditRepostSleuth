@@ -14,8 +14,9 @@ from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.model.events.repostevent import RepostEvent
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
+from redditrepostsleuth.util.helpers import chunk_list
 from redditrepostsleuth.util.reposthelpers import remove_newer_posts, sort_reposts
-from redditrepostsleuth.celery.tasks import hash_link_url, log_repost
+from redditrepostsleuth.celery.tasks import hash_link_url, log_repost, link_repost_check
 
 
 class LinkRepostService(RepostServiceBase):
@@ -49,33 +50,9 @@ class LinkRepostService(RepostServiceBase):
                         if post.url_hash is None:
                             continue
 
-                        matching_links = [match for match in uow.posts.find_all_by_url_hash(post.url_hash) if match.post_id != post.post_id]
-                        matching_links = self._clean_link_repost_list(matching_links, post)
-                        if not matching_links:
-                            log.debug('Not matching linkes for post %s', post.post_id)
-                            self.save_post(post)
-                            continue
-
-                        log.info('Found %s matching links', len(matching_links))
-
-                        log.debug('Checked Link %s (%s): %s', post.post_id, post.created_at, post.url)
-                        for match in matching_links:
-                            log.debug('Matching Link: %s (%s)  - %s', match.post_id, match.created_at, match.url)
-                        log.info('Creating Link Repost. Post %s is a repost of %s', post.url, matching_links[0].url)
-
-                        with self.uowm.start() as uow:
-                            repost = LinkRepost(post_id=post.post_id, repost_of=matching_links[0].post_id)
-                            matching_links[0].repost_count += 1
-                            uow.repost.add(repost)
-                            post.checked_repost = True
-                            uow.commit()
-
-                        self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
-                        self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
-                                                                 repost_of=matching_links[0].post_id,
-                                                                 post_type=post.post_type))
-
-                        log_repost.apply_async((repost,), queue='repostlog')
+                        chunks = chunk_list(posts, 50)
+                        for chunk in chunks:
+                            link_repost_check.apply_async((chunk,), queue='linkrepost')
 
                     offset += config.link_repost_batch_size
 

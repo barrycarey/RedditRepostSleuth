@@ -12,7 +12,7 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.helpers import chunk_list
 from redditrepostsleuth.util.imagehashing import set_image_hashes
@@ -77,7 +77,7 @@ class ImageRepostService(RepostServiceBase):
                 log.info('Saving hashes')
                 uow.commit()
                 offset += 25
-    def find_all_occurrences(self, submission: Submission) -> ImageRepostWrapper:
+    def find_all_occurrences(self, submission: Submission) -> RepostWrapper:
         """
         Take a given Reddit submission and find all matching posts
         :param submission:

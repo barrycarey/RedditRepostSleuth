@@ -9,6 +9,7 @@ from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.postdto import PostDto
 from redditrepostsleuth.model.imagematch import ImageMatch
+from redditrepostsleuth.model.repostmatch import RepostMatch
 
 
 def submission_to_post(submission: Submission) -> Post:
@@ -104,4 +105,11 @@ def annoy_result_to_image_match(result: Tuple[int, float], orig_id: int) -> Imag
     match.original_id = orig_id
     match.match_id = result[0]
     match.annoy_distance = result[1]
+    return match
+
+def post_to_repost_match(post: Post, orig_id: int) -> RepostMatch:
+    match = RepostMatch()
+    match.post = post
+    match.match_id = post.id
+    match.original_id = orig_id
     return match
