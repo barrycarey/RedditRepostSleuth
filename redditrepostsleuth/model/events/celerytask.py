@@ -30,12 +30,14 @@ class CeleryQueueSize(InfluxEvent):
         return event
 
 class BatchedEvent(InfluxEvent):
-    def __init__(self, count, event_type=None, status=None):
+    def __init__(self, count, event_type=None, status=None, post_type=None):
         super().__init__(event_type=event_type, status=status)
         self.count = count
+        self.post_type = post_type
 
     def get_influx_event(self):
         event = super().get_influx_event()
         event[0]['fields']['count'] = self.count
+        event[0]['tags']['post_type'] = self.post_type
         #log.debug('Writting influx log: %s', event)
         return event

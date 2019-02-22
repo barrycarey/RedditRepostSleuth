@@ -134,7 +134,7 @@ def link_repost_check(self, posts):
 
             log_repost.apply_async((repost,), queue='repostlog')
 
-        self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=len(posts)))
+        self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
 
 
 
@@ -161,7 +161,7 @@ def process_repost_annoy(self, repost: RepostWrapper):
             log.debug('Post %s has no matches', repost.checked_post.post_id)
             uow.posts.update(repost.checked_post)
             uow.commit()
-            self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
+            self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=1, post_type=repost.checked_post.post_type))
             return
 
         # Get the post object for each match
@@ -193,7 +193,7 @@ def process_repost_annoy(self, repost: RepostWrapper):
 
         uow.commit()
 
-        self.event_logger.save_event(InfluxEvent(event_type='repost_check', status='success'))
+        self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=1, post_type=repost.checked_post.post_type))
         self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success', repost_of=final_matches[0].post.post_id, post_type=repost.checked_post.post_type))
 
 
