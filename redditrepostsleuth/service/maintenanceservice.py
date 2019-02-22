@@ -73,3 +73,7 @@ class MaintenanceService:
                     time.sleep(3)
                 except Exception as e:
                     continue
+
+    def log_celery_events_to_influx(self):
+        while True:
+            pass

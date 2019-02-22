@@ -25,7 +25,7 @@ class Post(Base):
     subreddit = Column(String(100), nullable=False)
     title = Column(String(1000, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(200))
-    repost_of = Column(Integer)
+    repost_of = Column(Integer, default=0)
     image_hash = Column(String(64))
     dhash_v = Column(String(64))
     dhash_h = Column(String(64))
@@ -40,6 +40,7 @@ class Post(Base):
     dhash_h_set_bits = Column(Integer)
     image_bits_set = Column(Integer)
     bad_url = Column(Boolean, default=False)
+    repost_count = Column(Integer)
     #fullname = Column(String(30))
     # TODO: Noramlize bits set column names
 

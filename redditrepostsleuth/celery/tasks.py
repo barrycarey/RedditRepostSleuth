@@ -135,13 +135,15 @@ def process_repost_annoy(self, repost: ImageRepostWrapper):
 
             log.debug('Checked Image (%s): %s', repost.checked_post.created_at, repost.checked_post.url)
             for match in final_matches:
-                log.debug('Matching Image (%s) (Hamming: %s - Annoy: %s): %s', match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
+                log.debug('Matching Image: %s (%s) (Hamming: %s - Annoy: %s): %s', match.post.post_id, match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
             log.info('Creating repost. Post %s is a repost of %s', repost.checked_post.url, final_matches[0].post.url)
 
             new_repost = ImageRepost(post_id=repost.checked_post.post_id,
                                      repost_of=final_matches[0].post.post_id,
                                      hamming_distance=final_matches[0].hamming_distance,
                                      annoy_distance=final_matches[0].annoy_distance)
+            final_matches[0].post.repost_count += 1
+            uow.posts.update(final_matches[0].post)
             uow.repost.add(new_repost)
             repost.matches = final_matches
             log_repost.apply_async((repost,), queue='repostlog')
@@ -250,7 +252,7 @@ def save_new_post(self, post):
 
         try:
             uow.commit()
-            ingest_repost_check.apply_async((post,), queue='ingestrepost')
+            ingest_repost_check.apply_async((post,), queue='repost')
             log.info('started ')
             self.event_logger.save_event(
                 IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
@@ -265,7 +267,7 @@ def save_new_post(self, post):
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
     if post.post_type == 'image':
-        log.info('Starting ingest image repost check')
+        #log.info('Starting ingest image repost check')
         (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async(queue='repost')
 
 @celery.task(bind=True, base=RedditTask, ignore_reseults=True)
