@@ -20,6 +20,7 @@ from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Reposts, Comment, Post, ImageRepost
+from redditrepostsleuth.model.events.celerytask import DeleteCheckEvent
 from redditrepostsleuth.model.events.repostevent import RepostEvent
 from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.imagerepostwrapper import ImageRepostWrapper
@@ -219,8 +220,7 @@ def check_deleted_posts(self, posts):
             log.error('Commit failed: %s', str(e))
             status = 'error'
 
-        for post in posts:
-            log_event.apply_async((InfluxEvent(event_type='delete_check', status=status),), queue='logevent')
+        log_event.apply_async((DeleteCheckEvent(count=len(posts), event_type='delete_check', status=status),), queue='logevent')
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))

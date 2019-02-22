@@ -101,7 +101,7 @@ class MaintenanceService:
                     log.error('Celery events thread crashed')
 
     def log_queue_size(self):
-        queues = ['repost', 'celery', 'crosspost2', 'repost_log', 'commentingest', 'postingest', 'logevent']
+        queues = ['repost', 'celery', 'crosspost2', 'repost_log', 'commentingest', 'postingest', 'logevent', 'deletecheck']
         while True:
             try:
                 client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)

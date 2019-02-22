@@ -28,3 +28,14 @@ class CeleryQueueSize(InfluxEvent):
         event[0]['fields']['size'] = self.size
         #log.debug('Writting influx log: %s', event)
         return event
+
+class DeleteCheckEvent(InfluxEvent):
+    def __init__(self, count, event_type=None, status=None):
+        super().__init__(event_type=event_type, status=status)
+        self.count = count
+
+    def get_influx_event(self):
+        event = super().get_influx_event()
+        event[0]['fields']['count'] = self.count
+        #log.debug('Writting influx log: %s', event)
+        return event
