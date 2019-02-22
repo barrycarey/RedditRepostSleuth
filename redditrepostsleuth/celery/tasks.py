@@ -220,7 +220,7 @@ def check_deleted_posts(self, posts):
             log.error('Commit failed: %s', str(e))
             status = 'error'
 
-        log_event.apply_async((DeleteCheckEvent(count=len(posts), event_type='delete_check', status=status),), queue='logevent')
+        self.event_logger.save_event(DeleteCheckEvent(count=len(posts), event_type='delete_check', status=status))
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))

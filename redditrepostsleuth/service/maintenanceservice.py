@@ -4,8 +4,7 @@ import time
 import redis
 import requests
 
-from redditrepostsleuth.celery.tasks import check_deleted_posts, update_cross_post_parent, update_crosspost_parent_api, \
-    log_event
+from redditrepostsleuth.celery.tasks import check_deleted_posts, update_cross_post_parent, update_crosspost_parent_api
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -106,8 +105,7 @@ class MaintenanceService:
             try:
                 client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)
                 for queue in queues:
-                    log_event.apply_async((CeleryQueueSize(queue, client.llen(queue), event_type='queue_update'),), queue='logevent')
-
-                time.sleep(1)
+                    self.event_logger.save_event(CeleryQueueSize(queue, client.llen(queue), event_type='queue_update'))
+                time.sleep(2)
             except Exception as e:
                 log.error('Queue update task failed')
