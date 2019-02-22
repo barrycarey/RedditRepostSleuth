@@ -45,14 +45,10 @@ class LinkRepostService(RepostServiceBase):
                         time.sleep(5)
                         break
 
-                    for post in posts:
-                        log.info('Checking URL %s for repost', post.url)
-                        if post.url_hash is None:
-                            continue
 
-                        chunks = chunk_list(posts, 50)
-                        for chunk in chunks:
-                            link_repost_check.apply_async((chunk,), queue='linkrepost')
+                    chunks = chunk_list(posts, 50)
+                    for chunk in chunks:
+                        link_repost_check.apply_async((chunk,), queue='linkrepost')
 
                     offset += config.link_repost_batch_size
 
