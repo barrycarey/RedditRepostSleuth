@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
 
     image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), repost=True, hashing=True)
-    link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
+    link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), EventLogging())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     threading.Thread(target=maintenance.log_queue_size, name='Queue Update').start()
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
-    #maintenance.log_queue_size()
+    link_repost_service.repost_check()
 
     if args.ingestposts:
         log.info('Starting Post Ingest Agent')

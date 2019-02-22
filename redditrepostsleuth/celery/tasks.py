@@ -88,6 +88,10 @@ class RepostLogger(Task):
 
 
 
+@celery.task(bind=True, base=EventLoggerTask, ignore_results=True, serializer='pickle')
+def log_event(self, event):
+    self.event_logger.save_event(event)
+
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def temp_hash_image(self, posts):
     with self.uowm.start() as uow:
@@ -216,7 +220,7 @@ def check_deleted_posts(self, posts):
             status = 'error'
 
         for post in posts:
-            self.event_logger.save_event(InfluxEvent(event_type='delete_check', status=status))
+            log_event.apply_async((InfluxEvent(event_type='delete_check', status=status),), queue='logevent')
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
@@ -254,13 +258,15 @@ def save_new_post(self, post):
             uow.commit()
             ingest_repost_check.apply_async((post,), queue='repost')
             log.info('started ')
-            self.event_logger.save_event(
-                IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
-                                      post_type=post.post_type))
+            event = IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
+                                      post_type=post.post_type)
+
         except Exception as e:
-            self.event_logger.save_event(
-                IngestSubmissionEvent(event_type='ingest_post', status='error', post_id=post.post_id, queue='post',
-                                      post_type=post.post_type))
+
+                event = IngestSubmissionEvent(event_type='ingest_post', status='error', post_id=post.post_id, queue='post',
+                                      post_type=post.post_type)
+
+        log_event.apply_async((event,), queue='logevent')
 
 
 

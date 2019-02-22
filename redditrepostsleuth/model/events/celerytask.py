@@ -12,7 +12,7 @@ class CeleryTaskEvent(InfluxEvent):
     def get_influx_event(self):
         event = super().get_influx_event()
         event[0]['tags']['task_state'] = self.task_state
-        event[0]['tags']['uuid'] = self.task_uuid
+        event[0]['fields']['uuid'] = self.task_uuid
         event[0]['tags']['name'] = self.task_name
         return event
 
@@ -26,5 +26,5 @@ class CeleryQueueSize(InfluxEvent):
         event = super().get_influx_event()
         event[0]['tags']['queue_name'] = self.queue_name
         event[0]['fields']['size'] = self.size
-        log.debug('Writting influx log: %s', event)
+        #log.debug('Writting influx log: %s', event)
         return event
