@@ -25,13 +25,13 @@ def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post
     return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
 
 
-def clean_repost_matches(matches: List[RepostMatch]) -> List[RepostMatch]:
+def clean_repost_matches(repost: RepostWrapper) -> List[RepostMatch]:
     """
     Take a list of reposts, remove any cross posts and deleted posts
     :param posts: List of posts
     """
     #repost.matches = filter_matching_images(repost.matches, repost.checked_post)
-    matches = [match for match in matches if not match.post.crosspost_parent]
+    matches = [match for match in repost.matches if not match.post.crosspost_parent and match.post.created_at < repost.checked_post.created_at]
     matches = sort_reposts(matches)
     return matches
 

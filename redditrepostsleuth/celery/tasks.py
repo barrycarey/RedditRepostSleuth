@@ -12,6 +12,7 @@ from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidS
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.exception import ImageConversioinException, CrosspostRepostCheck
 from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.config import config
 from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -103,7 +104,7 @@ def link_repost_check(self, posts):
             repost = RepostWrapper()
             repost.checked_post = post
             repost.matches = [post_to_repost_match(match, post.id) for match in uow.posts.find_all_by_url_hash(post.url_hash) if match.post_id != post.post_id]
-            repost.matches = clean_repost_matches(repost.matches)
+            repost.matches = clean_repost_matches(repost)
             if not repost.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
                 post.checked_repost = True
@@ -116,15 +117,16 @@ def link_repost_check(self, posts):
             log.debug('Checked Link %s (%s): %s', post.post_id, post.created_at, post.url)
             for match in repost.matches:
                 log.debug('Matching Link: %s (%s)  - %s', match.post.post_id, match.post.created_at, match.post.url)
-            log.info('Creating Link Repost. Post %s is a repost of %s', post.url, repost.matches[0].post.url)
+            log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
 
-            with self.uowm.start() as uow:
-                new_repost = LinkRepost(post_id=post.post_id, repost_of=repost.matches[0].post.post_id)
-                repost.matches[0].post.repost_count += 1
-                post.checked_repost = True
-                uow.repost.add(new_repost)
-                uow.posts.update(post)
-                uow.commit()
+
+            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost.matches[0].post.post_id)
+            repost.matches[0].post.repost_count += 1
+            post.checked_repost = True
+            uow.repost.add(new_repost)
+            uow.posts.update(repost.matches[0].post)
+            log_repost.apply_async((repost,))
+            uow.commit()
 
 
             self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
@@ -132,7 +134,7 @@ def link_repost_check(self, posts):
                                                      post_type=post.post_type))
 
 
-            log_repost.apply_async((repost,), queue='repostlog')
+
 
         self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
 
@@ -168,7 +170,7 @@ def process_repost_annoy(self, repost: RepostWrapper):
         for match in repost.matches:
             match.post = uow.posts.get_by_id(match.match_id)
 
-        repost.matches = clean_repost_matches(repost.matches)
+        repost.matches = clean_repost_matches(repost)
 
         if len(repost.matches) > 0:
 
@@ -200,9 +202,15 @@ def process_repost_annoy(self, repost: RepostWrapper):
 @celery.task(bind=True, base=RepostLogger, ignore_results=True, serializer='pickle')
 def log_repost(self, repost: RepostWrapper):
     self.repost_log.info('---------------------------------------------')
-    self.repost_log.info('Original (%s): %s - %s', repost.checked_post.created_at, repost.checked_post.post_id, repost.checked_post.shortlink)
-    for match in repost.matches:
-        self.repost_log.info('Match (%s): %s - %s (Ham: %s - Annoy %s)', match.post.created_at, match.post.post_id, match.post.shortlink, match.hamming_distance, match.annoy_distance)
+    if repost.checked_post.post_type == 'image':
+
+        self.repost_log.info('Original (%s): %s - %s', repost.checked_post.created_at, repost.checked_post.post_id, repost.checked_post.shortlink)
+        for match in repost.matches:
+            self.repost_log.info('Match (%s): %s - %s (Ham: %s - Annoy %s)', match.post.created_at, match.post.post_id, match.post.shortlink, match.hamming_distance, match.annoy_distance)
+    else:
+        self.repost_log.info('Original Link %s (%s): %s', repost.checked_post.post_id, repost.checked_post.created_at, repost.checked_post.url)
+        for match in repost.matches:
+            log.debug('Matching Link: %s (%s)  - %s', match.post.post_id, match.post.created_at, match.post.url)
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def hash_link_url(self, id):
@@ -275,7 +283,7 @@ def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
 def save_new_post(self, post):
     # TODO - This whole mess needs to be cleaned up
-    #post = postdto_to_post(postdto)
+
     with self.uowm.start() as uow:
         uow.posts.add(post)
 
@@ -292,8 +300,7 @@ def save_new_post(self, post):
 
         try:
             uow.commit()
-            ingest_repost_check.apply_async((post,), queue='repost')
-            log.info('started ')
+            ingest_repost_check.apply_async((post,))
             event = IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
                                       post_type=post.post_type)
 
@@ -308,11 +315,13 @@ def save_new_post(self, post):
 
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
+    if not config.check_repost_on_ingest:
+        log.debug('Skipping ingest repost check')
+        return
     if post.post_type == 'image':
-        #log.info('Starting ingest image repost check')
-        (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async(queue='repost')
+        (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async()
     elif post.post_type == 'link':
-        link_repost_check.apply_async(([post],), queue='repost')
+        link_repost_check.apply_async(([post],))
 
 @celery.task(bind=True, base=RedditTask, ignore_reseults=True)
 def update_cross_post_parent(self, ids):

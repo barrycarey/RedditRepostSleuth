@@ -38,7 +38,7 @@ class MaintenanceService:
                     chunks = chunk_list(posts, 25)
                     for chunk in chunks:
                         try:
-                            check_deleted_posts.apply_async((chunk,), queue='deletecheck')
+                            check_deleted_posts.apply_async((chunk,))
                         except Exception as e:
                             log.error('Failed to send delete batch to Redis')
 
@@ -64,7 +64,7 @@ class MaintenanceService:
         with self.uowm.start() as uow:
             while True:
                 try:
-                    posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=1000)
+                    posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=5000)
                     if not posts:
                         log.info('Ran out of posts to crosspost check')
                         break
@@ -73,9 +73,9 @@ class MaintenanceService:
                         log.debug('Sending batch of cross post checks')
                         ids = ','.join(['t3_' + post.post_id for post in chunk])
                         self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
-                        update_crosspost_parent_api.apply_async((ids,), queue='crosspost2')
+                        update_crosspost_parent_api.apply_async((ids,))
                     offset += 1000
-                    time.sleep(3)
+                    #time.sleep(3)
                 except Exception as e:
                     continue
 
@@ -100,7 +100,7 @@ class MaintenanceService:
                     log.error('Celery events thread crashed')
 
     def log_queue_size(self):
-        queues = ['repost', 'celery', 'crosspost2', 'repost_log', 'commentingest', 'postingest', 'logevent', 'deletecheck']
+        queues = ['repost', 'celery', 'crosspost2', 'logrepost', 'commentingest', 'postingest', 'logevent', 'deletecheck']
         while True:
             try:
                 client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)

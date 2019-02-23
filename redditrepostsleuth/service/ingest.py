@@ -27,7 +27,7 @@ class Ingest:
                             log.debug('Saving post %s', submission.id)
                             post = submission_to_post(submission)
 
-                            save_new_post.apply_async((post,), queue='postingest')
+                            save_new_post.apply_async((post,))
                     except Forbidden as e:
                         pass
             except Exception as e:

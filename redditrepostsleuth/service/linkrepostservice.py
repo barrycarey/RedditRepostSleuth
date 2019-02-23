@@ -48,7 +48,7 @@ class LinkRepostService(RepostServiceBase):
 
                     chunks = chunk_list(posts, 50)
                     for chunk in chunks:
-                        link_repost_check.apply_async((chunk,), queue='linkrepost')
+                        link_repost_check.apply_async((chunk,))
 
                     offset += config.link_repost_batch_size
 

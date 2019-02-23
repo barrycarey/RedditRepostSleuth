@@ -59,7 +59,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.image_hash != None).offset(offset).limit(limit).all()
 
     def find_all_unchecked_crosspost(self, limit: int = None, offset: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.post_type == 'text', Post.crosspost_checked == False).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.crosspost_checked == False).offset(offset).limit(limit).all()
 
     def find_all_for_delete_check(self, hours: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(hours=hours)
