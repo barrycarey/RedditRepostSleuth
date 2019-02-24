@@ -187,7 +187,7 @@ def process_repost_annoy(self, repost: RepostWrapper):
         uow.commit()
 
         self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=1, post_type=repost.checked_post.post_type))
-        self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success', repost_of=final_matches[0].post.post_id, post_type=repost.checked_post.post_type))
+        self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success', repost_of=repost.matches[0].post.post_id, post_type=repost.checked_post.post_type))
 
 
 @celery.task(bind=True, base=RepostLogger, ignore_results=True, serializer='pickle')
