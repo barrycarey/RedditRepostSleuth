@@ -6,7 +6,7 @@ from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
-from redditrepostsleuth.celery.tasks import temp_hash_image, find_matching_images_annoy, process_repost_annoy
+from redditrepostsleuth.celery.tasks import find_matching_images_annoy, process_repost_annoy
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -14,69 +14,23 @@ from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
-from redditrepostsleuth.util.helpers import chunk_list
 from redditrepostsleuth.util.imagehashing import set_image_hashes
 from redditrepostsleuth.util.objectmapping import submission_to_post
-
 # TODO - Deal with images that PIL can't convert.  Tons in database
 from redditrepostsleuth.util.reposthelpers import sort_reposts
 
 
 class ImageRepostService(RepostServiceBase):
 
-    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, hashing: bool = False, repost: bool = False) -> None:
+    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit) -> None:
         super().__init__(uowm)
         self.reddit = reddit
-        self.hashing = hashing
-        self.repost = repost
 
     def start(self):
-        if self.hashing:
-            log.info('Starting image hashing thread')
-            threading.Thread(target=self.hash_images, name='Repost').start()
-        if self.repost:
-            log.info('Starting image repost thread')
-            threading.Thread(target=self.repost_check, name='Repost Queue').start()
+        log.info('Starting image repost thread')
+        threading.Thread(target=self.repost_check, name='Repost Queue').start()
 
-    def hash_images(self):
-        """
-        Collect images from the database without a hash.  Batch them into 100 posts and submit to celery to have
-        hashes created
-        """
-        while True:
-            offset = 0
-            while True:
-                try:
-                    with self.uowm.start() as uow:
-                        posts = uow.posts.find_all_without_hash(limit=config.generate_hash_batch_size, offset=offset)
 
-                    if not posts:
-                        log.info('Ran out of images to hash')
-                        break
-
-                    chunks = chunk_list(posts, 25)
-                    print('sending chunk jobs')
-                    for chunk in chunks:
-                        temp_hash_image.apply_async((chunk,), queue='hashing')
-                    log.info('Started %s hashing jobs', config.generate_hash_batch_size)
-
-                    offset += config.generate_hash_batch_size
-                    time.sleep(config.generate_hash_batch_delay)
-
-                except Exception as e:
-                    # TODO - Temp wide exception to catch any faults
-                    log.exception('Error processing celery jobs', exc_info=True)
-
-    def hash_test(self):
-        while True:
-            offset = 0
-            with self.uowm.start() as uow:
-                posts = uow.posts.find_all_by_type('image', limit=25, offset=offset)
-                for post in posts:
-                    set_image_hashes(post)
-                log.info('Saving hashes')
-                uow.commit()
-                offset += 25
     def find_all_occurrences(self, submission: Submission) -> RepostWrapper:
         """
         Take a given Reddit submission and find all matching posts
@@ -108,7 +62,7 @@ class ImageRepostService(RepostServiceBase):
         while True:
             try:
                 with self.uowm.start() as uow:
-                    posts = uow.posts.find_all_by_repost_check(False, limit=config.check_repost_batch_size, offset=offset)
+                    posts = uow.posts.find_all_by_repost_check(False, limit=config.repost_image_batch_size, offset=offset)
                     if not posts:
                         break
                     for post in posts:
@@ -116,7 +70,7 @@ class ImageRepostService(RepostServiceBase):
 
                     log.info('Waiting %s seconds until next repost batch', config.check_repost_batch_delay)
                     offset += config.check_repost_batch_size
-                    time.sleep(config.check_repost_batch_delay)
+                    time.sleep(config.repost_image_batch_delay)
 
             except Exception as e:
                 log.exception('Repost thread died', exc_info=True)

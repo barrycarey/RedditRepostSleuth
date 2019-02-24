@@ -25,27 +25,32 @@ class ConfigManager:
 
         # General
         self.summon_command = self.config['GENERAL'].get('summon_command', fallback='!repost')
-        self.generate_hash_batch_size = self.config['GENERAL'].getint('generate_hash_batch_size', fallback=50)
+
         self.delete_check_batch_size = self.config['GENERAL'].getint('delete_check_batch_size', fallback=50)
-        self.vptree_cache_duration = self.config['GENERAL'].getint('vptree_cache_duration', fallback=1800)
-        self.hamming_distance = self.config['GENERAL'].getint('hamming_distance', fallback=10)
+
         self.subreddit_summons = self.config['GENERAL'].get('subreddit_summons', fallback='all')
-        self.check_repost_on_ingest = self.config['GENERAL'].getboolean('check_repost_on_ingest', fallback=False)
-        self.generate_hash_batch_delay = self.config['GENERAL'].getint('generate_hash_batch_delay', fallback=15)
+
         self.delete_check_batch_delay = self.config['GENERAL'].getint('delete_check_batch_delay', fallback=15)
-        self.check_repost_batch_size = self.config['GENERAL'].getint('check_repost_batch_size', fallback=2)
-        self.check_repost_batch_delay = self.config['GENERAL'].getint('check_repost_batch_delay', fallback=20)
-        self.link_repost_batch_size = self.config['GENERAL'].getint('link_repost_batch_size', fallback=20)
-        self.link_repost_batch_delay = self.config['GENERAL'].getint('link_repost_batch_delay', fallback=20)
+
         post_types = self.config['GENERAL'].get('supported_post_types', fallback='image')
         self.supported_post_types = post_types.split(',')
+
+        # REPOST
+
+        self.check_new_links_for_repost = self.config['REPOST'].getboolean('check_new_links_for_repost', fallback=False)
+        self.repost_link_batch_size = self.config['REPOST'].getint('repost_link_batch_size', fallback=20)
+        self.repost_link_batch_delay = self.config['REPOST'].getint('repost_link_batch_delay', fallback=20)
+
+        self.check_new_images_for_repost = self.config['REPOST'].getboolean('check_new_images_for_repost', fallback=False)
+        self.repost_image_batch_size = self.config['REPOST'].getint('repost_image_batch_size', fallback=20)
+        self.repost_image_batch_delay = self.config['REPOST'].getint('repost_image_batch_delay', fallback=20)
 
         # IMAGES
         self.index_tree_count = self.config['IMAGES'].getint('index_tree_count', fallback=20)
         self.index_keep_alive = self.config['IMAGES'].getint('index_keep_alive', fallback=20)
         self.index_file_name = self.config['IMAGES'].get('index_file_name', fallback='images.ann')
         self.annoy_match_cutoff = self.config['IMAGES'].getfloat('annoy_match_cutoff', fallback=0.25)
-        self.hamming_cutoff = self.config['IMAGES'].getint('hamming_cutoff', fallback=10)
+        self.hamming_cutoff = self.config['IMAGES'].getint('hamming_cutoff', fallback=8)
         self.annoy_total_neighbors = self.config['IMAGES'].getint('annoy_total_neighbors', fallback=50)
         self.index_build_lock_ttl = self.config['IMAGES'].getint('index_build_lock_ttl', fallback=300000)
 

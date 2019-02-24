@@ -122,7 +122,7 @@ class DuplicateImageService:
 
             match.hamming_distance = hamming(original.dhash_h, match.post.dhash_h)
 
-            if match.hamming_distance <= config.hamming_distance:
+            if match.hamming_distance <= config.hamming_cutoff:
                 log.debug('Match %s: Annoy %s - Ham: %s', match.match_id, match.hamming_distance, match.annoy_distance)
                 final_results.append(match)
             else:

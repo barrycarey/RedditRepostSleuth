@@ -39,7 +39,7 @@ class LinkRepostService(RepostServiceBase):
             while True:
                 try:
                     with self.uowm.start() as uow:
-                        posts = uow.posts.find_all_by_type_repost('link', offset=offset, limit=config.link_repost_batch_size)
+                        posts = uow.posts.find_all_by_type_repost('link', offset=offset, limit=config.repost_link_batch_size)
                     if not posts:
                         log.info('Ran out of links to check for repost')
                         time.sleep(5)
@@ -51,6 +51,8 @@ class LinkRepostService(RepostServiceBase):
                         link_repost_check.apply_async((chunk,))
 
                     offset += config.link_repost_batch_size
+
+                    time.sleep(config.repost_link_batch_delay)
 
                 except Exception as e:
                     log.exception('Error in Link repost thread', exc_info=True)

@@ -31,7 +31,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), repost=True, hashing=True)
+    image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
     link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), EventLogging())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
     if args.celerymon:
-        threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
+        #threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
         threading.Thread(target=maintenance.log_queue_size, name='Queue Update').start()
 
     if args.ingestposts:
@@ -57,8 +57,8 @@ if __name__ == '__main__':
 
     if args.repost:
         log.info('Starting Repost Agent')
-        link_repost_service.start()
-        #image_repost_service.start()
+        #link_repost_service.start()
+        image_repost_service.start()
 
     if args.deleted:
         log.info('Starting Delete Check Agent')

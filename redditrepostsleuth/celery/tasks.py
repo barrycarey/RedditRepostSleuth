@@ -87,15 +87,6 @@ class RepostLogger(Task):
 def log_event(self, event):
     self.event_logger.save_event(event)
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
-def temp_hash_image(self, posts):
-    with self.uowm.start() as uow:
-        for post in posts:
-            set_image_hashes(post)
-            uow.posts.update(post)
-        log.debug('Saving batch of hashes')
-        uow.commit()
-
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts):
@@ -315,12 +306,9 @@ def save_new_post(self, post):
 
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
-    if not config.check_repost_on_ingest:
-        log.debug('Skipping ingest repost check')
-        return
-    if post.post_type == 'image':
+    if post.post_type == 'image' and config.check_new_images_for_repost:
         (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async()
-    elif post.post_type == 'link':
+    elif post.post_type == 'link' and config.check_new_links_for_repost:
         link_repost_check.apply_async(([post],))
 
 @celery.task(bind=True, base=RedditTask, ignore_reseults=True)

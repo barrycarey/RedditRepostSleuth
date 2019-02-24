@@ -6,3 +6,4 @@ Check index created date and skip check posts that are newer - Need to address t
 deal with deleted images on imgur and reddit that return default image and 200 instead of 404
 Setup splunk to capture logs so we can go back and see how matching on images was done
 Search for generic deleted images https://i.redd.it/d4rko4qeilg21.jpg
+Keep track of f8b2504b977a8b3b774fa03c0e7e8eb1 for link repost issues

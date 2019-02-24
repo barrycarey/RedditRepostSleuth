@@ -100,12 +100,15 @@ class MaintenanceService:
                     log.error('Celery events thread crashed')
 
     def log_queue_size(self):
-        queues = ['repost', 'celery', 'crosspost2', 'logrepost', 'commentingest', 'postingest', 'logevent', 'deletecheck']
+        skip_keys = ['unacked_index', 'unacked_mutex', 'unacked']
         while True:
             try:
                 client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)
-                for queue in queues:
-                    self.event_logger.save_event(CeleryQueueSize(queue, client.llen(queue), event_type='queue_update'))
+                for queue in client.scan_iter():
+                    queue_name = queue.decode('utf-8')
+                    if queue_name[0:1] == '_' or len(queue_name) > 15 or queue_name in skip_keys:
+                        continue
+                    self.event_logger.save_event(CeleryQueueSize(queue_name, client.llen(queue_name), event_type='queue_update'))
                 time.sleep(2)
             except Exception as e:
-                log.error('Queue update task failed')
+                log.error('Queue update task failed. Key %s', queue_name)
