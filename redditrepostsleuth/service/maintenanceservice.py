@@ -111,4 +111,5 @@ class MaintenanceService:
                     self.event_logger.save_event(CeleryQueueSize(queue_name, client.llen(queue_name), event_type='queue_update'))
                 time.sleep(2)
             except Exception as e:
-                log.error('Queue update task failed. Key %s', queue_name)
+                pass
+                #log.error('Queue update task failed. Key %s', queue_name)

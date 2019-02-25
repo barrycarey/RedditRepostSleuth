@@ -41,8 +41,16 @@ class DuplicateImageService:
                 log.error('Index file returned true')
                 return
 
-            time.sleep(random.randint(20,60)) # Keep multiple processes from grabbing lock all at once
-            with redlock.create_lock('Index Lock', ttl=config.index_build_lock_ttl):
+            time.sleep(random.randint(10,30)) # Keep multiple processes from grabbing lock all at once
+            log.debug('%s - Attempting to get index lock', os.getpid())
+
+            # Check for index one more time. I keep having processes start another rebuild just as one finishes
+            if self._load_index_file():
+                log.error('Index file returned true')
+                return
+
+            lock_name = 'index_lock_' + config.machine_id
+            with redlock.create_lock(lock_name, ttl=config.index_build_lock_ttl):
                 log.info('%s - Got Lock', os.getpid())
                 log.info('Building new Annoy index')
                 self.index = AnnoyIndex(64)
@@ -60,11 +68,14 @@ class DuplicateImageService:
                     vector = list(bytearray(image[1], encoding='utf-8'))
                     self.index.add_item(image[0], vector)
                 self.index.build(config.index_tree_count)
+                log.debug('Before index save')
                 self.index.save(config.index_file_name)
+                log.debug('After index save')
                 self.index_last_build = datetime.now()
                 delta = datetime.now() - start
                 log.info('Total index build time was %s seconds', delta.seconds)
                 time.sleep(15)
+
 
     def _load_index_file(self) -> bool:
         """
@@ -76,18 +87,18 @@ class DuplicateImageService:
             log.info('%s = Found Annoy index', os.getpid())
             created_at = datetime.fromtimestamp(os.stat(config.index_file_name).st_ctime)
             delta = datetime.now() - created_at
-            log.info('Indexed created %s seconds ago', delta.seconds)
+            log.info('%s - Indexed created %s seconds ago', os.getpid(), delta.seconds)
             if delta.seconds > config.index_keep_alive:
-                log.info('Index is too old.  Not using')
+                log.info('%s - Index is too old.  Not using', os.getpid())
                 return False
             else:
-                log.info('Index is fresh, using it')
+                log.info('%s - Index is fresh, using it', os.getpid())
                 self.index = AnnoyIndex(64)
                 self.index_last_build = created_at
                 self.index.load(config.index_file_name)
                 return True
         else:
-            log.info('No existing index file found')
+            log.info('%s - No existing index file found', os.getpid())
             return False
 
 

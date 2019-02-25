@@ -46,6 +46,7 @@ class ConfigManager:
         self.repost_image_batch_delay = self.config['REPOST'].getint('repost_image_batch_delay', fallback=20)
 
         # IMAGES
+        self.machine_id = self.config['IMAGES'].get('machine_id', fallback='1')
         self.index_tree_count = self.config['IMAGES'].getint('index_tree_count', fallback=20)
         self.index_keep_alive = self.config['IMAGES'].getint('index_keep_alive', fallback=20)
         self.index_file_name = self.config['IMAGES'].get('index_file_name', fallback='images.ann')

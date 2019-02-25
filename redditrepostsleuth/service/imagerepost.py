@@ -53,7 +53,7 @@ class ImageRepostService(RepostServiceBase):
             log.exception('Problem in find_all_occurrences.  Exception type %s', str(type(e)), exc_info=True)
             ImageConversioinException('Failed to convert image to hash')
 
-        results = find_matching_images_annoy.apply_async(queue='repost', args=(post,)).get()
+        results = find_matching_images_annoy.apply_async(args=(post,)).get()
         results.matches = sort_reposts(results.matches)
         return results
 

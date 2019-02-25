@@ -57,19 +57,6 @@ class RequestService:
             response.message = UNKNOWN_COMMAND
             self._send_response(comment, response)
 
-        """
-        if submission.post_hint == 'image':
-            log.info('Summons is for an image post')
-            self.process_image_repost_request(submission, comment, summons)
-        elif submission.post_hint == 'link':
-            self.process_link_repost_request(submission, comment, summons)
-        else:
-            log.error('Unsupported post type %s', submission.post_hint)
-            response.status = 'error'
-            response.message = UNSUPPORTED_POST_TYPE
-            self._send_response(comment, response)
-            return
-        """
 
     def process_stat_request(self, summons: Summons):
         response = RepostResponseBase(summons_id=summons.id)
@@ -165,7 +152,7 @@ class RequestService:
         submission = self.reddit.submission(id=summons.post_id)
         comment = self.reddit.comment(id=summons.comment_id)
         response = RepostResponseBase(summons_id=summons.id)
-        result = None
+
         with self.uowm.start() as uow:
             post_count = uow.posts.count_by_type('image')
 
@@ -196,7 +183,8 @@ class RequestService:
                 response.message += self._build_markdown_list(result.matches)
             else:
                 response.message = IMAGE_REPOST_SHORT.format(count=len(result.matches), orig_url=result.matches[0].post.shortlink)
-            self._send_response(comment, response, shortlink=submission.shortlink)
+
+        self._send_response(comment, response, shortlink=submission.shortlink)
 
     def _send_response(self, comment: Comment, response: RepostResponseBase, shortlink: str = ''):
         try:

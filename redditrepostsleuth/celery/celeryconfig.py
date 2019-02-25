@@ -1,7 +1,7 @@
 from redditrepostsleuth.config import config
 
 broker_url = config.celery_broker
-results_backend = config.celery_backend
+result_backend = config.celery_backend
 task_serializer = 'pickle'
 result_serializer='pickle'
 accept_content = ['pickle', 'json']
