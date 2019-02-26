@@ -104,6 +104,7 @@ class MaintenanceService:
         while True:
             try:
                 client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)
+
                 for queue in client.scan_iter():
                     queue_name = queue.decode('utf-8')
                     if queue_name[0:1] == '_' or len(queue_name) > 15 or queue_name in skip_keys:

@@ -25,7 +25,7 @@ class CommentMonitor:
         """
         Monitors the subreddits set in the config for comments containing the summoning string
         """
-        for comment in self.reddit.subreddit('funny+pics').stream.comments():
+        for comment in self.reddit.subreddit(config.subreddit_summons).stream.comments():
             if comment is None:
                 continue
             #log.info('COMMENT %s: %s', datetime.fromtimestamp(comment.created_utc), comment.body)

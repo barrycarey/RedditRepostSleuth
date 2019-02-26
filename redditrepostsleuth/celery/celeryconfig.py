@@ -5,6 +5,7 @@ result_backend = config.celery_backend
 task_serializer = 'pickle'
 result_serializer='pickle'
 accept_content = ['pickle', 'json']
+result_expires = 60
 task_routes = {
     'redditrepostsleuth.celery.tasks.save_new_post': {'queue': 'postingest'},
     'redditrepostsleuth.celery.tasks.ingest_repost_check': {'queue': 'repost'},

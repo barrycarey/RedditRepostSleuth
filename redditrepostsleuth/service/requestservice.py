@@ -10,13 +10,13 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
     LINK_ALL, \
     WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE, STATS, SIGNATURE, \
-    IMAGE_REPOST_SHORT
+    IMAGE_REPOST_SHORT, WATCH_NOT_OC
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.model.repostresponse import RepostResponseBase
 from redditrepostsleuth.model.imagematch import ImageMatch
 from redditrepostsleuth.service.imagerepost import ImageRepostService
-from redditrepostsleuth.util.reposthelpers import set_shortlink
+from redditrepostsleuth.util.reposthelpers import set_shortlink, verify_oc
 
 
 class RequestService:
@@ -33,24 +33,25 @@ class RequestService:
         submission = self.reddit.submission(id=summons.post_id)
         comment = self.reddit.comment(id=summons.comment_id)
         response = RepostResponseBase(summons_id=summons.id)
-        if not hasattr(submission, 'post_hint'):
+        if not hasattr(submission, 'post_hint') or submission.post_hint != 'image':
             log.error('Submission has no post hint.  Cannot process summons')
             response.status = 'error'
             response.message = UNSUPPORTED_POST_TYPE
             self._send_response(comment, response)
             return
 
+        sub_command = parsed_command.group('subcommand')
+        if sub_command:
+            sub_command = sub_command.strip()
+
         # TODO handle case when no command is passed
         if parsed_command.group('command').lower() == 'watch':
-            self.process_watch_request(summons, sub_command=parsed_command.group('subcommand').strip())
+            self.process_watch_request(summons, sub_command=sub_command)
         elif parsed_command.group('command').lower() == 'unwatch':
             self.process_unwatch_request(summons)
         elif parsed_command.group('command').lower() == 'stats':
             self.process_stat_request(summons)
         elif parsed_command.group('command').lower() == 'check':
-            sub_command = parsed_command.group('subcommand')
-            if sub_command:
-                sub_command.strip()
             self.process_repost_request(summons, sub_command=sub_command)
         else:
             log.error('Unknown command')
@@ -90,6 +91,16 @@ class RequestService:
         # TODO - Add check for existing watch
         response = RepostResponseBase(summons_id=summons.id)
         comment = self.reddit.comment(id=summons.comment_id)
+        submission = self.reddit.submission(id=summons.post_id)
+
+        if not verify_oc(submission, self.image_service):
+            response.message = WATCH_NOT_OC
+            self._send_response(comment, response)
+            return
+
+        with self.uowm.start() as uow:
+            post_count = uow.posts.count_by_type('image')
+
         with self.uowm.start() as uow:
             watch = uow.repostwatch.find_existing_watch(comment.author.name, summons.post_id)
             if watch:
@@ -101,7 +112,7 @@ class RequestService:
             watch = RepostWatch(post_id=summons.post_id, user=comment.author.name)
             watch.response_type = sub_command if sub_command else 'message'
             log.info('Creating watch request on post %s for user %s', summons.post_id, comment.author.name)
-            response.message = WATCH_ENABLED.format(response=watch.response_type)
+            response.message = WATCH_ENABLED.format(check_count=post_count, response=watch.response_type)
 
             uow.repostwatch.add(watch)
             # TODO - Probably need to catch exception here
@@ -164,7 +175,7 @@ class RequestService:
             self._send_response(comment, response)
             return
 
-        if not result:
+        if not result.matches:
             response.message = REPOST_NO_RESULT.format(total=post_count)
         else:
             # TODO: This is temp until database is backfilled with short links

@@ -1,6 +1,7 @@
 from typing import List
 
 from praw import Reddit
+from praw.models import Submission
 
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import Post
@@ -9,6 +10,7 @@ from redditrepostsleuth.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.model.imagematch import ImageMatch
 
 # TODO: Should be able to safely remove this now
+
 from redditrepostsleuth.util.helpers import get_reddit_instance
 
 
@@ -95,3 +97,20 @@ def get_crosspost_parent_batch(ids: List[str], reddit: Reddit):
         })
     log.info('Crosspost Parent Results: %s', result)
     return result
+
+def verify_oc(submission: Submission, repost_service) -> bool:
+    """
+    Check a provided post to see if it is OC
+    :param submission: Submission to check
+    :param repost_service: Repost processing service
+    :return: boolean
+    """
+    log.info('Checking submission %s is OC', submission.id)
+    result = repost_service.find_all_occurrences(submission)
+    matches = [match for match in result.matches if not match.post.crosspost_parent]
+    if matches:
+        log.info('Submission %s is not OC.  Found %s matches', submission.id, len(matches))
+        return False
+    else:
+        log.info('Submission %s is OC', submission.id)
+        return True
