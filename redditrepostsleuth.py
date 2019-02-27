@@ -28,6 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--deleted', action='store_true', help='Enables agent that that prunes deleted posts')
     parser.add_argument('--crosspost', action='store_true', help='Process Cross Posts in Backgroung')
     parser.add_argument('--celerymon', action='store_true', help='Process Cross Posts in Backgroung')
+    parser.add_argument('--stats', action='store_true', help='Process Cross Posts in Backgroung')
     args = parser.parse_args()
 
 
@@ -73,6 +74,9 @@ if __name__ == '__main__':
         threading.Thread(target=comments.monitor_for_summons, name='SummonsThread').start()
         threading.Thread(target=comments.handle_summons).start()
 
+    if args.stats:
+        log.info('Starting Wiki Stags Agent')
+        threading.Thread(target=maintenance.update_wiki_stats(), name='WikiStats').start()
 
 
     while True:

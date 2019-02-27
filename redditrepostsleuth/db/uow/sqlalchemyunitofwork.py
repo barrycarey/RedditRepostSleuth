@@ -1,5 +1,6 @@
 from sqlalchemy.orm import scoped_session
 
+from redditrepostsleuth.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.db.repository.postrepository import PostRepository
 from redditrepostsleuth.db.repository.repostrepository import RepostRepository
@@ -46,3 +47,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def repost(self) -> RepostRepository:
         return RepostRepository(self.session)
+
+    @property
+    def image_repost(self) -> ImageRepostRepository:
+        return ImageRepostRepository(self.session)

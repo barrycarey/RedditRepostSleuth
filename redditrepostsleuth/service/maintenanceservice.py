@@ -7,11 +7,12 @@ import requests
 from redditrepostsleuth.celery.tasks import check_deleted_posts, update_cross_post_parent, update_crosspost_parent_api
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
+from redditrepostsleuth.config.replytemplates import WIKI_STATS
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.events.celerytask import CeleryTaskEvent, CeleryQueueSize
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.service.eventlogging import EventLogging
-from redditrepostsleuth.util.helpers import chunk_list
+from redditrepostsleuth.util.helpers import chunk_list, get_reddit_instance
 
 
 class MaintenanceService:
@@ -45,18 +46,6 @@ class MaintenanceService:
                 offset += limit
                 time.sleep(config.delete_check_batch_delay)
 
-    def check_crossposts(self):
-
-        offset = 0
-        while True:
-            with self.uowm.start() as uow:
-                posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=100)
-
-            ids = ['t3_' + post.post_id for post in posts]
-            update_cross_post_parent.apply_async((ids,), queue='crosspost')
-            self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
-            time.sleep(.2)
-            offset += 100
 
 
     def check_crosspost_api(self):
@@ -114,3 +103,33 @@ class MaintenanceService:
             except Exception as e:
                 pass
                 #log.error('Queue update task failed. Key %s', queue_name)
+
+    def update_wiki_stats(self):
+        reddit = get_reddit_instance()
+        while True:
+            page = reddit.subreddit('RepostSleuthBot').wiki['stats']
+            page.edit('test', 'testedit')
+            with self.uowm.start() as uow:
+                video_count = uow.posts.count_by_type('video')
+                video_count += uow.posts.count_by_type('hosted:video')
+                video_count += uow.posts.count_by_type('rich:video')
+                image_count = uow.posts.count_by_type('image')
+                text_count = uow.posts.count_by_type('text')
+                link_count = uow.posts.count_by_type('link')
+                summons_count = uow.summons.get_count()
+                post_count = uow.posts.get_count()
+                oldest_post = uow.posts.get_oldest_post()
+
+            stats = WIKI_STATS.format(
+                post_count=post_count,
+                images=image_count,
+                links=link_count,
+                video=video_count,
+                text=text_count,
+                oldest=str(oldest_post.created_at),
+                reposts=0,
+                summoned=summons_count
+            )
+            page.edit(stats)
+
+            time.sleep(30)
