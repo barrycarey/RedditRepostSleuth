@@ -100,7 +100,7 @@ def delete_dups(self, objs):
                     if dup.id != keep:
                         uow.image_repost.remove(dup)
                         log.info('deleting post %s', dup.post_id)
-                        uow.commit()
+                uow.commit()
 
     log.info('Finished delete batch')
 
