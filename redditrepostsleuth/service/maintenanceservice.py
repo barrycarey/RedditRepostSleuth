@@ -108,7 +108,6 @@ class MaintenanceService:
         reddit = get_reddit_instance()
         while True:
             page = reddit.subreddit('RepostSleuthBot').wiki['stats']
-            page.edit('test', 'testedit')
             with self.uowm.start() as uow:
                 video_count = uow.posts.count_by_type('video')
                 video_count += uow.posts.count_by_type('hosted:video')
@@ -119,6 +118,7 @@ class MaintenanceService:
                 summons_count = uow.summons.get_count()
                 post_count = uow.posts.get_count()
                 oldest_post = uow.posts.get_oldest_post()
+                image_repost_count = uow.image_repost.get_count()
 
             stats = WIKI_STATS.format(
                 post_count=post_count,
@@ -127,7 +127,7 @@ class MaintenanceService:
                 video=video_count,
                 text=text_count,
                 oldest=str(oldest_post.created_at),
-                reposts=0,
+                image_reposts=image_repost_count,
                 summoned=summons_count
             )
             page.edit(stats)

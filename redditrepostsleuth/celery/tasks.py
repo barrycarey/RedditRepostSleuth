@@ -14,6 +14,7 @@ from redditrepostsleuth.common.exception import ImageConversioinException, Cross
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.config.constants import USER_AGENTS
+from redditrepostsleuth.config.replytemplates import WATCH_FOUND
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost
@@ -87,6 +88,21 @@ class RepostLogger(Task):
 def log_event(self, event):
     self.event_logger.save_event(event)
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def delete_dups(self, objs):
+    log.info('Starting delete batch')
+    with self.uowm.start() as uow:
+        for post in objs:
+            dups = uow.image_repost.get_dups_by_post_id(post.post_id)
+            if len(dups) > 1:
+                keep = dups[0].id
+                for dup in dups:
+                    if dup.id != keep:
+                        uow.image_repost.remove(dup)
+                        log.info('deleting post %s', dup.post_id)
+                        uow.commit()
+
+    log.info('Finished delete batch')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts):
@@ -185,6 +201,7 @@ def process_repost_annoy(self, repost: RepostWrapper):
             self.event_logger.save_event(
                 RepostEvent(event_type='repost_found', status='success', post_type=repost.checked_post.post_type))
 
+            check_repost_watch.apply_async((new_repost,), queue='test')
 
         uow.posts.update(repost.checked_post)
 
@@ -192,6 +209,23 @@ def process_repost_annoy(self, repost: RepostWrapper):
 
         self.event_logger.save_event(BatchedEvent(event_type='repost_check', status='success', count=1,
                                                   post_type=repost.checked_post.post_type))
+
+
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def check_repost_watch(self, repost):
+    with self.uowm.start() as uow:
+        watch = uow.repostwatch.get_by_post_id(repost.repost_of)
+        if not watch:
+            log.debug('No repost watch for post %s', repost.repost_of)
+            return
+        repost_obj = uow.posts.get_by_post_id(repost.post_id)
+    log.info('Post %s has an active watch for user %s', watch.post_id, watch.user)
+    reddit = get_reddit_instance()
+    if watch.response_type == 'message':
+        log.info('Sending private message to %s', watch.user)
+        reddit.redditor(watch.user).message('Repost Sleuth Watch Alert', WATCH_FOUND.format(user=watch.user, repost_url=repost_obj.shortlink))
 
 
 
