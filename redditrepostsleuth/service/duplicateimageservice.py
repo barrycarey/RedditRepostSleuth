@@ -22,6 +22,7 @@ class DuplicateImageService:
         self.uowm = uowm
         self.index  = AnnoyIndex(64)
         self.index_last_build = None
+        self.index_size = 0
         self._load_index_file()
 
     def _build_index(self):
@@ -64,6 +65,7 @@ class DuplicateImageService:
                     delta = datetime.now() - start
                     log.info('Loaded %s images in %s seconds', len(existing_images), delta.seconds)
                 log.info('Index will be built with %s hashes', len(existing_images))
+                self.index_size = len(existing_images)
                 for image in existing_images:
                     vector = list(bytearray(image[1], encoding='utf-8'))
                     self.index.add_item(image[0], vector)

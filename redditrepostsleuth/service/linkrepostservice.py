@@ -48,7 +48,8 @@ class LinkRepostService(RepostServiceBase):
                         break
 
 
-                    chunks = chunk_list(posts, 150)
+                    chunks = chunk_list(posts, 250)
+                    log.info('Starting batch of delete checks')
                     for chunk in chunks:
                         link_repost_check.apply_async((chunk,))
 

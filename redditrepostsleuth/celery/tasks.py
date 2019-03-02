@@ -3,6 +3,7 @@ import logging
 import random
 from datetime import datetime
 from hashlib import md5
+from time import perf_counter
 
 import requests
 from celery import Task
@@ -19,6 +20,7 @@ from redditrepostsleuth.config.replytemplates import WATCH_FOUND
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost
+from redditrepostsleuth.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.model.events.ingestsubmissionevent import IngestSubmissionEvent
@@ -316,11 +318,13 @@ def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
+    start = perf_counter()
     result = RepostWrapper()
     result.checked_post = post
     result.matches = self.dup_service.check_duplicate(post)
     log.debug('Found %s matching images', len(result.matches))
-    self.event_logger.save_event(InfluxEvent(event_type='find_matching_images'))
+    search_time = perf_counter() - start
+    self.event_logger.save_event(AnnoySearchEvent(search_time, self.dup_service.index_size, event_type='find_matching_images'))
     return result
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')

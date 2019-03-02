@@ -60,7 +60,7 @@ class PostRepository:
 
     # Repost methods
     def find_all_by_type_repost(self, post_type: str, limit: int = None, offset: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.post_type == post_type, Post.checked_repost == 0).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == post_type, Post.checked_repost == 0).offset(offset).limit(limit).all()
 
     def find_all_links_without_hash(self, limit: int = None, offset: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.post_type == 'link', Post.url_hash == None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
