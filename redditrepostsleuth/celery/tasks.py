@@ -134,6 +134,7 @@ def link_repost_check(self, posts):
             new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id)
             repost_of.repost_count += 1
             post.checked_repost = True
+            uow.posts.update(post)
             uow.repost.add(new_repost)
             #uow.posts.update(repost.matches[0].post)
             log_repost.apply_async((repost,))
@@ -144,8 +145,6 @@ def link_repost_check(self, posts):
                                                          post_type=post.post_type))
             except IntegrityError as e:
                 uow.rollback()
-                post.checked_repost = True
-                uow.commit()
                 log.exception('Error saving link repost', exc_info=True)
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
                                                          repost_of=repost.matches[0].post.post_id,
