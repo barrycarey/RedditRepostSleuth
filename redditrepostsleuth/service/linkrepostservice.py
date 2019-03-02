@@ -12,10 +12,12 @@ from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Post, Reposts, LinkRepost
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.model.events.repostevent import RepostEvent
+from redditrepostsleuth.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase
 from redditrepostsleuth.util.helpers import chunk_list
-from redditrepostsleuth.util.reposthelpers import remove_newer_posts, sort_reposts
+from redditrepostsleuth.util.objectmapping import post_to_repost_match
+from redditrepostsleuth.util.reposthelpers import remove_newer_posts, sort_reposts, clean_repost_matches
 from redditrepostsleuth.celery.tasks import hash_link_url, log_repost, link_repost_check
 
 
@@ -46,16 +48,17 @@ class LinkRepostService(RepostServiceBase):
                         break
 
 
-                    chunks = chunk_list(posts, 50)
+                    chunks = chunk_list(posts, 150)
                     for chunk in chunks:
                         link_repost_check.apply_async((chunk,))
 
-                    offset += config.link_repost_batch_size
+                    offset += config.repost_link_batch_size
 
                     time.sleep(config.repost_link_batch_delay)
 
                 except Exception as e:
                     log.exception('Error in Link repost thread', exc_info=True)
+
 
     def save_post(self, post: Post):
         with self.uowm.start() as uow:

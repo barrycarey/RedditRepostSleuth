@@ -58,8 +58,8 @@ if __name__ == '__main__':
 
     if args.repost:
         log.info('Starting Repost Agent')
-        #link_repost_service.start()
-        image_repost_service.start()
+        link_repost_service.start()
+        #image_repost_service.start()
 
     if args.deleted:
         log.info('Starting Delete Check Agent')

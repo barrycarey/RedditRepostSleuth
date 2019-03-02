@@ -120,25 +120,36 @@ def link_repost_check(self, posts):
                 continue
 
             log.info('Found %s matching links', len(repost.matches))
+            log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
+            """
+            
 
             log.debug('Checked Link %s (%s): %s', post.post_id, post.created_at, post.url)
             for match in repost.matches:
                 log.debug('Matching Link: %s (%s)  - %s', match.post.post_id, match.post.created_at, match.post.url)
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
-
-
-            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost.matches[0].post.post_id)
-            repost.matches[0].post.repost_count += 1
+            """
+            repost_of = repost.matches[0].post
+            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id)
+            repost_of.repost_count += 1
             post.checked_repost = True
             uow.repost.add(new_repost)
-            uow.posts.update(repost.matches[0].post)
+            #uow.posts.update(repost.matches[0].post)
             log_repost.apply_async((repost,))
-            uow.commit()
+            try:
+                uow.commit()
+                self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
+                                                         repost_of=repost.matches[0].post.post_id,
+                                                         post_type=post.post_type))
+            except Exception as e:
+                uow.rollback()
+                log.exception('Error saving link repost', exc_info=True)
+                self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
+                                                         repost_of=repost.matches[0].post.post_id,
+                                                         post_type=post.post_type))
 
 
-            self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
-                                                     repost_of=repost.matches[0].post.post_id,
-                                                     post_type=post.post_type))
+
 
 
 
