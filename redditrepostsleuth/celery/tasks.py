@@ -8,6 +8,7 @@ import requests
 from celery import Task
 from redlock import RedLockError
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidSchema, InvalidURL
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.celery import celery
 from redditrepostsleuth.common.exception import ImageConversioinException, CrosspostRepostCheck
@@ -141,8 +142,10 @@ def link_repost_check(self, posts):
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
                                                          repost_of=repost.matches[0].post.post_id,
                                                          post_type=post.post_type))
-            except Exception as e:
+            except IntegrityError as e:
                 uow.rollback()
+                post.checked_repost = True
+                uow.commit()
                 log.exception('Error saving link repost', exc_info=True)
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
                                                          repost_of=repost.matches[0].post.post_id,
