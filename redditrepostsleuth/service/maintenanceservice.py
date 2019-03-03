@@ -53,7 +53,7 @@ class MaintenanceService:
         with self.uowm.start() as uow:
             while True:
                 try:
-                    posts = uow.posts.find_all_unchecked_crosspost(offset=offset, limit=500)
+                    posts = uow.posts.no_selftext(offset=offset, limit=5000)
                     if not posts:
                         log.info('Ran out of posts to selftext check')
                         break

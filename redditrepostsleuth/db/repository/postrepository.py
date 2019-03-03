@@ -46,6 +46,9 @@ class PostRepository:
         since = datetime.now() - timedelta(hours=hours)
         return self.db_session.query(Post).filter(Post.last_deleted_check < since).offset(offset).limit(limit).all()
 
+    def no_selftext(self, limit: int, offset: int):
+        return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext == None).offset(offset).limit(limit).all()
+
     # TODO - Rename this
     def find_all_images_with_hash_return_id_hash(self, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).with_entities(Post.id, Post.dhash_h).offset(offset).limit(limit).all()

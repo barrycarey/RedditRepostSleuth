@@ -38,7 +38,7 @@ if __name__ == '__main__':
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
-
+    maintenance.check_crosspost_api()
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
     if args.celerymon:
