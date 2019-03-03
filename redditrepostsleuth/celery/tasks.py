@@ -398,15 +398,10 @@ def update_crosspost_parent_api(self, ids):
     with self.uowm.start() as uow:
         for result in results:
             post = uow.posts.get_by_post_id(result['id'])
-            post.crosspost_parent = result['crosspost_parent']
+            post.selftext = result['selftext']
             post.shortlink = result['shortlink']
             post.crosspost_checked = True
         uow.commit()
         self.event_logger.save_event(
-            InfluxEvent(event_type='crosspost_check', status='success', queue='post'))
-        """
-        for id in ids:
-            self.event_logger.save_event(
-                InfluxEvent(event_type='crosspost_check_item', status='success', queue='post'))
-        """
+            BatchedEvent(event_type='selftext', status='success', count=len(ids), post_type='link'))
         log.debug('Saved batch of crosspost')

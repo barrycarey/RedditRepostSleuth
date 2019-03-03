@@ -20,13 +20,12 @@ class Post(Base):
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type = Column(String(20))
     author = Column(String(100), nullable=False)
+    selftext = Column(Text(75000, collation='utf8mb4_general_ci'))
     created_at = Column(DateTime)
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(100), nullable=False)
     title = Column(String(1000, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(200))
-    repost_of = Column(Integer)
-    image_hash = Column(String(64))
     dhash_v = Column(String(64))
     dhash_h = Column(String(64))
     ahash = Column(String(64))
@@ -34,15 +33,11 @@ class Post(Base):
     crosspost_checked = Column(Boolean, default=False)
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     url_hash = Column(String(32)) # Needed to index URLs for faster lookups
-    images_bits_set = Column(Integer, index=True)
-    ahash_set_bits = Column(Integer)
-    dhash_v_set_bits = Column(Integer)
-    dhash_h_set_bits = Column(Integer)
-    image_bits_set = Column(Integer)
+
     bad_url = Column(Boolean, default=False)
     repost_count = Column(Integer, default=0)
     #fullname = Column(String(30))
-    # TODO: Noramlize bits set column names
+
 
 class Summons(Base):
 

@@ -28,6 +28,7 @@ def submission_to_post(submission: Submission) -> Post:
     post.title = submission.title
     post.perma_link = submission.permalink
     post.crosspost_parent = submission.__dict__.get('crosspost_parent', None)
+    post.selftext = submission.__dict__.get('selftext', None)
     post.crosspost_checked = True
     if submission.is_self:
         post.post_type = 'text'
