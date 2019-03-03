@@ -68,6 +68,8 @@ class PostRepository:
     def find_all_links_without_hash(self, limit: int = None, offset: int = None) -> List[Post]:
         return self.db_session.query(Post).filter(Post.post_type == 'link', Post.url_hash == None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
+    def get_with_self_text(self, limit: int = None, offset: int = None):
+        return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext != None).offset(offset).limit(limit).all()
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)

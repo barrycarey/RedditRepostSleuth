@@ -401,7 +401,7 @@ def update_crosspost_parent_api(self, ids):
             post.selftext = result['selftext']
             post.shortlink = result['shortlink']
             post.crosspost_checked = True
-        uow.commit()
+            uow.commit()
         self.event_logger.save_event(
             BatchedEvent(event_type='selftext', status='success', count=len(ids), post_type='link'))
         log.debug('Saved batch of crosspost')
