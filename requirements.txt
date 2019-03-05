@@ -16,3 +16,4 @@ RedLock
 influxdb
 requests
 gensim
+ffmpeg-python

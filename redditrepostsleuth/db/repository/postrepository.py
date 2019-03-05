@@ -69,7 +69,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == 'link', Post.url_hash == None).order_by(Post.created_at.desc()).offset(offset).limit(limit).all()
 
     def get_with_self_text(self, limit: int = None, offset: int = None):
-        return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext != None).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext != None).with_entities(Post.id, Post.selftext).offset(offset).limit(limit).all()
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)

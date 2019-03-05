@@ -53,7 +53,7 @@ class MaintenanceService:
         with self.uowm.start() as uow:
             while True:
                 try:
-                    posts = uow.posts.no_selftext(offset=offset, limit=10000)
+                    posts = uow.posts.no_selftext(offset=offset, limit=100000)
                     if not posts:
                         log.info('Ran out of posts to selftext check')
                         break
@@ -63,7 +63,7 @@ class MaintenanceService:
                         ids = ','.join(['t3_' + post.post_id for post in chunk])
                         #self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
                         update_crosspost_parent_api.apply_async((ids,), queue='selftext')
-                    offset += 10000
+                    offset += 100000
                     #time.sleep(3)
                 except Exception as e:
                     continue
