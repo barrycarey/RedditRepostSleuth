@@ -6,6 +6,7 @@ from redditrepostsleuth.db.repository.postrepository import PostRepository
 from redditrepostsleuth.db.repository.repostrepository import RepostRepository
 from redditrepostsleuth.db.repository.repostwatchrepository import RepostWatchRepository
 from redditrepostsleuth.db.repository.summonsrepository import SummonsRepository
+from redditrepostsleuth.db.repository.videohashrepository import VideoHashRepository
 from redditrepostsleuth.db.uow.unitofwork import UnitOfWork
 
 
@@ -51,3 +52,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def image_repost(self) -> ImageRepostRepository:
         return ImageRepostRepository(self.session)
+
+    @property
+    def video_hash(self) -> VideoHashRepository:
+        return VideoHashRepository(self.session)

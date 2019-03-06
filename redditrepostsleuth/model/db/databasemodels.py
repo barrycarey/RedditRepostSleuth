@@ -102,3 +102,11 @@ class LinkRepost(Base):
     post_id = Column(String(100), nullable=False, unique=True)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
+
+class VideoHash(Base):
+    __tablename__ = 'reddit_video_hashes'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    created_at = Column(DateTime, default=func.utc_timestamp())
+    hashes = Column(String(1300))
+    length = Column(Integer)

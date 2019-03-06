@@ -48,6 +48,16 @@ def generate_img_by_url(url: str) -> Image:
 
     return img if img else None
 
+def generate_img_by_file(path: str) -> Image:
+
+    try:
+        img = Image.open(path)
+    except (HTTPError, ConnectionError, OSError, DecompressionBombError, UnicodeEncodeError) as e:
+        log.error('Failed to convert image %s. Error: %s ', path, str(e))
+        raise ImageConversioinException(str(e))
+
+    return img if img else None
+
 def generate_dhash(img: Image, hash_size: int = 16) -> dict:
 
     result = {
@@ -126,10 +136,6 @@ def set_image_hashes(post: Post) -> Post:
         post.dhash_h = str(dhash_h)
         post.dhash_v = str(dhash_v)
         post.ahash = str(ahash)
-        post.dhash_h_set_bits = Counter(dhash_h.hash.flatten())[True]
-        post.dhash_v_set_bits = Counter(dhash_v.hash.flatten())[True]
-        post.ahash_set_bits = Counter(ahash.hash.flatten())[True]
-        post.image_bits_set = post.dhash_h_set_bits + post.dhash_v_set_bits + post.ahash_set_bits
     except Exception as e:
         # TODO: Specific exception
         log.exception('Error creating hash', exc_info=True)
