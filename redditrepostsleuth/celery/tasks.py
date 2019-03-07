@@ -422,10 +422,13 @@ def video_hash(self, post_id):
         duration = generate_thumbnails2(url, out_dir)
     except Exception as e:
         print('Failed to make thumbnaisl for ' + post_id)
+        shutil.rmtree(out_dir)
         raise
 
     hashes = []
     for thumb in os.listdir(out_dir):
+        if thumb == 'video.mp4':
+            continue
         img = generate_img_by_file(os.path.join(out_dir, thumb))
         dhash = str(imagehash.dhash(img, hash_size=16))
         hashes.append(dhash)

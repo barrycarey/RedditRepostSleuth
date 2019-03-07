@@ -10,6 +10,10 @@ class VideoHashRepository:
         result = self.db_session.query(VideoHash).filter(VideoHash.id == id).first()
         return result
 
+    def get_by_post_id(self, id: str) -> VideoHash:
+        result = self.db_session.query(VideoHash).filter(VideoHash.post_id == id).first()
+        return result
+
     def add(self, item):
         log.debug('Inserting: %s', item)
         self.db_session.add(item)

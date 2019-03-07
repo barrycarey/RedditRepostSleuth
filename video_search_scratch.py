@@ -20,20 +20,24 @@ reddit = get_reddit_instance()
 
 sub = reddit.submission(id='akixg2')
 
-
+probe = ffmpeg.probe(sub.media['reddit_video']['fallback_url'])
 
 
 
 uowm = SqlAlchemyUnitOfWorkManager(db_engine)
 
 with uowm.start() as uow:
-    posts = uow.posts.find_all_by_type('hosted:video', limit=100)
+    posts = uow.posts.find_all_by_type('hosted:video', offset=5000, limit=1000)
 
-for post in posts:
-    video_hash.apply_async((post.post_id,), queue='video_hash')
+    for post in posts:
+        match = uow.video_hash.get_by_post_id(post.post_id)
+        if match:
+            continue
+        url = sub.media['reddit_video']['fallback_url']
+        video_hash.apply_async((post.post_id,), queue='video_hash')
 
 with uowm.start() as uow:
-    posts = uow.posts.find_all_by_type('hosted:video', offset=2500, limit=10)
+    posts = uow.posts.find_all_by_type('hosted:video', offset=2500, limit=1000)
 
 start = datetime.now()
 for post in posts:
