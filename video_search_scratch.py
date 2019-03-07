@@ -7,6 +7,7 @@ from os import listdir
 import ffmpeg
 import imagehash
 
+from redditrepostsleuth.celery.tasks import video_hash
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import VideoHash
@@ -26,6 +27,12 @@ sub = reddit.submission(id='akixg2')
 uowm = SqlAlchemyUnitOfWorkManager(db_engine)
 
 with uowm.start() as uow:
+    posts = uow.posts.find_all_by_type('hosted:video', limit=100)
+
+for post in posts:
+    video_hash.apply_async((post.post_id,), queue='video_hash')
+
+with uowm.start() as uow:
     posts = uow.posts.find_all_by_type('hosted:video', offset=2500, limit=10)
 
 start = datetime.now()
@@ -35,7 +42,7 @@ for post in posts:
     out_dir = os.path.join(os.getcwd(), 'video', post.post_id)
 
     try:
-        generate_thumbnails(url, out_dir)
+        duration = generate_thumbnails(url, out_dir)
     except Exception as e:
         print('Failed to make thumbnaisl for ' + post.post_id)
         continue
@@ -49,12 +56,13 @@ for post in posts:
 
     shutil.rmtree(out_dir)
 
-    video_hash = VideoHash()
-    video_hash.post_id = post.post_id
-    video_hash.hashes = ','.join(hashes)
+    vhash = VideoHash()
+    vhash.post_id = post.post_id
+    vhash.hashes = ','.join(hashes)
+    vhash.length = duration
 
     with uowm.start() as uow:
-        uow.video_hash.add(video_hash)
+        uow.video_hash.add(vhash)
         uow.commit()
 
 """

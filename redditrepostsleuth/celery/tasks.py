@@ -1,10 +1,13 @@
 import json
 import logging
+import os
 import random
+import shutil
 from datetime import datetime
 from hashlib import md5
 from time import perf_counter
 
+import imagehash
 import requests
 from celery import Task
 from redlock import RedLockError
@@ -19,7 +22,7 @@ from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.config.replytemplates import WATCH_FOUND
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost
+from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost, VideoHash
 from redditrepostsleuth.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
@@ -30,9 +33,11 @@ from redditrepostsleuth.service.CachedVpTree import CashedVpTree
 from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.util.helpers import get_reddit_instance
-from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, set_image_hashes
+from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, set_image_hashes, \
+    generate_img_by_file
 from redditrepostsleuth.util.objectmapping import post_to_repost_match
 from redditrepostsleuth.util.reposthelpers import sort_reposts, clean_repost_matches
+from redditrepostsleuth.util.videohelpers import generate_thumbnails, generate_thumbnails2
 
 
 @celery.task
@@ -405,3 +410,35 @@ def update_crosspost_parent_api(self, ids):
         self.event_logger.save_event(
             BatchedEvent(event_type='selftext', status='success', count=len(ids), post_type='link'))
         log.debug('Saved batch of crosspost')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def video_hash(self, post_id):
+    reddit = get_reddit_instance()
+    sub = reddit.submission(id=post_id)
+    url = sub.media['reddit_video']['fallback_url']
+    out_dir = os.path.join(os.getcwd(), 'video', post_id)
+    log.info('Hashing video %s', post_id)
+    try:
+        duration = generate_thumbnails2(url, out_dir)
+    except Exception as e:
+        print('Failed to make thumbnaisl for ' + post_id)
+        raise
+
+    hashes = []
+    for thumb in os.listdir(out_dir):
+        img = generate_img_by_file(os.path.join(out_dir, thumb))
+        dhash = str(imagehash.dhash(img, hash_size=16))
+        hashes.append(dhash)
+
+    shutil.rmtree(out_dir)
+
+    video_hash = VideoHash()
+    video_hash.post_id = post_id
+    video_hash.hashes = ','.join(hashes)
+    video_hash.length = duration
+
+    with self.uowm.start() as uow:
+        uow.video_hash.add(video_hash)
+        uow.commit()
+        log.info('Saved new video hash %s' , post_id)
+
