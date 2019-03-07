@@ -349,6 +349,8 @@ def save_new_post(self, post):
             url_hash = md5(post.url.encode('utf-8'))
             post.url_hash = url_hash.hexdigest()
             log.info('Set URL hash for post %s', post.post_id)
+        elif post.post_type == 'hosted:video':
+            video_hash.apply_async((post.post_id,), queue='video_hash')
 
         try:
             uow.commit()
