@@ -1,5 +1,6 @@
 from sqlalchemy.orm import scoped_session
 
+from redditrepostsleuth.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
 from redditrepostsleuth.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.db.repository.postrepository import PostRepository
@@ -8,6 +9,7 @@ from redditrepostsleuth.db.repository.repostwatchrepository import RepostWatchRe
 from redditrepostsleuth.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.db.repository.videohashrepository import VideoHashRepository
 from redditrepostsleuth.db.uow.unitofwork import UnitOfWork
+from redditrepostsleuth.model.db.databasemodels import AudioFingerPrint
 
 
 class SqlAlchemyUnitOfWork(UnitOfWork):
@@ -56,3 +58,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def video_hash(self) -> VideoHashRepository:
         return VideoHashRepository(self.session)
+
+    @property
+    def audio_finger_print(self) -> AudioFingerPrintRepository:
+        return AudioFingerPrintRepository(self.session)

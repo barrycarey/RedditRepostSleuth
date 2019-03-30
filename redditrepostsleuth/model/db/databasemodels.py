@@ -33,6 +33,7 @@ class Post(Base):
     crosspost_checked = Column(Boolean, default=False)
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     url_hash = Column(String(32)) # Needed to index URLs for faster lookups
+    ingested_from = Column(String(40))
 
     bad_url = Column(Boolean, default=False)
     repost_count = Column(Integer, default=0)
@@ -110,3 +111,10 @@ class VideoHash(Base):
     created_at = Column(DateTime, default=func.utc_timestamp())
     hashes = Column(String(1300))
     length = Column(Integer)
+
+class AudioFingerPrint(Base):
+    __tablename__ = 'audio_fingerprints'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    hash = Column(String(30), nullable=False)
+    offset = Column(Integer, nullable=False)

@@ -1,3 +1,5 @@
+from typing import List
+
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import VideoHash
 
@@ -5,6 +7,9 @@ from redditrepostsleuth.model.db.databasemodels import VideoHash
 class VideoHashRepository:
     def __init__(self, db_session):
         self.db_session = db_session
+
+    def get_all(self, limit: int = None, offset: int = None) -> List[VideoHash]:
+        return self.db_session.query(VideoHash).offset(offset).limit(limit).all()
 
     def get_by_id(self, id: int) -> VideoHash:
         result = self.db_session.query(VideoHash).filter(VideoHash.id == id).first()

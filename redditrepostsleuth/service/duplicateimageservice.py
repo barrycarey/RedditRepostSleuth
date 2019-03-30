@@ -58,17 +58,24 @@ class DuplicateImageService:
                 if os.path.isfile(config.index_file_name):
                     log.info('Deleting existing index file')
                     os.remove(config.index_file_name)
+                start = datetime.now()
                 with self.uowm.start() as uow:
-                    log.info('Loading all images from database')
-                    start = datetime.now()
-                    existing_images = uow.posts.find_all_images_with_hash_return_id_hash()
-                    delta = datetime.now() - start
-                    log.info('Loaded %s images in %s seconds', len(existing_images), delta.seconds)
-                log.info('Index will be built with %s hashes', len(existing_images))
-                self.index_size = len(existing_images)
-                for image in existing_images:
-                    vector = list(bytearray(image[1], encoding='utf-8'))
-                    self.index.add_item(image[0], vector)
+                    offset = 0
+                    while True:
+                        log.info('Loading 100000 image hashes')
+                        existing_images = uow.posts.find_all_images_with_hash_return_id_hash(offset=offset, limit=1000000)
+                        if not existing_images:
+                            log.info('No more image hashes to load')
+                            break
+                        delta = datetime.now() - start
+                        log.info('Loaded %s images in %s seconds', len(existing_images), delta.seconds)
+                #log.info('Index will be built with %s hashes', len(existing_images))
+                #self.index_size = len(existing_images)
+                        for image in existing_images:
+                            vector = list(bytearray(image[1], encoding='utf-8'))
+                            self.index.add_item(image[0], vector)
+                        offset += 1000000
+
                 self.index.build(config.index_tree_count)
                 log.debug('Before index save')
                 self.index.save(config.index_file_name)
@@ -149,6 +156,7 @@ class DuplicateImageService:
         # TODO: Load and append post object to each match
         self._build_index()
         log.debug('%s - Checking %s for duplicates', os.getpid(), post.post_id)
+        log.debug('Image hash: %s', post.dhash_h)
         search_array = bytearray(post.dhash_h, encoding='utf-8')
         r = self.index.get_nns_by_vector(list(search_array), 50, search_k=20000, include_distances=True)
         results = list(zip(r[0], r[1]))

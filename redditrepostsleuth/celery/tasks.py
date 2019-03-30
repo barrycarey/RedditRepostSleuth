@@ -22,7 +22,8 @@ from redditrepostsleuth.config.constants import USER_AGENTS
 from redditrepostsleuth.config.replytemplates import WATCH_FOUND
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost, VideoHash
+from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost, VideoHash, \
+    AudioFingerPrint
 from redditrepostsleuth.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
@@ -30,6 +31,7 @@ from redditrepostsleuth.model.events.ingestsubmissionevent import IngestSubmissi
 from redditrepostsleuth.model.events.repostevent import RepostEvent
 from redditrepostsleuth.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.service.CachedVpTree import CashedVpTree
+from redditrepostsleuth.service.audiofingerprint import fingerprint_audio_file
 from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.util.helpers import get_reddit_instance
@@ -37,7 +39,7 @@ from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_d
     generate_img_by_file
 from redditrepostsleuth.util.objectmapping import post_to_repost_match
 from redditrepostsleuth.util.reposthelpers import sort_reposts, clean_repost_matches
-from redditrepostsleuth.util.videohelpers import generate_thumbnails, generate_thumbnails2
+from redditrepostsleuth.util.videohelpers import generate_thumbnails_from_url, download_file
 
 
 @celery.task
@@ -421,7 +423,7 @@ def video_hash(self, post_id):
     out_dir = os.path.join(os.getcwd(), 'video', post_id)
     log.info('Hashing video %s', post_id)
     try:
-        duration = generate_thumbnails2(url, out_dir)
+        duration = generate_thumbnails_from_url(url, out_dir)
     except Exception as e:
         print('Failed to make thumbnaisl for ' + post_id)
         shutil.rmtree(out_dir)
@@ -447,3 +449,86 @@ def video_hash(self, post_id):
         uow.commit()
         log.info('Saved new video hash %s' , post_id)
 
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def process_video(self, url, post_id):
+    try:
+        audio_file, video_file = download_file(url)
+    except Exception as e:
+        log.exception('Failed to download video for post %s', post_id, exc_info=True)
+        return
+    with self.uowm.start() as uow:
+        if audio_file:
+            if not uow.audio_finger_print.get_by_post_id(post_id):
+                try:
+                    hashes = fingerprint_audio_file(audio_file)
+                except Exception as e:
+                    log.exception('Problem finger printing post %s', post_id, exc_info=True)
+                    log.error(e)
+                    filepath = os.path.split(audio_file)[0]
+                    shutil.rmtree(filepath)
+                    return
+
+                fingerprints = []
+
+                for hash in hashes:
+                    fingerprint = AudioFingerPrint()
+                    fingerprint.post_id = post_id
+                    fingerprint.hash = hash[0]
+                    fingerprint.offset = hash[1]
+                    fingerprints.append(fingerprint)
+
+                uow.audio_finger_print.bulk_save(fingerprints)
+                uow.commit()
+
+        if video_file:
+            pass
+
+
+
+
+
+@celery.task(ignore_results=True)
+def test_api(url):
+    r = requests.post('http://localhost:8888/fingerprint?url=' + url)
+    print('Got result: Status: ' + str(r.status_code))
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def fingerprint_audio_dl(self, post):
+
+    with self.uowm.start() as uow:
+
+        if uow.audio_finger_print.get_by_post_id(post.post_id):
+            log.error('Post %s has already been fingerprinted', post.post_id)
+            return
+
+    try:
+        file = download_file(post.url)
+    except Exception as e:
+        log.error('Failed to download file from %s', post.url)
+        return
+
+    try:
+        hashes = fingerprint_audio_file(file)
+    except Exception as e:
+        log.exception('Problem finger printing post %s', post.post_id, exc_info=True)
+        log.error(e)
+        filepath = os.path.split(file)[0]
+        shutil.rmtree(filepath)
+        return
+
+    fingerprints = []
+
+    for hash in hashes:
+        fingerprint = AudioFingerPrint()
+        fingerprint.post_id = post.post_id
+        fingerprint.hash = hash[0]
+        fingerprint.offset = hash[1]
+        fingerprints.append(fingerprint)
+
+    uow.audio_finger_print.bulk_save(fingerprints)
+    uow.commit()
+    log.info('Finished fingerprinting %s', post.post_id)
+    filepath = os.path.split(file)[0]
+    shutil.rmtree(filepath)

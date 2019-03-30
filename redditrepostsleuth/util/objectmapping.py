@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Dict
 
 from praw.models import Submission
 from datetime import datetime
@@ -10,9 +10,10 @@ from redditrepostsleuth.model.hashwrapper import HashWrapper
 from redditrepostsleuth.model.postdto import PostDto
 from redditrepostsleuth.model.imagematch import ImageMatch
 from redditrepostsleuth.model.repostmatch import RepostMatch
+from redditrepostsleuth.util.helpers import get_post_type_pushshift
 
 
-def submission_to_post(submission: Submission) -> Post:
+def submission_to_post(submission: Submission, source: str = 'praw') -> Post:
     """
     Convert a PRAW Submission object into a Post object
     :param submission:
@@ -30,6 +31,7 @@ def submission_to_post(submission: Submission) -> Post:
     post.crosspost_parent = submission.__dict__.get('crosspost_parent', None)
     post.selftext = submission.__dict__.get('selftext', None)
     post.crosspost_checked = True
+    post.ingested_from = source
     if submission.is_self:
         post.post_type = 'text'
     else:
@@ -45,6 +47,24 @@ def submission_to_post(submission: Submission) -> Post:
     except AttributeError as e:
         pass
     """
+
+    return post
+
+def pushshift_to_post(submission: Dict, source: str = 'pushshift') -> Post:
+    post = Post()
+    post.post_id = submission.get('id', None)
+    post.url = submission.get('url', None)
+    post.shortlink = submission.get('shortlink', None)
+    post.author = submission.get('author', None)
+    post.created_at = datetime.fromtimestamp(submission.get('created_utc', None))
+    post.subreddit = submission.get('subreddit', None)
+    post.title = submission.get('title', None)
+    post.perma_link = submission.get('permalink', None)
+    post.crosspost_parent = submission.get('crosspost_parent', None)
+    post.selftext = submission.get('selftext', None)
+    post.crosspost_checked = True
+    post.ingested_from = source
+    post.post_type = get_post_type_pushshift(submission)
 
     return post
 
