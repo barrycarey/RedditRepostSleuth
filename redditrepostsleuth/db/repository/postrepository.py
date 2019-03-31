@@ -23,6 +23,9 @@ class PostRepository:
     def get_all(self, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
+    def get_newest_praw(self):
+        return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id.desc()).first()
+
     def get_oldest_post(self, limit: int = None):
         return self.db_session.query(Post).order_by(Post.created_at).first()
 
@@ -40,7 +43,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.url_hash == hash).limit(limit).all()
 
     def find_all_by_type(self, post_type: str, limit: int = None, offset: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.post_type == post_type).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == post_type).order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
     def find_all_by_repost_check(self, repost_check: bool, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.checked_repost == repost_check, Post.post_type == 'image', Post.crosspost_parent == None, Post.dhash_h != None).offset(offset).limit(limit).all()

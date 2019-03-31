@@ -39,7 +39,8 @@ from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_d
     generate_img_by_file
 from redditrepostsleuth.util.objectmapping import post_to_repost_match
 from redditrepostsleuth.util.reposthelpers import sort_reposts, clean_repost_matches
-from redditrepostsleuth.util.videohelpers import generate_thumbnails_from_url, download_file
+from redditrepostsleuth.util.videohelpers import generate_thumbnails_from_url, download_file, \
+    generate_thumbnails_from_file
 
 
 @celery.task
@@ -361,7 +362,7 @@ def save_new_post(self, post):
                                       post_type=post.post_type)
 
         except Exception as e:
-
+                log.exception('Error saving new post', exc_info=True)
                 event = IngestSubmissionEvent(event_type='ingest_post', status='error', post_id=post.post_id, queue='post',
                                       post_type=post.post_type)
 
@@ -452,41 +453,68 @@ def video_hash(self, post_id):
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def process_video(self, url, post_id):
+    if not os.path.isdir(os.path.join(os.getcwd(), 'temp')):
+        os.mkdir(os.path.join(os.getcwd()))
+
+    out_dir = os.path.join(os.path.join(os.getcwd(), 'temp'), post_id)
+
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+
     try:
-        audio_file, video_file = download_file(url)
+        audio_file, video_file = download_file(url, out_dir)
     except Exception as e:
         log.exception('Failed to download video for post %s', post_id, exc_info=True)
         return
+
     with self.uowm.start() as uow:
         if audio_file:
             if not uow.audio_finger_print.get_by_post_id(post_id):
+                hashes = None
                 try:
                     hashes = fingerprint_audio_file(audio_file)
                 except Exception as e:
                     log.exception('Problem finger printing post %s', post_id, exc_info=True)
                     log.error(e)
-                    filepath = os.path.split(audio_file)[0]
-                    shutil.rmtree(filepath)
-                    return
+                if hashes:
+                    fingerprints = []
 
-                fingerprints = []
+                    for hash in hashes:
+                        fingerprint = AudioFingerPrint()
+                        fingerprint.post_id = post_id
+                        fingerprint.hash = hash[0]
+                        fingerprint.offset = hash[1]
+                        fingerprints.append(fingerprint)
 
-                for hash in hashes:
-                    fingerprint = AudioFingerPrint()
-                    fingerprint.post_id = post_id
-                    fingerprint.hash = hash[0]
-                    fingerprint.offset = hash[1]
-                    fingerprints.append(fingerprint)
-
-                uow.audio_finger_print.bulk_save(fingerprints)
-                uow.commit()
-
-        if video_file:
-            pass
+                    uow.audio_finger_print.bulk_save(fingerprints)
 
 
+        if video_file and not uow.video_hash.get_by_post_id(post_id):
+            log.info('Generating thumbnails for %s', post_id)
+            try:
+                duration = generate_thumbnails_from_file(video_file)
+            except Exception as e:
+                log.exception('Problem generating video thumbs')
+                log.error(e)
+                shutil.rmtree(out_dir)
+                return
 
+            hashes = []
+            for file in os.listdir(out_dir):
+                if os.path.splitext(file)[1] == '.png':
+                    img = generate_img_by_file(os.path.join(out_dir, file))
+                    dhash = str(imagehash.dhash(img, hash_size=16))
+                    hashes.append(dhash)
 
+            video_hash = VideoHash()
+            video_hash.post_id = post_id
+            video_hash.hashes = ','.join(hashes)
+            video_hash.length = duration
+
+            uow.video_hash.add(video_hash)
+        uow.commit()
+
+    shutil.rmtree(out_dir)
 
 @celery.task(ignore_results=True)
 def test_api(url):

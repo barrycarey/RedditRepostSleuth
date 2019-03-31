@@ -7,14 +7,15 @@ from os import listdir
 import ffmpeg
 import imagehash
 
-from redditrepostsleuth.celery.tasks import video_hash
+from redditrepostsleuth.celery.tasks import video_hash, process_video
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import VideoHash
 
 from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_file
-from redditrepostsleuth.util.videohelpers import generate_thumbnails
+from redditrepostsleuth.util.videohelpers import download_file, generate_thumbnails_from_file
 
 reddit = get_reddit_instance()
 
@@ -33,6 +34,13 @@ with uowm.start() as uow:
         match = uow.video_hash.get_by_post_id(post.post_id)
         if match:
             continue
+
+        process_video.apply_async((post.url, post.post_id), queue='testhash')
+
+    for post in posts:
+        match = uow.video_hash.get_by_post_id(post.post_id)
+        if match:
+            continue
         url = sub.media['reddit_video']['fallback_url']
         video_hash.apply_async((post.post_id,), queue='video_hash')
 
@@ -40,6 +48,12 @@ with uowm.start() as uow:
     posts = uow.posts.find_all_by_type('hosted:video', offset=2500, limit=1000)
 
 start = datetime.now()
+
+
+def generate_thumbnails(url, out_dir):
+    pass
+
+
 for post in posts:
     sub = reddit.submission(id=post.post_id)
     url = sub.media['reddit_video']['fallback_url']

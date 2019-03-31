@@ -118,3 +118,4 @@ class AudioFingerPrint(Base):
     post_id = Column(String(100), nullable=False)
     hash = Column(String(30), nullable=False)
     offset = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=func.utc_timestamp())

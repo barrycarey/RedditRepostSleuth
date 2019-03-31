@@ -1,4 +1,5 @@
 import json
+import os
 
 import requests
 import time
@@ -40,9 +41,13 @@ class Ingest:
     def ingest_pushshift(self):
         oldest_id = None
         processed = []
+        if os.path.isfile('push_last.txt'):
+            with open('push_last.txt', 'r') as f:
+                oldest_id = int(f.read())
+
         while True:
             with self.uowm.start() as uow:
-                url = 'https://api.pushshift.io/reddit/search/submission?size=10000'
+                url = 'https://api.pushshift.io/reddit/search/submission?size=1000&sort_type=created_utc&sort=desc'
                 if oldest_id:
                     url += '&before=' + str((oldest_id + 10))
 
@@ -59,6 +64,7 @@ class Ingest:
                 data = json.loads(r.text)
 
                 oldest_id = data['data'][-1]['created_utc']
+                log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
                 with open('push_last.txt', 'w') as f:
                     f.write(str(oldest_id))
 
@@ -66,14 +72,16 @@ class Ingest:
                     #log.info(datetime.fromtimestamp(submission.get('created_utc', None)))
                     existing = uow.posts.get_by_post_id(submission['id'])
                     if existing:
-                        log.info('Skipping existing post found by %s', existing.ingested_from)
+                        continue
                     post = pushshift_to_post(submission)
                     save_new_post.apply_async((post,), queue='postingest')
 
     def ingest_pushshift_catch(self):
         while True:
             with self.uowm.start() as uow:
-                url = 'https://api.pushshift.io/reddit/search/submission?size=2000'
+                newest = uow.posts.get_newest_praw()
+
+                url = 'https://api.pushshift.io/reddit/search/submission?size=1000&sort_type=created_utc&sort=desc' + str(newest.created_at.timestamp())
 
                 try:
                     r = requests.get(url)
@@ -88,13 +96,13 @@ class Ingest:
                 data = json.loads(r.text)
 
                 for submission in data['data']:
-                    log.info(datetime.fromtimestamp(submission.get('created_utc', None)))
+                    #log.info(datetime.fromtimestamp(submission.get('created_utc', None)))
                     existing = uow.posts.get_by_post_id(submission['id'])
                     if existing:
-                        log.info('Skipping existing post found by %s', existing.ingested_from)
                         continue
+                    log.info('Post %s was missed by PRAW', submission['id'])
                     post = pushshift_to_post(submission)
-                    save_new_post.apply_async((post,), queue='testingest')
+                    save_new_post.apply_async((post,), queue='postingest')
 
                 time.sleep(30)
 

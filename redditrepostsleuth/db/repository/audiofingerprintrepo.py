@@ -1,5 +1,6 @@
 from typing import List
 
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.model.db.databasemodels import AudioFingerPrint
 
 
@@ -14,4 +15,5 @@ class AudioFingerPrintRepository:
         return self.db_session.query(AudioFingerPrint).filter(AudioFingerPrint.post_id == post_id).first()
 
     def bulk_save(self, items: List[AudioFingerPrint]):
+        log.info('Saving %s audio hashes', len(items))
         self.db_session.bulk_save_objects(items)

@@ -95,19 +95,12 @@ def generate_thumbnails_from_file(video_file: str, total_thumbs: int = 20) -> in
 
     return duration
 
-def download_file(url: str) -> Tuple[str, str]:
+def download_file(url: str, output_dir: str) -> Tuple[str, str]:
     """
     Take a URL to a video, download the file and return the path to the audio
     :param url: URL of video
     """
 
-    if not os.path.isdir(os.path.join(os.getcwd(), 'temp')):
-        os.mkdir(os.path.join(os.getcwd(), 'temp'))
-
-    output_dir = os.path.join(os.getcwd(), 'temp', str(uuid.uuid1()))
-
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
 
     ops = {
         'postprocessors': [
