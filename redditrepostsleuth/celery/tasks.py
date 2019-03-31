@@ -353,7 +353,7 @@ def save_new_post(self, post):
             post.url_hash = url_hash.hexdigest()
             log.info('Set URL hash for post %s', post.post_id)
         elif post.post_type == 'hosted:video':
-            video_hash.apply_async((post.post_id,), queue='video_hash')
+            process_video.apply_async((post.url, post.post_id), queue='video_hash')
 
         try:
             uow.commit()
@@ -457,7 +457,7 @@ def process_video(self, url, post_id):
         os.mkdir(os.path.join(os.getcwd()))
 
     out_dir = os.path.join(os.path.join(os.getcwd(), 'temp'), post_id)
-
+    log.info('Output Dir: %s', out_dir)
     if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
 
