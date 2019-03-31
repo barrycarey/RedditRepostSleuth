@@ -22,6 +22,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A Tool to monitor and respond to reposted content on Reddit")
     parser.add_argument('--ingestposts', action='store_true', help='Enables the post import agent')
     parser.add_argument('--ingestcomments', action='store_true', help='Enables the comment import agent')
+    parser.add_argument('--ingestpushshift', action='store_true', help='Enables the comment import agent')
     parser.add_argument('--summons', action='store_true', help='Enables agent to monitor for and respond to summons')
     parser.add_argument('--repost', action='store_true', help='Enables agent that scans database for reposts')
     parser.add_argument('--imagehashing', action='store_true', help='Enables agent that calculates and saves hashes of posts')
@@ -29,6 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--crosspost', action='store_true', help='Process Cross Posts in Backgroung')
     parser.add_argument('--celerymon', action='store_true', help='Process Cross Posts in Backgroung')
     parser.add_argument('--stats', action='store_true', help='Process Cross Posts in Backgroung')
+    parser.add_argument('--backfill', action='store_true', help='Work backwards through Push Shift looking for new posts')
     args = parser.parse_args()
 
 
@@ -38,10 +40,18 @@ if __name__ == '__main__':
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
+    #ingest.ingest_pushshift_catch()
     #ingest.ingest_pushshift()
     #maintenance.check_crosspost_api()
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
+
+    if args.ingestpushshift:
+        threading.Thread(target=ingest.ingest_pushshift_catch, name='Ingest Pushshift').start()
+
+    if args.backfill:
+        threading.Thread(target=ingest.ingest_pushshift, name="Back Fill").start()
+
     if args.celerymon:
         #threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
         threading.Thread(target=maintenance.log_queue_size, name='Queue Update').start()

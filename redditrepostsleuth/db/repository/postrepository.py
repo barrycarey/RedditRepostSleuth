@@ -20,6 +20,9 @@ class PostRepository:
     def update(self, item: Post):
         self.db_session.merge(item)
 
+    def get_all(self, limit: int = None, offset: int = None):
+        return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id.desc()).offset(offset).limit(limit).all()
+
     def get_oldest_post(self, limit: int = None):
         return self.db_session.query(Post).order_by(Post.created_at).first()
 
