@@ -454,7 +454,7 @@ def video_hash(self, post_id):
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def process_video(self, url, post_id):
     if not os.path.isdir(os.path.join(os.getcwd(), 'temp')):
-        os.mkdir(os.path.join(os.getcwd()))
+        os.mkdir(os.path.join(os.getcwd(), 'temp'))
 
     out_dir = os.path.join(os.path.join(os.getcwd(), 'temp'), post_id)
     log.info('Output Dir: %s', out_dir)
