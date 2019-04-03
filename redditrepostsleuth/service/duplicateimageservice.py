@@ -43,7 +43,7 @@ class DuplicateImageService:
                 return
 
             time.sleep(random.randint(10,30)) # Keep multiple processes from grabbing lock all at once
-            log.debug('%s - Attempting to get index lock', os.getpid())
+            #log.debug('%s - Attempting to get index lock', os.getpid())
 
             # Check for index one more time. I keep having processes start another rebuild just as one finishes
             if self._load_index_file():
@@ -62,13 +62,13 @@ class DuplicateImageService:
                 with self.uowm.start() as uow:
                     offset = 0
                     while True:
-                        log.info('Loading 100000 image hashes')
+                        log.info('%s: Loading 100000 image hashes', os.getpid())
                         existing_images = uow.posts.find_all_images_with_hash_return_id_hash(offset=offset, limit=1000000)
                         if not existing_images:
                             log.info('No more image hashes to load')
                             break
                         delta = datetime.now() - start
-                        log.info('Loaded %s images in %s seconds', len(existing_images), delta.seconds)
+                        log.info('%s: Loaded %s images in %s seconds', os.getpid(), len(existing_images), delta.seconds)
                 #log.info('Index will be built with %s hashes', len(existing_images))
                 #self.index_size = len(existing_images)
                         for image in existing_images:
@@ -91,7 +91,7 @@ class DuplicateImageService:
         Check if index file exists.  If it does, check it's age.  If it's fresh enough use it, if not build one
         :return:
         """
-        log.info('%s - Attempting to load Annoy index file', os.getpid())
+        #log.info('%s - Attempting to load Annoy index file', os.getpid())
         if os.path.isfile(config.index_file_name):
             log.info('%s = Found Annoy index', os.getpid())
             created_at = datetime.fromtimestamp(os.stat(config.index_file_name).st_ctime)
@@ -107,7 +107,7 @@ class DuplicateImageService:
                 self.index.load(config.index_file_name)
                 return True
         else:
-            log.info('%s - No existing index file found', os.getpid())
+            #log.info('%s - No existing index file found', os.getpid())
             return False
 
 

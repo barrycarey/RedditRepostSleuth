@@ -10,7 +10,8 @@ from celery import group
 from praw import Reddit
 from prawcore import Forbidden
 import webbrowser
-from redditrepostsleuth.celery.tasks import save_new_post, update_cross_post_parent, save_new_comment
+from redditrepostsleuth.celery.tasks import save_new_post, update_cross_post_parent, save_new_comment, \
+    ingest_pushshift_url
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.util.objectmapping import submission_to_post, pushshift_to_post
@@ -47,9 +48,20 @@ class Ingest:
 
         while True:
             with self.uowm.start() as uow:
-                url = 'https://api.pushshift.io/reddit/search/submission?size=1000&sort_type=created_utc&sort=desc'
+                url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
                 if oldest_id:
-                    url += '&before=' + str((oldest_id + 10))
+                    url += '&before=' + str(oldest_id)
+                    log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
+                else:
+                    oldest_id = round(datetime.utcnow().timestamp())
+
+                oldest_id = oldest_id - 90
+
+                ingest_pushshift_url.apply_async((url,), queue='pushshift')
+                with open('push_last.txt', 'w') as f:
+                    f.write(str(oldest_id))
+                time.sleep(.5)
+                continue
 
                 try:
                     r = requests.get(url)
@@ -67,7 +79,7 @@ class Ingest:
                 log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
                 with open('push_last.txt', 'w') as f:
                     f.write(str(oldest_id))
-
+                log.info('Total Results: %s', len(data['data']))
                 for submission in data['data']:
                     #log.info(datetime.fromtimestamp(submission.get('created_utc', None)))
                     existing = uow.posts.get_by_post_id(submission['id'])
@@ -81,7 +93,7 @@ class Ingest:
             with self.uowm.start() as uow:
                 newest = uow.posts.get_newest_praw()
 
-                url = 'https://api.pushshift.io/reddit/search/submission?size=1000&sort_type=created_utc&sort=desc' + str(newest.created_at.timestamp())
+                url = 'https://api.pushshift.io/reddit/search/submission?size=1000&sort_type=created_utc&sort=desc' + str(newest.created_at.timestamp() - 20)
 
                 try:
                     r = requests.get(url)

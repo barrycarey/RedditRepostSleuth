@@ -2,7 +2,9 @@ import os
 
 from sqlalchemy import create_engine
 
-db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format("dev",
-                                                                   "@Password",
-                                                                   "192.168.1.198",
-                                                                   'reddit'), echo=False, pool_size=50)
+from redditrepostsleuth.config import config
+
+db_engine = create_engine('mysql+pymysql://{}:{}@{}/{}'.format(config.db_user,
+                                                                   config.db_password,
+                                                                   config.db_host,
+                                                                   config.db_name), echo=False, pool_size=50)

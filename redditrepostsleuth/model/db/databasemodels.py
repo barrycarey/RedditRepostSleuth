@@ -9,7 +9,7 @@ class Post(Base):
         return self.image_hash < other.image_hash
 
     def __repr__(self) -> str:
-        return 'Post ID: {} - Type: {} - URL: {}'.format(self.post_id, self.post_type, self.url)
+        return 'Post ID: {} - Type: {} - URL: {} - Source: {}'.format(self.post_id, self.post_type, self.url, self.ingested_from)
 
     __tablename__ = 'reddit_post'
 

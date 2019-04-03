@@ -37,7 +37,7 @@ from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.util.helpers import get_reddit_instance
 from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash, set_image_hashes, \
     generate_img_by_file
-from redditrepostsleuth.util.objectmapping import post_to_repost_match
+from redditrepostsleuth.util.objectmapping import post_to_repost_match, pushshift_to_post
 from redditrepostsleuth.util.reposthelpers import sort_reposts, clean_repost_matches
 from redditrepostsleuth.util.videohelpers import generate_thumbnails_from_url, download_file, \
     generate_thumbnails_from_file
@@ -560,3 +560,32 @@ def fingerprint_audio_dl(self, post):
     log.info('Finished fingerprinting %s', post.post_id)
     filepath = os.path.split(file)[0]
     shutil.rmtree(filepath)
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, autoretry_for=(RedLockError,))
+def ingest_pushshift_url(self, url):
+    with self.uowm.start() as uow:
+        try:
+            r = requests.get(url)
+        except Exception as e:
+            log.exception('Exception getting Push Shift result', exc_info=True)
+            return
+
+        if r.status_code != 200:
+            log.error('Unexpected status code %s from Push Shift', r.status_code)
+            raise ConnectionError('Bad Status Code From Push Shift for url: ' + url)
+
+        data = json.loads(r.text)
+
+        oldest_id = data['data'][-1]['created_utc']
+        log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
+
+        log.info('Total Results: %s', len(data['data']))
+        for submission in data['data']:
+            # log.info(datetime.fromtimestamp(submission.get('created_utc', None)))
+
+            existing = uow.posts.get_by_post_id(submission['id'])
+            if existing:
+                return
+            post = pushshift_to_post(submission)
+            save_new_post.apply_async((post,), queue='postingest')
