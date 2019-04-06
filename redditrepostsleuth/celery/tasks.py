@@ -562,7 +562,7 @@ def fingerprint_audio_dl(self, post):
     shutil.rmtree(filepath)
 
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, autoretry_for=(RedLockError,))
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, autoretry_for=(ConnectionError,))
 def ingest_pushshift_url(self, url):
     with self.uowm.start() as uow:
         try:
@@ -589,3 +589,10 @@ def ingest_pushshift_url(self, url):
                 return
             post = pushshift_to_post(submission)
             save_new_post.apply_async((post,), queue='postingest')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def save_image_post(self, posts):
+    with self.uowm.start() as uow:
+        uow.image_post.bulk_save(posts)
+        uow.commit()
+        log.info('Saved batch')

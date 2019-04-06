@@ -1,6 +1,7 @@
 from sqlalchemy.orm import scoped_session
 
 from redditrepostsleuth.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
+from redditrepostsleuth.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.db.repository.postrepository import PostRepository
@@ -62,3 +63,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def audio_finger_print(self) -> AudioFingerPrintRepository:
         return AudioFingerPrintRepository(self.session)
+
+    @property
+    def image_post(self) -> ImagePostRepository:
+        return ImagePostRepository(self.session)

@@ -20,6 +20,9 @@ class PostRepository:
     def update(self, item: Post):
         self.db_session.merge(item)
 
+    def page_by_id(self, id: int, limit: int = None):
+        return self.db_session.query(Post).filter(Post.id > id).order_by(Post.id).limit(limit).all()
+
     def get_all(self, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
@@ -56,8 +59,11 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext == None).offset(offset).limit(limit).all()
 
     # TODO - Rename this
-    def find_all_images_with_hash_return_id_hash(self, limit: int = None, offset: int = None):
+    def find_all_images_with_hash_return_id_hash(self, limit: int = None, offset: int = 0):
         return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).with_entities(Post.id, Post.dhash_h).offset(offset).limit(limit).all()
+
+    def annoy_load_test(self, limit: int = None, offset: int = None):
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None, Post.id > offset).with_entities(Post.id, Post.dhash_h).order_by(Post.id).limit(limit).all()
 
     def count_by_type(self, post_type: str):
         r = self.db_session.query(func.count(Post.id)).filter(Post.post_type == post_type).first()

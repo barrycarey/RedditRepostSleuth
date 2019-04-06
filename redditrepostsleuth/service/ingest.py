@@ -58,9 +58,10 @@ class Ingest:
                 oldest_id = oldest_id - 90
 
                 ingest_pushshift_url.apply_async((url,), queue='pushshift')
+
                 with open('push_last.txt', 'w') as f:
                     f.write(str(oldest_id))
-                time.sleep(.5)
+                #time.sleep(.1)
                 continue
 
                 try:
