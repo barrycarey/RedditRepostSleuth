@@ -322,6 +322,7 @@ def check_deleted_posts(self, posts):
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
 def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
+    print('Finding matching images')
     if post.crosspost_parent:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
@@ -340,6 +341,12 @@ def save_new_post(self, post):
     # TODO - This whole mess needs to be cleaned up
 
     with self.uowm.start() as uow:
+
+        existing = uow.posts.get_by_post_id(post.post_id)
+        if existing:
+            log.error('Post %s already exists', post.post_id)
+            return
+
         uow.posts.add(post)
 
         if post.post_type == 'image':

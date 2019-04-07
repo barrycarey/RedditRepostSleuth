@@ -25,6 +25,8 @@ class DuplicateImageService:
         self.index_size = 0
         self._load_index_file()
 
+        log.info('Created dup image service')
+
     def _build_index(self):
         """
         Check if the index has expired.  Build a new one if it has.
@@ -34,7 +36,6 @@ class DuplicateImageService:
         to get the index file. If that files doesn't exist it will try to build it. If any process fails to get the lock
         the task fails and is retryed in 3 minutes.
         """
-
 
         if self.index_last_build is None or (datetime.now() - self.index_last_build).seconds > config.index_keep_alive:
 

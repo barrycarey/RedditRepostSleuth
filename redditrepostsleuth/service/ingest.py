@@ -94,12 +94,13 @@ class Ingest:
             with self.uowm.start() as uow:
                 newest = uow.posts.get_newest_praw()
 
-                url = 'https://api.pushshift.io/reddit/search/submission?size=1000&sort_type=created_utc&sort=desc' + str(newest.created_at.timestamp() - 20)
+                url = 'https://api.pushshift.io/reddit/search/submission?size=1000&sort_type=created_utc&sort=desc' + str(newest.created_at.timestamp() - 600)
 
                 try:
                     r = requests.get(url)
                 except Exception as e:
                     log.exception('Exception getting Push Shift result', exc_info=True)
+                    time.sleep(2)
                     continue
 
                 if r.status_code != 200:
@@ -117,7 +118,7 @@ class Ingest:
                     post = pushshift_to_post(submission)
                     save_new_post.apply_async((post,), queue='postingest')
 
-                time.sleep(30)
+                time.sleep(60)
 
     def ingest_new_comments(self):
         while True:
