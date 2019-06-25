@@ -147,7 +147,7 @@ def link_repost_check(self, posts):
             uow.posts.update(post)
             uow.repost.add(new_repost)
             #uow.posts.update(repost.matches[0].post)
-            log_repost.apply_async((repost,))
+            #log_repost.apply_async((repost,))
             try:
                 uow.commit()
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
@@ -219,7 +219,7 @@ def process_repost_annoy(self, repost: RepostWrapper):
             uow.posts.update(final_matches[0].post)
             uow.repost.add(new_repost)
             repost.matches = final_matches
-            log_repost.apply_async((repost,), queue='repostlog')
+            #log_repost.apply_async((repost,), queue='repostlog')
 
             self.event_logger.save_event(
                 RepostEvent(event_type='repost_found', status='success', post_type=repost.checked_post.post_type))
@@ -322,7 +322,7 @@ def check_deleted_posts(self, posts):
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
 def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
-    print('Finding matching images')
+    #print('Finding matching images')
     if post.crosspost_parent:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
@@ -360,7 +360,8 @@ def save_new_post(self, post):
             post.url_hash = url_hash.hexdigest()
             log.info('Set URL hash for post %s', post.post_id)
         elif post.post_type == 'hosted:video':
-            process_video.apply_async((post.url, post.post_id), queue='video_hash')
+            #process_video.apply_async((post.url, post.post_id), queue='video_hash')
+            pass
 
         try:
             uow.commit()

@@ -9,6 +9,7 @@ from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnit
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.service.imagerepost import ImageRepostService
+from redditrepostsleuth.service.indexmanager import IndexManager
 from redditrepostsleuth.service.linkrepostservice import LinkRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
 from redditrepostsleuth.service.ingest import Ingest
@@ -31,6 +32,8 @@ if __name__ == '__main__':
     parser.add_argument('--celerymon', action='store_true', help='Process Cross Posts in Backgroung')
     parser.add_argument('--stats', action='store_true', help='Process Cross Posts in Backgroung')
     parser.add_argument('--backfill', action='store_true', help='Work backwards through Push Shift looking for new posts')
+    parser.add_argument('--indexsvc', action='store_true', help='Keep building fresh image index')
+
     args = parser.parse_args()
 
 
@@ -40,11 +43,15 @@ if __name__ == '__main__':
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
+    indexsvc = IndexManager(SqlAlchemyUnitOfWorkManager(db_engine))
     #ingest.ingest_pushshift_catch()
     #ingest.ingest_pushshift()
     #maintenance.check_crosspost_api()
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
+
+    if args.indexsvc:
+        threading.Thread(target=indexsvc.run, name='Index Service').start()
 
     if args.ingestpushshift:
         threading.Thread(target=ingest.ingest_pushshift_catch, name='Ingest Pushshift').start()

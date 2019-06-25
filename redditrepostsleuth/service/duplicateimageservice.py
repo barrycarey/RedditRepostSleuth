@@ -56,38 +56,36 @@ class DuplicateImageService:
                 log.info('%s - Got Lock', os.getpid())
                 log.info('Building new Annoy index')
                 self.index = AnnoyIndex(64)
+
                 if os.path.isfile(config.index_file_name):
                     log.info('Deleting existing index file')
                     os.remove(config.index_file_name)
+                self.index.on_disk_build(os.path.join(os.getcwd(), config.index_file_name))
                 start = datetime.now()
                 with self.uowm.start() as uow:
-                    offset = 0
-                    while True:
-                        log.info('%s: Loading 100000 image hashes', os.getpid())
-                        existing_images = uow.posts.find_all_images_with_hash_return_id_hash(offset=offset, limit=2000000)
-                        if not existing_images:
-                            log.info('No more image hashes to load')
-                            break
-                        delta = datetime.now() - start
-                        log.info('%s: Loaded %s images in %s seconds', os.getpid(), len(existing_images), delta.seconds)
+                    existing_images = uow.posts.yield_test()
+                    delta = datetime.now() - start
+                    log.info('%s: Loaded %s images in %s seconds', os.getpid(), len(existing_images), delta.seconds)
+                    time.sleep(30)
 
                 #log.info('Index will be built with %s hashes', len(existing_images))
                 #self.index_size = len(existing_images)
-                        for image in existing_images:
-                            vector = list(bytearray(image[1], encoding='utf-8'))
-                            self.index.add_item(image[0], vector)
-                        offset += 2000000
-                        log.info('Current index size is %s', self.index.get_n_items())
+                for image in existing_images:
+                    vector = list(bytearray(image[1], encoding='utf-8'))
+                    self.index.add_item(image[0], vector)
+
 
                 self.index.build(config.index_tree_count)
                 log.debug('Before index save')
-                self.index.save(config.index_file_name)
+                #self.index.save(config.index_file_name)
                 log.debug('After index save')
                 self.index_last_build = datetime.now()
                 delta = datetime.now() - start
                 log.info('Total index build time was %s seconds', delta.seconds)
                 time.sleep(15)
 
+    def build_index(self):
+        pass
 
     def _load_index_file(self) -> bool:
         """
