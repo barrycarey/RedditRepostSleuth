@@ -14,3 +14,7 @@ class FutureDataRepostCheckException(RepostSleuthException):
 class CrosspostRepostCheck(RepostSleuthException):
     def __init__(self, message):
         super(CrosspostRepostCheck, self).__init__(message)
+
+class NoIndexException(RepostSleuthException):
+    def __init__(self, message):
+        super(NoIndexException, self).__init__(message)

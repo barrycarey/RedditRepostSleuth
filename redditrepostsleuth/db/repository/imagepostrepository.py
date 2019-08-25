@@ -3,7 +3,7 @@ from typing import List
 from sqlalchemy import DateTime, or_, func
 from datetime import datetime, timedelta
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.model.db.databasemodels import Post, ImagePost
+from redditrepostsleuth.model.db.databasemodels import Post, RedditImagePost
 
 
 class ImagePostRepository:
@@ -13,18 +13,21 @@ class ImagePostRepository:
     def add(self, item):
         self.db_session.add(item)
 
-    def page_by_id(self, id: int, limit: int = None):
-        return self.db_session.query(ImagePost).filter(ImagePost.id > id).order_by(ImagePost.id).limit(limit).all()
+    def get_by_id(self, id: int) -> RedditImagePost:
+        return self.db_session.query(RedditImagePost).filter(RedditImagePost.id == id).first()
 
-    def bulk_save(self, items: List[ImagePost]):
+    def page_by_id(self, id: int, limit: int = None):
+        return self.db_session.query(RedditImagePost).filter(RedditImagePost.id > id).order_by(RedditImagePost.id).limit(limit).all()
+
+    def bulk_save(self, items: List[RedditImagePost]):
         self.db_session.bulk_save_objects(items)
 
-    def update(self, item: ImagePost):
+    def update(self, item: RedditImagePost):
         self.db_session.merge(item)
 
-    def remove(self, item: ImagePost):
+    def remove(self, item: RedditImagePost):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
 
     def find_all_images_with_hash_return_id_hash(self, limit: int = None, id: int = 0):
-        return self.db_session.query(ImagePost).filter(ImagePost.id > id).with_entities(ImagePost.id, ImagePost.dhash_h).limit(limit).all()
+        return self.db_session.query(RedditImagePost).filter(RedditImagePost.id > id).with_entities(RedditImagePost.id, RedditImagePost.dhash_h).limit(limit).all()

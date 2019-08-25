@@ -15,7 +15,7 @@ from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidS
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.celery import celery
-from redditrepostsleuth.common.exception import ImageConversioinException, CrosspostRepostCheck
+from redditrepostsleuth.common.exception import ImageConversioinException, CrosspostRepostCheck, NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
 from redditrepostsleuth.config.constants import USER_AGENTS
@@ -23,7 +23,7 @@ from redditrepostsleuth.config.replytemplates import WATCH_FOUND
 from redditrepostsleuth.db import db_engine
 from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.model.db.databasemodels import Comment, Post, ImageRepost, LinkRepost, VideoHash, \
-    AudioFingerPrint
+    AudioFingerPrint, RedditImagePost
 from redditrepostsleuth.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.model.events.influxevent import InfluxEvent
@@ -224,7 +224,7 @@ def process_repost_annoy(self, repost: RepostWrapper):
             self.event_logger.save_event(
                 RepostEvent(event_type='repost_found', status='success', post_type=repost.checked_post.post_type))
 
-            check_repost_watch.apply_async((new_repost,), queue='test')
+            #check_repost_watch.apply_async((new_repost,), queue='test')
 
         uow.posts.update(repost.checked_post)
 
@@ -320,7 +320,7 @@ def check_deleted_posts(self, posts):
         self.event_logger.save_event(BatchedEvent(count=len(posts), event_type='delete_check', status=status))
 
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,))
+@celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 5, 'countdown': 30})
 def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
     #print('Finding matching images')
     if post.crosspost_parent:
@@ -333,7 +333,7 @@ def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
     result.matches = self.dup_service.check_duplicate(post)
     log.debug('Found %s matching images', len(result.matches))
     search_time = perf_counter() - start
-    self.event_logger.save_event(AnnoySearchEvent(search_time, self.dup_service.index_size, event_type='find_matching_images'))
+    self.event_logger.save_event(AnnoySearchEvent(search_time, 0, event_type='find_matching_images'))
     return result
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
@@ -352,6 +352,11 @@ def save_new_post(self, post):
         if post.post_type == 'image':
             try:
                 set_image_hashes(post)
+                image_post = RedditImagePost()
+                image_post.post_id = post.post_id
+                image_post.dhash_h = post.dhash_h
+                image_post.dhash_v = post.dhash_v
+                uow.image_post.add(image_post)
             except ImageConversioinException as e:
                 log.error('Failed to get image hashes on new post')
                 pass

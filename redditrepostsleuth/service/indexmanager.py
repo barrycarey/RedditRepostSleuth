@@ -23,17 +23,16 @@ class IndexManager:
         index.on_disk_build(self.temp_index)
         start = datetime.now()
         with self.uowm.start() as uow:
-            existing_images = uow.posts.yield_test(limit=1000000)
             delta = datetime.now() - start
-            log.info('%s: Loaded %s images in %s seconds', os.getpid(), len(existing_images), delta.seconds)
+            #log.info('%s: Loaded %s images in %s seconds', os.getpid(), len(existing_images), delta.seconds)
             log.info('Adding images to index')
-            for image in existing_images:
+            for image in uow.posts.yield_test():
                 vector = list(bytearray(image[1], encoding='utf-8'))
                 index.add_item(image[0], vector)
             log.info('Building index')
             index.build(config.index_tree_count)
             delta = datetime.now() - start
-            log.info('Total index build time was %s seconds with %s images', delta.seconds, len(existing_images))
+            log.info('Total index build time was %s seconds with images', delta.seconds)
 
     def run(self):
         self.build_index()

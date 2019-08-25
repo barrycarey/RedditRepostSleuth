@@ -39,31 +39,15 @@ class Post(Base):
     repost_count = Column(Integer, default=0)
     #fullname = Column(String(30))
 
-
-class ImagePost(Base):
-    def __repr__(self) -> str:
-        return 'Post ID: {} - Type: {} - URL: {} - Source: {}'.format(self.post_id, self.url, self.ingested_from)
+class RedditImagePost(Base):
 
     __tablename__ = 'reddit_image_post'
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
-    url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
-    shortlink = Column(String(300))
-    perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
-    author = Column(String(100), nullable=False)
-    created_at = Column(DateTime)
-    ingested_at = Column(DateTime, default=func.utc_timestamp())
-    subreddit = Column(String(100), nullable=False)
-    title = Column(String(1000, collation='utf8mb4_general_ci'), nullable=False)
-    crosspost_parent = Column(String(200))
     dhash_v = Column(String(64))
     dhash_h = Column(String(64))
-    ahash = Column(String(64))
-    checked_repost = Column(Boolean, default=False)
-    last_deleted_check = Column(DateTime, default=func.utc_timestamp())
-    ingested_from = Column(String(40))
-    repost_count = Column(Integer, default=0)
+
 
 class Summons(Base):
 

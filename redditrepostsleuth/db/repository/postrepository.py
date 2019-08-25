@@ -49,7 +49,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == post_type).order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
     def find_all_by_repost_check(self, repost_check: bool, limit: int = None, offset: int = None):
-        return self.db_session.query(Post).filter(Post.checked_repost == repost_check, Post.post_type == 'image', Post.crosspost_parent == None, Post.dhash_h != None).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.checked_repost == repost_check, Post.crosspost_parent == None, Post.dhash_h != None).offset(offset).limit(limit).all()
 
     def find_all_for_delete_check(self, hours: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(hours=hours)
@@ -84,7 +84,9 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext != None).with_entities(Post.id, Post.selftext).offset(offset).limit(limit).all()
 
     def yield_test(self, limit: int = None):
-        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).yield_per(1000).with_entities(Post.id, Post.dhash_h).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).yield_per(
+            10000).with_entities(
+            Post.id, Post.dhash_h).limit(limit)
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)
