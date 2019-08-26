@@ -320,7 +320,7 @@ def check_deleted_posts(self, posts):
         self.event_logger.save_event(BatchedEvent(count=len(posts), event_type='delete_check', status=status))
 
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 5, 'countdown': 30})
+@celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 10, 'countdown': 300})
 def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
     #print('Finding matching images')
     if post.crosspost_parent:
