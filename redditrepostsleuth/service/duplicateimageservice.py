@@ -96,6 +96,7 @@ class DuplicateImageService:
 
             if match.post.created_at > original.created_at:
                 log.debug('Skipping match that is newer than the post we are checking. Original: %s - Match: %s', original.created_at, match.post.created_at)
+                continue
 
             match.hamming_distance = hamming(original.dhash_h, match.post.dhash_h)
 
