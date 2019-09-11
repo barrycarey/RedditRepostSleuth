@@ -4,6 +4,7 @@ from redditrepostsleuth.db.repository.audiofingerprintrepo import AudioFingerPri
 from redditrepostsleuth.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.db.repository.commentrepository import CommentRepository
+from redditrepostsleuth.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.db.repository.postrepository import PostRepository
 from redditrepostsleuth.db.repository.repostrepository import RepostRepository
 from redditrepostsleuth.db.repository.repostwatchrepository import RepostWatchRepository
@@ -67,3 +68,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def image_post(self) -> ImagePostRepository:
         return ImagePostRepository(self.session)
+
+    @property
+    def index_build_time(self) -> IndexBuildTimesRepository:
+        return IndexBuildTimesRepository(self.session)

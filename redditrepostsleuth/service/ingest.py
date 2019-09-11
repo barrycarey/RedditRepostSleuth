@@ -11,7 +11,7 @@ from praw import Reddit
 from prawcore import Forbidden
 import webbrowser
 from redditrepostsleuth.celery.tasks import save_new_post, update_cross_post_parent, save_new_comment, \
-    ingest_pushshift_url
+    ingest_pushshift_url, save_pushshift_results
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.util.objectmapping import submission_to_post, pushshift_to_post
@@ -119,6 +119,60 @@ class Ingest:
                     save_new_post.apply_async((post,), queue='postingest')
 
                 time.sleep(60)
+
+    def ingest_pushshift_window(self):
+
+        while True:
+            oldest_id = None
+            start_time = None
+            base_url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
+            while True:
+
+                if oldest_id:
+                    url = base_url + '&before=' + str(oldest_id)
+                else:
+                    url = base_url
+
+                try:
+                    r = requests.post('http://sr2.plxbx.com:8888/crosspost', data={'url': url})
+                except Exception as e:
+                    log.exception('Exception getting Push Shift result', exc_info=True)
+                    time.sleep(10)
+                    continue
+
+                if r.status_code != 200:
+                    log.error('Unexpected status code %s from Push Shift', r.status_code)
+                    time.sleep(10)
+                    continue
+
+                try:
+                    response = json.loads(r.text)
+                except Exception:
+                    oldest_id = oldest_id - 90
+                    log.exception('Error decoding json')
+                    time.sleep(10)
+                    continue
+
+                if response['status'] != 'success':
+                    log.error('Error from API.  Status code %s, reason %s', response['status_code'],
+                              response['message'])
+                    if response['status_code'] == '502':
+                        continue
+                    continue
+
+                data = json.loads(response['payload'])
+                oldest_id = data['data'][-1]['created_utc']
+                log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
+
+                if not start_time:
+                    start_time = data['data'][0]['created_utc']
+
+                save_pushshift_results.apply_async((data['data'],), queue='pushshift')
+
+                start_end_dif = start_time - oldest_id
+                if  start_end_dif > 3600:
+                    log.info('Reached end of 1 hour window, starting over')
+                    break
 
     def ingest_new_comments(self):
         while True:

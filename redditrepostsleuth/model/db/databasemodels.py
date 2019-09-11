@@ -128,3 +128,13 @@ class AudioFingerPrint(Base):
     hash = Column(String(30), nullable=False)
     offset = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp())
+
+class IndexBuildTimes(Base):
+    __tablename__ = 'index_build_times'
+    id = Column(Integer, primary_key=True)
+    index_type = Column(String(50), nullable=False)
+    hostname = Column(String(200), nullable=False)
+    items = Column(Integer, nullable=False)
+    build_start = Column(DateTime, nullable=False)
+    build_end = Column(DateTime, nullable=False)
+    build_minutes = Column(Integer)

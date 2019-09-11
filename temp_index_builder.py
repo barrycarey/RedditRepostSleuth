@@ -5,6 +5,9 @@ from annoy import AnnoyIndex
 from datetime import datetime
 
 from redditrepostsleuth.config import config
+from redditrepostsleuth.db import db_engine
+from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.model.db.databasemodels import IndexBuildTimes
 
 conn = pymysql.connect(host=config.db_host,
                              user=config.db_user,
@@ -12,23 +15,29 @@ conn = pymysql.connect(host=config.db_host,
                              db=config.db_name,
                              cursorclass=pymysql.cursors.SSDictCursor)
 
-
+uowm = SqlAlchemyUnitOfWorkManager(db_engine)
 
 
 while True:
+
+    build_time = IndexBuildTimes()
+    build_time.index_type = 'image'
+    build_time.hostname = 'pc.ho.me'
+
     if os.path.isfile('images_temp.ann'):
         print('Removing existing temp index')
         os.remove('images_temp.ann')
     index = AnnoyIndex(64)
     index.on_disk_build('images_temp.ann')
     start = datetime.now()
+    build_time.build_start = start
 
     with conn.cursor() as cur:
         cur.execute("SELECT id, dhash_h FROM reddit_image_post")
 
         delta = datetime.now() - start
         print(f'Loaded records in {delta.seconds}')
-        print('Adding items to index')
+        print(f' {datetime.now()} Adding items to index')
         index_start = datetime.now()
         count = 0
         for row in cur:
@@ -36,12 +45,15 @@ while True:
             index.add_item(row['id'], vector)
 
         delta = datetime.now() - start
-        print(f'Added All Items in {delta.seconds}')
+        print(f'{datetime.now()} Added All Items in {delta.seconds}')
 
         index.build(20)
 
         delta = datetime.now() - start
-        print(f'Built Index in {delta.seconds}')
+        build_time.build_minutes = delta.seconds / 60
+        build_time.build_end = datetime.now()
+        build_time.items = index.get_n_items()
+        print(f'{datetime.now()} Built Index in {delta.seconds}')
 
         if os.path.isfile('images.ann'):
             print('Removing existing index file')
@@ -49,3 +61,7 @@ while True:
 
         os.rename('images_temp.ann', 'images.ann')
         print('Renamed temp index')
+
+        with uowm.start() as uow:
+            uow.index_build_time.add(build_time)
+            uow.commit()

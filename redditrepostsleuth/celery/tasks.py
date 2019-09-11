@@ -181,6 +181,18 @@ def save_new_comment(self, comment):
         except Exception as e:
             self.event_logger.save_event(InfluxEvent(event_type='ingest_comment', status='error'))
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def save_pushshift_results(self, data):
+    with self.uowm.start() as uow:
+        for submission in data:
+
+            existing = uow.posts.get_by_post_id(submission['id'])
+            if existing:
+                log.debug('Skipping pushshift post: %s', submission['id'])
+                continue
+            post = pushshift_to_post(submission)
+            log.debug('Saving pushshift post: %s', submission['id'])
+            save_new_post.apply_async((post,), queue='postingest')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def process_repost_annoy(self, repost: RepostWrapper):
@@ -371,13 +383,13 @@ def save_new_post(self, post):
         try:
             uow.commit()
             ingest_repost_check.apply_async((post,))
-            event = IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
-                                      post_type=post.post_type)
+            #event = IngestSubmissionEvent(event_type='ingest_post', status='success', post_id=post.post_id, queue='post',
+            #                         post_type=post.post_type)
 
         except Exception as e:
                 log.exception('Error saving new post', exc_info=True)
-                event = IngestSubmissionEvent(event_type='ingest_post', status='error', post_id=post.post_id, queue='post',
-                                      post_type=post.post_type)
+                #event = IngestSubmissionEvent(event_type='ingest_post', status='error', post_id=post.post_id, queue='post',
+                #                      post_type=post.post_type)
 
         #log_event.apply_async((event,), queue='logevent')
 
@@ -386,6 +398,7 @@ def save_new_post(self, post):
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
     if post.post_type == 'image' and config.check_new_images_for_repost:
+        #test_api.apply_async((post.post_id,), queue='apitest')
         (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async()
     elif post.post_type == 'link' and config.check_new_links_for_repost:
         link_repost_check.apply_async(([post],))
@@ -530,8 +543,8 @@ def process_video(self, url, post_id):
     shutil.rmtree(out_dir)
 
 @celery.task(ignore_results=True)
-def test_api(url):
-    r = requests.post('http://localhost:8888/fingerprint?url=' + url)
+def test_api(post_id):
+    r = requests.get(f'http://localhost:8888/image?post_id={post_id}')
     print('Got result: Status: ' + str(r.status_code))
 
 
@@ -609,3 +622,4 @@ def save_image_post(self, posts):
         uow.image_post.bulk_save(posts)
         uow.commit()
         log.info('Saved batch')
+

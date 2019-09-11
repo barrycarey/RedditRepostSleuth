@@ -11,7 +11,7 @@ class PostRepository:
         self.db_session = db_session
 
     def add(self, item):
-        log.debug('Inserting: %s', item)
+        #log.debug('Inserting: %s', item)
         self.db_session.add(item)
 
     def bulk_save(self, items: List[Post]):
@@ -49,7 +49,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_type == post_type).order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
     def find_all_by_repost_check(self, repost_check: bool, limit: int = None, offset: int = None):
-        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.checked_repost == repost_check, Post.crosspost_parent == None, Post.dhash_h != None).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.checked_repost == repost_check, Post.crosspost_parent == None, Post.dhash_h != None).order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
     def find_all_for_delete_check(self, hours: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(hours=hours)
