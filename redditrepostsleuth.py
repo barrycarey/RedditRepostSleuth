@@ -31,7 +31,6 @@ if __name__ == '__main__':
     parser.add_argument('--crosspost', action='store_true', help='Process Cross Posts in Backgroung')
     parser.add_argument('--celerymon', action='store_true', help='Process Cross Posts in Backgroung')
     parser.add_argument('--stats', action='store_true', help='Process Cross Posts in Backgroung')
-    parser.add_argument('--backfill', action='store_true', help='Work backwards through Push Shift looking for new posts')
     parser.add_argument('--indexsvc', action='store_true', help='Keep building fresh image index')
 
     args = parser.parse_args()
@@ -54,10 +53,7 @@ if __name__ == '__main__':
         threading.Thread(target=indexsvc.run, name='Index Service').start()
 
     if args.ingestpushshift:
-        threading.Thread(target=ingest.ingest_pushshift_catch, name='Ingest Pushshift').start()
-
-    if args.backfill:
-        threading.Thread(target=ingest.ingest_pushshift, name="Back Fill").start()
+        threading.Thread(target=ingest.ingest_pushshift_window(), name='Ingest Pushshift').start()
 
     if args.celerymon:
         #threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
