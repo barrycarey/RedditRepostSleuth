@@ -1,4 +1,5 @@
 import os
+import socket
 
 import pymysql
 from annoy import AnnoyIndex
@@ -13,7 +14,8 @@ conn = pymysql.connect(host=config.db_host,
                              user=config.db_user,
                              password=config.db_password,
                              db=config.db_name,
-                             cursorclass=pymysql.cursors.SSDictCursor)
+                             cursorclass=pymysql.cursors.SSDictCursor,
+                            autocommit=True)
 
 uowm = SqlAlchemyUnitOfWorkManager(db_engine)
 
@@ -22,7 +24,7 @@ while True:
 
     build_time = IndexBuildTimes()
     build_time.index_type = 'image'
-    build_time.hostname = 'pc.ho.me'
+    build_time.hostname = socket.gethostname()
 
     if os.path.isfile('images_temp.ann'):
         print('Removing existing temp index')
