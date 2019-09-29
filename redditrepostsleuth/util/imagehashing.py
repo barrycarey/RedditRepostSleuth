@@ -143,23 +143,3 @@ def set_image_hashes(post: Post) -> Post:
 
     return post
 
-def find_matching_images(images: List[Post], query_hash: str, hamming_distance: int = 10):
-    """
-    Find all matching images in the provided list given the hash to query
-    :param hamming_distance: Option hamming distance for comparision
-    :param images: List of Posts as a hay stack
-    :param query_hash: Hash to compare against image list
-    """
-    log.info('Building VP Tree with %s objects', len(images))
-    tree = VPTree(images, lambda x, y: hamming(x, y))
-    return find_matching_images_in_vp_tree(tree, query_hash, hamming_distance)
-
-def find_matching_images_in_vp_tree(tree: VPTree, query_hash: str, hamming_distance: int = 10):
-    """
-    Take a pre-built VP Tree of images and query it for the provided hash looking for matches within hamming distance
-    :param tree: VPTree of existing images
-    :param query_hash: Image hash to query tree for
-    :param hamming_distance: Distance for matches
-    """
-    log.info('Searching VP Tree with hash %s', query_hash)
-    return tree.get_all_in_range(query_hash, hamming_distance)

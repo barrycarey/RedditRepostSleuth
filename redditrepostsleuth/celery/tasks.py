@@ -15,6 +15,7 @@ from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidS
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.celery import celery
+from redditrepostsleuth.celery.helpers.repost_image import find_matching_images, save_image_repost_result
 from redditrepostsleuth.common.exception import ImageConversioinException, CrosspostRepostCheck, NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -332,19 +333,19 @@ def check_deleted_posts(self, posts):
         self.event_logger.save_event(BatchedEvent(count=len(posts), event_type='delete_check', status=status))
 
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle', autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 10, 'countdown': 300})
-def find_matching_images_annoy(self, post: Post) -> RepostWrapper:
-    #print('Finding matching images')
+@celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 20, 'countdown': 300})
+def check_image_repost_save(self, post: Post) -> RepostWrapper:
+
     if post.crosspost_parent:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
     start = perf_counter()
-    result = RepostWrapper()
-    result.checked_post = post
-    result.matches = self.dup_service.check_duplicate(post)
-    log.debug('Found %s matching images', len(result.matches))
+    result = find_matching_images(post, self.dup_service)
     search_time = perf_counter() - start
+
+    save_image_repost_result(result, self.uowm)
+
     self.event_logger.save_event(AnnoySearchEvent(search_time, 0, event_type='find_matching_images'))
     return result
 
@@ -398,8 +399,8 @@ def save_new_post(self, post):
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
     if post.post_type == 'image' and config.check_new_images_for_repost:
-        #test_api.apply_async((post.post_id,), queue='apitest')
-        (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async()
+        check_image_repost_save.apply_async((post,), queue='repost_image')
+        #check_image_repost_save.s(post)
     elif post.post_type == 'link' and config.check_new_links_for_repost:
         link_repost_check.apply_async(([post],))
 

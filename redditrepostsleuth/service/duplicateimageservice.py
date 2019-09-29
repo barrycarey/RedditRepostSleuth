@@ -15,6 +15,7 @@ from annoy import AnnoyIndex
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.imagematch import ImageMatch
 from redditrepostsleuth.util.objectmapping import annoy_result_to_image_match
+from redditrepostsleuth.util.reposthelpers import sort_reposts
 
 
 class DuplicateImageService:
@@ -98,6 +99,10 @@ class DuplicateImageService:
                 log.debug('Skipping match that is newer than the post we are checking. Original: %s - Match: %s', original.created_at, match.post.created_at)
                 continue
 
+            if match.post.crosspost_parent:
+                log.debug("Skipping match that is a crosspost")
+                continue
+
             match.hamming_distance = hamming(original.dhash_h, match.post.dhash_h)
 
             if match.hamming_distance <= config.hamming_cutoff:
@@ -107,7 +112,7 @@ class DuplicateImageService:
                 #log.debug('Passed annoy and failed hamming. (Anny: %s - Ham: %s) - %s', result[1], hamming_distance, result[0])
                 pass
 
-        return final_results
+        return sort_reposts(final_results)
 
 
     def check_duplicate(self, post: Post) -> List[ImageMatch]:

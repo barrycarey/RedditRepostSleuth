@@ -24,7 +24,7 @@ celery.conf.update(
     result_serializer='pickle',
     accept_content=['pickle', 'json'],
     task_routes = {
-    'tasks.find_matching_images_annoy': {'queue': 'test'}
+    'tasks.check_image_repost_save': {'queue': 'test'}
 }
 
 

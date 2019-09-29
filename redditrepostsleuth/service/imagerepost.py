@@ -6,7 +6,7 @@ from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
-from redditrepostsleuth.celery.tasks import find_matching_images_annoy, process_repost_annoy
+from redditrepostsleuth.celery.tasks import check_image_repost_save, process_repost_annoy
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.config import config
@@ -37,7 +37,7 @@ class ImageRepostService(RepostServiceBase):
         :param submission:
         :return:
         """
-        # TODO: Decide if I want to remove crossposts from this list
+        # TODO: Change to use new repost checking functions
 
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(submission.id)
@@ -53,7 +53,7 @@ class ImageRepostService(RepostServiceBase):
             log.exception('Problem in find_all_occurrences.  Exception type %s', str(type(e)), exc_info=True)
             ImageConversioinException('Failed to convert image to hash')
 
-        results = find_matching_images_annoy.apply_async(args=(post,)).get()
+        results = check_image_repost_save.apply_async(args=(post,)).get()
         results.matches = sort_reposts(results.matches)
         return results
 
@@ -66,7 +66,7 @@ class ImageRepostService(RepostServiceBase):
                     if not posts:
                         break
                     for post in posts:
-                        (find_matching_images_annoy.s(post) | process_repost_annoy.s()).apply_async()
+                        check_image_repost_save.s(post)
 
                     log.info('Waiting %s seconds until next repost batch', config.repost_image_batch_delay)
                     offset += config.repost_image_batch_size
