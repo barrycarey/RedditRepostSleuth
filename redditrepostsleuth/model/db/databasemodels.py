@@ -39,6 +39,8 @@ class Post(Base):
     repost_count = Column(Integer, default=0)
     #fullname = Column(String(30))
 
+
+
 class RedditImagePost(Base):
 
     __tablename__ = 'reddit_image_post'

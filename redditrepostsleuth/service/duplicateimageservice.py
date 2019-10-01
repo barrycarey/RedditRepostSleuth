@@ -34,8 +34,15 @@ class DuplicateImageService:
         """
 
         if not os.path.isfile(config.index_file_name):
-            log.info('No existing index found. ')
-            raise NoIndexException('No existing index found')
+            if not self.index_built_at:
+                log.error('No existing index found and no index loaded in memory')
+                raise NoIndexException('No existing index found')
+            elif self.index_built_at and (datetime.now() - self.index_built_at).seconds > 21600:
+                log.error('No existing index found and loaded index is too old')
+                raise NoIndexException('No existing index found')
+            else:
+                log.info('No existing index found, using in memory index')
+                return
 
         created_at = datetime.fromtimestamp(os.stat(config.index_file_name).st_ctime)
         delta = datetime.now() - created_at
@@ -49,17 +56,19 @@ class DuplicateImageService:
             self.index = AnnoyIndex(64)
             self.index.load(config.index_file_name)
             self.index_built_at = created_at
-            log.info('Loaded existing index')
+            log.info('Loaded existing index with %s items', self.index.get_n_items())
             return
 
         if created_at > self.index_built_at:
             log.info('Existing index is newer than loaded index.  Loading new index')
+            log.error('Loading newer index file.  Old file had %s items,', self.index.get_n_items())
             self.index.load(config.index_file_name)
             self.index_built_at = created_at
-            log.info('New index loaded')
+            log.error('New file has %s items', self.index.get_n_items())
+            log.info('New index loaded with %s items', self.index.get_n_items())
 
         else:
-            log.info('Loaded index is up to date.  Using')
+            log.info('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
 
 
     def _clean_results(self, results: List[ImageMatch], orig_id: int) -> List[ImageMatch]:
