@@ -23,6 +23,7 @@ class DuplicateImageService:
         self.uowm = uowm
         self.index  = AnnoyIndex(64)
         self.index_built_at = None
+        self.index_size = 0
 
         log.info('Created dup image service')
 
@@ -56,6 +57,7 @@ class DuplicateImageService:
             self.index = AnnoyIndex(64)
             self.index.load(config.index_file_name)
             self.index_built_at = created_at
+            self.index_size = self.index.get_n_items()
             log.info('Loaded existing index with %s items', self.index.get_n_items())
             return
 
@@ -66,6 +68,10 @@ class DuplicateImageService:
             self.index_built_at = created_at
             log.error('New file has %s items', self.index.get_n_items())
             log.info('New index loaded with %s items', self.index.get_n_items())
+            if self.index.get_n_items() < self.index_size:
+                log.critical('New index has less items than old. Aborting repost check')
+                raise NoIndexException('New index has less items than last index')
+            self.index_size = self.index.get_n_items()
 
         else:
             log.info('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
