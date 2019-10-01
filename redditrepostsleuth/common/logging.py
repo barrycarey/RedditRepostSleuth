@@ -1,10 +1,11 @@
 import logging
+import os
 import sys
 
 from redditrepostsleuth.common.logfilters import SingleLevelFilter
 
 log = logging.getLogger(__name__)
-log.setLevel('DEBUG')
+log.setLevel(os.getenv('LOG_LEVEL', 'INFO'))
 formatter = logging.Formatter('%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [%(threadName)s] - %(levelname)s: %(message)s')
 
 general_handler = logging.StreamHandler(sys.stdout)
