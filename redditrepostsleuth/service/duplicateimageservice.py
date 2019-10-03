@@ -14,6 +14,7 @@ from annoy import AnnoyIndex
 
 from redditrepostsleuth.model.db.databasemodels import Post
 from redditrepostsleuth.model.imagematch import ImageMatch
+from redditrepostsleuth.util import redlock
 from redditrepostsleuth.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.util.reposthelpers import sort_reposts
 
@@ -34,6 +35,11 @@ class DuplicateImageService:
         :return:
         """
 
+        if self.index_built_at and (datetime.now() - self.index_built_at).seconds < 1200:
+            log.debug('Loaded index is less than 20 minutes old.  Skipping load')
+            return
+
+
         if not os.path.isfile(config.index_file_name):
             if not self.index_built_at:
                 log.error('No existing index found and no index loaded in memory')
@@ -44,6 +50,7 @@ class DuplicateImageService:
             else:
                 log.info('No existing index found, using in memory index')
                 return
+
 
         created_at = datetime.fromtimestamp(os.stat(config.index_file_name).st_ctime)
         delta = datetime.now() - created_at
@@ -64,14 +71,16 @@ class DuplicateImageService:
         if created_at > self.index_built_at:
             log.info('Existing index is newer than loaded index.  Loading new index')
             log.error('Loading newer index file.  Old file had %s items,', self.index.get_n_items())
-            self.index.load(config.index_file_name)
-            self.index_built_at = created_at
-            log.error('New file has %s items', self.index.get_n_items())
-            log.info('New index loaded with %s items', self.index.get_n_items())
-            if self.index.get_n_items() < self.index_size:
-                log.critical('New index has less items than old. Aborting repost check')
-                raise NoIndexException('New index has less items than last index')
-            self.index_size = self.index.get_n_items()
+            with redlock.create_lock('index_load', ttl=30000):
+                log.info('Got index lock')
+                self.index.load(config.index_file_name)
+                self.index_built_at = created_at
+                log.error('New file has %s items', self.index.get_n_items())
+                log.info('New index loaded with %s items', self.index.get_n_items())
+                if self.index.get_n_items() < self.index_size:
+                    log.critical('New index has less items than old. Aborting repost check')
+                    raise NoIndexException('New index has less items than last index')
+                self.index_size = self.index.get_n_items()
 
         else:
             log.info('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
