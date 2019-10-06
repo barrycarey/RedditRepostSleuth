@@ -5,7 +5,7 @@ import sys
 sys.path.append('/home/barry/PycharmProjects/RedditRepostSleuth')
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from redditrepostsleuth.model.db.databasemodels import Base
+from redditrepostsleuth.common.model.db import Base
 
 from alembic import context
 

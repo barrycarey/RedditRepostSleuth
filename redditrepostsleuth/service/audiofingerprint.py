@@ -9,7 +9,7 @@ import hashlib
 from operator import itemgetter
 
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.util.audiohelpers import read_audio_file
+from redditrepostsleuth.common.util.audiohelpers import read_audio_file
 
 IDX_FREQ_I = 0
 IDX_TIME_J = 1

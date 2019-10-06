@@ -7,16 +7,16 @@ from datetime import datetime
 
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.config.replytemplates import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
+from redditrepostsleuth.common.config import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
     LINK_ALL, \
     WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE, STATS, SIGNATURE, \
     IMAGE_REPOST_SHORT, WATCH_NOT_OC
-from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Summons, Post, RepostWatch
-from redditrepostsleuth.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.model.imagematch import ImageMatch
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.model.db import Summons, Post, RepostWatch
+from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.common.model import ImageMatch
 from redditrepostsleuth.service.imagerepost import ImageRepostService
-from redditrepostsleuth.util.reposthelpers import set_shortlink, verify_oc
+from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc
 
 
 class RequestService:

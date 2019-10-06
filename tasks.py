@@ -1,6 +1,6 @@
-from redditrepostsleuth.celery import celery
+from redditrepostsleuth.common.celery import celery
 from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.util.imagehashing import generate_img_by_url, generate_dhash
+from redditrepostsleuth.common.util import generate_img_by_url, generate_dhash
 
 
 @celery.task

@@ -1,22 +1,20 @@
 import os
-import random
-import time
 from typing import List
 
 from distance import hamming
 
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.config import config
-from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.config import config
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 from annoy import AnnoyIndex
 
-from redditrepostsleuth.model.db.databasemodels import Post
-from redditrepostsleuth.model.imagematch import ImageMatch
-from redditrepostsleuth.util import redlock
-from redditrepostsleuth.util.objectmapping import annoy_result_to_image_match
-from redditrepostsleuth.util.reposthelpers import sort_reposts
+from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.common.model.imagematch import ImageMatch
+from redditrepostsleuth.common.util import redlock
+from redditrepostsleuth.common.util.objectmapping import annoy_result_to_image_match
+from redditrepostsleuth.common.util.reposthelpers import sort_reposts
 
 
 class DuplicateImageService:

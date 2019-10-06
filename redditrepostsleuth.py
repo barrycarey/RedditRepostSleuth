@@ -4,8 +4,8 @@ import threading
 from time import sleep
 
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.db import db_engine
-from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.common.db import db_engine
+from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.service.imagerepost import ImageRepostService
@@ -14,7 +14,7 @@ from redditrepostsleuth.service.linkrepostservice import LinkRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
 from redditrepostsleuth.service.ingest import Ingest
 from redditrepostsleuth.service.requestservice import RequestService
-from redditrepostsleuth.util.helpers import get_reddit_instance
+from redditrepostsleuth.common.util.helpers import get_reddit_instance
 
 sys.setrecursionlimit(50000)
 

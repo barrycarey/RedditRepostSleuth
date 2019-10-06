@@ -1,16 +1,11 @@
-import collections
 import logging
 from datetime import datetime
 import gensim
 from gensim import utils
 from gensim.models.doc2vec import TaggedDocument, Doc2Vec
 
-from gensim.models.doc2vec_inner import REAL
-from gensim.models.keyedvectors import _l2_norm
-from numpy.ma import sqrt
-
-from redditrepostsleuth.db import db_engine
-from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.common.db import db_engine
+from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
 from gensim.similarities.index import AnnoyIndexer
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 uowm = SqlAlchemyUnitOfWorkManager(db_engine)

@@ -1,9 +1,9 @@
 import os
-from datetime import datetime, time
+from datetime import datetime
 
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.config import config
-from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.config import config
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from annoy import AnnoyIndex
 
 class IndexManager:

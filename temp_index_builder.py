@@ -5,10 +5,11 @@ import pymysql
 from annoy import AnnoyIndex
 from datetime import datetime
 
-from redditrepostsleuth.config import config
-from redditrepostsleuth.db import db_engine
-from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import IndexBuildTimes
+from redditrepostsleuth.common.config import config
+from redditrepostsleuth.common.db import db_engine
+from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.common.model.db import IndexBuildTimes
 
 conn = pymysql.connect(host=config.db_host,
                              user=config.db_user,

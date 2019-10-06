@@ -1,16 +1,14 @@
 import re
 import time
 from datetime import datetime
-from queue import Queue
 
 from praw import Reddit
 
-from redditrepostsleuth.celery.tasks import save_new_comment
+from redditrepostsleuth.common.celery.tasks import save_new_comment
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.config import config
-from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import Comment as DbComment
-from redditrepostsleuth.model.db.databasemodels import Summons
+from redditrepostsleuth.common.config import config
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.model.db import Summons
 from redditrepostsleuth.service.requestservice import RequestService
 
 

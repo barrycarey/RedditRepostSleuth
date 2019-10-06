@@ -1,9 +1,7 @@
 from unittest import TestCase, mock
 
-from praw.models import Submission
-
 from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.model.db.databasemodels import Post
+from redditrepostsleuth.common.model.db import Post
 from datetime import datetime
 
 from redditrepostsleuth.service.imagerepost import ImageRepostService

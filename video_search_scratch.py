@@ -1,5 +1,4 @@
 import shutil
-import sys
 import os
 from datetime import datetime
 from os import listdir
@@ -7,15 +6,13 @@ from os import listdir
 import ffmpeg
 import imagehash
 
-from redditrepostsleuth.celery.tasks import video_hash, process_video
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.db import db_engine
-from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.model.db.databasemodels import VideoHash
+from redditrepostsleuth.common.celery.tasks import video_hash, process_video
+from redditrepostsleuth.common.db import db_engine
+from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.common.model.db import VideoHash
 
-from redditrepostsleuth.util.helpers import get_reddit_instance
-from redditrepostsleuth.util.imagehashing import generate_img_by_file
-from redditrepostsleuth.util.videohelpers import download_file, generate_thumbnails_from_file
+from redditrepostsleuth.common.util.helpers import get_reddit_instance
+from redditrepostsleuth.common.util import generate_img_by_file
 
 reddit = get_reddit_instance()
 

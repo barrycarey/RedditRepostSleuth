@@ -1,9 +1,7 @@
-import csv
-
-from redditrepostsleuth.celery.tasks import delete_dups
-from redditrepostsleuth.db import db_engine
-from redditrepostsleuth.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.util.helpers import chunk_list
+from redditrepostsleuth.common.celery.tasks import delete_dups
+from redditrepostsleuth.common.db import db_engine
+from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.common.util.helpers import chunk_list
 
 uowm = SqlAlchemyUnitOfWorkManager(db_engine)
 

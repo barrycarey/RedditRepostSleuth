@@ -1,14 +1,12 @@
-import sys
-
 from distance import hamming
 
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.config import config
-from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.config import config
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 
-from redditrepostsleuth.util.objectmapping import post_to_hashwrapper, hash_tuple_to_hashwrapper
-from redditrepostsleuth.util.vptree import VPTree
+from redditrepostsleuth.common.util.objectmapping import hash_tuple_to_hashwrapper
+from redditrepostsleuth.common.util.vptree import VPTree
 
 
 class CashedVpTree:

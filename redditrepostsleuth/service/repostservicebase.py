@@ -1,6 +1,6 @@
 from praw.models import Submission
 
-from redditrepostsleuth.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 
 
 class RepostServiceBase:
