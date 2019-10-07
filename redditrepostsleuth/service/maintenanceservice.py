@@ -47,25 +47,6 @@ class MaintenanceService:
 
 
 
-    def check_crosspost_api(self):
-        offset = 0
-        with self.uowm.start() as uow:
-            while True:
-                try:
-                    posts = uow.posts.no_selftext(offset=offset, limit=100000)
-                    if not posts:
-                        log.info('Ran out of posts to selftext check')
-                        break
-                    chunks = chunk_list(posts, 100)
-                    for chunk in chunks:
-                        log.debug('Sending batch of cross post checks')
-                        ids = ','.join(['t3_' + post.post_id for post in chunk])
-                        #self.event_logger.save_event(InfluxEvent(event_type='crosspost_check', status='error', queue='pre'))
-                        update_crosspost_parent_api.apply_async((ids,), queue='selftext')
-                    offset += 100000
-                    #time.sleep(3)
-                except Exception as e:
-                    continue
 
     def log_celery_events_to_influx(self):
         while True:

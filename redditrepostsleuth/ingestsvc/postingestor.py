@@ -8,7 +8,7 @@ from datetime import datetime
 from praw import Reddit
 from prawcore import Forbidden
 from redditrepostsleuth.common.celery.tasks import save_new_post, save_new_comment, \
-    ingest_pushshift_url
+    ingest_pushshift_url, save_pushshift_results
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.util.objectmapping import submission_to_post, pushshift_to_post
@@ -30,64 +30,64 @@ class PostIngestor:
                             log.debug('Saving post %s', submission.id)
                             post = submission_to_post(submission)
 
-                            save_new_post.apply_async((post,))
+                            save_new_post.apply_async((post,), queue='postingest')
                     except Forbidden as e:
                         pass
             except Exception as e:
                 log.exception('INGEST THREAD DIED', exc_info=True)
 
     def ingest_pushshift(self):
-        oldest_id = None
-        processed = []
-        if os.path.isfile('push_last.txt'):
-            with open('push_last.txt', 'r') as f:
-                oldest_id = int(f.read())
-
         while True:
-            with self.uowm.start() as uow:
-                url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
+            oldest_id = None
+            start_time = None
+            base_url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
+            while True:
+
                 if oldest_id:
-                    url += '&before=' + str(oldest_id)
-                    log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
+                    url = base_url + '&before=' + str(oldest_id)
                 else:
-                    oldest_id = round(datetime.utcnow().timestamp())
-
-                oldest_id = oldest_id - 90
-
-                ingest_pushshift_url.apply_async((url,), queue='pushshift')
-
-                with open('push_last.txt', 'w') as f:
-                    f.write(str(oldest_id))
-                #time.sleep(.1)
-                continue
+                    url = base_url
 
                 try:
-                    r = requests.get(url)
+                    r = requests.post('http://sr2.plxbx.com:8888/crosspost', data={'url': url})
                 except Exception as e:
                     log.exception('Exception getting Push Shift result', exc_info=True)
+                    time.sleep(10)
                     continue
 
                 if r.status_code != 200:
                     log.error('Unexpected status code %s from Push Shift', r.status_code)
+                    time.sleep(10)
                     continue
 
-                data = json.loads(r.text)
+                try:
+                    response = json.loads(r.text)
+                except Exception:
+                    oldest_id = oldest_id - 90
+                    log.exception('Error decoding json')
+                    time.sleep(10)
+                    continue
 
+                if response['status'] != 'success':
+                    log.error('Error from API.  Status code %s, reason %s', response['status_code'],
+                              response['message'])
+                    if response['status_code'] == '502':
+                        continue
+                    continue
+
+                data = json.loads(response['payload'])
                 oldest_id = data['data'][-1]['created_utc']
                 log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
-                with open('push_last.txt', 'w') as f:
-                    f.write(str(oldest_id))
-                log.info('Total Results: %s', len(data['data']))
-                for submission in data['data']:
-                    #log.info(datetime.fromtimestamp(submission.get('created_utc', None)))
-                    existing = uow.posts.get_by_post_id(submission['id'])
-                    if existing:
-                        continue
-                    post = pushshift_to_post(submission)
-                    save_new_post.apply_async((post,), queue='postingest')
 
+                if not start_time:
+                    start_time = data['data'][0]['created_utc']
 
-                time.sleep(60)
+                save_pushshift_results.apply_async((data['data'],), queue='pushshift')
+
+                start_end_dif = start_time - oldest_id
+                if start_end_dif > 3600:
+                    log.info('Reached end of 1 hour window, starting over')
+                    break
 
 
 

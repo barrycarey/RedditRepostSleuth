@@ -12,7 +12,7 @@ from annoy import AnnoyIndex
 
 from redditrepostsleuth.common.model.db.databasemodels import Post
 from redditrepostsleuth.common.model.imagematch import ImageMatch
-from redditrepostsleuth.common.util import redlock
+from redditrepostsleuth.common.util.redlock import redlock
 from redditrepostsleuth.common.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.common.util.reposthelpers import sort_reposts
 

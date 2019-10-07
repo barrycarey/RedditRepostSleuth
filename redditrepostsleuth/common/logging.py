@@ -5,7 +5,7 @@ import sys
 from redditrepostsleuth.common.logfilters import SingleLevelFilter
 
 log = logging.getLogger(__name__)
-log.setLevel(os.getenv('LOG_LEVEL', 'INFO'))
+log.setLevel(os.getenv('LOG_LEVEL', 'DEBUG'))
 formatter = logging.Formatter('%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [%(threadName)s] - %(levelname)s: %(message)s')
 
 general_handler = logging.StreamHandler(sys.stdout)
@@ -19,7 +19,11 @@ error_filter = SingleLevelFilter(logging.WARNING)
 error_handler.setFormatter(formatter)
 error_handler.addFilter(error_filter)
 
-error_file_handler = logging.FileHandler('error.log')
+log_dir = os.getenv('LOG_LOCATION', os.getcwd())
+if not os.path.exists(log_dir):
+    os.mkdir(log_dir)
+print('Log dir will be ' + log_dir)
+error_file_handler = logging.FileHandler(os.path.join(log_dir, 'error.log'))
 error_file_handler.setLevel(logging.ERROR)
 error_file_handler.setFormatter(formatter)
 

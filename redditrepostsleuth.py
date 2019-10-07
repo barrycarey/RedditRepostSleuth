@@ -5,12 +5,9 @@ from time import sleep
 
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.db import db_engine
-from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.service.imagerepost import ImageRepostService
-from redditrepostsleuth.service.indexmanager import IndexManager
-from redditrepostsleuth.service.linkrepostservice import LinkRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
 from redditrepostsleuth.service.ingest import Ingest
 from redditrepostsleuth.service.requestservice import RequestService
@@ -37,20 +34,18 @@ if __name__ == '__main__':
 
 
     image_repost_service = ImageRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance())
-    link_repost_service = LinkRepostService(SqlAlchemyUnitOfWorkManager(db_engine), get_reddit_instance(), EventLogging())
     repost_service = RequestService(SqlAlchemyUnitOfWorkManager(db_engine), image_repost_service, get_reddit_instance())
     comments = CommentMonitor(get_reddit_instance(), repost_service, SqlAlchemyUnitOfWorkManager(db_engine))
     ingest = Ingest(get_reddit_instance(), SqlAlchemyUnitOfWorkManager(db_engine))
     maintenance = MaintenanceService(SqlAlchemyUnitOfWorkManager(db_engine), EventLogging())
-    indexsvc = IndexManager(SqlAlchemyUnitOfWorkManager(db_engine))
+
     #ingest.ingest_pushshift_catch()
     #ingest.ingest_pushshift()
     #maintenance.check_crosspost_api()
     #image_repost_service.hash_test()
     #image_repost_service.check_single_repost('apxpec')
 
-    if args.indexsvc:
-        threading.Thread(target=indexsvc.run, name='Index Service').start()
+
 
     if args.ingestpushshift:
         threading.Thread(target=ingest.ingest_pushshift_window(), name='Ingest Pushshift').start()
@@ -59,29 +54,14 @@ if __name__ == '__main__':
         #threading.Thread(target=maintenance.log_celery_events_to_influx, name='Celery Event').start()
         threading.Thread(target=maintenance.log_queue_size, name='Queue Update').start()
 
-    if args.ingestposts:
-        log.info('Starting Post Ingest Agent')
-        threading.Thread(target=ingest.ingest_new_posts, name='Post Ingest').start()
-
     if args.ingestcomments:
         log.info('Starting Comment Ingest Agent')
         threading.Thread(target=ingest.ingest_new_comments, name='CommentIngest').start()
 
-    if args.imagehashing:
-        log.info('Starting Hashing Agent')
-
-    if args.repost:
-        log.info('Starting Repost Agent')
-        link_repost_service.start()
-        #image_repost_service.start()
 
     if args.deleted:
         log.info('Starting Delete Check Agent')
         threading.Thread(target=maintenance.clear_deleted_images, name='Deleted Cleanup').start()
-
-    if args.crosspost:
-        log.info('Starting Crosspost Check Agent')
-        threading.Thread(target=maintenance.check_crosspost_api, name='Crosspost Check').start()
 
     if args.summons:
         log.info('Starting Summons Agent')
