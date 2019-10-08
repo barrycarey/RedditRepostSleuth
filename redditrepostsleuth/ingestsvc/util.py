@@ -24,11 +24,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Post:
             # process_video.apply_async((post.url, post.post_id), queue='video_hash')
             pass
 
-        try:
-            uow.commit()
-            log.debug('Commited Post: %s', post)
-        except Exception as e:
-            log.exception('Error saving new post', exc_info=True)
+
 
     return post
 

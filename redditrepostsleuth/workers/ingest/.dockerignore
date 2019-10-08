@@ -1,0 +1,10 @@
+*.ann
+*.npy
+venv
+alembic
+logs
+temp
+tests
+video
+.git
+.idea

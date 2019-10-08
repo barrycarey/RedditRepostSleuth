@@ -1,5 +1,5 @@
 import os
-
+print(os.getcwd())
 # Celery is broken on windows
 import sys
 

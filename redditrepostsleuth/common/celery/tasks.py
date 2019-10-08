@@ -354,7 +354,14 @@ def save_new_post(self, post):
     # TODO - This whole mess needs to be cleaned up
 
     post = pre_process_post(post, self.uowm)
-    ingest_repost_check.apply_async((post,))
+    with self.uowm.start() as uow:
+        try:
+            uow.posts.add(post)
+            uow.commit()
+            log.debug('Commited Post: %s', post)
+            ingest_repost_check.apply_async((post,))
+        except Exception as e:
+            log.exception('Problem saving new post', exc_info=True)
 
 
 
