@@ -3,9 +3,7 @@ MAINTAINER Barry Carey <mcarey66@gmail.com>
 
 VOLUME /src/
 COPY testconfig.ini requirements.txt /src/
-ADD common /src/redditrepostsleuth/common/
-ADD ingestsvc /src/redditrepostsleuth/ingestsvc/
-ADD service /src/redditrepostsleuth/service/
+ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src
 
 RUN apt-get update && apt-get install -y \
