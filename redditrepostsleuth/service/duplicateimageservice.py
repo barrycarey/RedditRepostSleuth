@@ -37,8 +37,9 @@ class DuplicateImageService:
             log.debug('Loaded index is less than 20 minutes old.  Skipping load')
             return
 
-
-        if not os.path.isfile(config.index_file_name):
+        index_file = os.path.join('/opt/imageindex', config.index_file_name)
+        log.debug('Index file is %s', index_file)
+        if not os.path.isfile(index_file):
             if not self.index_built_at:
                 log.error('No existing index found and no index loaded in memory')
                 raise NoIndexException('No existing index found')
@@ -50,7 +51,7 @@ class DuplicateImageService:
                 return
 
 
-        created_at = datetime.fromtimestamp(os.stat(config.index_file_name).st_ctime)
+        created_at = datetime.fromtimestamp(os.stat(index_file).st_ctime)
         delta = datetime.now() - created_at
 
         if delta.seconds > 21600:
@@ -60,7 +61,7 @@ class DuplicateImageService:
         if not self.index_built_at:
             log.debug('Loading existing index')
             self.index = AnnoyIndex(64)
-            self.index.load(config.index_file_name)
+            self.index.load(index_file)
             self.index_built_at = created_at
             self.index_size = self.index.get_n_items()
             log.info('Loaded existing index with %s items', self.index.get_n_items())
@@ -71,7 +72,7 @@ class DuplicateImageService:
             log.error('Loading newer index file.  Old file had %s items,', self.index.get_n_items())
             with redlock.create_lock('index_load', ttl=30000):
                 log.info('Got index lock')
-                self.index.load(config.index_file_name)
+                self.index.load(index_file)
                 self.index_built_at = created_at
                 log.error('New file has %s items', self.index.get_n_items())
                 log.info('New index loaded with %s items', self.index.get_n_items())

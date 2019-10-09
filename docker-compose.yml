@@ -1,0 +1,41 @@
+version: "3.7"
+services:
+    ingest:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/ingestsvc/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+
+    ingest_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+        entrypoint: celery -A redditrepostsleuth.common worker -Q postingest,repost,repost_link -c 1
+
+    image_repost_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+        entrypoint: celery -A redditrepostsleuth.common worker -Q repost_image -c 1
+        volumes:
+            - /opt/imageindex:/opt/imageindex
+
+    ingest_pushshift_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+        entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift -c 1
