@@ -90,13 +90,6 @@ class ImageRepostService(RepostServiceBase):
         return [x for x in raw_list if x.post_id != post_being_checked.post_id and x.crosspost_parent is None and post_being_checked.author != x.author]
 
 
-    def _handle_reposts(self, post: List[Post]) -> List[Post]:
-        """
-        Take a list of reposts and process them
-        :param post: List of Posts
-        """
-        pass
-
     def _clean_reposts(self, posts: List[Post]) -> List[Post]:
         """
         Take a list of reposts, remove any cross posts and deleted posts

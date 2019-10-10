@@ -24,3 +24,4 @@ numpy
 matplotlib
 scipy
 numpy
+kombu==4.5.0

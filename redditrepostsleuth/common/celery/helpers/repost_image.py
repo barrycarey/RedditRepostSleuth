@@ -3,7 +3,7 @@ from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.model.db.databasemodels import Post, ImageRepost
 
 from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 
 
 

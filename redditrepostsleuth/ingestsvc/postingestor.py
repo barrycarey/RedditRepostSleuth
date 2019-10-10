@@ -90,11 +90,3 @@ class PostIngestor:
                     break
 
 
-
-    def ingest_new_comments(self):
-        while True:
-            try:
-                for comment in self.reddit.subreddit('all').stream.comments():
-                    save_new_comment.apply_async((comment,), queue='commentingest')
-            except Exception as e:
-                log.exception('Problem in comment ingest thread', exc_info=True)

@@ -40,7 +40,7 @@ from redditrepostsleuth.common.util.videohelpers import generate_thumbnails_from
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 from redditrepostsleuth.service.audiofingerprint import fingerprint_audio_file
-from redditrepostsleuth.service.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.common.util.helpers import get_reddit_instance
 
@@ -195,6 +195,7 @@ def save_pushshift_results(self, data):
             log.debug('Saving pushshift post: %s', submission['id'])
             save_new_post.apply_async((post,), queue='postingest')
 
+# TODO - Remove
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def process_repost_annoy(self, repost: RepostWrapper):
     # TODO: Break down into smaller chunks
