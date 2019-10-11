@@ -117,13 +117,10 @@ def delete_dups(self, objs):
     log.info('Finished delete batch')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
-def link_repost_check(self, posts):
+def link_repost_check(self, posts, check_link_repostst=None):
     with self.uowm.start() as uow:
         for post in posts:
-            repost = RepostWrapper()
-            repost.checked_post = post
-            repost.matches = [post_to_repost_match(match, post.id) for match in uow.posts.find_all_by_url_hash(post.url_hash) if match.post_id != post.post_id]
-            repost.matches = clean_repost_matches(repost)
+            repost = check_link_repostst(post, self.uowm)
             if not repost.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
                 post.checked_repost = True

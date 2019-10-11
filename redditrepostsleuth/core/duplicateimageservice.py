@@ -23,7 +23,7 @@ class DuplicateImageService:
         self.index  = AnnoyIndex(64)
         self.index_built_at = None
         self.index_size = 0
-        self._load_index_file()
+        #self._load_index_file()
         log.info('Created dup image service')
 
 

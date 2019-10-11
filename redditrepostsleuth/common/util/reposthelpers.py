@@ -3,6 +3,7 @@ from typing import List
 from praw import Reddit
 from praw.models import Submission
 
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Post
 from redditrepostsleuth.common.model.imagematch import ImageMatch
@@ -14,6 +15,7 @@ from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
 # TODO: Should be able to safely remove this now
 
 from redditrepostsleuth.common.util.helpers import get_reddit_instance
+from redditrepostsleuth.common.util.objectmapping import post_to_repost_match
 
 
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
@@ -116,3 +118,13 @@ def verify_oc(submission: Submission, repost_service) -> bool:
     else:
         log.info('Submission %s is OC', submission.id)
         return True
+
+def check_link_repost(post: Post, uowm: UnitOfWorkManager) -> RepostWrapper:
+    with uowm.start() as uow:
+        repost = RepostWrapper()
+        repost.checked_post = post
+        repost.matches = [post_to_repost_match(match, post.id) for match in uow.posts.find_all_by_url_hash(post.url_hash) if
+                          match.post_id != post.post_id]
+        repost.matches = clean_repost_matches(repost)
+
+    return repost

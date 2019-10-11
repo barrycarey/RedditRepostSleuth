@@ -34,6 +34,7 @@ class Post(Base):
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     url_hash = Column(String(32)) # Needed to index URLs for faster lookups
     ingested_from = Column(String(40))
+    left_comment = Column(Boolean, default=False)
 
     bad_url = Column(Boolean, default=False)
     repost_count = Column(Integer, default=0)

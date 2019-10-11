@@ -19,7 +19,7 @@ from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc
+from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc, check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -155,23 +155,22 @@ class SummonsHandler:
         if post.post_type == 'image':
             self.process_image_repost_request(summons, post, sub_command=sub_command)
         elif post.post_type == 'link':
-            self.process_link_repost_request(summons, sub_command=sub_command)
+            self.process_link_repost_request(summons, post, sub_command=sub_command)
 
-    def process_link_repost_request(self, summons: Summons, sub_command: str = None):
-        submission = self.reddit.submission(id=summons.post_id)
-        comment = self.reddit.comment(id=summons.comment_id)
+    def process_link_repost_request(self, summons: Summons, post: Post, sub_command: str = None):
+
         response = RepostResponseBase(summons_id=summons.id)
         with self.uowm.start() as uow:
-            search_count = uow.posts.get_count()
-            posts = uow.posts.find_all_by_url(submission.url)
-            if len(posts) > 0:
-                response.message = LINK_ALL.format(occurrences=len(posts),
+            search_count = (uow.posts.get_newest_post()).id
+            result = check_link_repost(post, self.uowm)
+            if len(result.matches) > 0:
+                response.message = LINK_ALL.format(occurrences=len(result.matches),
                                                    searched=search_count,
-                                                   original_href='https://reddit.com' + posts[0].perma_link,
-                                                   link_text=posts[0].perma_link)
+                                                   original_href='https://reddit.com' + result.matches[0].perma_link,
+                                                   link_text=result.matches[0].perma_link)
             else:
                 response.message = REPOST_NO_RESULT.format(total=search_count)
-            self._send_response(comment, response)
+            self._send_response(summons.comment_id, response)
 
     def process_image_repost_request(self, summons: Summons, post: Post, sub_command: str = None):
 

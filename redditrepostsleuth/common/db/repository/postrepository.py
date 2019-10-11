@@ -40,7 +40,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.post_id == id).first()
 
     def find_all_by_url(self, url: str, limit: int = None):
-        return self.db_session.query(Post).filter(Post.url == url).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.url_hash == url).limit(limit).all()
 
     def find_all_by_url_hash(self, hash: str, limit: int = None):
         return self.db_session.query(Post).filter(Post.url_hash == hash).limit(limit).all()
@@ -72,6 +72,9 @@ class PostRepository:
     def get_count(self):
         r = self.db_session.query(func.count(Post.id)).first()
         return r[0] if r else None
+
+    def get_newest_post(self):
+        return self.db_session.query(Post).order_by(Post.id.desc()).limit(1).first()
 
     # Repost methods
     def find_all_by_type_repost(self, post_type: str, limit: int = None, offset: int = None) -> List[Post]:
