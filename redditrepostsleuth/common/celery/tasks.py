@@ -45,8 +45,7 @@ from redditrepostsleuth.service.eventlogging import EventLogging
 from redditrepostsleuth.common.util.helpers import get_reddit_instance
 
 from redditrepostsleuth.common.util.objectmapping import post_to_repost_match, pushshift_to_post
-from redditrepostsleuth.common.util.reposthelpers import sort_reposts, clean_repost_matches
-
+from redditrepostsleuth.common.util.reposthelpers import sort_reposts, clean_repost_matches, check_link_repost
 
 
 @celery.task
@@ -117,10 +116,10 @@ def delete_dups(self, objs):
     log.info('Finished delete batch')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
-def link_repost_check(self, posts, check_link_repostst=None):
+def link_repost_check(self, posts,):
     with self.uowm.start() as uow:
         for post in posts:
-            repost = check_link_repostst(post, self.uowm)
+            repost = check_link_repost(post, self.uowm)
             if not repost.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
                 post.checked_repost = True

@@ -7,6 +7,12 @@ services:
         environment:
             - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
+        deploy:
+            restart_policy:
+                condition: on-failure
+                delay: 120s
+                max_attempts: 3
+                window: 60s
 
     ingest_worker:
         build:
@@ -16,6 +22,12 @@ services:
             - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
+        deploy:
+            restart_policy:
+                condition: on-failure
+                delay: 120s
+                max_attempts: 3
+                window: 60s
         entrypoint: celery -A redditrepostsleuth.common worker -Q postingest,repost,repost_link -c 1
 
     image_repost_worker:
@@ -29,6 +41,12 @@ services:
         entrypoint: celery -A redditrepostsleuth.common worker -Q repost_image -c 1
         volumes:
             - /opt/imageindex:/opt/imageindex
+        deploy:
+            restart_policy:
+                condition: on-failure
+                delay: 120s
+                max_attempts: 3
+                window: 60s
 
     ingest_pushshift_worker:
         build:
@@ -39,3 +57,10 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift -c 1
+        deploy:
+            restart_policy:
+                condition: on-failure
+                delay: 120s
+                max_attempts: 3
+                window: 60s
+

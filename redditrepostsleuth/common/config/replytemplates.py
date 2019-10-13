@@ -16,3 +16,16 @@ SIGNATURE = '\n\n***\n\nThe Repost Detective\n\n[About Me](https://www.reddit.co
 SIGNATURE_NO_LINK = '\n\nThe Repost Detective'
 WATCH_NOT_OC = 'Sorry, I only keep an eye out for OC.  I checked my database and I\'ve seen this image before. \n\nTo see which images I matched repost with `!repost check all`\n\nIf you think this is an error [send me a message](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=Issue%20With%20Watch%20Request)'
 WIKI_STATS = '### Submission Index Stats\n\n**Total Posts:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n### Repost Statistics\n\n**Image Reposts:** {image_reposts}\n\n**Times Summoned:** {summoned}'
+REPOST_MESSAGE_TEMPLATE = 'This image has been seen {count} time(s) in 2019\n\n' \
+                        'First seen at [{link_text}]({original_link}) on {oldest}\n\n' \
+                              '\n\n***\n\n' \
+                              '**Searched Images:** {index_size} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
+                              '***\n\n' \
+                              '*I need feedback! Repost marked as OC? Suggestions? Hate? Send me a PM or leave a comment*'
+
+OC_MESSAGE_TEMPLATE = 'Looks like we have some certified OC! \n\n' \
+                      'I checked {count} image posts from 2019 and did not find a match\n\n' \
+                      '\n\n***\n\n' \
+                      '**Searched Images:** {count} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
+                      '***\n\n' \
+                      '*I need feedback! Repost marked as OC? Suggestions? Hate? Send me a PM or leave a comment*'

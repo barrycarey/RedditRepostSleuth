@@ -9,5 +9,8 @@ USER_AGENTS = [
 
 NO_LINK_SUBREDDITS = [
     'gaming',
-    'pcmasterrace'
+    'pcmasterrace',
+    'MurderedByWords',
+    'goddesses',
+
 ]
