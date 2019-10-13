@@ -1,7 +1,7 @@
 import re
 import time
 from typing import List
-
+from time import perf_counter
 from praw import Reddit
 from praw.models import Comment, Submission
 from datetime import datetime
@@ -9,7 +9,8 @@ from datetime import datetime
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
     WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
-    IMAGE_REPOST_SHORT, SIGNATURE, IMAGE_REPOST_SHORT_NO_LINK, SIGNATURE_NO_LINK
+    IMAGE_REPOST_SHORT, SIGNATURE, IMAGE_REPOST_SHORT_NO_LINK, SIGNATURE_NO_LINK, REPOST_MESSAGE_TEMPLATE, \
+    REPOST_MESSAGE_TEMPLATE_NO_LINK
 from redditrepostsleuth.common.exception import ImageConversioinException, NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -179,10 +180,15 @@ class SummonsHandler:
         post_count = self.image_service.index.get_n_items()
 
         try:
+            start = perf_counter()
             results = self.image_service.check_duplicate(post)
+            search_time = perf_counter() - start
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return
+
+        with self.uowm.start() as uow:
+            newest_post = uow.posts.get_newest_post()
 
         if not results:
             response.message = REPOST_NO_RESULT.format(total=post_count)
@@ -195,17 +201,36 @@ class SummonsHandler:
                         uow.posts.update(match.post)
                         uow.commit()
 
+            if results[0].post.shortlink:
+                original_link = results[0].post.shortlink
+            else:
+                original_link = 'https://reddit.com' + results[0].post.perma_link
+
             if sub_command and sub_command.lower() == 'all':
-                response.message = IMAGE_REPOST_ALL.format(occurrences=len(results),
-                                                           search_total=post_count,
-                                                           original_link='https://reddit.com' + results[0].post.perma_link,
-                                                           link_text=results[0].post.perma_link)
+                response.message = REPOST_MESSAGE_TEMPLATE.format(index_size=self.image_service.index.get_n_items(),
+                                                     time=search_time,
+                                                     total_posts=newest_post.id,
+                                                     oldest=results[0].post.created_at,
+                                                     count=len(results),
+                                                     link_text=results[0].post.post_id,
+                                                     original_link=original_link)
                 response.message += self._build_markdown_list(results)
             else:
                 if post.subreddit in NO_LINK_SUBREDDITS:
-                    response.message = IMAGE_REPOST_SHORT_NO_LINK.format(count=len(results), post_id=results[0].post.shortlink, total_search=post_count)
+                    response.message = REPOST_MESSAGE_TEMPLATE_NO_LINK.format(index_size=self.image_service.index.get_n_items(),
+                                                                      time=search_time,
+                                                                      total_posts=newest_post.id,
+                                                                      oldest=results[0].post.created_at,
+                                                                      count=len(results),
+                                                                      orig_id=results[0].post.post_id)
                 else:
-                    response.message = IMAGE_REPOST_SHORT.format(count=len(results), orig_url=results[0].post.post_id, total_search=post_count)
+                    response.message = REPOST_MESSAGE_TEMPLATE.format(index_size=self.image_service.index.get_n_items(),
+                                                                      time=search_time,
+                                                                      total_posts=newest_post.id,
+                                                                      oldest=results[0].post.created_at,
+                                                                      count=len(results),
+                                                                      link_text=results[0].post.post_id,
+                                                                      original_link=original_link)
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
@@ -225,6 +250,10 @@ class SummonsHandler:
             log.error('Did not receive reply ID when replying to comment')
         except Exception as e:
             log.exception('Problem replying to comment', exc_info=True)
+            if hasattr(e, 'error_type') and e.error_type in ['DELETED_COMMENT', 'THREAD_LOCKED']:
+                response.message = 'Failed to leave reply'
+                self._save_response(response, None)
+                return
 
 
     def _save_response(self, response: RepostResponseBase, response_id: str):

@@ -16,16 +16,17 @@ from redditrepostsleuth.common.model.db.databasemodels import Summons
 
 class SummonsMonitor:
 
-    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager):
+    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager, subreddit_list):
         self.reddit = reddit
         self.uowm = uowm
+        self.subreddit_list = subreddit_list
         #self.request_service = request_service
 
     def monitor_for_summons(self):
         """
         Monitors the subreddits set in the config for comments containing the summoning string
         """
-        for comment in self.reddit.subreddit(config.subreddit_summons).stream.comments():
+        for comment in self.reddit.subreddit(self.subreddit_list).stream.comments():
             if comment is None:
                 continue
             if self.check_for_summons(comment.body, config.summon_command):
@@ -33,11 +34,9 @@ class SummonsMonitor:
 
     @staticmethod
     def check_for_summons(comment: str, summons_string: str) -> bool:
-
         if re.search(summons_string, comment, re.IGNORECASE):
             log.info('Comment [%s] matches summons string [%s]', comment, summons_string)
             return True
-
         return False
 
     def _save_summons(self, comment: Comment):

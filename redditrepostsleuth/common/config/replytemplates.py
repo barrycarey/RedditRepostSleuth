@@ -3,7 +3,7 @@ UNSUPPORTED_POST_TYPE = 'Sorry, I don\'t support this post type right now.  Feel
 IMAGE_REPOST_ALL = '**Times Seen:** {occurrences} \n\n**Total Searched:** {search_total}\n\n**First Saw:** [{link_text}]({original_link})\n\nHere are all the instances I\'ve seen:\n\n'
 IMAGE_REPOST_SHORT = 'I\'ve seen this image {count} times. The first time I saw it [was here]({orig_url})\n\nImages search, {total_search}'
 IMAGE_REPOST_SHORT_NO_LINK = 'I\'ve seen this image {count} times. The first time I saw it was here {post_id}\n\nImages search, {total_search}'
-REPOST_NO_RESULT = 'Hey, this looks like OC! I searched {total} images and didn\'t find a match. \n\n'
+REPOST_NO_RESULT = 'Hey, this looks like unique! I searched {total} images and didn\'t find a match. However, keep in mind I only check 2019 currently \n\n'
 LINK_ALL = 'I have seen this link {occurrences} times\n\n**Total Searched:** {searched}\n\n**Oldest Post:** [{original_href}]({link_text})'
 WATCH_ENABLED = 'This looks like OC! I checked {check_count} images haven\'t seen it before.  I\'ll keep an eye on it for you!\n\nIf someone posts this same image I will let you know via {response}'
 WATCH_DISABLED = 'I have removed your repost watch from this post'
@@ -23,7 +23,15 @@ REPOST_MESSAGE_TEMPLATE = 'This image has been seen {count} time(s) in 2019\n\n'
                               '***\n\n' \
                               '*I need feedback! Repost marked as OC? Suggestions? Hate? Send me a PM or leave a comment*'
 
-OC_MESSAGE_TEMPLATE = 'Looks like we have some certified OC! \n\n' \
+REPOST_MESSAGE_TEMPLATE_NO_LINK = 'This image has been seen {count} time(s) in 2019\n\n' \
+                        'First seen at {orig_id}\n\n' \
+                              '\n\n***\n\n' \
+                              '**Searched Images:** {index_size} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
+                              '***\n\n' \
+                              '*I need feedback! Repost marked as OC? Suggestions? Hate? Send me a PM or leave a comment*'
+
+
+OC_MESSAGE_TEMPLATE = 'Looks like we have some unique content! \n\n' \
                       'I checked {count} image posts from 2019 and did not find a match\n\n' \
                       '\n\n***\n\n' \
                       '**Searched Images:** {count} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \

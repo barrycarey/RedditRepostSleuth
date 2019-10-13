@@ -141,3 +141,11 @@ class IndexBuildTimes(Base):
     build_start = Column(DateTime, nullable=False)
     build_end = Column(DateTime, nullable=False)
     build_minutes = Column(Integer)
+
+class PostReply(Base):
+    __tablename__ = 'reddit_post_reply'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    reply_id = Column(String(100), unique=True)
+    reply_body = Column(String(1000, collation='utf8mb4_general_ci'))
