@@ -2,6 +2,7 @@ import time
 from time import perf_counter
 
 from praw import Reddit
+from redlock import RedLockError
 
 from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -24,7 +25,7 @@ class TopPostMonitor:
             with self.uowm.start() as uow:
                 submissions = [sub for sub in self.reddit.subreddit('all').top('day')]
                 #submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
-                submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
+                #submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
                 submissions = submissions + [sub for sub in self.reddit.subreddit('all').hot()]
                 for sub in submissions:
                     post = uow.posts.get_by_post_id(sub.id)
@@ -54,6 +55,9 @@ class TopPostMonitor:
             search_time = perf_counter() - start
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
+            return
+        except RedLockError:
+            log.error('Could not get RedLock.  Trying again later')
             return
 
         self.add_comment(post, results, round(search_time, 4))

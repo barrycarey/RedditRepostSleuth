@@ -10,12 +10,14 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Post:
 
     with uowm.start() as uow:
         if post.post_type == 'image':
-            try:
-                image_post = process_image_post(post)
+
+            # TODO - We're implicitly setting the value of post and creating image_post.  Make it explicit
+            image_post = process_image_post(post)
+            if image_post.dhash_h and image_post.dhash_v:
                 uow.image_post.add(image_post)
-            except ImageConversioinException as e:
-                log.error('Failed to get image hashes on new post')
-                pass
+                uow.commit()
+                log.debug('Saved new image post')
+
         elif post.post_type == 'link':
             url_hash = md5(post.url.encode('utf-8'))
             post.url_hash = url_hash.hexdigest()

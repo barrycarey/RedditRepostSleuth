@@ -14,6 +14,9 @@ class ImagePostRepository:
     def get_by_id(self, id: int) -> RedditImagePost:
         return self.db_session.query(RedditImagePost).filter(RedditImagePost.id == id).first()
 
+    def get_by_post_id(self, id: str) -> RedditImagePost:
+        return self.db_session.query(RedditImagePost).filter(RedditImagePost.post_id == id).first()
+
     def page_by_id(self, id: int, limit: int = None):
         return self.db_session.query(RedditImagePost).filter(RedditImagePost.id > id).order_by(RedditImagePost.id).limit(limit).all()
 

@@ -25,8 +25,8 @@ from redditrepostsleuth.common.config import config
 
 
 from redditrepostsleuth.common.db import db_engine
-from redditrepostsleuth.common.model.db.databasemodels import LinkRepost, Comment, ImageRepost, Post,  \
-    VideoHash, AudioFingerPrint
+from redditrepostsleuth.common.model.db.databasemodels import LinkRepost, Comment, ImageRepost, Post, \
+    VideoHash, AudioFingerPrint, RedditImagePost
 from redditrepostsleuth.common.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.common.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.common.model.events.influxevent import InfluxEvent
@@ -349,8 +349,13 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
 def save_new_post(self, post):
     # TODO - This whole mess needs to be cleaned up
+    try:
+        post = pre_process_post(post, self.uowm)
+    except ImageConversioinException as e:
+        log.error('Failed to hash image post %s', post.post_id)
+        return
 
-    post = pre_process_post(post, self.uowm)
+    # TODO - Move into function
     with self.uowm.start() as uow:
         try:
             uow.posts.add(post)
@@ -591,3 +596,25 @@ def save_image_post(self, posts):
         uow.commit()
         log.info('Saved batch')
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def temp_save_image_post_batch(self, posts):
+    log.info('Starting batch job')
+    save_batch = []
+    with self.uowm.start() as uow:
+        for post in posts:
+            existing = uow.image_post.get_by_post_id(post['post_id'])
+            if existing:
+                continue
+            image_post = RedditImagePost(post_id=post['post_id'], dhash_h=post['dhash_h'], dhash_v=post['dhash_v'])
+            save_batch.append(image_post)
+
+            if len(save_batch) >= 1000:
+                uow.image_post.bulk_save(save_batch)
+                uow.commit()
+                save_batch = []
+                log.info('Saved batch')
+
+        uow.image_post.bulk_save(save_batch)
+        uow.commit()
+        save_batch = []
+        log.info('Saved last batch')

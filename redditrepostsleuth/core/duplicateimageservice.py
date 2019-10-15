@@ -59,13 +59,14 @@ class DuplicateImageService:
             raise NoIndexException('Existing index is too old')
 
         if not self.index_built_at:
-            log.debug('Loading existing index')
-            self.index = AnnoyIndex(64)
-            self.index.load(index_file)
-            self.index_built_at = created_at
-            self.index_size = self.index.get_n_items()
-            log.info('Loaded existing index with %s items', self.index.get_n_items())
-            return
+            with redlock.create_lock('index_load', ttl=30000):
+                log.debug('Loading existing index')
+                self.index = AnnoyIndex(64)
+                self.index.load(index_file)
+                self.index_built_at = created_at
+                self.index_size = self.index.get_n_items()
+                log.info('Loaded existing index with %s items', self.index.get_n_items())
+                return
 
         if created_at > self.index_built_at:
             log.info('Existing index is newer than loaded index.  Loading new index')

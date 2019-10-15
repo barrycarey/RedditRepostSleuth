@@ -47,7 +47,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=DEBUG
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift -c 1
