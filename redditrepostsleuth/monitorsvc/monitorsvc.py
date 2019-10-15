@@ -16,10 +16,11 @@ def log_queue_size(event_logger):
 
             for queue in client.scan_iter():
                 queue_name = queue.decode('utf-8')
-                if queue_name[0:1] == '_' or len(queue_name) > 15 or queue_name in skip_keys:
+                if queue_name[0:1] == '_' or len(queue_name) > 20 or queue_name in skip_keys:
                     continue
                 event_logger.save_event(
                     CeleryQueueSize(queue_name, client.llen(queue_name), event_type='queue_update'))
+            print('sleep')
             time.sleep(2)
         except Exception as e:
             pass

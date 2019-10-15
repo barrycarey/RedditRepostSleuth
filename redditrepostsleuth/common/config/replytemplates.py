@@ -16,6 +16,9 @@ SIGNATURE = '\n\n***\n\nThe Repost Detective\n\n[About Me](https://www.reddit.co
 SIGNATURE_NO_LINK = '\n\nThe Repost Detective'
 WATCH_NOT_OC = 'Sorry, I only keep an eye out for OC.  I checked my database and I\'ve seen this image before. \n\nTo see which images I matched repost with `!repost check all`\n\nIf you think this is an error [send me a message](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=Issue%20With%20Watch%20Request)'
 WIKI_STATS = '### Submission Index Stats\n\n**Total Posts:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n### Repost Statistics\n\n**Image Reposts:** {image_reposts}\n\n**Times Summoned:** {summoned}'
+
+FAILED_TO_LEAVE_RESPONSE = 'I\'m unable to comment in sub {sub}.  Here\'s the repost search I preformed. \n\n *** \n\n'
+
 REPOST_MESSAGE_TEMPLATE = 'This image has been seen {count} time(s) in 2019\n\n' \
                         'First seen at [{link_text}]({original_link}) on {oldest}\n\n' \
                               '\n\n***\n\n' \

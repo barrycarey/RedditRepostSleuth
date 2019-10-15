@@ -182,7 +182,6 @@ def save_new_comment(self, comment):
 def save_pushshift_results(self, data):
     with self.uowm.start() as uow:
         for submission in data:
-
             existing = uow.posts.get_by_post_id(submission['id'])
             if existing:
                 log.debug('Skipping pushshift post: %s', submission['id'])
@@ -190,6 +189,18 @@ def save_pushshift_results(self, data):
             post = pushshift_to_post(submission)
             log.debug('Saving pushshift post: %s', submission['id'])
             save_new_post.apply_async((post,), queue='postingest')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def save_pushshift_results_archive(self, data):
+    with self.uowm.start() as uow:
+        for submission in data:
+            existing = uow.posts.get_by_post_id(submission['id'])
+            if existing:
+                log.debug('Skipping pushshift post: %s', submission['id'])
+                continue
+            post = pushshift_to_post(submission)
+            log.debug('Saving pushshift post: %s', submission['id'])
+            save_new_post.apply_async((post,), queue='pushshift_ingest')
 
 # TODO - Remove
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
@@ -349,14 +360,18 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
 def save_new_post(self, post):
     # TODO - This whole mess needs to be cleaned up
-    try:
-        post = pre_process_post(post, self.uowm)
-    except ImageConversioinException as e:
-        log.error('Failed to hash image post %s', post.post_id)
-        return
-
-    # TODO - Move into function
     with self.uowm.start() as uow:
+        existing = uow.posts.get_by_post_id(post.post_id)
+        if existing:
+            return
+        try:
+            post = pre_process_post(post, self.uowm)
+        except ImageConversioinException as e:
+            log.error('Failed to hash image post %s', post.post_id)
+            return
+
+        # TODO - Move into function
+
         try:
             uow.posts.add(post)
             uow.commit()

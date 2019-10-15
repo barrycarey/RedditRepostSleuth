@@ -10,7 +10,7 @@ from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
     WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
     IMAGE_REPOST_SHORT, SIGNATURE, IMAGE_REPOST_SHORT_NO_LINK, SIGNATURE_NO_LINK, REPOST_MESSAGE_TEMPLATE, \
-    REPOST_MESSAGE_TEMPLATE_NO_LINK
+    REPOST_MESSAGE_TEMPLATE_NO_LINK, FAILED_TO_LEAVE_RESPONSE
 from redditrepostsleuth.common.exception import ImageConversioinException, NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -25,16 +25,19 @@ from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
 class SummonsHandler:
-    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: Reddit):
+    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: Reddit, summons_disabled=False):
         self.uowm = uowm
         self.image_service = image_service
         self.reddit = reddit
+        self.summons_disabled = summons_disabled
 
     def handle_repost_request(self, summons: Summons):
 
         parsed_command = re.search('!repost\s(?P<command>[^\s]+)(?P<subcommand>\s[^\s]+)?', summons.comment_body, re.IGNORECASE)
 
         log.info('Processing request for comment %s. Body: %s', summons.comment_id, summons.comment_body)
+
+
 
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(summons.post_id)
@@ -44,6 +47,12 @@ class SummonsHandler:
             self.save_unknown_post(summons.post_id)
 
         response = RepostResponseBase(summons_id=summons.id)
+
+        if self.summons_disabled:
+            log.info('Sending summons disabled message')
+            response.message = 'Repost checking is disabled right now.  We\'re working on feedback from the launch. I\'ll be back in 48 hours'
+            self._send_response(summons.comment_id, response)
+            return
 
         if post.post_type is None or post.post_type not in ['image', 'link']:
             log.error('Submission has no post hint.  Cannot process summons')
@@ -250,10 +259,21 @@ class SummonsHandler:
             log.error('Did not receive reply ID when replying to comment')
         except Exception as e:
             log.exception('Problem replying to comment', exc_info=True)
-            if hasattr(e, 'error_type') and e.error_type in ['DELETED_COMMENT', 'THREAD_LOCKED']:
-                response.message = 'Failed to leave reply'
-                self._save_response(response, None)
-                return
+
+            if hasattr(e, 'error_type') and e.error_type in ['DELETED_COMMENT']:
+                response.message = 'COMMENT DELETED'
+            else:
+                self._send_direct_message(comment, response)
+            self._save_response(response, None)
+
+    def _send_direct_message(self, comment: Comment, response: RepostResponseBase):
+        log.info('Sending direct message to %s', comment.author.name)
+        response.message = FAILED_TO_LEAVE_RESPONSE.format(sub=comment.subreddit_name_prefixed) + response.message
+        try:
+            r = comment.author.message('Repost Check', response.message)
+            self._save_response(response, None)
+        except Exception as e:
+            log.error('Failed to send private message to %s', comment.author.name)
 
 
     def _save_response(self, response: RepostResponseBase, response_id: str):

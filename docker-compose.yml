@@ -41,7 +41,6 @@ services:
         volumes:
             - /opt/imageindex:/opt/imageindex
 
-
     ingest_pushshift_worker:
         build:
             context: .
@@ -51,3 +50,23 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift -c 1
+
+    pushshift_archive_intake_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+        entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_intake -c 1
+
+    pushshift_archive_ingest:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+        entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_ingest -c 1
