@@ -62,6 +62,7 @@ BANNED_SUBS = [
     'electronics',
     'whatisthisthing',
     'dankmemes',
-    'justneckbeardthings'
+    'justneckbeardthings',
+    'whatisthisthing'
 
 ]

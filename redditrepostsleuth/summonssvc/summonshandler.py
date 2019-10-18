@@ -11,7 +11,7 @@ from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
     WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, \
     REPOST_MESSAGE_TEMPLATE, \
-    FAILED_TO_LEAVE_RESPONSE, OC_MESSAGE_TEMPLATE
+    FAILED_TO_LEAVE_RESPONSE, OC_MESSAGE_TEMPLATE, IMAGE_REPOST_ALL
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
@@ -33,7 +33,7 @@ class SummonsHandler:
 
     def handle_repost_request(self, summons: Summons):
 
-        parsed_command = re.search('!repost\s(?P<command>[^\s]+)(?P<subcommand>\s[^\s]+)?', summons.comment_body, re.IGNORECASE)
+        parsed_command = re.search('\?repost\s(?P<command>[^\s]+)(?P<subcommand>\s[^\s]+)?', summons.comment_body, re.IGNORECASE)
 
         log.info('Processing request for comment %s. Body: %s', summons.comment_id, summons.comment_body)
 
@@ -210,22 +210,33 @@ class SummonsHandler:
                         uow.posts.update(match.post)
                         uow.commit()
 
-            if search_results[0].post.shortlink:
-                original_link = search_results[0].post.shortlink
+            if sub_command == 'all':
+                response.message = IMAGE_REPOST_ALL.format(
+                    count=len(search_results),
+                    searched_posts=self._searched_post_str(post, self.image_service.index.get_n_items()),
+                    firstseen=self._create_first_seen(search_results[0].post),
+                    time=search_time
+
+                )
+                if len(search_results) > 3:
+                    log.info('Sending check all results via PM with %s matches', len(search_results))
+                    comment = self.reddit.comment(summons.comment_id)
+                    response.message = response.message + self._build_markdown_list(search_results)
+                    self._send_direct_message(comment, response)
+                    response.message = f'I found {len(search_results)} matches.  I\'m sending them to you via PM to reduce comment spam'
+
+                response.message = response.message
             else:
-                original_link = 'https://reddit.com' + search_results[0].post.perma_link
-
-
-            response.message = REPOST_MESSAGE_TEMPLATE.format(
-                                                 searched_posts=self._searched_post_str(post, self.image_service.index.get_n_items()),
-                                                 post_type=post.post_type,
-                                                 time=search_time,
-                                                 total_posts=f'{newest_post.id:,}',
-                                                 oldest=search_results[0].post.created_at,
-                                                 count=len(search_results),
-                                                 firstseen=self._create_first_seen(search_results[0].post),
-                                                 times='times' if len(search_results) > 1 else 'time',
-                                                 promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot')
+                response.message = REPOST_MESSAGE_TEMPLATE.format(
+                                                     searched_posts=self._searched_post_str(post, self.image_service.index.get_n_items()),
+                                                     post_type=post.post_type,
+                                                     time=search_time,
+                                                     total_posts=f'{newest_post.id:,}',
+                                                     oldest=search_results[0].post.created_at,
+                                                     count=len(search_results),
+                                                     firstseen=self._create_first_seen(search_results[0].post),
+                                                     times='times' if len(search_results) > 1 else 'time',
+                                                     promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot')
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
@@ -236,6 +247,7 @@ class SummonsHandler:
 
             reply = comment.reply(response.message)
             if reply.id:
+                log.debug(f'https://reddit.com{reply.permalink}')
                 self._save_response(response, reply.id)
                 return
             log.error('Did not receive reply ID when replying to comment')
@@ -245,14 +257,15 @@ class SummonsHandler:
             if hasattr(e, 'error_type') and e.error_type in ['DELETED_COMMENT']:
                 response.message = 'COMMENT DELETED'
             else:
+                response.message = FAILED_TO_LEAVE_RESPONSE.format(
+                    sub=comment.subreddit_name_prefixed) + response.message
                 self._send_direct_message(comment, response)
             self._save_response(response, None)
 
     def _send_direct_message(self, comment: Comment, response: RepostResponseBase):
         log.info('Sending direct message to %s', comment.author.name)
-        response.message = FAILED_TO_LEAVE_RESPONSE.format(sub=comment.subreddit_name_prefixed) + response.message
         try:
-            r = comment.author.message('Repost Check', response.message)
+            comment.author.message('Repost Check', response.message)
             self._save_response(response, None)
         except Exception as e:
             log.error('Failed to send private message to %s', comment.author.name)
@@ -271,7 +284,7 @@ class SummonsHandler:
     def _build_markdown_list(self, matches: List[ImageMatch]) -> str:
         result = ''
         for match in matches:
-            result += '* {} - [{}]({})\n'.format(match.post.created_at, match.post.shortlink, match.post.shortlink)
+            result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
         return result
 
     def _save_post(self, post: Post):
@@ -316,7 +329,7 @@ class SummonsHandler:
     def _create_first_seen(self, post: Post) -> str:
         # TODO - Move to helper. Dupped in hot post
         if post.subreddit in NO_LINK_SUBREDDITS:
-            firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%d-%m-%Y')}"
+            firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%d-%m-%Y')} by u/{post.author}"
         else:
             if post.shortlink:
                 original_link = post.shortlink

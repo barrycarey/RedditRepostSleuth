@@ -102,7 +102,7 @@ class TopPostMonitor:
                                                      count=len(search_results),
                                                      firstseen=self._create_first_seen(search_results[0].post),
                                                      times='times' if len(search_results) > 1 else 'time',
-                                                     promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot')
+                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*')
             else:
                 msg = OC_MESSAGE_TEMPLATE.format(count=f'{total_search:,}',
                                                  time=search_time,
