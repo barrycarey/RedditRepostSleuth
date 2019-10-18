@@ -122,7 +122,6 @@ def set_image_hashes(post: Post) -> Post:
     try:
         img = generate_img_by_url(post.url)
     except ImageConversioinException as e:
-        log.exception('Problem converting image', exc_info=True)
         raise
 
     try:

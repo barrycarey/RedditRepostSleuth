@@ -1,20 +1,21 @@
-import threading
-
 from redditrepostsleuth.common.db import db_engine
 from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.util.helpers import get_reddit_instance
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
-from redditrepostsleuth.summonssvc.summonsmonitor import SummonsMonitor
 
-uowm = SqlAlchemyUnitOfWorkManager(db_engine)
-dup = DuplicateImageService(uowm)
+if __name__ == '__main__':
+    uowm = SqlAlchemyUnitOfWorkManager(db_engine)
+    dup = DuplicateImageService(uowm)
+    summons = SummonsHandler(uowm, dup, get_reddit_instance(), summons_disabled=False)
+    while True:
+        try:
+            summons.handle_summons()
+        except Exception as e:
+            log.exception('Summons handler crashed', exc_info=True)
 
-summons = SummonsHandler(uowm, dup, get_reddit_instance(), summons_disabled=True)
-summons.handle_summons()
 
-with uowm.start() as uow:
-    post = uow.posts.get_by_post_id('dg2foo')
 
-result = dup.check_duplicate(post)
+
 

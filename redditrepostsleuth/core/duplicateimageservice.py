@@ -54,7 +54,7 @@ class DuplicateImageService:
         created_at = datetime.fromtimestamp(os.stat(index_file).st_ctime)
         delta = datetime.now() - created_at
 
-        if delta.seconds > 21600:
+        if delta.seconds > 30000:
             log.info('Existing index is too old.  Skipping repost check')
             raise NoIndexException('Existing index is too old')
 
@@ -127,6 +127,9 @@ class DuplicateImageService:
                 log.debug("Skipping match that is a crosspost")
                 continue
 
+            if not original.dhash_h or not match.post.dhash_h:
+                log.error('Missing dash in dup check. Original(%s): %s - Match (%s): %s', original.post_id, original.dhash_h, match.post.post_id, match.post.dhash_h)
+                continue
             match.hamming_distance = hamming(original.dhash_h, match.post.dhash_h)
 
             if match.hamming_distance <= config.hamming_cutoff:

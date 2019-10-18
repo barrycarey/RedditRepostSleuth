@@ -17,26 +17,16 @@ SIGNATURE_NO_LINK = '\n\nThe Repost Detective'
 WATCH_NOT_OC = 'Sorry, I only keep an eye out for OC.  I checked my database and I\'ve seen this image before. \n\nTo see which images I matched repost with `!repost check all`\n\nIf you think this is an error [send me a message](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=Issue%20With%20Watch%20Request)'
 WIKI_STATS = '### Submission Index Stats\n\n**Total Posts:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n### Repost Statistics\n\n**Image Reposts:** {image_reposts}\n\n**Times Summoned:** {summoned}'
 
+GENERIC_IMAGE_NO_MATCH_COMMENT = ''
+
 FAILED_TO_LEAVE_RESPONSE = 'I\'m unable to comment in sub {sub}.  Here\'s the repost search I preformed. \n\n *** \n\n'
 
-REPOST_MESSAGE_TEMPLATE = 'This image has been seen {count} time(s) in 2019\n\n' \
-                        'First seen at [{link_text}]({original_link}) on {oldest}\n\n' \
-                              '\n\n***\n\n' \
-                              '**Searched Images:** {index_size} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
-                              '***\n\n' \
-                              '*I need feedback! Repost marked as OC? Suggestions? Hate? Send me a PM or leave a comment*'
-
-REPOST_MESSAGE_TEMPLATE_NO_LINK = 'This image has been seen {count} time(s) in 2019\n\n' \
-                        'First seen at {orig_id}\n\n' \
-                              '\n\n***\n\n' \
-                              '**Searched Images:** {index_size} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
-                              '***\n\n' \
-                              '*I need feedback! Repost marked as OC? Suggestions? Hate? Send me a PM or leave a comment*'
+# First seen at [{link_text}]({original_link}) on {oldest}
+REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {count} {times}. {firstseen}\n\n' \
+                              '{searched_posts} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
+                              '*If this is useful, comment \'**Good Bot**\'. Feedback? Hate? Send me a PM {promo}*'
 
 
-OC_MESSAGE_TEMPLATE = 'Looks like we have some unique content! \n\n' \
-                      'I checked {count} image posts from 2019 and did not find a match\n\n' \
-                      '\n\n***\n\n' \
-                      '**Searched Images:** {count} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
-                      '***\n\n' \
-                      '*I need feedback! Repost marked as OC? Suggestions? Hate? Send me a PM or leave a comment*'
+OC_MESSAGE_TEMPLATE = 'This looks like unique content! I checked {count} {post_type} posts in {time} seconds and didn\'t find a match\n\n' \
+                      '*If this is useful, comment \'**Good Bot**\'. Feedback? Hate? Send me a PM {promo}*'
+

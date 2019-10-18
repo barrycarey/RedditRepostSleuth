@@ -1,26 +1,26 @@
 import re
 import time
-from typing import List
-from time import perf_counter
-from praw import Reddit
-from praw.models import Comment, Submission
 from datetime import datetime
+from time import perf_counter
+from typing import List
+
+from praw import Reddit
+from praw.models import Comment
 
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
-    WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
-    IMAGE_REPOST_SHORT, SIGNATURE, IMAGE_REPOST_SHORT_NO_LINK, SIGNATURE_NO_LINK, REPOST_MESSAGE_TEMPLATE, \
-    REPOST_MESSAGE_TEMPLATE_NO_LINK, FAILED_TO_LEAVE_RESPONSE
-from redditrepostsleuth.common.exception import ImageConversioinException, NoIndexException
-from redditrepostsleuth.common.logging import log
+    WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, \
+    REPOST_MESSAGE_TEMPLATE, \
+    FAILED_TO_LEAVE_RESPONSE, OC_MESSAGE_TEMPLATE
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.exception import NoIndexException
+from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Summons, RepostWatch, Post
 from redditrepostsleuth.common.model.imagematch import ImageMatch
-
 from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc, check_link_repost
+from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -37,8 +37,6 @@ class SummonsHandler:
 
         log.info('Processing request for comment %s. Body: %s', summons.comment_id, summons.comment_body)
 
-
-
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(summons.post_id)
 
@@ -50,11 +48,11 @@ class SummonsHandler:
 
         if self.summons_disabled:
             log.info('Sending summons disabled message')
-            response.message = 'Repost checking is disabled right now.  We\'re working on feedback from the launch. I\'ll be back in 48 hours'
+            response.message = 'Bot summons is disabled right now.  We\'re working on feedback from the launch. I\'ll be back in 48 hours'
             self._send_response(summons.comment_id, response)
             return
 
-        if post.post_type is None or post.post_type not in ['image', 'link']:
+        if post.post_type is None or post.post_type not in ['image']:
             log.error('Submission has no post hint.  Cannot process summons')
             response.status = 'error'
             response.message = UNSUPPORTED_POST_TYPE
@@ -186,11 +184,9 @@ class SummonsHandler:
 
         response = RepostResponseBase(summons_id=summons.id)
 
-        post_count = self.image_service.index.get_n_items()
-
         try:
             start = perf_counter()
-            results = self.image_service.check_duplicate(post)
+            search_results = self.image_service.check_duplicate(post)
             search_time = perf_counter() - start
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
@@ -199,47 +195,37 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             newest_post = uow.posts.get_newest_post()
 
-        if not results:
-            response.message = REPOST_NO_RESULT.format(total=post_count)
+        if not search_results:
+            response.message = OC_MESSAGE_TEMPLATE.format(count=f'{self.image_service.index.get_n_items():,}',
+                                                 time=round(search_time, 4),
+                                                 post_type=post.post_type,
+                                                 promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot'
+                                                 )
         else:
             # TODO: This is temp until database is backfilled with short links
             with self.uowm.start() as uow:
-                for match in results:
+                for match in search_results:
                     if not match.post.shortlink:
                         set_shortlink(match.post)
                         uow.posts.update(match.post)
                         uow.commit()
 
-            if results[0].post.shortlink:
-                original_link = results[0].post.shortlink
+            if search_results[0].post.shortlink:
+                original_link = search_results[0].post.shortlink
             else:
-                original_link = 'https://reddit.com' + results[0].post.perma_link
+                original_link = 'https://reddit.com' + search_results[0].post.perma_link
 
-            if sub_command and sub_command.lower() == 'all':
-                response.message = REPOST_MESSAGE_TEMPLATE.format(index_size=self.image_service.index.get_n_items(),
-                                                     time=search_time,
-                                                     total_posts=newest_post.id,
-                                                     oldest=results[0].post.created_at,
-                                                     count=len(results),
-                                                     link_text=results[0].post.post_id,
-                                                     original_link=original_link)
-                response.message += self._build_markdown_list(results)
-            else:
-                if post.subreddit in NO_LINK_SUBREDDITS:
-                    response.message = REPOST_MESSAGE_TEMPLATE_NO_LINK.format(index_size=self.image_service.index.get_n_items(),
-                                                                      time=search_time,
-                                                                      total_posts=newest_post.id,
-                                                                      oldest=results[0].post.created_at,
-                                                                      count=len(results),
-                                                                      orig_id=results[0].post.post_id)
-                else:
-                    response.message = REPOST_MESSAGE_TEMPLATE.format(index_size=self.image_service.index.get_n_items(),
-                                                                      time=search_time,
-                                                                      total_posts=newest_post.id,
-                                                                      oldest=results[0].post.created_at,
-                                                                      count=len(results),
-                                                                      link_text=results[0].post.post_id,
-                                                                      original_link=original_link)
+
+            response.message = REPOST_MESSAGE_TEMPLATE.format(
+                                                 searched_posts=self._searched_post_str(post, self.image_service.index.get_n_items()),
+                                                 post_type=post.post_type,
+                                                 time=search_time,
+                                                 total_posts=f'{newest_post.id:,}',
+                                                 oldest=search_results[0].post.created_at,
+                                                 count=len(search_results),
+                                                 firstseen=self._create_first_seen(search_results[0].post),
+                                                 times='times' if len(search_results) > 1 else 'time',
+                                                 promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot')
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
@@ -248,10 +234,6 @@ class SummonsHandler:
         try:
             log.info('Sending response to summons comment %s. MESSAGE: %s', comment.id, response.message)
 
-            if no_link:
-                response.message += SIGNATURE_NO_LINK
-            else:
-                response.message += SIGNATURE.format()
             reply = comment.reply(response.message)
             if reply.id:
                 self._save_response(response, reply.id)
@@ -330,3 +312,29 @@ class SummonsHandler:
 
         return post
 
+
+    def _create_first_seen(self, post: Post) -> str:
+        # TODO - Move to helper. Dupped in hot post
+        if post.subreddit in NO_LINK_SUBREDDITS:
+            firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%d-%m-%Y')}"
+        else:
+            if post.shortlink:
+                original_link = post.shortlink
+            else:
+                original_link = 'https://reddit.com' + post.perma_link
+
+            firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%d-%m-%Y')}"
+
+        log.debug('First Seen String: %s', firstseen)
+        return firstseen
+
+    def _searched_post_str(self, post: Post, count: int) -> str:
+        # TODO - Move to helper. Dupped in host post
+        # **Searched Images:** {index_size}
+        output = '**Searched '
+        if post.post_type == 'image':
+            output = output + f'Images:** {count:,}'
+        elif post.post_type == 'link':
+            output = output + f'Links:** {count:,}'
+
+        return output
