@@ -16,8 +16,8 @@ NO_LINK_SUBREDDITS = [
     'me_irl',
     'natureismetal',
     'interestingasfuck',
-    'PewdiepieSubmissions',
-    'memes'
+    'memes',
+    'science'
 
 ]
 
@@ -63,6 +63,8 @@ BANNED_SUBS = [
     'whatisthisthing',
     'dankmemes',
     'justneckbeardthings',
-    'whatisthisthing'
+    'whatisthisthing',
+    'pewdiepiesubmissions',
+    'oddlysatisfying'
 
 ]

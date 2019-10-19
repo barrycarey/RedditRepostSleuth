@@ -26,7 +26,7 @@ class TopPostMonitor:
         while True:
             with self.uowm.start() as uow:
                 submissions = [sub for sub in self.reddit.subreddit('all').top('day')]
-                #submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
+                submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
                 #submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
                 submissions = submissions + [sub for sub in self.reddit.subreddit('all').hot()]
                 for sub in submissions:
@@ -107,11 +107,13 @@ class TopPostMonitor:
                 msg = OC_MESSAGE_TEMPLATE.format(count=f'{total_search:,}',
                                                  time=search_time,
                                                  post_type=post.post_type,
-                                                 promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot'
+                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*'
                                                  )
             log.info('Leaving message %s', msg)
             try:
-                submission.reply(msg)
+                comment = submission.reply(msg)
+                if comment:
+                    log.info(f'https://reddit.com{comment.permalink}')
             except Exception as e:
                 log.exception('Failed to leave comment on post %s', post.post_id)
                 return

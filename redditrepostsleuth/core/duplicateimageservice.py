@@ -137,6 +137,7 @@ class DuplicateImageService:
                 final_results.append(match)
             else:
                 #log.debug('Passed annoy and failed hamming. (Anny: %s - Ham: %s) - %s', result[1], hamming_distance, result[0])
+                log.info('Post %s missed hamming cutoff of %s with %s', match.post.post_id, config.hamming_cutoff, match.hamming_distance)
                 pass
 
         return sort_reposts(final_results)

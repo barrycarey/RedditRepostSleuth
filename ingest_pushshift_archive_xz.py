@@ -36,12 +36,13 @@ if __name__ == '__main__':
 
                 object = json.loads(line)
 
-                if object['created_utc'] < 1538580561:
+                if object['created_utc'] < 1538650595:
                     continue
-
+                print('line')
                 batch.append(object)
 
                 if len(batch) >= 1000:
+                    print('Sending to pushshift')
                     try:
                         save_pushshift_results_archive.apply_async((batch,), queue='pushshift_intake')
                     except Exception as e:
@@ -51,7 +52,6 @@ if __name__ == '__main__':
                         except Exception:
                             continue
 
-                    time.sleep(20)
                     print('Sent batch to celery: ' + str(datetime.utcfromtimestamp(batch[0]['created_utc'])) + ' (' + str(object['created_utc']) + ')' )
                     batch = []
 
