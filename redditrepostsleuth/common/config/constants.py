@@ -65,6 +65,11 @@ BANNED_SUBS = [
     'justneckbeardthings',
     'whatisthisthing',
     'pewdiepiesubmissions',
-    'oddlysatisfying'
+    'oddlysatisfying',
+    'cursedimages',
+    'minecraft',
+    'oregairusnafu'
+    'fireemblem',
+    'hmmm'
 
 ]

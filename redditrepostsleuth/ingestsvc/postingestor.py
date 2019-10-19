@@ -77,7 +77,7 @@ class PostIngestor:
 
                 data = json.loads(response['payload'])
                 oldest_id = data['data'][-1]['created_utc']
-                log.info('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
+                log.debug('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
 
                 if not start_time:
                     start_time = data['data'][0]['created_utc']
@@ -86,7 +86,7 @@ class PostIngestor:
 
                 start_end_dif = start_time - oldest_id
                 if start_end_dif > 3600:
-                    log.info('Reached end of 1 hour window, starting over')
+                    log.debug('Reached end of 1 hour window, starting over')
                     break
 
 

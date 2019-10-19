@@ -2,7 +2,7 @@ import os
 from typing import List
 
 from distance import hamming
-
+from time import perf_counter
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.config import config
@@ -12,6 +12,7 @@ from annoy import AnnoyIndex
 
 from redditrepostsleuth.common.model.db.databasemodels import Post
 from redditrepostsleuth.common.model.imagematch import ImageMatch
+from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.common.util.redlock import redlock
 from redditrepostsleuth.common.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.common.util.reposthelpers import sort_reposts
@@ -85,23 +86,28 @@ class DuplicateImageService:
         else:
             log.info('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
 
-
-    def _clean_results(self, results: List[ImageMatch], orig_id: int) -> List[ImageMatch]:
+    # TODO - Remove this method
+    def _clean_results(self, results: List[ImageMatch], orig_id: int, target_hamming_distance: int = None, target_annoy_distance: float = None) -> List[ImageMatch]:
         """
         Take a list of matches and filter out the results.
         :param results: List of ImageMatch
         :param orig_id: ID of the post we are checked for reposts
         :return:
         """
+
+        # Prefers passed in targets, defaults to config
+        target_hamming_distance = target_hamming_distance or config.hamming_cutoff
+        target_annoy_distance = target_annoy_distance or config.annoy_match_cutoff
+
         with self.uowm.start() as uow:
             original = uow.posts.get_by_id(orig_id)
 
         final_results = []
+        log.debug('Original: %s', f'http://redd.it/{original.post_id}')
         for match in results:
-            if match.annoy_distance > 0.265:
-                #log.debug('Skipping result with distance %s', result[1])
-                continue
 
+            if match.annoy_distance > target_annoy_distance:
+                continue
 
             # Skip original query (result[0] is DB ID)
             if match.match_id == match.original_id:
@@ -132,7 +138,7 @@ class DuplicateImageService:
                 continue
             match.hamming_distance = hamming(original.dhash_h, match.post.dhash_h)
 
-            if match.hamming_distance <= config.hamming_cutoff:
+            if match.hamming_distance <= target_hamming_distance:
                 log.debug('Match %s: Annoy %s - Ham: %s', match.match_id, match.hamming_distance, match.annoy_distance)
                 final_results.append(match)
             else:
@@ -142,14 +148,130 @@ class DuplicateImageService:
 
         return sort_reposts(final_results)
 
+    def _filter_results_for_reposts(self, matches: List[ImageMatch], checked_post: Post, target_hamming_distance: int = None, target_annoy_distance: float = None) -> List[ImageMatch]:
+        """
+        Take a list of matches and filter out posts that are not reposts.
+        This is done via distance checking, creation date, crosspost
+        :param checked_post: The post we're finding matches for
+        :param matches: A cleaned list of matches
+        :param target_hamming_distance: Hamming cutoff for matches
+        :param target_annoy_distance: Annoy cutoff for matches
+        :rtype: List[ImageMatch]
+        """
+        target_hamming_distance = target_hamming_distance or config.hamming_cutoff
+        target_annoy_distance = target_annoy_distance or config.annoy_match_cutoff
+        self._set_match_posts(matches)
+        self._set_match_hamming(checked_post, matches)
+        results = []
+        log.info('Checking %s %s for duplicates', checked_post.post_id, f'https://redd.it/{checked_post.post_id}')
+        log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
+        log.info('Matches pre-filter: %s', len(matches))
+        for match in matches:
+            if match.annoy_distance > target_annoy_distance:
+                log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance, f'http:redd.it/{match.post.post_id}')
+                continue
+            if checked_post.post_id == match.post.post_id:
+                continue
+            if match.post.created_at > checked_post.created_at:
+                continue
+            if checked_post.author == match.post.author:
+                # TODO - Need logic to check age and sub of matching posts with same author
+                continue
+            if match.post.crosspost_parent:
+                continue
+            if match.hamming_distance > target_hamming_distance:
+                log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
+                          match.hamming_distance, f'http://redd.it/{match.post.post_id}')
+                continue
+            log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
+            results.append(match)
+        log.info('Matches post-filter: %s', len(results))
+        return sort_reposts(results)
 
-    def check_duplicate(self, post: Post) -> List[ImageMatch]:
+
+    # TODO - Phase this out
+    def check_duplicate(self, post: Post, filter: bool = True, max_matches: int = 50, target_hamming_distance: int = None, target_annoy_distance: float = None) -> List[ImageMatch]:
+        """
+        Take a given post and check it against the index for matches
+        :rtype: List[ImageMatch]
+        :param post: Post object
+        :param filter: Filter the returned result or return raw results
+        :param target_hamming_distance: Only return matches below this value
+        :param target_annoy_distance: Only return matches below this value.  This is checked first
+        :return: List of matching images
+        """
         # TODO: Load and append post object to each match
         self._load_index_file()
         log.debug('%s - Checking %s for duplicates', os.getpid(), post.post_id)
         log.debug('Image hash: %s', post.dhash_h)
         search_array = bytearray(post.dhash_h, encoding='utf-8')
-        r = self.index.get_nns_by_vector(list(search_array), 50, search_k=20000, include_distances=True)
+        r = self.index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
         results = list(zip(r[0], r[1]))
         matches = [annoy_result_to_image_match(match, post.id) for match in results]
-        return self._clean_results(matches, post.id)
+        if filter:
+            return self._clean_results(matches, post.id, target_hamming_distance, target_annoy_distance)
+        else:
+            return matches
+
+    def check_duplicates_wrapped(self, post: Post, filter: bool = True, max_matches: int = 50, target_hamming_distance: int = None, target_annoy_distance: float = None) -> ImageRepostWrapper:
+        """
+        Wrapper around check_duplicates to keep existing API intact
+        :rtype: ImageRepostWrapper
+        :param post: Post object
+        :param filter: Filter the returned result or return raw results
+        :param target_hamming_distance: Only return matches below this value
+        :param target_annoy_distance: Only return matches below this value.  This is checked first
+        :return: List of matching images
+        """
+        self._load_index_file()
+        result = ImageRepostWrapper()
+        start = perf_counter()
+        search_array = bytearray(post.dhash_h, encoding='utf-8')
+        r = self.index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
+        search_results = list(zip(r[0], r[1]))
+        result.matches = [annoy_result_to_image_match(match, post.id) for match in search_results]
+        result.search_time = round(perf_counter() - start, 5)
+        result.index_size = self.index.get_n_items()
+        if filter:
+            self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance)
+        else:
+            self._set_match_posts(result.matches)
+            self._set_match_hamming(post, result.matches)
+        result.checked_post = post
+        return result
+
+    def _set_match_posts(self, matches: List[ImageMatch]) -> List[ImageMatch]:
+        """
+        Attach each matches corresponding database entry
+        :rtype: List[ImageMatch]
+        :param matches: List of matches
+        """
+        start = perf_counter()
+        with self.uowm.start() as uow:
+            for match in matches:
+                # Hacky but we need this to get the original database post ID from the RedditImagePost object
+                # TODO - Clean this shit up once I fix relationships
+                original_image_post = uow.image_post.get_by_id(match.match_id)
+                match_post = uow.posts.get_by_post_id(original_image_post.post_id)
+                match.post = match_post
+                match.match_id = match_post.id
+        log.debug('Time to set match posts: %s', perf_counter() - start)
+        return matches
+
+
+    def _set_match_hamming(self, searched_post: Post, matches: List[ImageMatch]) -> List[ImageMatch]:
+        """
+        Take a list of ImageMatches and set the hamming distance vs origional post
+        :rtype: List[ImageMatch]
+        :param matches: List of ImageMatches
+        :return: List of Imagematches
+        """
+        for match in matches:
+            if not match.post:
+                log.error('Match missing post object')
+                continue
+            if not match.post.dhash_h:
+                log.error('Match %s missing dhash_h', match.post.post_id)
+                continue
+            match.hamming_distance = hamming(searched_post.dhash_h, match.post.dhash_h)
+        return matches

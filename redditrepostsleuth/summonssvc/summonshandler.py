@@ -187,7 +187,7 @@ class SummonsHandler:
         try:
             start = perf_counter()
             search_results = self.image_service.check_duplicate(post)
-            search_time = perf_counter() - start
+
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return

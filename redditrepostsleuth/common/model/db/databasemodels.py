@@ -9,7 +9,7 @@ class Post(Base):
         return self.image_hash < other.image_hash
 
     def __repr__(self) -> str:
-        return 'Post ID: {} - Type: {} - URL: {} - Source: {}'.format(self.post_id, self.post_type, self.url, self.ingested_from)
+        return 'Post ID: {} - Type: {} - URL: {} - Source: {} - Created: {}'.format(self.post_id, self.post_type, self.url, self.ingested_from, self.created_at)
 
     __tablename__ = 'reddit_post'
 
@@ -39,6 +39,18 @@ class Post(Base):
     bad_url = Column(Boolean, default=False)
     repost_count = Column(Integer, default=0)
     #fullname = Column(String(30))
+
+    def to_dict(self):
+        return {
+            'post_id': self.post_id,
+            'url': self.url,
+            'shortlink': self.shortlink,
+            'perma_link': self.perma_link,
+            'title': self.title,
+            'dhash_v': self.dhash_v,
+            'dhash_h': self.dhash_h,
+            'created_at': self.created_at.timestamp()
+        }
 
 
 

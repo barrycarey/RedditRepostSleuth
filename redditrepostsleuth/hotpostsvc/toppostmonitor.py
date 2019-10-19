@@ -26,7 +26,7 @@ class TopPostMonitor:
         while True:
             with self.uowm.start() as uow:
                 submissions = [sub for sub in self.reddit.subreddit('all').top('day')]
-                submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
+                #submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
                 #submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
                 submissions = submissions + [sub for sub in self.reddit.subreddit('all').hot()]
                 for sub in submissions:
