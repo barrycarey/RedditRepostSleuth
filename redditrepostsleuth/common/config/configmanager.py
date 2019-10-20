@@ -25,6 +25,7 @@ class ConfigManager:
 
         # General
         self.summon_command = self.config['GENERAL'].get('summon_command', fallback='!repost')
+        self.comment_on_oc = self.config['GENERAL'].getboolean('comment_on_oc', fallback=False)
 
         self.delete_check_batch_size = self.config['GENERAL'].getint('delete_check_batch_size', fallback=50)
 

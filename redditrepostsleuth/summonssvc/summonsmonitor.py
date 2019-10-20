@@ -57,6 +57,33 @@ class SummonsMonitor:
                 uow.summons.add(summons)
                 uow.commit()
 
+    def monitor_for_mentions(self):
+        while True:
+            try:
+                for comment in self.reddit.inbox.mentions():
+                    if comment.created_utc < datetime.utcnow().timestamp() - 86400:
+                        log.debug('Skipping old mention. Created at %s', datetime.fromtimestamp(comment.created_utc))
+                        continue
+
+                    with self.uowm.start() as uow:
+                        existing_summons = uow.summons.get_by_comment_id(comment.id)
+                        if existing_summons:
+                            log.debug('Skipping existing mention %s', comment.id)
+                            continue
+                        summons = Summons(
+                            post_id=comment.submission.id,
+                            comment_id=comment.id,
+                            comment_body=comment.body,
+                            summons_received_at=datetime.fromtimestamp(comment.created_utc),
+                            requestor=comment.author.name
+                        )
+                        uow.summons.add(summons)
+                        uow.commit()
+            except Exception as e:
+                log.exception('Mention monitor failed', exc_info=True)
+
+            time.sleep(20)
+
 
     def monitor_for_summons_pushshift(self):
         try:

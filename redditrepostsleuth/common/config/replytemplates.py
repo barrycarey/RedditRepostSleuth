@@ -22,7 +22,7 @@ GENERIC_IMAGE_NO_MATCH_COMMENT = ''
 FAILED_TO_LEAVE_RESPONSE = 'I\'m unable to comment in sub {sub}.  Here\'s the repost search I preformed. \n\n *** \n\n'
 
 # First seen at [{link_text}]({original_link}) on {oldest}
-REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {count} {times}. {firstseen}\n\n' \
+REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {count} {times}. {firstseen}. {percent} match.\n\n' \
                               '{searched_posts} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
                               '*If this is useful, comment \'**Good Bot**\'. Feedback? Hate? Send me a PM{promo}'
 

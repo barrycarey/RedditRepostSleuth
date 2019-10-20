@@ -40,11 +40,16 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(summons.post_id)
 
+        response = RepostResponseBase(summons_id=summons.id)
+
         if not post:
             log.info('Post ID %s does not exist in database.  Attempting to ingest', summons.post_id)
-            self.save_unknown_post(summons.post_id)
-
-        response = RepostResponseBase(summons_id=summons.id)
+            post = self.save_unknown_post(summons.post_id)
+            if not post.id:
+                log.exception('Failed to save unknown post %s', summons.post_id)
+                response.message = 'Sorry, an error is preventing me from checking this post.'
+                self._send_response(summons.comment_id, response)
+                return
 
         if self.summons_disabled:
             log.info('Sending summons disabled message')
@@ -185,9 +190,7 @@ class SummonsHandler:
         response = RepostResponseBase(summons_id=summons.id)
 
         try:
-            start = perf_counter()
-            search_results = self.image_service.check_duplicate(post)
-
+            search_results = self.image_service.check_duplicates_wrapped(post, target_hamming_distance=10)
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return
@@ -195,16 +198,16 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             newest_post = uow.posts.get_newest_post()
 
-        if not search_results:
-            response.message = OC_MESSAGE_TEMPLATE.format(count=f'{self.image_service.index.get_n_items():,}',
-                                                 time=round(search_time, 4),
+        if not search_results.matches:
+            response.message = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
+                                                 time=search_results.search_time,
                                                  post_type=post.post_type,
-                                                 promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot'
+                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*'
                                                  )
         else:
             # TODO: This is temp until database is backfilled with short links
             with self.uowm.start() as uow:
-                for match in search_results:
+                for match in search_results.matches:
                     if not match.post.shortlink:
                         set_shortlink(match.post)
                         uow.posts.update(match.post)
@@ -212,42 +215,43 @@ class SummonsHandler:
 
             if sub_command == 'all':
                 response.message = IMAGE_REPOST_ALL.format(
-                    count=len(search_results),
-                    searched_posts=self._searched_post_str(post, self.image_service.index.get_n_items()),
-                    firstseen=self._create_first_seen(search_results[0].post),
-                    time=search_time
+                    count=len(search_results.matches),
+                    searched_posts=self._searched_post_str(post, search_results.index_size),
+                    firstseen=self._create_first_seen(search_results.matches[0].post),
+                    time=search_results.search_time
 
                 )
-                if len(search_results) > 3:
-                    log.info('Sending check all results via PM with %s matches', len(search_results))
+                response.message = response.message + self._build_markdown_list(search_results.matches)
+                if len(search_results.matches) > 4:
+                    log.info('Sending check all results via PM with %s matches', len(search_results.matches))
                     comment = self.reddit.comment(summons.comment_id)
-                    response.message = response.message + self._build_markdown_list(search_results)
                     self._send_direct_message(comment, response)
-                    response.message = f'I found {len(search_results)} matches.  I\'m sending them to you via PM to reduce comment spam'
+                    response.message = f'I found {len(search_results.matches)} matches.  I\'m sending them to you via PM to reduce comment spam'
 
                 response.message = response.message
             else:
                 response.message = REPOST_MESSAGE_TEMPLATE.format(
                                                      searched_posts=self._searched_post_str(post, self.image_service.index.get_n_items()),
                                                      post_type=post.post_type,
-                                                     time=search_time,
+                                                     time=search_results.search_time,
                                                      total_posts=f'{newest_post.id:,}',
-                                                     oldest=search_results[0].post.created_at,
-                                                     count=len(search_results),
-                                                     firstseen=self._create_first_seen(search_results[0].post),
-                                                     times='times' if len(search_results) > 1 else 'time',
-                                                     promo='' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot')
+                                                     oldest=search_results.matches[0].post.created_at,
+                                                     count=len(search_results.matches),
+                                                     firstseen=self._create_first_seen(search_results.matches[0].post),
+                                                     times='times' if len(search_results.matches) > 1 else 'time',
+                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*',
+                                                     percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}')
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
         comment = self.reddit.comment(comment_id)
         try:
-            log.info('Sending response to summons comment %s. MESSAGE: %s', comment.id, response.message)
+            log.debug('Sending response to summons comment %s. MESSAGE: %s', comment.id, response.message)
 
             reply = comment.reply(response.message)
             if reply.id:
-                log.debug(f'https://reddit.com{reply.permalink}')
+                log.debug(f'Left response at: https://reddit.com{reply.permalink}')
                 self._save_response(response, reply.id)
                 return
             log.error('Did not receive reply ID when replying to comment')

@@ -36,7 +36,7 @@ if __name__ == '__main__':
             object = json.loads(line)
 
             if object['created_utc'] < 1538650595:
-                continue
+                pass
 
             batch.append(object)
 

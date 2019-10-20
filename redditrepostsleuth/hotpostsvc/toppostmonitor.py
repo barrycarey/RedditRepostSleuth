@@ -4,7 +4,8 @@ from time import perf_counter
 from praw import Reddit
 from redlock import RedLockError
 
-from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS, BANNED_SUBS
+from redditrepostsleuth.common.config import config
+from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS
 from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
@@ -26,7 +27,7 @@ class TopPostMonitor:
         while True:
             with self.uowm.start() as uow:
                 submissions = [sub for sub in self.reddit.subreddit('all').top('day')]
-                #submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
+                submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
                 #submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
                 submissions = submissions + [sub for sub in self.reddit.subreddit('all').hot()]
                 for sub in submissions:
@@ -58,18 +59,18 @@ class TopPostMonitor:
                 log.info('Post %s has no dhash value, skipping', post.post_id)
                 return
             try:
-                start = perf_counter()
-                results = self.image_service.check_duplicate(post)
-                search_time = perf_counter() - start
-                total_searched = self.image_service.index.get_n_items()
+                results = self.image_service.check_duplicates_wrapped(post)
             except NoIndexException:
                 log.error('No available index for image repost check.  Trying again later')
                 return
             except RedLockError:
                 log.error('Could not get RedLock.  Trying again later')
                 return
+            self.add_comment(post, results.matches, round(results.search_time, 5), results.index_size)
         elif post.post_type == 'link':
+            return
             # TODO - Deal with imgur posts marked as link
+            # TODO - Change link reposts to use same wrapper as image reposts
             if 'imgur' in post.url:
                 log.info('Skipping imgur post marked as link')
                 return
@@ -78,17 +79,18 @@ class TopPostMonitor:
             search_time = perf_counter() - start
             with self.uowm.start() as uow:
                 total_searched = uow.posts.count_by_type('link')
+            self.add_comment(post, results, search_time, total_searched)
         else:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
 
 
-        self.add_comment(post, results, round(search_time, 4), total_searched)
+
 
     def add_comment(self, post: Post, search_results, search_time: float, total_search: int):
 
         submission = self.reddit.submission(post.post_id)
-        log.info('Leaving comment on post %s. %s.  In sub %s', post.post_id, post.shortlink, submission.subreddit)
+
         with self.uowm.start() as uow:
             newest_post = uow.posts.get_newest_post()
             if search_results:
@@ -102,14 +104,20 @@ class TopPostMonitor:
                                                      count=len(search_results),
                                                      firstseen=self._create_first_seen(search_results[0].post),
                                                      times='times' if len(search_results) > 1 else 'time',
-                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*')
+                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
+                                                     percent=f'{(100 - search_results[0].hamming_distance) / 100:.2%}')
             else:
+                if post.subreddit in ONLY_COMMENT_REPOST_SUBS or not config.comment_on_oc:
+                    log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
+                    return
+
                 msg = OC_MESSAGE_TEMPLATE.format(count=f'{total_search:,}',
                                                  time=search_time,
                                                  post_type=post.post_type,
-                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*'
+                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
                                                  )
-            log.info('Leaving message %s', msg)
+            log.info('Leaving comment on post %s. %s.  In sub %s', post.post_id, post.shortlink, submission.subreddit)
+            log.debug('Leaving message %s', msg)
             try:
                 comment = submission.reply(msg)
                 if comment:

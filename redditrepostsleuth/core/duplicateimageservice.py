@@ -167,8 +167,11 @@ class DuplicateImageService:
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.info('Matches pre-filter: %s', len(matches))
         for match in matches:
+            if not match.post.dhash_h:
+                log.debug('Match %s missing dhash_h', match.post.post_id)
+                continue
             if match.annoy_distance > target_annoy_distance:
-                log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance, f'http:redd.it/{match.post.post_id}')
+                log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance, f'https://redd.it/{match.post.post_id}')
                 continue
             if checked_post.post_id == match.post.post_id:
                 continue
@@ -181,7 +184,7 @@ class DuplicateImageService:
                 continue
             if match.hamming_distance > target_hamming_distance:
                 log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
-                          match.hamming_distance, f'http://redd.it/{match.post.post_id}')
+                          match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
             log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
             results.append(match)
@@ -213,7 +216,7 @@ class DuplicateImageService:
         else:
             return matches
 
-    def check_duplicates_wrapped(self, post: Post, filter: bool = True, max_matches: int = 50, target_hamming_distance: int = None, target_annoy_distance: float = None) -> ImageRepostWrapper:
+    def check_duplicates_wrapped(self, post: Post, filter: bool = True, max_matches: int = 75, target_hamming_distance: int = None, target_annoy_distance: float = None) -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -233,7 +236,7 @@ class DuplicateImageService:
         result.search_time = round(perf_counter() - start, 5)
         result.index_size = self.index.get_n_items()
         if filter:
-            self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance)
+            result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)

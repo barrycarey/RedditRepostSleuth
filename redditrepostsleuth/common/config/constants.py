@@ -8,8 +8,6 @@ USER_AGENTS = [
 ]
 
 NO_LINK_SUBREDDITS = [
-    'gaming',
-    'pcmasterrace',
     'MurderedByWords',
     'goddesses',
     'NatureIsFuckingLit',
@@ -17,8 +15,24 @@ NO_LINK_SUBREDDITS = [
     'natureismetal',
     'interestingasfuck',
     'memes',
-    'science'
+    'science',
+    'madlads',
+    'tumblr',
+    'memes',
+    'interestingasfuck',
+    'art',
+    'eyebleach',
+    'facepalm'
 
+]
+
+ONLY_COMMENT_REPOST_SUBS = [
+    'gaming',
+    'dankmemes'
+]
+
+SILENCED_SUBS = [
+    'dankmemes'
 ]
 
 BANNED_SUBS = [
@@ -61,7 +75,6 @@ BANNED_SUBS = [
     'politics',
     'electronics',
     'whatisthisthing',
-    'dankmemes',
     'justneckbeardthings',
     'whatisthisthing',
     'pewdiepiesubmissions',
@@ -71,5 +84,14 @@ BANNED_SUBS = [
     'oregairusnafu'
     'fireemblem',
     'hmmm'
-
+    'jokes'
+    'clevercomebacks',
+    'pcmasterrace',
+    'news',
+    'physics',
+    'modernwarfare',
+    'purrito',
+    'gaming',
+    'petitegonewild',
+    'celebnsfw'
 ]
