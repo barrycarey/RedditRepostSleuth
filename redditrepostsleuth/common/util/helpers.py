@@ -5,6 +5,8 @@ from praw import Reddit
 from praw.models import Submission
 
 from redditrepostsleuth.common.config import config
+from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.common.model.db.databasemodels import Post
 
 
 def get_reddit_instance() -> Reddit:
@@ -71,3 +73,30 @@ def get_post_type_pushshift(submission: Dict) -> str:
     # Last ditch to get post_hint
     reddit_sub = reddit.submission(id=submission['id'])
     return reddit_sub.__dict__.get('post_hint', None)
+
+def searched_post_str(post: Post, count: int) -> str:
+    output = '**Searched '
+    if post.post_type == 'image':
+        output = output + f'Images:** {count:,}'
+    elif post.post_type == 'link':
+        output = output + f'Links:** {count:,}'
+
+    return output
+
+def create_first_seen(post: Post) -> str:
+    """
+    Create a first seen string to use in a comment.  Takes into account subs that dont' allow links
+    :param post: DB Post obj
+    :return: final string
+    """
+    if post.subreddit in NO_LINK_SUBREDDITS:
+        firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%d-%m-%Y')}"
+    else:
+        if post.shortlink:
+            original_link = post.shortlink
+        else:
+            original_link = 'https://reddit.com' + post.perma_link
+
+        firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%d-%m-%Y')}"
+
+    return firstseen

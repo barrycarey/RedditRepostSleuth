@@ -1,0 +1,4 @@
+Sub Monitor:
+    Option to only check within sub
+    Ability to register by sending a PM
+        Validate they are a mod

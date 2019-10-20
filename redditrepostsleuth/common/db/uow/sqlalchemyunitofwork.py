@@ -5,6 +5,7 @@ from redditrepostsleuth.common.db.repository.commentrepository import CommentRep
 from redditrepostsleuth.common.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.common.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.common.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
+from redditrepostsleuth.common.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.common.db.repository.postrepository import PostRepository
 from redditrepostsleuth.common.db.repository.repostrepository import RepostRepository
 from redditrepostsleuth.common.db.repository.repostwatchrepository import RepostWatchRepository
@@ -72,3 +73,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def index_build_time(self) -> IndexBuildTimesRepository:
         return IndexBuildTimesRepository(self.session)
+
+    @property
+    def monitored_sub(self) -> MonitoredSubRepository:
+        return MonitoredSubRepository(self.session)

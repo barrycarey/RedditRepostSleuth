@@ -88,7 +88,7 @@ class TopPostMonitor:
 
 
     def add_comment(self, post: Post, search_results, search_time: float, total_search: int):
-
+        # TODO - Use new wrapper dup search method
         submission = self.reddit.submission(post.post_id)
 
         with self.uowm.start() as uow:

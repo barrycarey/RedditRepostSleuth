@@ -161,3 +161,13 @@ class PostReply(Base):
     post_id = Column(String(100), nullable=False, unique=True)
     reply_id = Column(String(100), unique=True)
     reply_body = Column(String(1000, collation='utf8mb4_general_ci'))
+
+class MonitoredSub(Base):
+    __tablename__ = 'reddit_monitored_sub'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False, unique=True)
+    active = Column(Boolean, default=False)
+    repost_only = Column(Boolean, default=True)
+    requestor = Column(String(150))
+    added_at = Column(DateTime, default=func.utc_timestamp())

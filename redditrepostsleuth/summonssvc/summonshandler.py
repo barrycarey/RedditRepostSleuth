@@ -190,7 +190,7 @@ class SummonsHandler:
         response = RepostResponseBase(summons_id=summons.id)
 
         try:
-            search_results = self.image_service.check_duplicates_wrapped(post, target_hamming_distance=10)
+            search_results = self.image_service.check_duplicates_wrapped(post)
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return
@@ -239,7 +239,7 @@ class SummonsHandler:
                                                      count=len(search_results.matches),
                                                      firstseen=self._create_first_seen(search_results.matches[0].post),
                                                      times='times' if len(search_results.matches) > 1 else 'time',
-                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*',
+                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
                                                      percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}')
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
