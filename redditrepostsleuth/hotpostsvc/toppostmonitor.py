@@ -5,7 +5,8 @@ from praw import Reddit
 from redlock import RedLockError
 
 from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS
+from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
+    CUSTOM_FILTER_LEVELS
 from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
@@ -60,7 +61,14 @@ class TopPostMonitor:
                 log.info('Post %s has no dhash value, skipping', post.post_id)
                 return
             try:
-                results = self.image_service.check_duplicates_wrapped(post)
+                target_annoy = None
+                target_hamming = None
+                if post.subreddit in CUSTOM_FILTER_LEVELS:
+                    log.info('Using custom filter values for sub %s', post.subreddit)
+                    target_annoy = CUSTOM_FILTER_LEVELS.get(post.subreddit)['annoy']
+                    target_hamming = CUSTOM_FILTER_LEVELS.get(post.subreddit)['hamming']
+                results = self.image_service.check_duplicates_wrapped(post, target_hamming_distance=target_hamming,
+                                                                      target_annoy_distance=target_annoy)
             except NoIndexException:
                 log.error('No available index for image repost check.  Trying again later')
                 return

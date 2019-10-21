@@ -94,5 +94,19 @@ BANNED_SUBS = [
     'gaming',
     'petitegonewild',
     'celebnsfw',
-    'geek'
+    'geek',
+    'absolutelynotanimeirl',
+    'callofduty',
+    'photoshopbattles'
 ]
+
+CUSTOM_FILTER_LEVELS = {
+    'memes': {
+        'annoy': None,
+        'hamming': 6
+    },
+    'dankmemes': {
+        'annoy': None,
+        'hamming': 6
+    }
+}

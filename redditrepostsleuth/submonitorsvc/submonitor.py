@@ -8,7 +8,7 @@ from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPL
 from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.common.model.db.databasemodels import Post, MonitoredSub
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
@@ -30,8 +30,10 @@ class SubMonitor:
                     monitored_subs = uow.monitored_sub.get_all()
                     for sub in monitored_subs:
                         if not sub.active:
+                            log.debug('Sub %s is disabled', sub.name)
                             continue
-                        self._check_sub(sub.name)
+                        self._check_sub(sub)
+                log.info('Sleeping until next run')
                 time.sleep(60)
 
 
@@ -40,14 +42,14 @@ class SubMonitor:
 
 
 
-    def _check_sub(self, sub_name: str):
-        log.info('Checking sub %s', sub_name)
-        subreddit = self.reddit.subreddit(sub_name)
+    def _check_sub(self, monitored_sub: MonitoredSub):
+        log.info('Checking sub %s', monitored_sub.name)
+        subreddit = self.reddit.subreddit(monitored_sub.name)
         if not subreddit:
-            log.error('Failed to get Subreddit %s', sub_name)
+            log.error('Failed to get Subreddit %s', monitored_sub.name)
             return
 
-        submissions = subreddit.new(limit=25)
+        submissions = subreddit.new(limit=75)
 
         for sub in submissions:
             with self.uowm.start() as uow:
@@ -55,6 +57,12 @@ class SubMonitor:
                 if not post:
                     log.info('Post %s not in database, attempting to ingest', sub.id)
                     post = self._save_unknown_post(sub)
+                    uow.posts.add(post)
+                    try:
+                        uow.commit()
+                    except Exception as e:
+                        log.error('Failed to save new post.. %s', str(e))
+                        continue
                     if not post.id:
                         log.error('Failed to save post %s', sub.id)
                         continue
@@ -65,18 +73,20 @@ class SubMonitor:
                     log.error('Post %s has no dhash', post.post_id)
                     continue
 
-                self._check_for_repost(post, sub)
+                self._check_for_repost(post, sub, monitored_sub)
 
 
 
-    def _check_for_repost(self, post: Post, submission: Submission, comment_oc: bool = False) -> None:
+    def _check_for_repost(self, post: Post, submission: Submission, monitored_sub: MonitoredSub, comment_oc: bool = False) -> None:
         """
         Check if provided post is a repost
         :param post: DB Post obj
         :return: None
         """
         try:
-            search_results = self.image_service.check_duplicates_wrapped(post)
+            search_results = self.image_service.check_duplicates_wrapped(post,
+                                                                         target_annoy_distance=monitored_sub.target_annoy,
+                                                                         target_hamming_distance=monitored_sub.target_hamming)
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return
@@ -85,8 +95,17 @@ class SubMonitor:
             log.info('No matches for post %s and comment OC is disabled', f'https://redd.it/{search_results.checked_post.post_id}')
             return
 
-
         self._leave_comment(search_results, submission)
+        time.sleep(3)
+
+        if monitored_sub.report_submission:
+            log.info('Reporting post %s on %s', f'https://redd.it/{post.post_id}', monitored_sub.name)
+            try:
+                submission.report(monitored_sub.report_msg)
+            except Exception as e:
+                log.exception('Failed to report submissioni', exc_info=True)
+
+
 
     def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission) -> None:
 
@@ -135,10 +154,12 @@ class SubMonitor:
         :return:
         """
         post = pre_process_post(submission_to_post(submission), self.uowm)
+        return post
         with self.uowm.start() as uow:
             try:
                 uow.posts.add(post)
                 uow.commit()
+                uow.posts.remove_from_session(post)
                 log.debug('Commited Post: %s', post)
             except Exception as e:
                 log.exception('Problem saving new post', exc_info=True)

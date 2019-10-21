@@ -10,6 +10,9 @@ class PostRepository:
     def __init__(self, db_session):
         self.db_session = db_session
 
+    def remove_from_session(self, item):
+        self.db_session.expunge(item)
+
     def add(self, item):
         #log.debug('Inserting: %s', item)
         self.db_session.add(item)
