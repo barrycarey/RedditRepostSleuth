@@ -2,3 +2,9 @@ Sub Monitor:
     Option to only check within sub
     Ability to register by sending a PM
         Validate they are a mod
+
+Image Repost
+    Add filter to only flag ones within same Sub
+
+Host Post Monitor
+    Add how many times it has been seen in current sub

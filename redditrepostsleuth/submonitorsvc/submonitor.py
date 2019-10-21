@@ -32,7 +32,7 @@ class SubMonitor:
                         if not sub.active:
                             continue
                         self._check_sub(sub.name)
-                time.sleep(600)
+                time.sleep(60)
 
 
             except Exception as e:
@@ -60,6 +60,11 @@ class SubMonitor:
                         continue
                 if post.left_comment:
                     continue
+
+                if not post.dhash_h:
+                    log.error('Post %s has no dhash', post.post_id)
+                    continue
+
                 self._check_for_repost(post, sub)
 
 

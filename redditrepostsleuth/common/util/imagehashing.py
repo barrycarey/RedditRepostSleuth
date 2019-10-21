@@ -1,3 +1,6 @@
+import json
+
+import requests
 from collections import Counter
 from io import BytesIO
 from urllib import request
@@ -138,3 +141,23 @@ def set_image_hashes(post: Post) -> Post:
 
     return post
 
+def set_image_hashes_api(post: Post) -> Post:
+    log.debug('Hashing image post using api %s', post.post_id)
+    r = requests.head(post.url)
+    if r.status_code != 200:
+        raise ImageConversioinException('Image URL no longer valid')
+
+    r = requests.get('http://167.99.10.47:8000/hash', params={'url': post.url})
+
+    if r.status_code != 200:
+        log.error('Back statuscode from DO API %s', r.status_code)
+        raise ImageConversioinException('Bad response from DO API')
+
+    hashes = json.loads(r.text)
+    print(hashes)
+
+    post.dhash_h = hashes['dhash_h']
+    post.dhash_v = hashes['dhash_v']
+    post.ahash = hashes['ahash']
+
+    return post

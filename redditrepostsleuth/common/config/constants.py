@@ -93,5 +93,6 @@ BANNED_SUBS = [
     'purrito',
     'gaming',
     'petitegonewild',
-    'celebnsfw'
+    'celebnsfw',
+    'geek'
 ]

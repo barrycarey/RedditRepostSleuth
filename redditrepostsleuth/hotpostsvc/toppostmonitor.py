@@ -11,6 +11,7 @@ from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen
 from redditrepostsleuth.common.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 
@@ -96,13 +97,13 @@ class TopPostMonitor:
             if search_results:
 
                 msg = REPOST_MESSAGE_TEMPLATE.format(
-                                                     searched_posts=self._searched_post_str(post, total_search),
+                                                     searched_posts=searched_post_str(post, total_search),
                                                      post_type=post.post_type,
                                                      time=search_time,
                                                      total_posts=f'{newest_post.id:,}',
                                                      oldest=search_results[0].post.created_at,
                                                      count=len(search_results),
-                                                     firstseen=self._create_first_seen(search_results[0].post),
+                                                     firstseen=create_first_seen(search_results[0].post),
                                                      times='times' if len(search_results) > 1 else 'time',
                                                      promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
                                                      percent=f'{(100 - search_results[0].hamming_distance) / 100:.2%}')
@@ -130,27 +131,3 @@ class TopPostMonitor:
 
             uow.posts.update(post)
             uow.commit()
-
-    def _create_first_seen(self, post: Post) -> str:
-        if post.subreddit in NO_LINK_SUBREDDITS:
-            firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%d-%m-%Y')}"
-        else:
-            if post.shortlink:
-                original_link = post.shortlink
-            else:
-                original_link = 'https://reddit.com' + post.perma_link
-
-            firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%d-%m-%Y')}"
-
-        log.debug('First Seen String: %s', firstseen)
-        return firstseen
-
-    def _searched_post_str(self, post: Post, count: int) -> str:
-        # **Searched Images:** {index_size}
-        output = '**Searched '
-        if post.post_type == 'image':
-            output = output + f'Images:** {count:,}'
-        elif post.post_type == 'link':
-            output = output + f'Links:** {count:,}'
-
-        return output
