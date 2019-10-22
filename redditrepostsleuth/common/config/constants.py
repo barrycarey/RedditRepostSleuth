@@ -18,7 +18,6 @@ NO_LINK_SUBREDDITS = [
     'science',
     'madlads',
     'tumblr',
-    'memes',
     'interestingasfuck',
     'art',
     'eyebleach',
@@ -97,16 +96,20 @@ BANNED_SUBS = [
     'geek',
     'absolutelynotanimeirl',
     'callofduty',
-    'photoshopbattles'
+    'photoshopbattles',
+    'teenagers',
+    'blizzard',
+    'imaginarymonsters',
+    'insaneparents'
 ]
 
 CUSTOM_FILTER_LEVELS = {
     'memes': {
         'annoy': None,
-        'hamming': 6
+        'hamming': 3
     },
     'dankmemes': {
         'annoy': None,
-        'hamming': 6
+        'hamming': 3
     }
 }

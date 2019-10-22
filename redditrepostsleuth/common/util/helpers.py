@@ -90,13 +90,13 @@ def create_first_seen(post: Post) -> str:
     :return: final string
     """
     if post.subreddit in NO_LINK_SUBREDDITS:
-        firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%d-%m-%Y')}"
+        firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')}"
     else:
         if post.shortlink:
             original_link = post.shortlink
         else:
             original_link = 'https://reddit.com' + post.perma_link
 
-        firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%d-%m-%Y')}"
+        firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%Y-%m-%d')}"
 
     return firstseen

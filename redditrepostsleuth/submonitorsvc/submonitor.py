@@ -2,6 +2,8 @@ import time
 
 from praw import Reddit
 from praw.models import Subreddit, Submission
+from redlock import RedLockError
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
@@ -90,6 +92,9 @@ class SubMonitor:
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return
+        except RedLockError:
+            log.error('Failed to get lock to load new index')
+            return
 
         if not search_results.matches and not comment_oc:
             log.info('No matches for post %s and comment OC is disabled', f'https://redd.it/{search_results.checked_post.post_id}')
@@ -153,7 +158,12 @@ class SubMonitor:
         :param submission: Reddit Submission
         :return:
         """
-        post = pre_process_post(submission_to_post(submission), self.uowm)
+        post = submission_to_post(submission)
+        try:
+            post = pre_process_post(post, self.uowm)
+        except IntegrityError as e:
+            log.error('Image post already exists')
+
         return post
         with self.uowm.start() as uow:
             try:
