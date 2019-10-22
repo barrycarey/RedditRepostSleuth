@@ -186,3 +186,4 @@ class MemeTemplate(Base):
     target_hamming = Column(Integer)
     target_annoy = Column(Float)
     example = Column(String(500))
+    template_detection_hamming = Column(Integer)

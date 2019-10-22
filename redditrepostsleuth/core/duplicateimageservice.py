@@ -10,7 +10,7 @@ from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 from annoy import AnnoyIndex
 
-from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.common.util.redlock import redlock
@@ -236,6 +236,13 @@ class DuplicateImageService:
         result.search_time = round(perf_counter() - start, 5)
         result.index_size = self.index.get_n_items()
         if filter:
+            # TODO - Possibly make this optional instead of running on each check
+            meme_template = self.get_meme_template(post)
+            if meme_template:
+                log.debug('Got meme template, overriding distance targets')
+                target_hamming_distance = meme_template.target_hamming
+                target_annoy_distance = meme_template.target_annoy
+
             result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance)
         else:
             self._set_match_posts(result.matches)
@@ -260,6 +267,22 @@ class DuplicateImageService:
                 match.match_id = match_post.id
         log.debug('Time to set match posts: %s', perf_counter() - start)
         return matches
+
+    def get_meme_template(self, check_post: Post) -> MemeTemplate:
+        """
+        Check if a given post matches a known meme template.  If it is, use that templates distance override
+        :param check_post: Post we're checking
+        :rtype: List[ImageMatch]
+        """
+        with self.uowm.start() as uow:
+            templates = uow.meme_template.get_all()
+
+        for template in templates:
+            h_distance = hamming(check_post.dhash_h, template.dhash_h)
+            log.debug('Meme template %s: Hamming %s', template.name, h_distance)
+            if (h_distance <= template.template_detection_hamming):
+                log.info('Post %s matches meme template %s', f'https://redd.it/{check_post.post_id}', template.name)
+                return template
 
 
     def _set_match_hamming(self, searched_post: Post, matches: List[ImageMatch]) -> List[ImageMatch]:

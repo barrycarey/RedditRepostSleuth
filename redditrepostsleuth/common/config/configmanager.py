@@ -55,6 +55,7 @@ class ConfigManager:
         self.hamming_cutoff = self.config['IMAGES'].getint('hamming_cutoff', fallback=8)
         self.annoy_total_neighbors = self.config['IMAGES'].getint('annoy_total_neighbors', fallback=50)
         self.index_build_lock_ttl = self.config['IMAGES'].getint('index_build_lock_ttl', fallback=300000)
+        self.meme_template_cutoff = self.config['IMAGES'].getint('meme_template_cutoff', fallback=8)
 
         # Database
         self.db_host = self.config['DATABASE']['host']

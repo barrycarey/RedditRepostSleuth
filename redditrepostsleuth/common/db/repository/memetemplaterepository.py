@@ -12,3 +12,9 @@ class MemeTemplateRepository:
 
     def get_all(self) -> List[MemeTemplate]:
         return self.db_session.query(MemeTemplate).all()
+
+    def get_by_name(self, name: str) -> MemeTemplate:
+        return self.db_session.query(MemeTemplate).filter(MemeTemplate.name == name).first()
+
+    def update(self, item: MemeTemplate):
+        self.db_session.merge(item)

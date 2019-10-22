@@ -125,5 +125,6 @@ def create_meme_template(url: str, name: str = None) -> MemeTemplate:
         dhash_v=str(dhash_v),
         ahash=str(ahash),
         name=name,
-        example=url
+        example=url,
+        template_detection_hamming=10
     )
