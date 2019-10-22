@@ -175,3 +175,14 @@ class MonitoredSub(Base):
     added_at = Column(DateTime, default=func.utc_timestamp())
     target_hamming = Column(Integer)
     target_annoy = Column(Float)
+
+class MemeTemplate(Base):
+    __tablename__ = 'meme_template'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200))
+    dhash_v = Column(String(64))
+    dhash_h = Column(String(64))
+    ahash = Column(String(64))
+    target_hamming = Column(Integer)
+    target_annoy = Column(Float)
+    example = Column(String(500))

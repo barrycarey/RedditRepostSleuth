@@ -100,7 +100,8 @@ BANNED_SUBS = [
     'teenagers',
     'blizzard',
     'imaginarymonsters',
-    'insaneparents'
+    'insaneparents',
+    'comedycemetery'
 ]
 
 CUSTOM_FILTER_LEVELS = {

@@ -1,12 +1,15 @@
 from typing import Dict
 
+import imagehash
 from influxdb import InfluxDBClient
 from praw import Reddit
 from praw.models import Submission
 
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.common.exception import ImageConversioinException
+from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.common.util.imagehashing import generate_img_by_url
 
 
 def get_reddit_instance() -> Reddit:
@@ -100,3 +103,27 @@ def create_first_seen(post: Post) -> str:
         firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%Y-%m-%d')}"
 
     return firstseen
+
+def create_meme_template(url: str, name: str = None) -> MemeTemplate:
+    """
+    Take a given URL and create a meme template from it
+    :param url: URL to create template from
+    :param name: Name of template
+    :return: MemeTemplate
+    """
+    try:
+        img = generate_img_by_url(url)
+    except ImageConversioinException as e:
+        raise
+
+    dhash_h = imagehash.dhash(img, hash_size=16)
+    dhash_v = imagehash.dhash_vertical(img, hash_size=16)
+    ahash = imagehash.average_hash(img, hash_size=16)
+
+    return MemeTemplate(
+        dhash_h=str(dhash_h),
+        dhash_v=str(dhash_v),
+        ahash=str(ahash),
+        name=name,
+        example=url
+    )
