@@ -103,7 +103,13 @@ BANNED_SUBS = [
     'insaneparents',
     'comedycemetery',
     'cirkeltrek',
-    'pics'
+    'pics',
+    'funny',
+    'geekygirls',
+    'csgo',
+    'deadbydaylight',
+    'csgo',
+    'trashpandas'
 ]
 
 CUSTOM_FILTER_LEVELS = {
@@ -114,5 +120,9 @@ CUSTOM_FILTER_LEVELS = {
     'dankmemes': {
         'annoy': None,
         'hamming': 3
+    },
+    'historymemes': {
+        'annoy': None,
+        'hamming': 5
     }
 }

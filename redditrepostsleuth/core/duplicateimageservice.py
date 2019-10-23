@@ -158,7 +158,13 @@ class DuplicateImageService:
         :param target_annoy_distance: Annoy cutoff for matches
         :rtype: List[ImageMatch]
         """
-        target_hamming_distance = target_hamming_distance or config.hamming_cutoff
+
+        # Dumb fix for 0 evaling to False
+        if target_hamming_distance == 0:
+            target_hamming_distance = 0
+        else:
+            target_hamming_distance = target_hamming_distance or config.hamming_cutoff
+
         target_annoy_distance = target_annoy_distance or config.annoy_match_cutoff
         self._set_match_posts(matches)
         self._set_match_hamming(checked_post, matches)
@@ -176,6 +182,7 @@ class DuplicateImageService:
             if checked_post.post_id == match.post.post_id:
                 continue
             if match.post.created_at > checked_post.created_at:
+                log.debug('Date Filter Reject: Target: %s Actual: %s - %s', checked_post.created_at.strftime('%Y-%d-%m'), match.post.created_at.strftime('%Y-%d-%m'), f'https://redd.it/{match.post.post_id}')
                 continue
             if checked_post.author == match.post.author:
                 # TODO - Need logic to check age and sub of matching posts with same author
@@ -239,9 +246,9 @@ class DuplicateImageService:
             # TODO - Possibly make this optional instead of running on each check
             meme_template = self.get_meme_template(post)
             if meme_template:
-                log.debug('Got meme template, overriding distance targets')
                 target_hamming_distance = meme_template.target_hamming
                 target_annoy_distance = meme_template.target_annoy
+                log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
             result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance)
         else:

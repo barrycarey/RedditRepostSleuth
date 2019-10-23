@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
+
 from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
@@ -51,7 +52,7 @@ class SubMonitor:
             log.error('Failed to get Subreddit %s', monitored_sub.name)
             return
 
-        submissions = subreddit.new(limit=75)
+        submissions = subreddit.new(limit=100)
 
         for sub in submissions:
             with self.uowm.start() as uow:
@@ -118,6 +119,7 @@ class SubMonitor:
             newest_post = uow.posts.get_newest_post()
 
         if search_results.matches:
+
             msg = REPOST_MESSAGE_TEMPLATE.format(
                                                  searched_posts=searched_post_str(search_results.checked_post, search_results.index_size),
                                                  post_type=search_results.checked_post.post_type,
@@ -127,8 +129,8 @@ class SubMonitor:
                                                  count=len(search_results.matches),
                                                  firstseen=create_first_seen(search_results.matches[0].post),
                                                  times='times' if len(search_results.matches) > 1 else 'time',
-                                                 promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
-                                                 percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}'
+                                                 percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+                                                 post_url=f'https://redd.it/{search_results.checked_post.post_id}'
             )
         else:
             msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',

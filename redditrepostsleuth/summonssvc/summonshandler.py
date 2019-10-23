@@ -239,7 +239,7 @@ class SummonsHandler:
                                                      count=len(search_results.matches),
                                                      firstseen=self._create_first_seen(search_results.matches[0].post),
                                                      times='times' if len(search_results.matches) > 1 else 'time',
-                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
+                                                    post_url=f'https://redd.it/{search_results.checked_post.post_id}',
                                                      percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}')
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
@@ -333,14 +333,14 @@ class SummonsHandler:
     def _create_first_seen(self, post: Post) -> str:
         # TODO - Move to helper. Dupped in hot post
         if post.subreddit in NO_LINK_SUBREDDITS:
-            firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%d-%m-%Y')} by u/{post.author}"
+            firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')} by u/{post.author}"
         else:
             if post.shortlink:
                 original_link = post.shortlink
             else:
                 original_link = 'https://reddit.com' + post.perma_link
 
-            firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%d-%m-%Y')}"
+            firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%Y-%m-%d')}"
 
         log.debug('First Seen String: %s', firstseen)
         return firstseen

@@ -35,8 +35,9 @@ if __name__ == '__main__':
         for line in sys.stdin:
             object = json.loads(line)
 
-            if object['created_utc'] < 1538650595:
+            if object['created_utc'] < 1535511752:
                 pass
+
 
             batch.append(object)
 

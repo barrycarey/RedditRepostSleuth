@@ -113,7 +113,7 @@ class TopPostMonitor:
                                                      count=len(search_results),
                                                      firstseen=create_first_seen(search_results[0].post),
                                                      times='times' if len(search_results) > 1 else 'time',
-                                                     promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
+                                                     post_url=f'https://redd.it/{post.post_id}',
                                                      percent=f'{(100 - search_results[0].hamming_distance) / 100:.2%}')
             else:
                 if post.subreddit in ONLY_COMMENT_REPOST_SUBS or not config.comment_on_oc:

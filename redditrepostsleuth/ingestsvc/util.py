@@ -1,3 +1,5 @@
+import os
+
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
@@ -31,8 +33,11 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Post:
     return post
 
 def process_image_post(post: Post) -> RedditImagePost:
-    set_image_hashes(post)
-    #set_image_hashes_api(post)
+    if os.getenv('INGEST_API', None):
+        set_image_hashes_api(post)
+    else:
+        set_image_hashes(post)
+
     image_post = RedditImagePost()
     image_post.post_id = post.post_id
     image_post.dhash_h = post.dhash_h
