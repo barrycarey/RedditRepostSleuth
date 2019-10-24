@@ -106,6 +106,7 @@ class DuplicateImageService:
         log.debug('Original: %s', f'http://redd.it/{original.post_id}')
         for match in results:
 
+
             if match.annoy_distance > target_annoy_distance:
                 continue
 
@@ -148,7 +149,7 @@ class DuplicateImageService:
 
         return sort_reposts(final_results)
 
-    def _filter_results_for_reposts(self, matches: List[ImageMatch], checked_post: Post, target_hamming_distance: int = None, target_annoy_distance: float = None) -> List[ImageMatch]:
+    def _filter_results_for_reposts(self, matches: List[ImageMatch], checked_post: Post, target_hamming_distance: int = None, target_annoy_distance: float = None, same_sub: bool = False, date_cutff: int = None) -> List[ImageMatch]:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -158,7 +159,7 @@ class DuplicateImageService:
         :param target_annoy_distance: Annoy cutoff for matches
         :rtype: List[ImageMatch]
         """
-
+        # TODO - Allow array of filters to be passed
         # Dumb fix for 0 evaling to False
         if target_hamming_distance == 0:
             target_hamming_distance = 0
@@ -176,6 +177,11 @@ class DuplicateImageService:
             if not match.post.dhash_h:
                 log.debug('Match %s missing dhash_h', match.post.post_id)
                 continue
+            if match.post.crosspost_parent:
+                continue
+            if same_sub and checked_post.subreddit != match.post.subreddit:
+                log.debug('Same Sub Reject: Orig sub: %s - Match Sub: %s - %s', checked_post.subreddit, match.post.subreddit, f'https://redd.it/{match.post.post_id}')
+                continue
             if match.annoy_distance > target_annoy_distance:
                 log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance, f'https://redd.it/{match.post.post_id}')
                 continue
@@ -184,11 +190,13 @@ class DuplicateImageService:
             if match.post.created_at > checked_post.created_at:
                 log.debug('Date Filter Reject: Target: %s Actual: %s - %s', checked_post.created_at.strftime('%Y-%d-%m'), match.post.created_at.strftime('%Y-%d-%m'), f'https://redd.it/{match.post.post_id}')
                 continue
+            if date_cutff and (datetime.utcnow() - match.post.created_at).days > date_cutff:
+                log.debug('Date Cutoff Reject: Target: %s Actual: %s - %s', date_cutff, (datetime.utcnow() - match.post.created_at).days, f'https://redd.it/{match.post.post_id}')
+                continue
             if checked_post.author == match.post.author:
                 # TODO - Need logic to check age and sub of matching posts with same author
                 continue
-            if match.post.crosspost_parent:
-                continue
+
             if match.hamming_distance > target_hamming_distance:
                 log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
@@ -200,7 +208,7 @@ class DuplicateImageService:
 
 
     # TODO - Phase this out
-    def check_duplicate(self, post: Post, filter: bool = True, max_matches: int = 50, target_hamming_distance: int = None, target_annoy_distance: float = None) -> List[ImageMatch]:
+    def check_duplicate(self, post: Post, filter: bool = True, max_matches: int = 50, target_hamming_distance: int = None, target_annoy_distance: float = None, same_sub: bool = False, date_cutff: int = None) -> List[ImageMatch]:
         """
         Take a given post and check it against the index for matches
         :rtype: List[ImageMatch]
@@ -223,7 +231,7 @@ class DuplicateImageService:
         else:
             return matches
 
-    def check_duplicates_wrapped(self, post: Post, filter: bool = True, max_matches: int = 75, target_hamming_distance: int = None, target_annoy_distance: float = None) -> ImageRepostWrapper:
+    def check_duplicates_wrapped(self, post: Post, filter: bool = True, max_matches: int = 75, target_hamming_distance: int = None, target_annoy_distance: float = None, same_sub: bool = False, date_cutff: int = None) -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -250,7 +258,7 @@ class DuplicateImageService:
                 target_annoy_distance = meme_template.target_annoy
                 log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
-            result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance)
+            result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance, same_sub=same_sub, date_cutff=date_cutff)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)

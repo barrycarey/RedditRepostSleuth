@@ -175,6 +175,9 @@ class MonitoredSub(Base):
     added_at = Column(DateTime, default=func.utc_timestamp())
     target_hamming = Column(Integer)
     target_annoy = Column(Float)
+    target_days_old = Column(Integer)
+    same_sub_only = Column(Boolean, default=False)
+    notes = Column(String(500))
 
 class MemeTemplate(Base):
     __tablename__ = 'meme_template'

@@ -109,7 +109,10 @@ BANNED_SUBS = [
     'csgo',
     'deadbydaylight',
     'csgo',
-    'trashpandas'
+    'trashpandas',
+    'dontputthatinyourass',
+    'crappydesign',
+    'ohitllbefine'
 ]
 
 CUSTOM_FILTER_LEVELS = {

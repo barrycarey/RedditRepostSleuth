@@ -28,7 +28,7 @@ REPOST_MESSAGE_TEMPLATE_OLD = 'Looks like a repost. I\'ve seen this {post_type} 
 
 REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {count} {times}. {firstseen}. {percent} match.\n\n' \
                               '{searched_posts} | **Indexed Posts:** {total_posts} | **Search Time:** {time}s \n\n' \
-                              '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Every report helps improve results [ [Report Bad Match](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={post_url}) ]*'
+                              '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help [ [Report Bad Match](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={post_url}) ]*'
 
 
 OC_MESSAGE_TEMPLATE = 'This looks like unique content! I checked {count} {post_type} posts in {time} seconds and didn\'t find a match\n\n' \

@@ -89,7 +89,9 @@ class SubMonitor:
         try:
             search_results = self.image_service.check_duplicates_wrapped(post,
                                                                          target_annoy_distance=monitored_sub.target_annoy,
-                                                                         target_hamming_distance=monitored_sub.target_hamming)
+                                                                         target_hamming_distance=monitored_sub.target_hamming,
+                                                                         date_cutff=monitored_sub.target_days_old,
+                                                                         same_sub=monitored_sub.same_sub_only)
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return
