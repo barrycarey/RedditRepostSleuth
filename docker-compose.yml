@@ -19,6 +19,37 @@ services:
         volumes:
             - /opt/imageindex:/opt/imageindex
 
+    summons_svc:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/summonssvc/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
+
+    summons_handler:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/summonssvc/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonshandlersvc.py
+        volumes:
+            - /opt/imageindex:/opt/imageindex
+
+    subreddit_monitor:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/submonitorsvc/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+        entrypoint: python -u /src/redditrepostsleuth/submonitorsvc/submonitorsvc.py
+        volumes:
+            - /opt/imageindex:/opt/imageindex
+
     ingest_worker:
         build:
             context: .

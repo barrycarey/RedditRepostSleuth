@@ -246,6 +246,12 @@ class SummonsHandler:
 
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
         comment = self.reddit.comment(comment_id)
+        if not comment.author:
+            log.error('Comment has no author')
+            response.message = 'NO AUTHOR ON COMMENT'
+            self._save_response(response, None)
+            return
+
         try:
             log.debug('Sending response to summons comment %s. MESSAGE: %s', comment.id, response.message)
 

@@ -201,7 +201,7 @@ class DuplicateImageService:
                 log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
-            log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
+            log.info('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
         return sort_reposts(results)

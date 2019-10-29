@@ -1,6 +1,8 @@
 import threading
 import time
-
+# TODO - Mega hackery, figure this out.
+import os,sys
+sys.path.append('./')
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.db import db_engine
 from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager

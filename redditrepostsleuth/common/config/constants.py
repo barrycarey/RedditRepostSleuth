@@ -14,7 +14,6 @@ NO_LINK_SUBREDDITS = [
     'me_irl',
     'natureismetal',
     'interestingasfuck',
-    'memes',
     'science',
     'madlads',
     'tumblr',
@@ -112,7 +111,8 @@ BANNED_SUBS = [
     'trashpandas',
     'dontputthatinyourass',
     'crappydesign',
-    'ohitllbefine'
+    'ohitllbefine',
+    'introvert'
 ]
 
 CUSTOM_FILTER_LEVELS = {
@@ -126,6 +126,6 @@ CUSTOM_FILTER_LEVELS = {
     },
     'historymemes': {
         'annoy': None,
-        'hamming': 5
+        'hamming': 2
     }
 }

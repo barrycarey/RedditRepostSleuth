@@ -1,3 +1,6 @@
+# TODO - Mega hackery, figure this out.
+import os,sys
+sys.path.append('./')
 from redditrepostsleuth.common.db import db_engine
 from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.common.logging import log
