@@ -13,6 +13,7 @@ from annoy import AnnoyIndex
 from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.common.util.helpers import is_image_still_available
 from redditrepostsleuth.common.util.redlock import redlock
 from redditrepostsleuth.common.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.common.util.reposthelpers import sort_reposts
@@ -202,6 +203,10 @@ class DuplicateImageService:
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
             log.info('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
+            if not is_image_still_available(match.post.url):
+                log.debug('Active Image Reject: Imgae has been deleted from post https://redd.it/%s', match.post.post_id)
+                continue
+
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
         return sort_reposts(results)

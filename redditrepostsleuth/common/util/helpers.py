@@ -1,3 +1,4 @@
+import requests
 from typing import Dict
 
 import imagehash
@@ -128,3 +129,10 @@ def create_meme_template(url: str, name: str = None) -> MemeTemplate:
         example=url,
         template_detection_hamming=10
     )
+
+def is_image_still_available(url: str) -> bool:
+    r = requests.head(url)
+    if r.status_code == 200:
+        return True
+    else:
+        return False
