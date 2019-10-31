@@ -145,6 +145,7 @@ def set_image_hashes_api(post: Post) -> Post:
     log.debug('Hashing image post using api %s', post.post_id)
     r = requests.head(post.url)
     if r.status_code != 200:
+        log.error('Image no longer exists %s', r.status_code)
         raise ImageConversioinException('Image URL no longer valid')
 
     r = requests.get('http://167.99.10.47:8000/hash', params={'url': post.url})

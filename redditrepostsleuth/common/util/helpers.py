@@ -86,13 +86,13 @@ def searched_post_str(post: Post, count: int) -> str:
 
     return output
 
-def create_first_seen(post: Post) -> str:
+def create_first_seen(post: Post, subreddit: str) -> str:
     """
     Create a first seen string to use in a comment.  Takes into account subs that dont' allow links
     :param post: DB Post obj
     :return: final string
     """
-    if post.subreddit in NO_LINK_SUBREDDITS:
+    if subreddit and subreddit in NO_LINK_SUBREDDITS:
         firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')}"
     else:
         if post.shortlink:

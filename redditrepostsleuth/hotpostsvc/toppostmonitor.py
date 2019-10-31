@@ -111,7 +111,7 @@ class TopPostMonitor:
                                                      total_posts=f'{newest_post.id:,}',
                                                      oldest=search_results[0].post.created_at,
                                                      count=len(search_results),
-                                                     firstseen=create_first_seen(search_results[0].post),
+                                                     firstseen=create_first_seen(search_results[0].post, post.subreddit),
                                                      times='times' if len(search_results) > 1 else 'time',
                                                      post_url=f'https://redd.it/{post.post_id}',
                                                      percent=f'{(100 - search_results[0].hamming_distance) / 100:.2%}')

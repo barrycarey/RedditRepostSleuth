@@ -129,7 +129,7 @@ class SubMonitor:
                                                  total_posts=f'{newest_post.id:,}',
                                                  oldest=search_results.matches[0].post.created_at,
                                                  count=len(search_results.matches),
-                                                 firstseen=create_first_seen(search_results.matches[0].post),
+                                                 firstseen=create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
                                                  times='times' if len(search_results.matches) > 1 else 'time',
                                                  percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
                                                  post_url=f'https://redd.it/{search_results.checked_post.post_id}'

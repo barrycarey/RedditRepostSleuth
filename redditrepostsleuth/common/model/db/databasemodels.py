@@ -190,3 +190,16 @@ class MemeTemplate(Base):
     target_annoy = Column(Float)
     example = Column(String(500))
     template_detection_hamming = Column(Integer)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'dhash_v': self.dhash_v,
+            'dhash_h': self.dhash_h,
+            'ahash': self.ahash,
+            'target_hamming': self.target_hamming,
+            'target_annoy': self.target_annoy,
+            'example': self.example,
+            'template_detection_hamming': self.template_detection_hamming
+        }

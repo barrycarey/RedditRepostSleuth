@@ -18,6 +18,7 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Summons, RepostWatch, Post
 from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.common.util.helpers import create_first_seen
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
 from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc, check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -237,7 +238,7 @@ class SummonsHandler:
                                                      total_posts=f'{newest_post.id:,}',
                                                      oldest=search_results.matches[0].post.created_at,
                                                      count=len(search_results.matches),
-                                                     firstseen=self._create_first_seen(search_results.matches[0].post),
+                                                     firstseen=create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
                                                      times='times' if len(search_results.matches) > 1 else 'time',
                                                     post_url=f'https://redd.it/{search_results.checked_post.post_id}',
                                                      percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}')
@@ -286,7 +287,7 @@ class SummonsHandler:
             summons = uow.summons.get_by_id(response.summons_id)
             if summons:
                 summons.comment_reply = response.message
-                summons.summons_replied_at = datetime.now()
+                summons.summons_replied_at = datetime.utcnow()
                 summons.comment_reply_id = response_id
                 uow.commit()
                 log.debug('Committed summons response to database')

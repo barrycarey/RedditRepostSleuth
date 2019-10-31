@@ -112,7 +112,8 @@ BANNED_SUBS = [
     'dontputthatinyourass',
     'crappydesign',
     'ohitllbefine',
-    'introvert'
+    'introvert',
+    'thebullwins'
 ]
 
 CUSTOM_FILTER_LEVELS = {
@@ -127,5 +128,13 @@ CUSTOM_FILTER_LEVELS = {
     'historymemes': {
         'annoy': None,
         'hamming': 2
+    },
+    'prequelmemes': {
+        'annoy': None,
+        'hamming': 2
+    },
+    'historymemes': {
+        'annoy': None,
+        'hamming': 1
     }
 }

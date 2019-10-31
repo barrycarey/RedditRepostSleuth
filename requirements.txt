@@ -27,3 +27,4 @@ numpy
 kombu==4.6.3
 falcon
 waitress
+falcon-cors

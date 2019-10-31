@@ -7,6 +7,7 @@ Sub Monitor:
 Image Repost
     Add filter to only flag ones within same Sub
     Try to read text in memes to detect same template different text
+    Check if original has been deleted
 
 Host Post Monitor
     Add how many times it has been seen in current sub
