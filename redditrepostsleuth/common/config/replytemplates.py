@@ -31,7 +31,8 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
                               '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help [ [Report Bad Match](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={post_url}) ]*'
 
 
-DEFAULT_REPOST_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. {first_seen}. {oldest_percent_match} match.\n\n' \
+DEFAULT_REPOST_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
+                                '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n' \
                               '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n' \
                               '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help [ [Report Bad Match](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={post_shortlink}) ]*'
 

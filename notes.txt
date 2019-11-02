@@ -1,13 +1,10 @@
 Sub Monitor:
-    Option to only check within sub
     Ability to register by sending a PM
         Validate they are a mod
     Cutoff date for matches
 
 Image Repost
-    Add filter to only flag ones within same Sub
     Try to read text in memes to detect same template different text
-    Check if original has been deleted
 
 Host Post Monitor
     Add how many times it has been seen in current sub
