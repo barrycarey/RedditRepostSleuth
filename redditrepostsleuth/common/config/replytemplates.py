@@ -32,6 +32,6 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 
 OC_MESSAGE_TEMPLATE = 'This looks like unique content! I checked {count} {post_type} posts in {time} seconds and didn\'t find a match\n\n' \
-                      '*If this is useful, comment \'**Good Bot**\'. Feedback? Hate? Send me a PM{promo}'
+                      '*Feedback? Hate? Send me a PM{promo}'
 
 IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\n\n**Search Time:** {time}s \n\nHere are all the instances I\'ve seen:\n\n'

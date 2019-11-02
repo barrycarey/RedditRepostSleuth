@@ -80,7 +80,7 @@ class SubMonitor:
 
 
 
-    def _check_for_repost(self, post: Post, submission: Submission, monitored_sub: MonitoredSub, comment_oc: bool = False) -> None:
+    def _check_for_repost(self, post: Post, submission: Submission, monitored_sub: MonitoredSub) -> None:
         """
         Check if provided post is a repost
         :param post: DB Post obj
@@ -99,14 +99,14 @@ class SubMonitor:
             log.error('Failed to get lock to load new index')
             return
 
-        if not search_results.matches and not comment_oc:
+        if not search_results.matches and monitored_sub.repost_only:
             log.info('No matches for post %s and comment OC is disabled', f'https://redd.it/{search_results.checked_post.post_id}')
             return
 
-        self._leave_comment(search_results, submission)
+        self._leave_comment(search_results, submission, monitored_sub)
         time.sleep(3)
 
-        if monitored_sub.report_submission:
+        if search_results.matches and monitored_sub.report_submission:
             log.info('Reporting post %s on %s', f'https://redd.it/{post.post_id}', monitored_sub.name)
             try:
                 submission.report(monitored_sub.report_msg)
@@ -115,7 +115,7 @@ class SubMonitor:
 
 
 
-    def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission) -> None:
+    def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> None:
 
         with self.uowm.start() as uow:
             newest_post = uow.posts.get_newest_post()
@@ -131,10 +131,12 @@ class SubMonitor:
                 'oldest_url': search_results.matches[0].post.url,
                 'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
                 'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+                'oldest_sub': search_results.matches[0].post.subreddit,
                 'newest_created_at': search_results.matches[-1].post.created_at,
                 'newest_url': search_results.matches[-1].post.url,
                 'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
                 'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
+                'newest_sub': search_results.matches[-1].post.subreddit,
                 'match_list': build_markdown_list(search_results.matches)
             }
 
@@ -151,11 +153,21 @@ class SubMonitor:
                                                  post_url=f'https://redd.it/{search_results.checked_post.post_id}'
             )
         else:
-            msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
-                                             time=search_results.search_time,
-                                             post_type=search_results.checked_post.post_type,
-                                             promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
-                                             )
+            if search_results.checked_post.subreddit.lower() == 'the_dedede':
+                msg = 'This post is unique over the last {days} days! I checked {count} {post_type} posts in {time} seconds and didn\'t find a match\n\n' \
+                      '*Feedback? Hate? Send me a PM{promo}'.format(count=f'{search_results.index_size:,}',
+                                                             time=search_results.search_time,
+                                                             post_type=search_results.checked_post.post_type,
+                                                             promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
+                                                             days=monitored_sub.target_days_old
+                                                             )
+            else:
+
+                msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
+                                                 time=search_results.search_time,
+                                                 post_type=search_results.checked_post.post_type,
+                                                 promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
+                                                 )
 
         log.info('Leaving comment on post %s', f'https://redd.it/{search_results.checked_post.post_id}')
         log.debug('Leaving message %s', msg)
@@ -171,6 +183,9 @@ class SubMonitor:
         with self.uowm.start() as uow:
             uow.posts.update(search_results.checked_post)
             uow.commit()
+
+    def _build_default_message(self, values) -> str:
+        pass
 
     def _save_unknown_post(self, submission: Submission) -> Post:
         """

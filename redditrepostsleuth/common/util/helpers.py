@@ -8,6 +8,7 @@ from praw.models import Submission
 
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.common.model.imagematch import ImageMatch
@@ -143,3 +144,6 @@ def build_markdown_list(matches: List[ImageMatch]) -> str:
     for match in matches:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
     return result
+
+def build_default_repost_message(values: dict) -> str:
+    pass
