@@ -106,7 +106,7 @@ class SubMonitor:
         self._leave_comment(search_results, submission)
         time.sleep(3)
 
-        if monitored_sub.report_submission:
+        if search_results.matches and monitored_sub.report_submission:
             log.info('Reporting post %s on %s', f'https://redd.it/{post.post_id}', monitored_sub.name)
             try:
                 submission.report(monitored_sub.report_msg)
@@ -160,6 +160,7 @@ class SubMonitor:
         log.info('Leaving comment on post %s', f'https://redd.it/{search_results.checked_post.post_id}')
         log.debug('Leaving message %s', msg)
         try:
+            log.info(self.reddit.auth.limits)
             comment = submission.reply(msg)
             if comment:
                 log.info(f'https://reddit.com{comment.permalink}')

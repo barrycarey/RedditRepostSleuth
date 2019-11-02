@@ -66,14 +66,12 @@ class SqlAlchemyTask(Task):
 
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
-        self.reddit = get_reddit_instance()
         self.event_logger = EventLogging()
 
 class AnnoyTask(Task):
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
         self.dup_service = DuplicateImageService(self.uowm)
-        self.reddit = get_reddit_instance()
         self.event_logger = EventLogging()
 
 class RedditTask(Task):
