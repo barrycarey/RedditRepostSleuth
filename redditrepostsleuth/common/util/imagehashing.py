@@ -42,7 +42,7 @@ def generate_img_by_url(url: str) -> Image:
         response = request.urlopen(req, timeout=10)
         img = Image.open(BytesIO(response.read()))
     except (HTTPError, ConnectionError, OSError, DecompressionBombError, UnicodeEncodeError) as e:
-        log.error('Failed to convert image %s. Error: %s ', url, str(e))
+        log.exception('Failed to convert image %s. Error: %s ', url, str(e))
         raise ImageConversioinException(str(e))
 
     return img if img else None
@@ -52,7 +52,7 @@ def generate_img_by_file(path: str) -> Image:
     try:
         img = Image.open(path)
     except (HTTPError, ConnectionError, OSError, DecompressionBombError, UnicodeEncodeError) as e:
-        log.error('Failed to convert image %s. Error: %s ', path, str(e))
+        log.exception('Failed to convert image %s. Error: %s ', path, str(e))
         raise ImageConversioinException(str(e))
 
     return img if img else None
@@ -143,10 +143,6 @@ def set_image_hashes(post: Post) -> Post:
 
 def set_image_hashes_api(post: Post) -> Post:
     log.debug('Hashing image post using api %s', post.post_id)
-    r = requests.head(post.url)
-    if r.status_code != 200:
-        log.error('Image no longer exists %s', r.status_code)
-        raise ImageConversioinException('Image URL no longer valid')
 
     r = requests.get('http://167.99.10.47:8000/hash', params={'url': post.url})
 

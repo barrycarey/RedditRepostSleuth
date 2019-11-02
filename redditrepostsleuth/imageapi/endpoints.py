@@ -57,8 +57,8 @@ class ImageSleuth:
         except Exception as e:
             log.exception('Problem checking duplicates for post %s', post_id)
             response['status'] = 'error'
-            response['message'] = 'Error during duplicate checking'
-            resp.body = response
+            response['message'] = f'Error during Search.  Error Message: {str(e)}'
+            resp.body = json.dumps(response)
             return
 
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)

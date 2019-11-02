@@ -113,7 +113,9 @@ BANNED_SUBS = [
     'crappydesign',
     'ohitllbefine',
     'introvert',
-    'thebullwins'
+    'thebullwins',
+    'delicioustraps',
+    'halloween'
 ]
 
 CUSTOM_FILTER_LEVELS = {

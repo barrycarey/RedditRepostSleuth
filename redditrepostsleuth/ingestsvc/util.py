@@ -1,4 +1,5 @@
 import os
+import requests
 
 from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import ImageConversioinException
@@ -9,7 +10,7 @@ from redditrepostsleuth.common.util.imagehashing import set_image_hashes, set_im
 from hashlib import md5
 
 def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Post:
-
+    log.debug(post)
     with uowm.start() as uow:
         if post.post_type == 'image':
 
@@ -33,6 +34,13 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Post:
     return post
 
 def process_image_post(post: Post) -> RedditImagePost:
+    r = requests.head(post.url)
+    if r.status_code != 200:
+        log.error('Image no longer exists %s: %s', r.status_code, post.url)
+        raise ImageConversioinException('Image URL no longer valid')
+
+    log.info('Hashing URL: %s', post.url)
+
     if os.getenv('INGEST_API', None):
         set_image_hashes_api(post)
     else:

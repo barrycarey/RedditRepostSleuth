@@ -365,6 +365,7 @@ def save_new_post(self, post):
         if existing:
             return
         try:
+            log.info(post)
             post = pre_process_post(post, self.uowm)
         except ImageConversioinException as e:
             log.error('Failed to hash image post %s', post.post_id)

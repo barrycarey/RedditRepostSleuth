@@ -11,3 +11,6 @@ Image Repost
 
 Host Post Monitor
     Add how many times it has been seen in current sub
+
+Summoning:
+    Make summons abide by distances rules for specific subs
