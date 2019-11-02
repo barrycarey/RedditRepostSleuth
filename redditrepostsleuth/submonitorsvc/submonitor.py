@@ -13,7 +13,7 @@ from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Post, MonitoredSub
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen
+from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen, build_markdown_list
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.ingestsvc.util import pre_process_post
@@ -121,6 +121,22 @@ class SubMonitor:
             newest_post = uow.posts.get_newest_post()
 
         if search_results.matches:
+
+            values = {
+                'total_searched': search_results.index_size,
+                'search_time': search_results.search_time,
+                'total_posts': newest_post.id,
+                'match_count': len(search_results.matches),
+                'oldest_created_at': search_results.matches[0].post.created_at,
+                'oldest_url': search_results.matches[0].post.url,
+                'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
+                'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+                'newest_created_at': search_results.matches[-1].post.created_at,
+                'newest_url': search_results.matches[-1].post.url,
+                'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
+                'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
+                'match_list': build_markdown_list(search_results.matches)
+            }
 
             msg = REPOST_MESSAGE_TEMPLATE.format(
                                                  searched_posts=searched_post_str(search_results.checked_post, search_results.index_size),

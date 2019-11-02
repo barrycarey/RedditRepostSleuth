@@ -1,5 +1,5 @@
 import requests
-from typing import Dict
+from typing import Dict, List
 
 import imagehash
 from influxdb import InfluxDBClient
@@ -10,6 +10,7 @@ from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.util.imagehashing import generate_img_by_url
 
 
@@ -136,3 +137,9 @@ def is_image_still_available(url: str) -> bool:
         return True
     else:
         return False
+
+def build_markdown_list(matches: List[ImageMatch]) -> str:
+    result = ''
+    for match in matches:
+        result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
+    return result

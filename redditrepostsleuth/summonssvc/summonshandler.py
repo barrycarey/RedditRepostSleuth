@@ -18,7 +18,7 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Summons, RepostWatch, Post
 from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.common.util.helpers import create_first_seen
+from redditrepostsleuth.common.util.helpers import create_first_seen, build_markdown_list
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
 from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc, check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -222,7 +222,7 @@ class SummonsHandler:
                     time=search_results.search_time
 
                 )
-                response.message = response.message + self._build_markdown_list(search_results.matches)
+                response.message = response.message + build_markdown_list(search_results.matches)
                 if len(search_results.matches) > 4:
                     log.info('Sending check all results via PM with %s matches', len(search_results.matches))
                     comment = self.reddit.comment(summons.comment_id)
@@ -291,12 +291,6 @@ class SummonsHandler:
                 summons.comment_reply_id = response_id
                 uow.commit()
                 log.debug('Committed summons response to database')
-
-    def _build_markdown_list(self, matches: List[ImageMatch]) -> str:
-        result = ''
-        for match in matches:
-            result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
-        return result
 
     def _save_post(self, post: Post):
         with self.uowm.start() as uow:
