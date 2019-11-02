@@ -11,20 +11,24 @@ from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPL
 from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import Post, MonitoredSub
+from redditrepostsleuth.common.model.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen, build_markdown_list
+from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen, build_markdown_list, \
+    build_msg_values_from_search
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.responsebuilder import ResponseBuilder
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
 class SubMonitor:
 
-    def __init__(self, image_service: DuplicateImageService, uowm: SqlAlchemyUnitOfWorkManager, reddit: Reddit):
+    def __init__(self, image_service: DuplicateImageService, uowm: SqlAlchemyUnitOfWorkManager, reddit: Reddit, response_builder: ResponseBuilder):
         self.image_service = image_service
         self.uowm = uowm
         self.reddit = reddit
+        self.response_builder = response_builder
+        self.checked_posts = []
 
     def run(self):
         while True:
@@ -32,6 +36,8 @@ class SubMonitor:
                 with self.uowm.start() as uow:
                     monitored_subs = uow.monitored_sub.get_all()
                     for sub in monitored_subs:
+                        if len(self.checked_posts) > 10000:
+                            self.checked_posts = []
                         if not sub.active:
                             log.debug('Sub %s is disabled', sub.name)
                             continue
@@ -56,6 +62,9 @@ class SubMonitor:
 
         for sub in submissions:
             with self.uowm.start() as uow:
+                checked = uow.monitored_sub_checked.get_by_id(sub.id)
+                if checked:
+                    continue
                 post = uow.posts.get_by_post_id(sub.id)
                 if not post:
                     log.info('Post %s not in database, attempting to ingest', sub.id)
@@ -77,6 +86,8 @@ class SubMonitor:
                     continue
 
                 self._check_for_repost(post, sub, monitored_sub)
+                uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id))
+                uow.commit()
 
 
 
@@ -103,8 +114,8 @@ class SubMonitor:
             log.info('No matches for post %s and comment OC is disabled', f'https://redd.it/{search_results.checked_post.post_id}')
             return
 
-        self._leave_comment(search_results, submission)
-        time.sleep(3)
+        self._leave_comment(search_results, submission, monitored_sub)
+        #time.sleep(3)
 
         if search_results.matches and monitored_sub.report_submission:
             log.info('Reporting post %s on %s', f'https://redd.it/{post.post_id}', monitored_sub.name)
@@ -115,55 +126,40 @@ class SubMonitor:
 
 
 
-    def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission) -> None:
+    def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> None:
 
-        with self.uowm.start() as uow:
-            newest_post = uow.posts.get_newest_post()
 
         if search_results.matches:
-
-            values = {
-                'total_searched': search_results.index_size,
-                'search_time': search_results.search_time,
-                'total_posts': newest_post.id,
-                'match_count': len(search_results.matches),
-                'oldest_created_at': search_results.matches[0].post.created_at,
-                'oldest_url': search_results.matches[0].post.url,
-                'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
-                'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
-                'newest_created_at': search_results.matches[-1].post.created_at,
-                'newest_url': search_results.matches[-1].post.url,
-                'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
-                'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
-                'match_list': build_markdown_list(search_results.matches)
-            }
-
-            msg = REPOST_MESSAGE_TEMPLATE.format(
-                                                 searched_posts=searched_post_str(search_results.checked_post, search_results.index_size),
-                                                 post_type=search_results.checked_post.post_type,
-                                                 time=search_results.search_time,
-                                                 total_posts=f'{newest_post.id:,}',
-                                                 oldest=search_results.matches[0].post.created_at,
-                                                 count=len(search_results.matches),
-                                                 firstseen=create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
-                                                 times='times' if len(search_results.matches) > 1 else 'time',
-                                                 percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
-                                                 post_url=f'https://redd.it/{search_results.checked_post.post_id}'
-            )
+            msg_values = build_msg_values_from_search(search_results, self.uowm)
+            msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values)
         else:
-            msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
-                                             time=search_results.search_time,
-                                             post_type=search_results.checked_post.post_type,
-                                             promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
-                                             )
+            if search_results.checked_post.subreddit.lower() == 'the_dedede':
+                msg = 'This post is unique over the last {days} days! I checked {count} {post_type} posts in {time} seconds and didn\'t find a match\n\n' \
+                      '*Feedback? Hate? Send me a PM{promo}'.format(count=f'{search_results.index_size:,}',
+                                                             time=search_results.search_time,
+                                                             post_type=search_results.checked_post.post_type,
+                                                             promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
+                                                             days=monitored_sub.target_days_old
+                                                             )
+            else:
+
+                msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
+                                                 time=search_results.search_time,
+                                                 post_type=search_results.checked_post.post_type,
+                                                 promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
+                                                 )
 
         log.info('Leaving comment on post %s', f'https://redd.it/{search_results.checked_post.post_id}')
         log.debug('Leaving message %s', msg)
         try:
-            log.info(self.reddit.auth.limits)
+            start = time.perf_counter()
             comment = submission.reply(msg)
+            log.info('PRAW Comment Time %s', round(time.perf_counter() - start, 4))
             if comment:
                 log.info(f'https://reddit.com{comment.permalink}')
+                if monitored_sub.sticky_comment:
+                    comment.mod.distinguish(sticky=True)
+                    log.debug('Made comment sticky')
         except Exception as e:
             log.exception('Failed to leave comment on post %s', search_results.checked_post.post_id)
             return
@@ -172,6 +168,9 @@ class SubMonitor:
         with self.uowm.start() as uow:
             uow.posts.update(search_results.checked_post)
             uow.commit()
+
+    def _build_default_message(self, values) -> str:
+        pass
 
     def _save_unknown_post(self, submission: Submission) -> Post:
         """

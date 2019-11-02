@@ -85,7 +85,7 @@ class DuplicateImageService:
                 self.index_size = self.index.get_n_items()
 
         else:
-            log.info('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
+            log.debug('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
 
     # TODO - Remove this method
     def _clean_results(self, results: List[ImageMatch], orig_id: int, target_hamming_distance: int = None, target_annoy_distance: float = None) -> List[ImageMatch]:
@@ -173,7 +173,7 @@ class DuplicateImageService:
         results = []
         log.info('Checking %s %s for duplicates', checked_post.post_id, f'https://redd.it/{checked_post.post_id}')
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
-        log.info('Matches pre-filter: %s', len(matches))
+        log.debug('Matches pre-filter: %s', len(matches))
         for match in matches:
             if not match.post.dhash_h:
                 log.debug('Match %s missing dhash_h', match.post.post_id)
@@ -202,7 +202,7 @@ class DuplicateImageService:
                 log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
-            log.info('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
+            log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
             if not is_image_still_available(match.post.url):
                 log.debug('Active Image Reject: Imgae has been deleted from post https://redd.it/%s', match.post.post_id)
                 continue

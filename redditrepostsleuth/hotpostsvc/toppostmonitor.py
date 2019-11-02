@@ -12,17 +12,19 @@ from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Post
-from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen
+from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen, build_msg_values_from_search
 from redditrepostsleuth.common.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.responsebuilder import ResponseBuilder
 
 
 class TopPostMonitor:
 
-    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager, image_service: DuplicateImageService):
+    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager, image_service: DuplicateImageService, response_builder: ResponseBuilder):
         self.reddit = reddit
         self.uowm = uowm
         self.image_service = image_service
+        self.response_builder = response_builder
 
 
     def monitor(self):
@@ -67,7 +69,7 @@ class TopPostMonitor:
                     log.info('Using custom filter values for sub %s', post.subreddit)
                     target_annoy = CUSTOM_FILTER_LEVELS.get(post.subreddit)['annoy']
                     target_hamming = CUSTOM_FILTER_LEVELS.get(post.subreddit)['hamming']
-                results = self.image_service.check_duplicates_wrapped(post, target_hamming_distance=target_hamming,
+                search_results = self.image_service.check_duplicates_wrapped(post, target_hamming_distance=target_hamming,
                                                                       target_annoy_distance=target_annoy)
             except NoIndexException:
                 log.error('No available index for image repost check.  Trying again later')
@@ -75,7 +77,7 @@ class TopPostMonitor:
             except RedLockError:
                 log.error('Could not get RedLock.  Trying again later')
                 return
-            self.add_comment(post, results.matches, round(results.search_time, 5), results.index_size)
+            self.add_comment(post, search_results)
         elif post.post_type == 'link':
             return
             # TODO - Deal with imgur posts marked as link
@@ -84,11 +86,11 @@ class TopPostMonitor:
                 log.info('Skipping imgur post marked as link')
                 return
             start = perf_counter()
-            results = check_link_repost(post, self.uowm).matches
+            search_results = check_link_repost(post, self.uowm).matches
             search_time = perf_counter() - start
             with self.uowm.start() as uow:
                 total_searched = uow.posts.count_by_type('link')
-            self.add_comment(post, results, search_time, total_searched)
+            self.add_comment(post, search_results, search_time, total_searched)
         else:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
@@ -96,32 +98,21 @@ class TopPostMonitor:
 
 
 
-    def add_comment(self, post: Post, search_results, search_time: float, total_search: int):
+    def add_comment(self, post: Post, search_results):
         # TODO - Use new wrapper dup search method
         submission = self.reddit.submission(post.post_id)
 
         with self.uowm.start() as uow:
-            newest_post = uow.posts.get_newest_post()
-            if search_results:
-
-                msg = REPOST_MESSAGE_TEMPLATE.format(
-                                                     searched_posts=searched_post_str(post, total_search),
-                                                     post_type=post.post_type,
-                                                     time=search_time,
-                                                     total_posts=f'{newest_post.id:,}',
-                                                     oldest=search_results[0].post.created_at,
-                                                     count=len(search_results),
-                                                     firstseen=create_first_seen(search_results[0].post, post.subreddit),
-                                                     times='times' if len(search_results) > 1 else 'time',
-                                                     post_url=f'https://redd.it/{post.post_id}',
-                                                     percent=f'{(100 - search_results[0].hamming_distance) / 100:.2%}')
+            if search_results.matches:
+                msg_values = build_msg_values_from_search(search_results, self.uowm)
+                msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values)
             else:
                 if post.subreddit in ONLY_COMMENT_REPOST_SUBS or not config.comment_on_oc:
                     log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
                     return
 
-                msg = OC_MESSAGE_TEMPLATE.format(count=f'{total_search:,}',
-                                                 time=search_time,
+                msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
+                                                 time=search_results.search_time,
                                                  post_type=post.post_type,
                                                  promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
                                                  )

@@ -18,19 +18,22 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.db.databasemodels import Summons, RepostWatch, Post
 from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.common.util.helpers import create_first_seen, build_markdown_list
+from redditrepostsleuth.common.util.helpers import create_first_seen, build_markdown_list, searched_post_str, \
+    build_msg_values_from_search
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
 from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc, check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.responsebuilder import ResponseBuilder
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
 class SummonsHandler:
-    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: Reddit, summons_disabled=False):
+    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: Reddit, response_builder: ResponseBuilder, summons_disabled=False):
         self.uowm = uowm
         self.image_service = image_service
         self.reddit = reddit
         self.summons_disabled = summons_disabled
+        self.response_builder = response_builder
 
     def handle_repost_request(self, summons: Summons):
 
@@ -199,20 +202,17 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             newest_post = uow.posts.get_newest_post()
 
+
+
         if not search_results.matches:
             response.message = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
                                                  time=search_results.search_time,
                                                  post_type=post.post_type,
-                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else 'or visit r/RepostSleuthBot*'
+                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
                                                  )
         else:
-            # TODO: This is temp until database is backfilled with short links
-            with self.uowm.start() as uow:
-                for match in search_results.matches:
-                    if not match.post.shortlink:
-                        set_shortlink(match.post)
-                        uow.posts.update(match.post)
-                        uow.commit()
+
+            msg_values = msg_values = build_msg_values_from_search(search_results, self.uowm)
 
             if sub_command == 'all':
                 response.message = IMAGE_REPOST_ALL.format(
@@ -231,17 +231,8 @@ class SummonsHandler:
 
                 response.message = response.message
             else:
-                response.message = REPOST_MESSAGE_TEMPLATE.format(
-                                                     searched_posts=self._searched_post_str(post, self.image_service.index.get_n_items()),
-                                                     post_type=post.post_type,
-                                                     time=search_results.search_time,
-                                                     total_posts=f'{newest_post.id:,}',
-                                                     oldest=search_results.matches[0].post.created_at,
-                                                     count=len(search_results.matches),
-                                                     firstseen=create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
-                                                     times='times' if len(search_results.matches) > 1 else 'time',
-                                                    post_url=f'https://redd.it/{search_results.checked_post.post_id}',
-                                                     percent=f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}')
+
+                response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values)
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
