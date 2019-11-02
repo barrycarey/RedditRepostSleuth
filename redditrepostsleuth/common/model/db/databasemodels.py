@@ -178,6 +178,16 @@ class MonitoredSub(Base):
     target_days_old = Column(Integer)
     same_sub_only = Column(Boolean, default=False)
     notes = Column(String(500))
+    sticky_comment = Column(Boolean, default=False)
+    repost_response_template = Column(String(2000))
+    oc_response_template = Column(String(2000))
+
+class MonitoredSubChecks(Base):
+    __tablename__ = 'reddit_monitored_sub_checked'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    checked_at = Column(DateTime, default=func.utc_timestamp())
 
 class MemeTemplate(Base):
     __tablename__ = 'meme_template'

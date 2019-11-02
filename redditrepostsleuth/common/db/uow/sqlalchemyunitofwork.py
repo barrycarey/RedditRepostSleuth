@@ -6,6 +6,7 @@ from redditrepostsleuth.common.db.repository.imagepostrepository import ImagePos
 from redditrepostsleuth.common.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.common.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.common.db.repository.memetemplaterepository import MemeTemplateRepository
+from redditrepostsleuth.common.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.common.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.common.db.repository.postrepository import PostRepository
 from redditrepostsleuth.common.db.repository.repostrepository import RepostRepository
@@ -82,3 +83,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def meme_template(self) -> MemeTemplateRepository:
         return MemeTemplateRepository(self.session)
+
+    @property
+    def monitored_sub_checked(self) -> MonitoredSubCheckRepository:
+        return MonitoredSubCheckRepository(self.session)

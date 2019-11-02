@@ -9,9 +9,11 @@ from praw.models import Submission
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE
+from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.common.model.imagematch import ImageMatch
+from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.common.util.imagehashing import generate_img_by_url
 
 
@@ -89,23 +91,23 @@ def searched_post_str(post: Post, count: int) -> str:
 
     return output
 
-def create_first_seen(post: Post, subreddit: str) -> str:
+def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> str:
     """
     Create a first seen string to use in a comment.  Takes into account subs that dont' allow links
     :param post: DB Post obj
     :return: final string
     """
     if subreddit and subreddit in NO_LINK_SUBREDDITS:
-        firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')}"
+        seen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')}"
     else:
         if post.shortlink:
             original_link = post.shortlink
         else:
             original_link = 'https://reddit.com' + post.perma_link
 
-        firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%Y-%m-%d')}"
+        seen = f"{first_last} seen [Here]({original_link}) on {post.created_at.strftime('%Y-%m-%d')}"
 
-    return firstseen
+    return seen
 
 def create_meme_template(url: str, name: str = None) -> MemeTemplate:
     """
@@ -145,5 +147,38 @@ def build_markdown_list(matches: List[ImageMatch]) -> str:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
     return result
 
-def build_default_repost_message(values: dict) -> str:
-    pass
+def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None) -> dict:
+    """
+    Take a ImageRepostWrapper object and return a dict of values for use in a message template
+    :param search_results: ImageRepostWrapper
+    :param uowm: UnitOfWorkManager
+    """
+    msg_values = {
+        'total_searched': search_results.index_size,
+        'search_time': search_results.search_time,
+        'total_posts': 0,
+        'match_count': len(search_results.matches),
+        'oldest_created_at': search_results.matches[0].post.created_at,
+        'oldest_url': search_results.matches[0].post.url,
+        'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
+        'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+        'oldest_sub': search_results.matches[0].post.subreddit,
+        'newest_created_at': search_results.matches[-1].post.created_at,
+        'newest_url': search_results.matches[-1].post.url,
+        'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
+        'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
+        'newest_sub': search_results.matches[-1].post.subreddit,
+        'match_list': build_markdown_list(search_results.matches),
+        'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
+        'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
+        'post_type': search_results.checked_post.post_type,
+        'times_word': 'times' if len(search_results.matches) > 1 else 'time',
+        'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.index_size),
+        'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}'
+    }
+
+    if uowm:
+        with uowm.start() as uow:
+            msg_values['total_posts'] = uow.posts.get_newest_post().id
+
+    return msg_values

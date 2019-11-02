@@ -66,15 +66,8 @@ class SqlAlchemyTask(Task):
 
     def __init__(self):
         self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
-        self.reddit = get_reddit_instance()
         self.event_logger = EventLogging()
 
-class SqlAlchemyRedditTask(Task):
-
-    def __init__(self):
-        self.uowm = SqlAlchemyUnitOfWorkManager(db_engine)
-        self.reddit = get_reddit_instance()
-        self.event_logger = EventLogging()
 
 class AnnoyTask(Task):
     def __init__(self):
@@ -273,10 +266,9 @@ def check_repost_watch(self, repost):
             return
         repost_obj = uow.posts.get_by_post_id(repost.post_id)
     log.info('Post %s has an active watch for user %s', watch.post_id, watch.user)
-    reddit = get_reddit_instance()
     if watch.response_type == 'message':
         log.info('Sending private message to %s', watch.user)
-        reddit.redditor(watch.user).message('Repost Sleuth Watch Alert', WATCH_FOUND.format(user=watch.user, repost_url=repost_obj.shortlink))
+
 
 
 
@@ -438,10 +430,9 @@ def update_crosspost_parent_api(self, ids):
             BatchedEvent(event_type='selftext', status='success', count=len(ids), post_type='link'))
         log.debug('Saved batch of crosspost')
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+@celery.task(bind=True, base=RedditTask, ignore_results=True, serializer='pickle')
 def video_hash(self, post_id):
-    reddit = get_reddit_instance()
-    sub = reddit.submission(id=post_id)
+    sub = self.reddit.submission(id=post_id)
     url = sub.media['reddit_video']['fallback_url']
     out_dir = os.path.join(os.getcwd(), 'video', post_id)
     log.info('Hashing video %s', post_id)
