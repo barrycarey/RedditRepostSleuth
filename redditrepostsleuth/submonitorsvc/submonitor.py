@@ -80,7 +80,7 @@ class SubMonitor:
 
 
 
-    def _check_for_repost(self, post: Post, submission: Submission, monitored_sub: MonitoredSub, comment_oc: bool = False) -> None:
+    def _check_for_repost(self, post: Post, submission: Submission, monitored_sub: MonitoredSub) -> None:
         """
         Check if provided post is a repost
         :param post: DB Post obj
@@ -99,7 +99,7 @@ class SubMonitor:
             log.error('Failed to get lock to load new index')
             return
 
-        if not search_results.matches and not comment_oc:
+        if not search_results.matches and monitored_sub.repost_only:
             log.info('No matches for post %s and comment OC is disabled', f'https://redd.it/{search_results.checked_post.post_id}')
             return
 
