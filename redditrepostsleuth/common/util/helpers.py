@@ -3,7 +3,6 @@ from typing import Dict, List
 
 import imagehash
 from influxdb import InfluxDBClient
-from praw import Reddit
 from praw.models import Submission
 
 from redditrepostsleuth.common.config import config
@@ -17,14 +16,7 @@ from redditrepostsleuth.common.util.imagehashing import generate_img_by_url
 
 # TODO - Move praw dependant helpers to own file to reduce dependency
 
-def get_reddit_instance() -> Reddit:
-    return Reddit(
-                        client_id=config.reddit_client_id,
-                        client_secret=config.reddit_client_secret,
-                        password=config.reddit_password,
-                        user_agent=config.reddit_useragent,
-                        username=config.reddit_username
-                    )
+
 
 # TODO - Pull this out and retest
 def get_influx_instance() -> InfluxDBClient:

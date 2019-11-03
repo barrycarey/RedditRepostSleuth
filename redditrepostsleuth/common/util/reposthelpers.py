@@ -3,10 +3,10 @@ from typing import List
 from praw import Reddit
 from praw.models import Submission
 
+from redditrepostsleuth.common.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.common.model.imagematch import ImageMatch
 
 from redditrepostsleuth.common.model.repostmatch import RepostMatch
 from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
@@ -14,7 +14,7 @@ from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
 
 # TODO: Should be able to safely remove this now
 
-from redditrepostsleuth.common.util.helpers import get_reddit_instance
+
 from redditrepostsleuth.common.util.objectmapping import post_to_repost_match
 
 
@@ -52,17 +52,6 @@ def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
 def remove_newer_posts(posts: List[Post], repost_check: Post):
     return [post for post in posts if post.created_at < repost_check.created_at]
 
-
-def check_for_image_crosspost(matches: List[ImageMatch], reddit: Reddit = None) -> List[ImageMatch]:
-    if not reddit:
-        reddit = get_reddit_instance()
-    for match in matches:
-        if match.post.crosspost_checked:
-            continue
-        match.post.crosspost_parent = get_crosspost_parent(match.post, reddit)
-        match.post.crosspost_checked = True
-    return matches
-
 def get_crosspost_parent(post: Post, reddit: Reddit):
     submission = reddit.submission(id=post.post_id)
     if submission:
@@ -76,6 +65,7 @@ def get_crosspost_parent(post: Post, reddit: Reddit):
     log.error('Failed to find submission with ID %s', post.post_id)
 
 def set_shortlink(post: Post) -> Post:
+    # TODO - Strip this out
     """
     Take a post and set its short link if it doesn't exist
     :param post:

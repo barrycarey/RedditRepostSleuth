@@ -3,7 +3,7 @@ from typing import List
 
 from redditrepostsleuth.core.db.databasemodels import Post
 
-
+# TODO - Convert to Py 3.7 dataclasses
 @dataclass
 class RepostResponseBase:
     status: str = None
