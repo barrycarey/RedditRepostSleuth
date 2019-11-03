@@ -15,6 +15,7 @@ from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.common.util.imagehashing import generate_img_by_url
 
+# TODO - Move praw dependant helpers to own file to reduce dependency
 
 def get_reddit_instance() -> Reddit:
     return Reddit(

@@ -1,0 +1,13 @@
+sqlalchemy
+pymysql
+falcon
+waitress
+gunicorn
+annoy
+falcon_cors
+distance
+imagehash
+requests
+praw
+influxdb
+redlock

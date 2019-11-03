@@ -3,7 +3,7 @@ from falcon_cors import CORS
 from waitress import serve
 
 from redditrepostsleuth.core.db import db_engine
-from redditrepostsleuth.core.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.imageapi.endpoints import ImageSleuth, MemeTemplate
 

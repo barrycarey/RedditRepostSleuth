@@ -2,7 +2,7 @@ import json
 
 from falcon import Request, Response
 
-from redditrepostsleuth.core.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.common.logging import log
