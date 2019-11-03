@@ -183,7 +183,7 @@ class SubMonitor:
         """
         post = submission_to_post(submission)
         try:
-            post = pre_process_post(post, self.uowm)
+            post = pre_process_post(post, self.uowm, hash_api=None)
         except IntegrityError as e:
             log.error('Image post already exists')
 
