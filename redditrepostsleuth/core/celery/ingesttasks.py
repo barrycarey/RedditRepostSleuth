@@ -31,7 +31,7 @@ def save_new_post(self, post):
             uow.posts.add(post)
             uow.commit()
             log.debug('Commited Post: %s', post)
-            ingest_repost_check.apply_async((post,))
+            ingest_repost_check.apply_async((post,), queue='repost2')
         except Exception as e:
             log.exception('Problem saving new post', exc_info=True)
 
@@ -55,7 +55,7 @@ def save_pushshift_results(self, data):
                 continue
             post = pushshift_to_post(submission)
             log.debug('Saving pushshift post: %s', submission['id'])
-            save_new_post.apply_async((post,), queue='postingest')
+            save_new_post.apply_async((post,), queue='postingest2')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results_archive(self, data):

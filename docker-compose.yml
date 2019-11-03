@@ -7,6 +7,7 @@ services:
         environment:
             - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
 
     hot_post:
         build:
