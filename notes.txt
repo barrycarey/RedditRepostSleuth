@@ -11,4 +11,6 @@ Host Post Monitor
 
 Summoning:
     Make summons abide by distances rules for specific subs
-    If 1 summons throws and unexpected exception it will loop out
+    If 1 summons throws and unexpected exception it will loop ou
+
+Move repost checking logic to API

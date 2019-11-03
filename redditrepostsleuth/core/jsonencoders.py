@@ -1,7 +1,7 @@
 import json
 
-from redditrepostsleuth.core.model import ImageMatch
-from redditrepostsleuth.core.model import ImageRepostWrapper
+from redditrepostsleuth.core.model.imagematch import ImageMatch
+from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 
 class ImageMatchJsonEncoder(json.JSONEncoder):

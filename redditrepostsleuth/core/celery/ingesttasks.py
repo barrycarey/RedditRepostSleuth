@@ -31,7 +31,7 @@ def save_new_post(self, post):
             uow.posts.add(post)
             uow.commit()
             log.debug('Commited Post: %s', post)
-            ingest_repost_check.apply_async((post,), queue='repost2')
+            ingest_repost_check.apply_async((post,), queue='repost')
         except Exception as e:
             log.exception('Problem saving new post', exc_info=True)
 
@@ -40,9 +40,9 @@ def ingest_repost_check(post):
     if post.post_type == 'image' and config.check_new_images_for_repost:
         #check_image_repost_save.apply_async((post,), queue='repost_image')
         # TODO - Make sure this works
-        celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post], queue='demo_repost')
+        celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post], queue='repost_image')
     elif post.post_type == 'link' and config.check_new_links_for_repost:
-        celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]])
+        celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]], queue='repost_link')
         #link_repost_check().apply_async(([post],))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
@@ -55,7 +55,7 @@ def save_pushshift_results(self, data):
                 continue
             post = pushshift_to_post(submission)
             log.debug('Saving pushshift post: %s', submission['id'])
-            save_new_post.apply_async((post,), queue='postingest2')
+            save_new_post.apply_async((post,), queue='postingest')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results_archive(self, data):

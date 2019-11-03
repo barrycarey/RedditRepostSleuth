@@ -1,4 +1,4 @@
-from redditrepostsleuth.core.model import InfluxEvent
+from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 
 
 class CeleryTaskEvent(InfluxEvent):
@@ -38,5 +38,4 @@ class BatchedEvent(InfluxEvent):
         event = super().get_influx_event()
         event[0]['fields']['count'] = self.count
         event[0]['tags']['post_type'] = self.post_type
-        #log.debug('Writting influx log: %s', event)
         return event

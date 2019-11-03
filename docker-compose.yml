@@ -63,9 +63,9 @@ services:
     ingest_worker:
         build:
             context: .
-            dockerfile: redditrepostsleuth/workers/Dockerfile
+            dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=DEBUG
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
