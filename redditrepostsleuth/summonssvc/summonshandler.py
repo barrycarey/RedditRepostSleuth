@@ -310,7 +310,7 @@ class SummonsHandler:
         """
         # TODO - Deal with case of not finding post ID.  Should be rare since this is triggered directly via a comment
         submission = self.reddit.submission(id=post_id)
-        post = pre_process_post(submission_to_post(submission), self.uowm)
+        post = pre_process_post(submission_to_post(submission), self.uowm, hash_api=None)
         with self.uowm.start() as uow:
             try:
                 uow.posts.add(post)
