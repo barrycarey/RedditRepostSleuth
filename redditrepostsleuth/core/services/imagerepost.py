@@ -7,17 +7,17 @@ from praw.models import Submission
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.celery.tasks import check_image_repost_save
-from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.config import config
+from redditrepostsleuth.core.exception import ImageConversioinException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.model.db import Post
-from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.service.repostservicebase import RepostServiceBase
-from redditrepostsleuth.common.util import set_image_hashes
-from redditrepostsleuth.common.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.model import Post
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.services.repostservicebase import RepostServiceBase
+from redditrepostsleuth.core.util import set_image_hashes
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
 # TODO - Deal with images that PIL can't convert.  Tons in database
-from redditrepostsleuth.common.util.reposthelpers import sort_reposts
+from redditrepostsleuth.core.util.reposthelpers import sort_reposts
 
 
 class ImageRepostService(RepostServiceBase):

@@ -1,6 +1,6 @@
 import os
 
-from redditrepostsleuth.common.config.configmanager import ConfigManager
+from redditrepostsleuth.core.config.configmanager import ConfigManager
 
 if os.getenv('SLEUTHCONFIG'):
     print('Config ENV Set')

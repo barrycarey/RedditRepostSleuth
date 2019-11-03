@@ -4,16 +4,17 @@ from time import perf_counter
 from praw import Reddit
 from redlock import RedLockError
 
-from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
-    CUSTOM_FILTER_LEVELS
-from redditrepostsleuth.common.config.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.config.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
+    NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.config.replytemplates import OC_MESSAGE_TEMPLATE
+
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.exception import NoIndexException
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.common.util.helpers import build_msg_values_from_search
-from redditrepostsleuth.common.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
+from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder
 

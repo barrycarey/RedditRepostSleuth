@@ -9,10 +9,10 @@ import imagehash
 from redditrepostsleuth.core.celery.tasks import video_hash, process_video
 from redditrepostsleuth.core.db import db_engine
 from redditrepostsleuth.core.db import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.common.model.db import VideoHash
+from redditrepostsleuth.core.model import VideoHash
 
-from redditrepostsleuth.common.util.helpers import get_reddit_instance
-from redditrepostsleuth.common.util import generate_img_by_file
+from redditrepostsleuth.core.util.helpers import get_reddit_instance
+from redditrepostsleuth.core.util import generate_img_by_file
 
 reddit = get_reddit_instance()
 

@@ -1,7 +1,7 @@
 from typing import List
 
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.common.model.repostmatch import RepostMatch
+from redditrepostsleuth.core.model.repostmatch import RepostMatch
 
 
 class RepostWrapper:

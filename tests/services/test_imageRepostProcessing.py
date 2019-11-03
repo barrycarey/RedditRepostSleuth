@@ -1,10 +1,10 @@
 from unittest import TestCase, mock
 
-from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.common.model.db import Post
+from redditrepostsleuth.core.exception import ImageConversioinException
+from redditrepostsleuth.core.model import Post
 from datetime import datetime
 
-from redditrepostsleuth.service.imagerepost import ImageRepostService
+from redditrepostsleuth.core.services.imagerepost import ImageRepostService
 
 
 class TestImageRepostProcessing(TestCase):

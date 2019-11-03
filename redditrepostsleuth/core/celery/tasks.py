@@ -10,26 +10,25 @@ import requests
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidSchema, InvalidURL
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.common.config.constants import USER_AGENTS
-from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.config import config
+from redditrepostsleuth.core.config import USER_AGENTS
+from redditrepostsleuth.core.exception import ImageConversioinException
+from redditrepostsleuth.core.logging import log
 
 from redditrepostsleuth.core.db.databasemodels import Comment, ImageRepost, VideoHash, AudioFingerPrint, RedditImagePost
-from redditrepostsleuth.common.model.events.celerytask import BatchedEvent
-from redditrepostsleuth.common.model.events.influxevent import InfluxEvent
-from redditrepostsleuth.common.model.events.repostevent import RepostEvent
+from redditrepostsleuth.core.model import BatchedEvent
+from redditrepostsleuth.core.model import InfluxEvent
+from redditrepostsleuth.core.model import RepostEvent
 
-from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.common.util.imagehashing import generate_img_by_url, generate_dhash, \
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.util import generate_img_by_url, generate_dhash, \
     generate_img_by_file
-from redditrepostsleuth.common.util.videohelpers import generate_thumbnails_from_url, download_file, \
+from redditrepostsleuth.core.util.videohelpers import generate_thumbnails_from_url, download_file, \
     generate_thumbnails_from_file
 
-from redditrepostsleuth.service.audiofingerprint import fingerprint_audio_file
+from redditrepostsleuth.core.services.audiofingerprint import fingerprint_audio_file
 
-from redditrepostsleuth.common.util.objectmapping import pushshift_to_post
-from redditrepostsleuth.common.util.reposthelpers import sort_reposts, clean_repost_matches
+from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
+from redditrepostsleuth.core.util.reposthelpers import sort_reposts, clean_repost_matches
 
 
 @celery.task

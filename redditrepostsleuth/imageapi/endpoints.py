@@ -4,9 +4,9 @@ from falcon import Request, Response
 
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.jsonencoders import ImageRepostWrapperEncoder
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.util.helpers import create_meme_template
+from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.helpers import create_meme_template
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 
 

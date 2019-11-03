@@ -5,16 +5,16 @@ from praw.models import Submission
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.common.config.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.config import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.config import OC_MESSAGE_TEMPLATE
 
 
-from redditrepostsleuth.common.exception import NoIndexException
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
-from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.common.util.helpers import build_msg_values_from_search
-from redditrepostsleuth.common.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.model import ImageRepostWrapper
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder

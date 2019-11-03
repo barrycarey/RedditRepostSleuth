@@ -2,7 +2,7 @@ from typing import List
 
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post
 
 

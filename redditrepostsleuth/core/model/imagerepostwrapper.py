@@ -1,4 +1,4 @@
-from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 
 
 class ImageRepostWrapper(RepostWrapper):

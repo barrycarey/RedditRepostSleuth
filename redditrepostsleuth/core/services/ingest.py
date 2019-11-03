@@ -9,9 +9,9 @@ from praw import Reddit
 from prawcore import Forbidden
 from redditrepostsleuth.core.celery.tasks import save_new_post, save_new_comment, \
     ingest_pushshift_url, save_pushshift_results
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.util.objectmapping import submission_to_post, pushshift_to_post
+from redditrepostsleuth.core.util.objectmapping import submission_to_post, pushshift_to_post
 
 
 class Ingest:

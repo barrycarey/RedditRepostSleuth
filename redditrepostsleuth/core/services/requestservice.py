@@ -5,18 +5,18 @@ from praw import Reddit
 from praw.models import Comment
 from datetime import datetime
 
-from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.config import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
+from redditrepostsleuth.core.exception import ImageConversioinException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.config import UNSUPPORTED_POST_TYPE, REPOST_NO_RESULT, IMAGE_REPOST_ALL, \
     LINK_ALL, \
     WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE, STATS, SIGNATURE, \
     IMAGE_REPOST_SHORT, WATCH_NOT_OC
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.model.db import Summons, Post, RepostWatch
-from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.common.model import ImageMatch
-from redditrepostsleuth.service.imagerepost import ImageRepostService
-from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc
+from redditrepostsleuth.core.model import Summons, Post, RepostWatch
+from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.core.model import ImageMatch
+from redditrepostsleuth.core.services.imagerepost import ImageRepostService
+from redditrepostsleuth.core.util.reposthelpers import set_shortlink, verify_oc
 
 
 class RequestService:

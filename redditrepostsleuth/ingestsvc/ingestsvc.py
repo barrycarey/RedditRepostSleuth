@@ -8,8 +8,8 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 sys.path.append('./')
 from redditrepostsleuth.core.db import db_engine
 
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.util.helpers import get_reddit_instance
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.helpers import get_reddit_instance
 from redditrepostsleuth.ingestsvc.postingestor import PostIngestor
 
 if __name__ == '__main__':

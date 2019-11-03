@@ -3,15 +3,15 @@ import sys
 import threading
 from time import sleep
 
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db import db_engine
-from redditrepostsleuth.service.commentmonitor import CommentMonitor
+from redditrepostsleuth.core.services.commentmonitor import CommentMonitor
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.service.imagerepost import ImageRepostService
-from redditrepostsleuth.service.maintenanceservice import MaintenanceService
-from redditrepostsleuth.service.ingest import Ingest
-from redditrepostsleuth.service.requestservice import RequestService
-from redditrepostsleuth.common.util.helpers import get_reddit_instance
+from redditrepostsleuth.core.services.imagerepost import ImageRepostService
+from redditrepostsleuth.core.services.maintenanceservice import MaintenanceService
+from redditrepostsleuth.core.services.ingest import Ingest
+from redditrepostsleuth.core.services.requestservice import RequestService
+from redditrepostsleuth.core.util.helpers import get_reddit_instance
 
 sys.setrecursionlimit(50000)
 

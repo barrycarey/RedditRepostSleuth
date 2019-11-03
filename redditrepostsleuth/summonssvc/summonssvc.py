@@ -3,11 +3,11 @@ import time
 # TODO - Mega hackery, figure this out.
 import sys
 
-from redditrepostsleuth.common.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util import get_reddit_instance
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 
 sys.path.append('./')
-from redditrepostsleuth.common.config import config
+from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.db import db_engine
 
 from redditrepostsleuth.summonssvc.summonsmonitor import SummonsMonitor

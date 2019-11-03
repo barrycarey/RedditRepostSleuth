@@ -8,8 +8,8 @@ from scipy.ndimage.morphology import (generate_binary_structure,
 import hashlib
 from operator import itemgetter
 
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.util.audiohelpers import read_audio_file
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util import read_audio_file
 
 IDX_FREQ_I = 0
 IDX_TIME_J = 1

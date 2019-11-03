@@ -5,16 +5,16 @@ from datetime import datetime
 from praw import Reddit
 from praw.models import Comment
 
-from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.common.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
-    WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, \
-    FAILED_TO_LEAVE_RESPONSE, OC_MESSAGE_TEMPLATE, IMAGE_REPOST_ALL
-from redditrepostsleuth.common.exception import NoIndexException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.common.util.helpers import build_markdown_list, build_msg_values_from_search
-from redditrepostsleuth.common.util.objectmapping import submission_to_post
-from redditrepostsleuth.common.util.reposthelpers import verify_oc, check_link_repost
+from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
+    WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, OC_MESSAGE_TEMPLATE, \
+    IMAGE_REPOST_ALL, FAILED_TO_LEAVE_RESPONSE
+from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.reposthelpers import verify_oc, check_link_repost
 from redditrepostsleuth.core.db.databasemodels import Summons, RepostWatch, Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService

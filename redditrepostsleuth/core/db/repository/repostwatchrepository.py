@@ -1,4 +1,4 @@
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import RepostWatch
 
 

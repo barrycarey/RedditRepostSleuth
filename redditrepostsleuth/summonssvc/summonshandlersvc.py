@@ -1,14 +1,15 @@
 # TODO - Mega hackery, figure this out.
 import sys
 
-from redditrepostsleuth.common.util.reddithelpers import get_reddit_instance
+
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 sys.path.append('./')
 from redditrepostsleuth.core.db import db_engine
 
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.logging import log
 
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler

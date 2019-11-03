@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 
-from redditrepostsleuth.common.logfilters import SingleLevelFilter
+from redditrepostsleuth.core.logfilters import SingleLevelFilter
 
 log = logging.getLogger(__name__)
 log.setLevel(os.getenv('LOG_LEVEL', 'DEBUG'))

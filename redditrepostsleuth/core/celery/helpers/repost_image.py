@@ -1,8 +1,8 @@
-from redditrepostsleuth.common.logging import log
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost
 
-from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 
 

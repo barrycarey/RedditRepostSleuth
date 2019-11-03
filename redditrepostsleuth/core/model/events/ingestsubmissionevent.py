@@ -1,4 +1,4 @@
-from redditrepostsleuth.common.model import InfluxEvent
+from redditrepostsleuth.core.model import InfluxEvent
 
 
 class IngestSubmissionEvent(InfluxEvent):

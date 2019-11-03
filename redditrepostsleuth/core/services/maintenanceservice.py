@@ -5,13 +5,13 @@ import redis
 import requests
 
 from redditrepostsleuth.core.celery.tasks import check_deleted_posts
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.config import WIKI_STATS
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.config import WIKI_STATS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.model import CeleryTaskEvent, CeleryQueueSize
+from redditrepostsleuth.core.model import CeleryTaskEvent, CeleryQueueSize
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.common.util.helpers import chunk_list, get_reddit_instance
+from redditrepostsleuth.core.util.helpers import chunk_list, get_reddit_instance
 
 
 class MaintenanceService:

@@ -3,14 +3,14 @@ from time import perf_counter
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.exception import NoIndexException, CrosspostRepostCheck
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.events.annoysearchevent import AnnoySearchEvent
-from redditrepostsleuth.common.model.events.celerytask import BatchedEvent
-from redditrepostsleuth.common.model.events.repostevent import RepostEvent
-from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.common.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
+from redditrepostsleuth.core.model import BatchedEvent
+from redditrepostsleuth.core.model import RepostEvent
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask
 from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result

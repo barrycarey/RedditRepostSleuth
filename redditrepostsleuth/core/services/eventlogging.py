@@ -1,9 +1,9 @@
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.model.events.influxevent import InfluxEvent
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.model import InfluxEvent
 
 
 class EventLogging:

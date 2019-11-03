@@ -1,4 +1,4 @@
-from redditrepostsleuth.common.model.events.influxevent import InfluxEvent
+from redditrepostsleuth.core.model import InfluxEvent
 
 
 class CeleryTaskEvent(InfluxEvent):

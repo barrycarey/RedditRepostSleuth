@@ -8,7 +8,7 @@ from influxdb import InfluxDBClient
 import sys
 
 from redditrepostsleuth.core.celery.tasks import save_pushshift_results_archive
-from redditrepostsleuth.common.config import config
+from redditrepostsleuth.core.config import config
 
 client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)
 influx = InfluxDBClient('monitor.ho.me', '8086', database='collectd')

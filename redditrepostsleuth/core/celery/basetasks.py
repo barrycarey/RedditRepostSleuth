@@ -1,7 +1,7 @@
 from celery import Task
 
-from redditrepostsleuth.common import logging
-from redditrepostsleuth.common.util.helpers import get_reddit_instance
+from redditrepostsleuth.core import logging
+from redditrepostsleuth.core.util.helpers import get_reddit_instance
 from redditrepostsleuth.core.db import db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 

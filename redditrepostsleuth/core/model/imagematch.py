@@ -1,4 +1,4 @@
-from redditrepostsleuth.common.model.repostmatch import RepostMatch
+from redditrepostsleuth.core.model.repostmatch import RepostMatch
 
 
 class ImageMatch(RepostMatch):

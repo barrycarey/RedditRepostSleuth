@@ -1,6 +1,6 @@
 import os
 
-from redditrepostsleuth.common.config import config
+from redditrepostsleuth.core.config import config
 
 broker_url = config.celery_broker
 result_backend = config.celery_backend
