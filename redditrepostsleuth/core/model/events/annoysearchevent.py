@@ -1,6 +1,6 @@
 import platform
 
-from redditrepostsleuth.core.model import InfluxEvent
+from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 
 
 class AnnoySearchEvent(InfluxEvent):

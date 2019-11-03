@@ -2,12 +2,8 @@ import requests
 from typing import Dict, List
 
 import imagehash
-from influxdb import InfluxDBClient
-from praw.models import Submission
 
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
-
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
@@ -23,29 +19,13 @@ from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
-def get_influx_instance() -> InfluxDBClient:
-    return InfluxDBClient(
-            config.influx_address,
-            config.influx_port,
-            database=config.influx_database,
-            ssl=config.influx_ssl,
-            verify_ssl=config.influx_verify_ssl,
-            username=config.influx_user,
-            password=config.influx_password,
-            timeout=5,
-            pool_size=50
-        )
-
 def chunk_list(l, n):
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
-def get_post_type_praw(submission: Submission) -> str:
-    pass
-
 def get_post_type_pushshift(submission: Dict) -> str:
-
+    # TODO - Go over this whole function
     if submission.get('is_self', None):
         return 'text'
 
@@ -81,11 +61,13 @@ def get_post_type_pushshift(submission: Dict) -> str:
     return reddit_sub.__dict__.get('post_hint', None)
 
 def searched_post_str(post: Post, count: int) -> str:
-    output = '**Searched '
+    output = '**Searched'
     if post.post_type == 'image':
-        output = output + f'Images:** {count:,}'
+        output = output + f' Images:** {count:,}'
     elif post.post_type == 'link':
-        output = output + f'Links:** {count:,}'
+        output = output + f' Links:** {count:,}'
+    else:
+        output = output + f':** {count:,}'
 
     return output
 
@@ -98,12 +80,7 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
     if subreddit and subreddit in NO_LINK_SUBREDDITS:
         seen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')}"
     else:
-        if post.shortlink:
-            original_link = post.shortlink
-        else:
-            original_link = 'https://reddit.com' + post.perma_link
-
-        seen = f"{first_last} seen [Here]({original_link}) on {post.created_at.strftime('%Y-%m-%d')}"
+        seen = f"{first_last} seen [Here](https://redd.it/{post.post_id}) on {post.created_at.strftime('%Y-%m-%d')}"
 
     return seen
 

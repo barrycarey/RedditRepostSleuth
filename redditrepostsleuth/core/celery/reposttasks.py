@@ -7,8 +7,8 @@ from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
-from redditrepostsleuth.core.model import BatchedEvent
-from redditrepostsleuth.core.model import RepostEvent
+from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
+from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.celery import celery

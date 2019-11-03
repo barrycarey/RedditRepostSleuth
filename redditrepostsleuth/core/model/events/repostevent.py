@@ -1,4 +1,4 @@
-from redditrepostsleuth.core.model import InfluxEvent
+from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 
 
 class RepostEvent(InfluxEvent):
