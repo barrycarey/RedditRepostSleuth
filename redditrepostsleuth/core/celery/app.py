@@ -15,8 +15,8 @@ if os.name =='nt':
     os.environ.setdefault('FORKED_BY_MULTIPROCESSING', '1')
 
 celery = Celery('tasks')
-celery.config_from_object('redditrepostsleuth.common.celery.celeryconfig')
-
+celery.config_from_object('redditrepostsleuth.core.celery.celeryconfig')
+print('')
 """
 celery.conf.update(
     task_serializer='pickle',

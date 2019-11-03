@@ -4,7 +4,6 @@ from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.celery.reposttasks import check_image_repost_save, link_repost_check
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -39,9 +38,12 @@ def save_new_post(self, post):
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
     if post.post_type == 'image' and config.check_new_images_for_repost:
-        check_image_repost_save.apply_async((post,), queue='repost_image')
+        #check_image_repost_save.apply_async((post,), queue='repost_image')
+        # TODO - Make sure this works
+        celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post], queue='demo_repost')
     elif post.post_type == 'link' and config.check_new_links_for_repost:
-        link_repost_check().apply_async(([post],))
+        celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]])
+        #link_repost_check().apply_async(([post],))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results(self, data):

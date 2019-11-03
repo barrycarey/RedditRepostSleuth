@@ -7,13 +7,12 @@ result_serializer='pickle'
 accept_content = ['pickle', 'json']
 result_expires = 60
 task_routes = {
-    'redditrepostsleuth.common.celery.tasks.save_new_post': {'queue': 'postingest'},
-    'redditrepostsleuth.common.celery.tasks.ingest_repost_check': {'queue': 'repost'},
-    'redditrepostsleuth.common.celery.tasks.check_image_repost_save': {'queue': 'repost_image'},
-    'redditrepostsleuth.common.celery.tasks.process_repost_annoy': {'queue': 'process_repost'},
-    'redditrepostsleuth.common.celery.tasks.link_repost_check': {'queue': 'repost_link'},
-    'redditrepostsleuth.common.celery.tasks.update_crosspost_parent_api': {'queue': 'crosspost2'},
-    'redditrepostsleuth.common.celery.tasks.check_deleted_posts': {'queue': 'deletecheck'},
-'redditrepostsleuth.common.celery.tasks.log_repost': {'queue': 'logrepost'},
+    'redditrepostsleuth.core.celery.ingesttasks.save_new_post': {'queue': 'postingest'},
+    'redditrepostsleuth.core.celery.reposttasks.ingest_repost_check': {'queue': 'repost'},
+    'redditrepostsleuth.core.celery.reposttasks.check_image_repost_save': {'queue': 'repost_image'},
+    'redditrepostsleuth.core.celery.reposttasks.process_repost_annoy': {'queue': 'process_repost'},
+    'redditrepostsleuth.core.celery.tasks.link_repost_check': {'queue': 'repost_link'},
+'redditrepostsleuth.core.celery.tasks.log_repost': {'queue': 'logrepost'},
 
 }
+imports = ('redditrepostsleuth.core.celery.reposttasks', 'redditrepostsleuth.core.celery.ingesttasks')

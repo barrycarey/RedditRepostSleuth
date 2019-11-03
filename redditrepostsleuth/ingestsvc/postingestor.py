@@ -80,7 +80,7 @@ class PostIngestor:
                 if not start_time:
                     start_time = data['data'][0]['created_utc']
 
-                save_pushshift_results.apply_async((data['data'],), queue='pushshift')
+                save_pushshift_results.apply_async((data['data'],), queue='pushshift2')
 
                 start_end_dif = start_time - oldest_id
                 if start_end_dif > 3600:
