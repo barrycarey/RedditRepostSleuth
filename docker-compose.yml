@@ -59,7 +59,8 @@ services:
             - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
-        entrypoint: celery -A redditrepostsleuth.common worker -Q postingest,repost,repost_link -c 1
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest,repost,repost_link -c 1
 
     image_repost_worker:
         build:
