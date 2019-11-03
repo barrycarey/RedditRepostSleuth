@@ -26,6 +26,7 @@ def get_reddit_instance() -> Reddit:
                         username=config.reddit_username
                     )
 
+# TODO - Pull this out and retest
 def get_influx_instance() -> InfluxDBClient:
     return InfluxDBClient(
             config.influx_address,

@@ -1,7 +1,7 @@
 import time
-
+import sys
 import redis
-
+sys.path.append('./')
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.events.celerytask import CeleryQueueSize

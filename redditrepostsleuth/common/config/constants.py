@@ -115,7 +115,10 @@ BANNED_SUBS = [
     'introvert',
     'thebullwins',
     'delicioustraps',
-    'halloween'
+    'halloween',
+    'de',
+    'BlackPeopleTwitter'
+
 ]
 
 CUSTOM_FILTER_LEVELS = {

@@ -29,6 +29,15 @@ services:
             - SLEUTHCONFIG=testconfig.ini
         entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
 
+    stat_monitor_svc:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/monitorsvc/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+        entrypoint: python -u /src/redditrepostsleuth/monitorsvc/monitorsvc.py
+
     summons_handler:
         build:
             context: .
