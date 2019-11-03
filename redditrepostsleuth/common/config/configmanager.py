@@ -35,6 +35,7 @@ class ConfigManager:
 
         post_types = self.config['GENERAL'].get('supported_post_types', fallback='image')
         self.supported_post_types = post_types.split(',')
+        self.hash_api = os.getenv('HASH_API', None)
 
         # REPOST
 

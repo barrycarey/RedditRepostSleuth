@@ -355,7 +355,7 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
     self.event_logger.save_event(AnnoySearchEvent(search_time, 0, event_type='find_matching_images'))
     return result
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post):
     # TODO - This whole mess needs to be cleaned up
     with self.uowm.start() as uow:
@@ -363,9 +363,13 @@ def save_new_post(self, post):
         if existing:
             return
         try:
-            log.info(post)
-            post = pre_process_post(post, self.uowm)
-        except ImageConversioinException as e:
+            log.debug(post)
+            post = pre_process_post(post, self.uowm, config.hash_api)
+        except (ImageConversioinException, ConnectionError) as e:
+            if isinstance(e, ConnectionError):
+                log.exception('Issue getting URL during save', exc_info=True)
+                log.error(post.url)
+                return
             log.error('Failed to hash image post %s', post.post_id)
             return
 

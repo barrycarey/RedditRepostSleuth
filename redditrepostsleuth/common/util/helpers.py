@@ -69,6 +69,7 @@ def get_post_type_pushshift(submission: Dict) -> str:
     if is_video:
         #log.debug('Post %s has is_video value of %s. It is a video', submission['id'], is_video)
         # Since the push push obj didn't have a post hint, we need to query reddit
+        print('Hitting Reddit API')
         reddit_sub = reddit.submission(id=submission['id'])
         post_hint = reddit_sub.__dict__.get('post_hint', None)
         if post_hint:

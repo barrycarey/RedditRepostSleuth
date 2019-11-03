@@ -85,6 +85,9 @@ class SubMonitor:
                     log.error('Post %s has no dhash', post.post_id)
                     continue
 
+                if post.crosspost_parent:
+                    log.debug('Skipping crosspost')
+
                 self._check_for_repost(post, sub, monitored_sub)
                 uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id))
                 uow.commit()

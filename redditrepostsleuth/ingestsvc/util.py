@@ -9,13 +9,13 @@ from redditrepostsleuth.common.util.imagehashing import set_image_hashes, set_im
 
 from hashlib import md5
 
-def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Post:
+def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
     log.debug(post)
     with uowm.start() as uow:
         if post.post_type == 'image':
 
             # TODO - We're implicitly setting the value of post and creating image_post.  Make it explicit
-            image_post = process_image_post(post)
+            image_post = process_image_post(post, hash_api)
             if image_post.dhash_h and image_post.dhash_v:
                 uow.image_post.add(image_post)
                 uow.commit()
@@ -33,7 +33,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Post:
 
     return post
 
-def process_image_post(post: Post) -> RedditImagePost:
+def process_image_post(post: Post, hash_api) -> RedditImagePost:
     r = requests.head(post.url)
     if r.status_code != 200:
         log.error('Image no longer exists %s: %s', r.status_code, post.url)
@@ -41,8 +41,8 @@ def process_image_post(post: Post) -> RedditImagePost:
 
     log.info('Hashing URL: %s', post.url)
 
-    if os.getenv('INGEST_API', None):
-        set_image_hashes_api(post)
+    if hash_api:
+        set_image_hashes_api(post, hash_api)
     else:
         set_image_hashes(post)
 

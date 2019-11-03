@@ -141,17 +141,17 @@ def set_image_hashes(post: Post) -> Post:
 
     return post
 
-def set_image_hashes_api(post: Post) -> Post:
+def set_image_hashes_api(post: Post, api_url: str) -> Post:
     log.debug('Hashing image post using api %s', post.post_id)
 
-    r = requests.get('http://167.99.10.47:8000/hash', params={'url': post.url})
+    r = requests.get(api_url, params={'url': post.url})
 
     if r.status_code != 200:
         log.error('Back statuscode from DO API %s', r.status_code)
         raise ImageConversioinException('Bad response from DO API')
 
     hashes = json.loads(r.text)
-    print(hashes)
+    log.info(hashes)
 
     post.dhash_h = hashes['dhash_h']
     post.dhash_v = hashes['dhash_v']
