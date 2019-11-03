@@ -53,6 +53,8 @@ class TopPostMonitor:
                     self.check_for_repost(post)
                     time.sleep(0.2)
 
+                # TODO - Add checked posts to checked table
+
             log.info('Processed all top posts.  Sleeping')
             time.sleep(3600)
 
