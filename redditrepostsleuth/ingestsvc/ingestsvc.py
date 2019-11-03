@@ -16,4 +16,4 @@ if __name__ == '__main__':
     ingestor = PostIngestor(get_reddit_instance(), uowm)
 
     threading.Thread(target=ingestor.ingest_new_posts, name='praw_ingest').start()
-    threading.Thread(target=ingestor.ingest_pushshift, name='pushshift_ingest').start()
+    #threading.Thread(target=ingestor.ingest_pushshift, name='pushshift_ingest').start()

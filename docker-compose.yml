@@ -65,11 +65,23 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
-            - LOG_LEVEL=DEBUG
+            - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
+            - HASH_API=http://157.230.64.152:8000/hash
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 1
+
+    generic_repost_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
+        environment:
+            - LOG_LEVEL=DEBUG
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link -c 1
 
     image_repost_worker:
         build:
@@ -86,7 +98,7 @@ services:
     ingest_pushshift_worker:
         build:
             context: .
-            dockerfile: redditrepostsleuth/workers/Dockerfile
+            dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
             - LOG_LEVEL=DEBUG
             - SLEUTHCONFIG=testconfig.ini
