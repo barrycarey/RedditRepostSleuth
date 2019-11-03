@@ -8,10 +8,9 @@ from praw.models import Submission
 
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.common.util.imagehashing import generate_img_by_url

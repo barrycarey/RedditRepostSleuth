@@ -12,7 +12,7 @@ from PIL.Image import DecompressionBombError
 
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post
 
 
 def generate_img_by_post(post: Post) -> Image:

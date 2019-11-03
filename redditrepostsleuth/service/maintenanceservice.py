@@ -4,13 +4,13 @@ import time
 import redis
 import requests
 
-from redditrepostsleuth.common.celery.tasks import check_deleted_posts, update_crosspost_parent_api
+from redditrepostsleuth.core.celery.tasks import check_deleted_posts
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.config import WIKI_STATS
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.model import CeleryTaskEvent, CeleryQueueSize
-from redditrepostsleuth.service.eventlogging import EventLogging
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.common.util.helpers import chunk_list, get_reddit_instance
 
 

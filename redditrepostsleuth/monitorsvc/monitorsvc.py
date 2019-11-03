@@ -5,7 +5,7 @@ import redis
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.model.events.celerytask import CeleryQueueSize
-from redditrepostsleuth.service.eventlogging import EventLogging
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 
 
 def log_queue_size(event_logger):

@@ -4,9 +4,9 @@ import threading
 from time import sleep
 
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.db import db_engine
+from redditrepostsleuth.core.db import db_engine
 from redditrepostsleuth.service.commentmonitor import CommentMonitor
-from redditrepostsleuth.service.eventlogging import EventLogging
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.service.imagerepost import ImageRepostService
 from redditrepostsleuth.service.maintenanceservice import MaintenanceService
 from redditrepostsleuth.service.ingest import Ingest

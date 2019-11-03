@@ -7,12 +7,12 @@ from redlock import RedLockError
 from redditrepostsleuth.common.config import config
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
     CUSTOM_FILTER_LEVELS
-from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.common.config.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import Post
-from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen, build_msg_values_from_search
+from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.common.util.helpers import build_msg_values_from_search
 from redditrepostsleuth.common.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder

@@ -11,7 +11,7 @@ from redditrepostsleuth.common.config import UNSUPPORTED_POST_TYPE, REPOST_NO_RE
     LINK_ALL, \
     WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, UNKNOWN_COMMAND, WATCH_DUPLICATE, STATS, SIGNATURE, \
     IMAGE_REPOST_SHORT, WATCH_NOT_OC
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.model.db import Summons, Post, RepostWatch
 from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
 from redditrepostsleuth.common.model import ImageMatch

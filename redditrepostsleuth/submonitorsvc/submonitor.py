@@ -1,20 +1,19 @@
 import time
 
 from praw import Reddit
-from praw.models import Subreddit, Submission
+from praw.models import Submission
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.common.config.replytemplates import OC_MESSAGE_TEMPLATE
 
-from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen, build_markdown_list, \
-    build_msg_values_from_search
+from redditrepostsleuth.common.util.helpers import build_msg_values_from_search
 from redditrepostsleuth.common.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder

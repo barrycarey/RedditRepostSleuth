@@ -5,10 +5,9 @@ from datetime import datetime
 
 from prawcore import Forbidden
 
-from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.common.model.hashwrapper import HashWrapper
 from redditrepostsleuth.common.model.imagematch import ImageMatch
-from redditrepostsleuth.common.model.postdto import PostDto
 
 from redditrepostsleuth.common.model.repostmatch import RepostMatch
 from redditrepostsleuth.common.util.helpers import get_post_type_pushshift
@@ -69,45 +68,6 @@ def pushshift_to_post(submission: Dict, source: str = 'pushshift') -> Post:
 
     return post
 
-def submission_to_postdto(submission: Submission):
-    postdto = PostDto()
-
-    postdto.post_id = submission.id
-    postdto.url = submission.url
-    postdto.perma_link = submission.permalink
-    postdto.author = submission.author.name if submission.author else None
-    postdto.created_at = submission.created
-    postdto.subreddit = submission.subreddit.display_name
-    postdto.title = submission.title
-    if submission.is_self:
-        postdto.post_type = 'text'
-    else:
-        try:
-            postdto.post_type = submission.post_hint
-        except (AttributeError, Forbidden) as e:
-            print('Missing Post Hint')
-
-    return postdto
-
-
-def postdto_to_post(postdto: PostDto):
-    post = Post()
-    post.id = postdto.id
-    post.post_id = postdto.post_id
-    post.url = postdto.url
-    post.perma_link = postdto.perma_link
-    post.post_type = postdto.post_type
-    post.author = postdto.author
-    post.created_at = postdto.created_at
-    post.ingested_at = postdto.ingested_at if postdto.ingested_at else None
-    post.subreddit = postdto.subreddit
-    post.title = postdto.title
-    post.crosspost_parent = postdto.crosspost_parent
-    post.repost_of = postdto.repost_of
-    post.image_hash = postdto.image_hash
-    post.checked_repost = postdto.checked_repost
-    post.crosspost_checked = postdto.crosspost_checked
-    return post
 
 def post_to_hashwrapper(post: Post):
     wrapper = HashWrapper()

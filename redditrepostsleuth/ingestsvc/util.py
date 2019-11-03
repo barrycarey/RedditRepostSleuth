@@ -1,10 +1,9 @@
-import os
 import requests
 
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import RedditImagePost, Post
+from redditrepostsleuth.core.db.databasemodels import RedditImagePost, Post
 from redditrepostsleuth.common.util.imagehashing import set_image_hashes, set_image_hashes_api
 
 from hashlib import md5

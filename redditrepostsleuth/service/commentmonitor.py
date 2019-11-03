@@ -4,10 +4,10 @@ from datetime import datetime
 
 from praw import Reddit
 
-from redditrepostsleuth.common.celery.tasks import save_new_comment
+from redditrepostsleuth.core.celery.tasks import save_new_comment
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.model.db import Summons
 from redditrepostsleuth.service.requestservice import RequestService
 

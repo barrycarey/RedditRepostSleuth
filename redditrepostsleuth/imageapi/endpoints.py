@@ -2,8 +2,8 @@ import json
 
 from falcon import Request, Response
 
-from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.util.helpers import create_meme_template

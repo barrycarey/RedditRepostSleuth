@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List
 
-from redditrepostsleuth.common.model.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post
 
 
 @dataclass

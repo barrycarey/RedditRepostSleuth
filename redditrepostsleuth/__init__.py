@@ -1,2 +1,2 @@
-from redditrepostsleuth.common.celery import app
+from redditrepostsleuth.core.celery import app
 

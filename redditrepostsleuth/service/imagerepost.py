@@ -6,11 +6,11 @@ from praw import Reddit
 from praw.models import Submission
 from prawcore import Forbidden
 
-from redditrepostsleuth.common.celery.tasks import check_image_repost_save
+from redditrepostsleuth.core.celery.tasks import check_image_repost_save
 from redditrepostsleuth.common.exception import ImageConversioinException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.model.db import Post
 from redditrepostsleuth.common.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.service.repostservicebase import RepostServiceBase

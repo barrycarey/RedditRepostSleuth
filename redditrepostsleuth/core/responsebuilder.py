@@ -1,5 +1,5 @@
 from redditrepostsleuth.common.config.replytemplates import DEFAULT_REPOST_COMMENT
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 
 class ResponseBuilder:

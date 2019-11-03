@@ -6,11 +6,11 @@ from time import perf_counter
 from redditrepostsleuth.common.exception import NoIndexException
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 from annoy import AnnoyIndex
 
-from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.common.model.imagematch import ImageMatch
 from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.common.util.helpers import is_image_still_available

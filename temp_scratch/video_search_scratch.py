@@ -6,9 +6,9 @@ from os import listdir
 import ffmpeg
 import imagehash
 
-from redditrepostsleuth.common.celery.tasks import video_hash, process_video
-from redditrepostsleuth.common.db import db_engine
-from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.celery.tasks import video_hash, process_video
+from redditrepostsleuth.core.db import db_engine
+from redditrepostsleuth.core.db import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.common.model.db import VideoHash
 
 from redditrepostsleuth.common.util.helpers import get_reddit_instance

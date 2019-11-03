@@ -7,10 +7,10 @@ from datetime import datetime
 
 from praw import Reddit
 from prawcore import Forbidden
-from redditrepostsleuth.common.celery.tasks import save_new_post, save_new_comment, \
+from redditrepostsleuth.core.celery.tasks import save_new_post, save_new_comment, \
     ingest_pushshift_url, save_pushshift_results
 from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.common.util.objectmapping import submission_to_post, pushshift_to_post
 
 

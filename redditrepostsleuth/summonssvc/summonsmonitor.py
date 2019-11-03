@@ -9,8 +9,8 @@ from praw.models import Comment
 
 from redditrepostsleuth.common.logging import log
 from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.model.db.databasemodels import Summons
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.db.databasemodels import Summons
 
 
 
