@@ -1,21 +1,20 @@
 import time
 
 from praw import Reddit
-from praw.models import Subreddit, Submission
+from praw.models import Submission
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.common.config.replytemplates import REPOST_MESSAGE_TEMPLATE, OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.config.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
+from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
-from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.common.exception import NoIndexException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
-from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.common.util.helpers import searched_post_str, create_first_seen, build_markdown_list, \
-    build_msg_values_from_search
-from redditrepostsleuth.common.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder
 from redditrepostsleuth.ingestsvc.util import pre_process_post
@@ -58,7 +57,7 @@ class SubMonitor:
             log.error('Failed to get Subreddit %s', monitored_sub.name)
             return
 
-        submissions = subreddit.new(limit=100)
+        submissions = subreddit.new(limit=monitored_sub.search_depth)
 
         for sub in submissions:
             with self.uowm.start() as uow:
@@ -67,6 +66,9 @@ class SubMonitor:
                     continue
                 post = uow.posts.get_by_post_id(sub.id)
                 if not post:
+                    log.info('Post %s has not been ingested yet.  Skipping')
+                    continue
+                    """
                     log.info('Post %s not in database, attempting to ingest', sub.id)
                     post = self._save_unknown_post(sub)
                     uow.posts.add(post)
@@ -78,18 +80,23 @@ class SubMonitor:
                     if not post.id:
                         log.error('Failed to save post %s', sub.id)
                         continue
+                    """
                 if post.left_comment:
                     continue
 
+                if post.post_type not in ['image']:
+                    continue
+
                 if not post.dhash_h:
-                    log.error('Post %s has no dhash', post.post_id)
+                    log.error('Post %s has no dhash. Post type %s', post.post_id, post.post_type)
                     continue
 
                 if post.crosspost_parent:
                     log.debug('Skipping crosspost')
+                    continue
 
                 self._check_for_repost(post, sub, monitored_sub)
-                uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id))
+                uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id, subreddit=post.subreddit))
                 uow.commit()
 
 
@@ -172,9 +179,6 @@ class SubMonitor:
             uow.posts.update(search_results.checked_post)
             uow.commit()
 
-    def _build_default_message(self, values) -> str:
-        pass
-
     def _save_unknown_post(self, submission: Submission) -> Post:
         """
         If we received a request on a post we haven't ingest save it
@@ -183,7 +187,7 @@ class SubMonitor:
         """
         post = submission_to_post(submission)
         try:
-            post = pre_process_post(post, self.uowm, hash_api=None)
+            post = pre_process_post(post, self.uowm, None)
         except IntegrityError as e:
             log.error('Image post already exists')
 

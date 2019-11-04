@@ -3,20 +3,20 @@ from typing import List
 
 from distance import hamming
 from time import perf_counter
-from redditrepostsleuth.common.exception import NoIndexException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.config import config
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 from annoy import AnnoyIndex
 
-from redditrepostsleuth.common.model.db.databasemodels import Post, MemeTemplate
-from redditrepostsleuth.common.model.imagematch import ImageMatch
-from redditrepostsleuth.common.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.common.util.helpers import is_image_still_available
-from redditrepostsleuth.common.util.redlock import redlock
-from redditrepostsleuth.common.util.objectmapping import annoy_result_to_image_match
-from redditrepostsleuth.common.util.reposthelpers import sort_reposts
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.model.imagematch import ImageMatch
+from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.util.helpers import is_image_still_available
+from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
+from redditrepostsleuth.core.util.redlock import redlock
+from redditrepostsleuth.core.util.reposthelpers import sort_reposts
 
 
 class DuplicateImageService:

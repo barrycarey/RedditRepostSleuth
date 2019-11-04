@@ -1,27 +1,22 @@
 import re
 import time
 from datetime import datetime
-from time import perf_counter
-from typing import List
 
 from praw import Reddit
 from praw.models import Comment
 
-from redditrepostsleuth.common.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.common.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
-    WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, \
-    REPOST_MESSAGE_TEMPLATE, \
-    FAILED_TO_LEAVE_RESPONSE, OC_MESSAGE_TEMPLATE, IMAGE_REPOST_ALL
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.exception import NoIndexException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import Summons, RepostWatch, Post
-from redditrepostsleuth.common.model.imagematch import ImageMatch
-from redditrepostsleuth.common.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.common.util.helpers import create_first_seen, build_markdown_list, searched_post_str, \
-    build_msg_values_from_search
-from redditrepostsleuth.common.util.objectmapping import submission_to_post
-from redditrepostsleuth.common.util.reposthelpers import set_shortlink, verify_oc, check_link_repost
+from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
+    WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, OC_MESSAGE_TEMPLATE, \
+    IMAGE_REPOST_ALL, FAILED_TO_LEAVE_RESPONSE
+from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.reposthelpers import verify_oc, check_link_repost
+from redditrepostsleuth.core.db.databasemodels import Summons, RepostWatch, Post
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder
 from redditrepostsleuth.ingestsvc.util import pre_process_post
@@ -310,7 +305,7 @@ class SummonsHandler:
         """
         # TODO - Deal with case of not finding post ID.  Should be rare since this is triggered directly via a comment
         submission = self.reddit.submission(id=post_id)
-        post = pre_process_post(submission_to_post(submission), self.uowm, hash_api=None)
+        post = pre_process_post(submission_to_post(submission), self.uowm, None)
         with self.uowm.start() as uow:
             try:
                 uow.posts.add(post)

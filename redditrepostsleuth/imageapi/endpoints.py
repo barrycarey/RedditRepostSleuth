@@ -2,11 +2,11 @@ import json
 
 from falcon import Request, Response
 
-from redditrepostsleuth.common.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.jsonencoders import ImageRepostWrapperEncoder
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.util.helpers import create_meme_template
+from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.helpers import create_meme_template
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 
 
@@ -53,7 +53,7 @@ class ImageSleuth:
         try:
             search_results = self.image_svc.check_duplicates_wrapped(post, filter=filter,
                                            target_hamming_distance=post_filter,
-                                           target_annoy_distance=pre_filter)
+                                           target_annoy_distance=pre_filter,)
         except Exception as e:
             log.exception('Problem checking duplicates for post %s', post_id)
             response['status'] = 'error'

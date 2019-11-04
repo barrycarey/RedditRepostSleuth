@@ -4,8 +4,8 @@ import gensim
 from gensim import utils
 from gensim.models.doc2vec import TaggedDocument, Doc2Vec
 
-from redditrepostsleuth.common.db import db_engine
-from redditrepostsleuth.common.db import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db import db_engine
+from redditrepostsleuth.core.db import SqlAlchemyUnitOfWorkManager
 from gensim.similarities.index import AnnoyIndexer
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 uowm = SqlAlchemyUnitOfWorkManager(db_engine)

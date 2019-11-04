@@ -1,13 +1,15 @@
-import os
 import requests
 
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.exception import ImageConversioinException
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.model.db.databasemodels import RedditImagePost, Post
-from redditrepostsleuth.common.util.imagehashing import set_image_hashes, set_image_hashes_api
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.exception import ImageConversioinException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.db.databasemodels import RedditImagePost, Post
+
 
 from hashlib import md5
+
+from redditrepostsleuth.core.util.imagehashing import set_image_hashes_api, set_image_hashes
+
 
 def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
     log.debug(post)

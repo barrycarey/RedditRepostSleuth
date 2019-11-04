@@ -1,0 +1,7 @@
+celery[redis]==4.3.0
+praw
+redlock
+sqlalchemy
+pymysql
+imagehash
+influxdb

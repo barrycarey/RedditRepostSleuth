@@ -1,0 +1,10 @@
+praw
+requests
+sqlalchemy
+pymysql
+annoy
+distance
+imagehash
+influxdb
+redlock
+dataclasses

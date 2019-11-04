@@ -1,0 +1,9 @@
+praw
+pymysql
+sqlalchemy
+redlock
+imagehash
+influxdb
+annoy
+distance
+celery[redis]==4.3.0

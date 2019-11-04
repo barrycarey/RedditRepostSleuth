@@ -1,5 +1,4 @@
 import json
-import os
 
 import requests
 import time
@@ -7,11 +6,11 @@ from datetime import datetime
 
 from praw import Reddit
 from prawcore import Forbidden
-from redditrepostsleuth.common.celery.tasks import save_new_post, save_new_comment, \
-    ingest_pushshift_url, save_pushshift_results
-from redditrepostsleuth.common.logging import log
-from redditrepostsleuth.common.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.common.util.objectmapping import submission_to_post, pushshift_to_post
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_pushshift_results
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.util.helpers import post_type_from_url
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
 
 
 class PostIngestor:
@@ -29,10 +28,35 @@ class PostIngestor:
                         for submission in sr.stream.submissions():
                             log.debug('Saving post %s', submission.id)
                             post = submission_to_post(submission)
-
+                            if not post.post_type:
+                                post.post_type = post_type_from_url(post.url)
+                                log.error('Last resort post type %s', post.post_type)
+                                log.error(post.url)
                             save_new_post.apply_async((post,), queue='postingest')
                     except Forbidden as e:
                         pass
+            except Exception as e:
+                log.exception('INGEST THREAD DIED', exc_info=True)
+
+    def ingest_without_stream(self):
+        seen_posts = []
+        while True:
+            try:
+                if len(seen_posts) > 10000:
+                    seen_posts = []
+                submissions = [sub for sub in self.reddit.subreddit('all').new(limit=500)]
+                log.info('%s posts from API', len(submissions))
+                for submission in submissions:
+                    if submission.id in seen_posts:
+                        continue
+                    log.debug('Saving post %s', submission.id)
+                    post = submission_to_post(submission)
+                    if not post.post_type:
+                        post.post_type = post_type_from_url(post.url)
+                        #log.debug('Last resort post type %s', post.post_type)
+                        #log.debug(post.url)
+                    save_new_post.apply_async((post,), queue='postingest')
+                    seen_posts.append(post.post_id)
             except Exception as e:
                 log.exception('INGEST THREAD DIED', exc_info=True)
 
