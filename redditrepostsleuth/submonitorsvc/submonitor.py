@@ -57,7 +57,7 @@ class SubMonitor:
             log.error('Failed to get Subreddit %s', monitored_sub.name)
             return
 
-        submissions = subreddit.new(limit=100)
+        submissions = subreddit.new(limit=monitored_sub.search_depth)
 
         for sub in submissions:
             with self.uowm.start() as uow:

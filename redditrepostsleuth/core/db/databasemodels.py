@@ -181,6 +181,7 @@ class MonitoredSub(Base):
     sticky_comment = Column(Boolean, default=False)
     repost_response_template = Column(String(2000))
     oc_response_template = Column(String(2000))
+    search_depth = Column(Integer, default=100)
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'reddit_monitored_sub_checked'
