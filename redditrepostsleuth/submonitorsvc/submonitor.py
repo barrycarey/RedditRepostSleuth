@@ -66,6 +66,9 @@ class SubMonitor:
                     continue
                 post = uow.posts.get_by_post_id(sub.id)
                 if not post:
+                    log.info('Post %s has not been ingested yet.  Skipping')
+                    continue
+                    """
                     log.info('Post %s not in database, attempting to ingest', sub.id)
                     post = self._save_unknown_post(sub)
                     uow.posts.add(post)
@@ -77,18 +80,23 @@ class SubMonitor:
                     if not post.id:
                         log.error('Failed to save post %s', sub.id)
                         continue
+                    """
                 if post.left_comment:
                     continue
 
+                if post.post_type not in ['image']:
+                    continue
+
                 if not post.dhash_h:
-                    log.error('Post %s has no dhash', post.post_id)
+                    log.error('Post %s has no dhash. Post type %s', post.post_id, post.post_type)
                     continue
 
                 if post.crosspost_parent:
                     log.debug('Skipping crosspost')
+                    continue
 
                 self._check_for_repost(post, sub, monitored_sub)
-                uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id))
+                uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id, subreddit=post.subreddit))
                 uow.commit()
 
 
@@ -170,9 +178,6 @@ class SubMonitor:
         with self.uowm.start() as uow:
             uow.posts.update(search_results.checked_post)
             uow.commit()
-
-    def _build_default_message(self, values) -> str:
-        pass
 
     def _save_unknown_post(self, submission: Submission) -> Post:
         """

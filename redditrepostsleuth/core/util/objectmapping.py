@@ -9,7 +9,7 @@ from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.hashwrapper import HashWrapper
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
-from redditrepostsleuth.core.util.helpers import get_post_type_pushshift
+from redditrepostsleuth.core.util.helpers import get_post_type_pushshift, post_type_from_url
 
 
 def submission_to_post(submission: Submission, source: str = 'praw') -> Post:
@@ -38,6 +38,7 @@ def submission_to_post(submission: Submission, source: str = 'praw') -> Post:
             post.post_type = submission.__dict__.get('post_hint', None)
         except (AttributeError, Forbidden) as e:
             pass
+
 
     # TODO - Do this lookup at time of checking reposts.  It's slow and slows down ingest
     """

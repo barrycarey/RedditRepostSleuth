@@ -18,6 +18,15 @@ from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
+def post_type_from_url(url: str) -> str:
+    """
+    Try to guess post type based off URL
+    :param url:
+    """
+    image_exts = ['.jpg', '.png', '.jpeg', '.gif']
+    for ext in image_exts:
+        if ext in url.lower():
+            return 'image'
 
 def chunk_list(l, n):
     """Yield successive n-sized chunks from l."""

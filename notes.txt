@@ -2,6 +2,8 @@ Sub Monitor:
     Ability to register by sending a PM
         Validate they are a mod
     Cutoff date for matches
+    Flair posts as repost
+    Set Search depth
 
 Image Repost
     Try to read text in memes to detect same template different text
@@ -14,3 +16,5 @@ Summoning:
     If 1 summons throws and unexpected exception it will loop ou
 
 Move repost checking logic to API
+Move critical config options to ENV
+Searching: Increase n_trees and search_k

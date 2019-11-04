@@ -7,7 +7,11 @@ from PIL import Image
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, create_meme_template
+from redditrepostsleuth.core.model.imagematch import ImageMatch
+from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+
+from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, create_meme_template, \
+    post_type_from_url, build_markdown_list, build_msg_values_from_search
 
 
 class TestHelpers(TestCase):
@@ -72,5 +76,37 @@ class TestHelpers(TestCase):
         generate_img_by_url.side_effect = ImageConversioinException('broke')
         self.assertRaises(ImageConversioinException, create_meme_template, url)
 
+    def test_post_type_from_url_image_lowercase(self):
+        self.assertEqual('image', post_type_from_url('www.example.com/test.jpg'))
+
+    def test_post_type_from_url_image_uppercase(self):
+        self.assertEqual('image', post_type_from_url('www.example.com/test.Jpg'))
+
     def test_build_markdown_list_valid(self):
-        pass
+        match = ImageMatch()
+        match.post = Post(created_at=datetime.fromtimestamp(1572799193),
+                                shortlink='http://redd.it',
+                                subreddit='somesub')
+        match.hamming_distance = 5
+        expected = f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [95.00% match]\n'
+        self.assertEqual(expected, build_markdown_list([match]))
+
+    def test_build_msg_values_from_search_key_total(self):
+        match1 = ImageMatch()
+        match1.hamming_distance = 5
+        match1.post = Post(url='www.example.com',
+                           created_at=datetime.fromtimestamp(1572799193),
+                           post_id='1234',
+                           subreddit='somesub')
+        wrapper = ImageRepostWrapper()
+        wrapper.matches.append(match1)
+        wrapper.matches.append(match1)
+        wrapper.checked_post = Post(subreddit='sub2')
+        wrapper.index_size = 100
+        wrapper.search_time = 0.111
+
+        result = build_msg_values_from_search(wrapper)
+
+        self.assertEqual(21, len(result.keys()))
+        # TODO - Maybe test return values.  Probably not needed
+

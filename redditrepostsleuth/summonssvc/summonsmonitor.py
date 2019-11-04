@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import time
 from datetime import datetime
@@ -25,6 +26,11 @@ class SummonsMonitor:
         """
         Monitors the subreddits set in the config for comments containing the summoning string
         """
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.DEBUG)
+        logger = logging.getLogger('prawcore')
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
         log.info('Starting praw summons monitor for subs %s', subreddits)
         while True:
             try:

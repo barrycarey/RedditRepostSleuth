@@ -2,9 +2,8 @@ import time
 import sys
 import redis
 
-from redditrepostsleuth.core.model.events.celerytask import CeleryQueueSize
-
 sys.path.append('./')
+from redditrepostsleuth.core.model.events.celerytask import CeleryQueueSize
 from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.eventlogging import EventLogging

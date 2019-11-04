@@ -53,7 +53,7 @@ class ImageSleuth:
         try:
             search_results = self.image_svc.check_duplicates_wrapped(post, filter=filter,
                                            target_hamming_distance=post_filter,
-                                           target_annoy_distance=pre_filter)
+                                           target_annoy_distance=pre_filter,)
         except Exception as e:
             log.exception('Problem checking duplicates for post %s', post_id)
             response['status'] = 'error'

@@ -188,6 +188,7 @@ class MonitoredSubChecks(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     checked_at = Column(DateTime, default=func.utc_timestamp())
+    subreddit = Column(String(100))
 
 class MemeTemplate(Base):
     __tablename__ = 'meme_template'
