@@ -24,5 +24,8 @@ Searching: Increase n_trees and search_k
 Ingest:
     Check URL posts for 404
 
-Track summons in influx
+
 If there is only 1 match doens't do a first and last seen
+Track raw index search time and total after filter
+
+!! Log all comments we leave

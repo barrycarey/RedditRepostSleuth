@@ -155,7 +155,7 @@ class DuplicateImageService:
                                     target_hamming_distance: int = None,
                                     target_annoy_distance: float = None,
                                     same_sub: bool = False, date_cutff: int = None,
-                                    filter_dead_matches: bool = False) -> List[ImageMatch]:
+                                    filter_dead_matches: bool = True) -> List[ImageMatch]:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -242,7 +242,14 @@ class DuplicateImageService:
         else:
             return matches
 
-    def check_duplicates_wrapped(self, post: Post, filter: bool = True, max_matches: int = 75, target_hamming_distance: int = None, target_annoy_distance: float = None, same_sub: bool = False, date_cutff: int = None) -> ImageRepostWrapper:
+    def check_duplicates_wrapped(self, post: Post,
+                                 filter: bool = True,
+                                 max_matches: int = 75,
+                                 target_hamming_distance: int = None,
+                                 target_annoy_distance: float = None,
+                                 same_sub: bool = False,
+                                 date_cutff: int = None,
+                                 filter_dead_matches: bool = True) -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -269,7 +276,7 @@ class DuplicateImageService:
                 target_annoy_distance = meme_template.target_annoy
                 log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
-            result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance, same_sub=same_sub, date_cutff=date_cutff)
+            result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance, same_sub=same_sub, date_cutff=date_cutff, filter_dead_matches=filter_dead_matches)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)

@@ -1,9 +1,10 @@
 # TODO - Mega hackery, figure this out.
 import sys
 
-from redditrepostsleuth.core.services.eventlogging import EventLogging
+
 
 sys.path.append('./')
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
