@@ -21,7 +21,6 @@ def log_queue_size(event_logger):
                     continue
                 event_logger.save_event(
                     CeleryQueueSize(queue_name, client.llen(queue_name), event_type='queue_update'))
-            print('sleep')
             time.sleep(2)
         except Exception as e:
             pass

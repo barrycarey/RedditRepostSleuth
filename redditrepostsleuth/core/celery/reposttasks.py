@@ -38,6 +38,12 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
     save_image_repost_result(result, self.uowm)
 
     self.event_logger.save_event(AnnoySearchEvent(search_time, 0, event_type='find_matching_images'))
+    self.event_logger.save_event(RepostEvent(
+        event_type='repost_found' if result.matches else 'repost_check',
+        status='success',
+        post_type='image',
+        repost_of=result.matches[0].post.post_id if result.matches else None
+    ))
     return result
 
 

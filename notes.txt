@@ -4,6 +4,7 @@ Sub Monitor:
     Cutoff date for matches
     Flair posts as repost
     Set Search depth
+    Option to ignore flaired posts
 
 Image Repost
     Try to read text in memes to detect same template different text
@@ -22,3 +23,6 @@ Searching: Increase n_trees and search_k
 
 Ingest:
     Check URL posts for 404
+
+Track summons in influx
+If there is only 1 match doens't do a first and last seen

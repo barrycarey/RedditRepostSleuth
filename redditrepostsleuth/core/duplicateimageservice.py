@@ -150,7 +150,12 @@ class DuplicateImageService:
 
         return sort_reposts(final_results)
 
-    def _filter_results_for_reposts(self, matches: List[ImageMatch], checked_post: Post, target_hamming_distance: int = None, target_annoy_distance: float = None, same_sub: bool = False, date_cutff: int = None) -> List[ImageMatch]:
+    def _filter_results_for_reposts(self, matches: List[ImageMatch],
+                                    checked_post: Post,
+                                    target_hamming_distance: int = None,
+                                    target_annoy_distance: float = None,
+                                    same_sub: bool = False, date_cutff: int = None,
+                                    filter_dead_matches: bool = False) -> List[ImageMatch]:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -203,9 +208,10 @@ class DuplicateImageService:
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
             log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
-            if not is_image_still_available(match.post.url):
-                log.debug('Active Image Reject: Imgae has been deleted from post https://redd.it/%s', match.post.post_id)
-                continue
+            if filter_dead_matches:
+                if not is_image_still_available(match.post.url):
+                    log.debug('Active Image Reject: Imgae has been deleted from post https://redd.it/%s', match.post.post_id)
+                    continue
 
             results.append(match)
         log.info('Matches post-filter: %s', len(results))

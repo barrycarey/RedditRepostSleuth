@@ -17,7 +17,7 @@ class InfluxEvent:
                 'rate_limit': self.rate_limit
 
             },
-            'time': self.event_time,
+            #'time': self.event_time,
             'tags': {
                 'event_type': self.event_type,
                 'status': self.status,

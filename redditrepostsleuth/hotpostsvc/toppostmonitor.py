@@ -73,7 +73,7 @@ class TopPostMonitor:
                     target_annoy = CUSTOM_FILTER_LEVELS.get(post.subreddit)['annoy']
                     target_hamming = CUSTOM_FILTER_LEVELS.get(post.subreddit)['hamming']
                 search_results = self.image_service.check_duplicates_wrapped(post, target_hamming_distance=target_hamming,
-                                                                      target_annoy_distance=target_annoy)
+                                                                      target_annoy_distance=target_annoy, same_sub=True)
             except NoIndexException:
                 log.error('No available index for image repost check.  Trying again later')
                 return

@@ -91,7 +91,8 @@ services:
             - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
-        entrypoint: celery -A redditrepostsleuth.common worker -Q repost_image -c 1
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 1
         volumes:
             - /opt/imageindex:/opt/imageindex
 

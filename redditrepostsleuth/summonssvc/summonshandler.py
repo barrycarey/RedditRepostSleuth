@@ -11,7 +11,10 @@ from redditrepostsleuth.core.config.replytemplates import UNSUPPORTED_POST_TYPE,
     IMAGE_REPOST_ALL, FAILED_TO_LEAVE_RESPONSE
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
+from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.reposthelpers import verify_oc, check_link_repost
@@ -23,12 +26,29 @@ from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
 class SummonsHandler:
-    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: Reddit, response_builder: ResponseBuilder, summons_disabled=False):
+    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: Reddit, response_builder: ResponseBuilder, event_logger: EventLogging = None, summons_disabled=False):
         self.uowm = uowm
         self.image_service = image_service
         self.reddit = reddit
         self.summons_disabled = summons_disabled
         self.response_builder = response_builder
+        self.event_logger = event_logger
+
+    def handle_summons(self):
+        """
+        Continually check the summons table for new requests.  Handle them as they are found
+        """
+        while True:
+            try:
+                with self.uowm.start() as uow:
+                    summons = uow.summons.get_unreplied()
+                    for s in summons:
+                        self.handle_repost_request(s)
+                        summons_event = SummonsEvent((s.summons_received_at - datetime.utcnow()).seconds, s.summons_received_at, event_type='summons')
+                        self._send_event(summons_event)
+                time.sleep(2)
+            except Exception as e:
+                log.exception('Exception in handle summons thread')
 
     def handle_repost_request(self, summons: Summons):
 
@@ -283,20 +303,6 @@ class SummonsHandler:
             uow.posts.update(post)
             uow.commit()
 
-    def handle_summons(self):
-        """
-        Continually check the summons table for new requests.  Handle them as they are found
-        """
-        while True:
-            try:
-                with self.uowm.start() as uow:
-                    summons = uow.summons.get_unreplied()
-                    for s in summons:
-                        self.handle_repost_request(s)
-                time.sleep(2)
-            except Exception as e:
-                log.exception('Exception in handle summons thread')
-
     def save_unknown_post(self, post_id: str) -> Post:
         """
         If we received a request on a post we haven't ingest save it
@@ -342,3 +348,7 @@ class SummonsHandler:
             output = output + f'Links:** {count:,}'
 
         return output
+
+    def _send_event(self, event: InfluxEvent):
+        if self.event_logger:
+            self.event_logger.save_event(event)

@@ -23,11 +23,11 @@ log_dir = os.getenv('LOG_LOCATION', os.getcwd())
 if not os.path.exists(log_dir):
     os.mkdir(log_dir)
 print('Log dir will be ' + log_dir)
-error_file_handler = logging.FileHandler(os.path.join(log_dir, 'error.log'))
-error_file_handler.setLevel(logging.ERROR)
-error_file_handler.setFormatter(formatter)
+#error_file_handler = logging.FileHandler(os.path.join(log_dir, 'error.log'))
+#error_file_handler.setLevel(logging.ERROR)
+#error_file_handler.setFormatter(formatter)
 
 log.addHandler(error_handler)
-log.addHandler(error_file_handler)
+#log.addHandler(error_file_handler)
 
 log.propagate = False
