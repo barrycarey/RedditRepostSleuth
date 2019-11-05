@@ -1,7 +1,7 @@
 import time
 
 from praw import Reddit
-from praw.models import Submission
+from praw.models import Submission, Comment
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
@@ -9,7 +9,7 @@ from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.config.replytemplates import OC_MESSAGE_TEMPLATE
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, BotComment
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
@@ -166,6 +166,7 @@ class SubMonitor:
             comment = submission.reply(msg)
             log.info('PRAW Comment Time %s', round(time.perf_counter() - start, 4))
             if comment:
+                self._leave_comment(comment, search_results.checked_post)
                 log.info(f'https://reddit.com{comment.permalink}')
                 if monitored_sub.sticky_comment:
                     comment.mod.distinguish(sticky=True)
@@ -202,3 +203,23 @@ class SubMonitor:
                 log.exception('Problem saving new post', exc_info=True)
 
         return post
+
+    def _log_comment(self, comment: Comment, post: Post):
+        """
+        Log reply comment to database
+        :param comment:
+        """
+        bot_comment = BotComment(
+            post_id=post.post_id,
+            comment_body=comment.body,
+            perma_link=comment.permalink,
+            source='toppost',
+            comment_id=comment.id,
+            subreddit=post.subreddit
+        )
+        with self.uowm.start() as uow:
+            uow.bot_comment.add(bot_comment)
+            try:
+                uow.commit()
+            except Exception as e:
+                log.exception('Failed to save bot comment', exc_info=True)

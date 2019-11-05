@@ -2,6 +2,7 @@ import time
 from time import perf_counter
 
 from praw import Reddit
+from praw.models import Comment
 from redlock import RedLockError
 
 from redditrepostsleuth.core.config import config
@@ -12,7 +13,7 @@ from redditrepostsleuth.core.config.replytemplates import OC_MESSAGE_TEMPLATE
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, BotComment
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -98,9 +99,6 @@ class TopPostMonitor:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
 
-
-
-
     def add_comment(self, post: Post, search_results):
         # TODO - Use new wrapper dup search method
         submission = self.reddit.submission(post.post_id)
@@ -124,6 +122,7 @@ class TopPostMonitor:
             try:
                 comment = submission.reply(msg)
                 if comment:
+                    self._log_comment(comment, post)
                     log.info(f'https://reddit.com{comment.permalink}')
             except Exception as e:
                 log.exception('Failed to leave comment on post %s', post.post_id)
@@ -133,3 +132,23 @@ class TopPostMonitor:
 
             uow.posts.update(post)
             uow.commit()
+
+    def _log_comment(self, comment: Comment, post: Post):
+        """
+        Log reply comment to database
+        :param comment:
+        """
+        bot_comment = BotComment(
+            post_id=post.post_id,
+            comment_body=comment.body,
+            perma_link=comment.permalink,
+            source='toppost',
+            comment_id=comment.id,
+            subreddit=post.subreddit
+        )
+        with self.uowm.start() as uow:
+            uow.bot_comment.add(bot_comment)
+            try:
+                uow.commit()
+            except Exception as e:
+                log.exception('Failed to save bot comment', exc_info=True)

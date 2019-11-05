@@ -1,6 +1,7 @@
 from sqlalchemy.orm import scoped_session
 
 from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
+from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
@@ -87,3 +88,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def monitored_sub_checked(self) -> MonitoredSubCheckRepository:
         return MonitoredSubCheckRepository(self.session)
+
+    @property
+    def bot_comment(self) -> BotCommentRepo:
+        return BotCommentRepo(self.session)

@@ -52,10 +52,7 @@ class Post(Base):
             'created_at': self.created_at.timestamp()
         }
 
-
-
 class RedditImagePost(Base):
-
     __tablename__ = 'reddit_image_post'
 
     id = Column(Integer, primary_key=True)
@@ -65,7 +62,6 @@ class RedditImagePost(Base):
 
 
 class Summons(Base):
-
     __tablename__ = 'reddit_bot_summons'
 
     id = Column(Integer, primary_key=True)
@@ -77,11 +73,22 @@ class Summons(Base):
     comment_reply_id = Column(String(100))
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
+    subreddit = Column(String(100), nullable=False)
 
+class BotComment(Base):
+    __tablename__ = 'reddit_bot_comment'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    comment_body = Column(String(2000, collation='utf8mb4_general_ci'))
+    perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
+    comment_left_at = Column(DateTime, default=func.utc_timestamp())
+    source = Column(String(20), nullable=False)
+    comment_id = Column(String(20), nullable=False)
+    subreddit = Column(String(100), nullable=False)
 
 
 class Comment(Base):
-
     __tablename__ = 'reddit_comments'
 
     id = Column(Integer, primary_key=True)
@@ -90,7 +97,6 @@ class Comment(Base):
     ingested_at = Column(DateTime, default=func.utc_timestamp())
 
 class RepostWatch(Base):
-
     __tablename__ = 'reddit_repost_watch'
 
     id = Column(Integer, primary_key=True)

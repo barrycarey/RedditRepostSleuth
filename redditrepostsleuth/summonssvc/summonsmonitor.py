@@ -53,7 +53,8 @@ class SummonsMonitor:
                     comment_id=comment.id,
                     comment_body=comment.body,
                     summons_received_at=datetime.fromtimestamp(comment.created_utc),
-                    requestor=comment.author.name
+                    requestor=comment.author.name,
+                    subreddit=comment.subreddit.display_name
                 )
                 uow.summons.add(summons)
                 uow.commit()
@@ -76,7 +77,8 @@ class SummonsMonitor:
                             comment_id=comment.id,
                             comment_body=comment.body,
                             summons_received_at=datetime.fromtimestamp(comment.created_utc),
-                            requestor=comment.author.name
+                            requestor=comment.author.name,
+                            subreddit=comment.subreddit.display_name
                         )
                         uow.summons.add(summons)
                         uow.commit()

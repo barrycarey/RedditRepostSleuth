@@ -18,7 +18,7 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.reposthelpers import verify_oc, check_link_repost
-from redditrepostsleuth.core.db.databasemodels import Summons, RepostWatch, Post
+from redditrepostsleuth.core.db.databasemodels import Summons, RepostWatch, Post, BotComment
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder
@@ -265,7 +265,7 @@ class SummonsHandler:
             reply = comment.reply(response.message)
             if reply.id:
                 log.debug(f'Left response at: https://reddit.com{reply.permalink}')
-                self._save_response(response, reply.id)
+                self._save_response(response, reply)
                 return
             log.error('Did not receive reply ID when replying to comment')
         except Exception as e:
@@ -288,15 +288,26 @@ class SummonsHandler:
             log.error('Failed to send private message to %s', comment.author.name)
 
 
-    def _save_response(self, response: RepostResponseBase, response_id: str):
+    def _save_response(self, response: RepostResponseBase, reply: Comment, subreddit: str = None):
         with self.uowm.start() as uow:
             summons = uow.summons.get_by_id(response.summons_id)
             if summons:
                 summons.comment_reply = response.message
                 summons.summons_replied_at = datetime.utcnow()
-                summons.comment_reply_id = response_id
+                summons.comment_reply_id = reply.id if reply else None # TODO: Hacky
                 uow.commit()
                 log.debug('Committed summons response to database')
+            if reply:
+                bot_comment = BotComment(
+                    post_id=summons.post_id,
+                    comment_body=response.message,
+                    perma_link=reply.permalink,
+                    source='summons',
+                    comment_id=reply.id,
+                    subreddit=reply.subreddit.display_name
+                )
+                uow.bot_comment.add(bot_comment)
+                uow.commit()
 
     def _save_post(self, post: Post):
         with self.uowm.start() as uow:

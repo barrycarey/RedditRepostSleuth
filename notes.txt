@@ -25,7 +25,8 @@ Ingest:
     Check URL posts for 404
 
 
-If there is only 1 match doens't do a first and last seen
+!!If there is only 1 match doens't do a first and last seen
 Track raw index search time and total after filter
 
 !! Log all comments we leave
+Create mixin for logging comments

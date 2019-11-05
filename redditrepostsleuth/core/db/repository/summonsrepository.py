@@ -1,3 +1,5 @@
+from typing import List
+
 from sqlalchemy import func
 
 from redditrepostsleuth.core.logging import log
@@ -10,6 +12,9 @@ class SummonsRepository:
     def add(self, item):
         log.debug('Inserting: %s', item)
         self.db_session.add(item)
+
+    def get_all(self) -> List[Summons]:
+        return self.db_session.query(Summons).all()
 
     def get_by_id(self, id: int) -> Summons:
         result = self.db_session.query(Summons).filter(Summons.id == id).first()
