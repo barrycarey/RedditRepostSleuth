@@ -14,7 +14,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/hotpostsvc/Dockerfile
         environment:
-            - LOG_LEVEL=DEBUG
+            - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
         entrypoint: python -u /src/redditrepostsleuth/hotpostsvc/hotpostsvc.py
         volumes:
@@ -77,7 +77,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=DEBUG
+            - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
@@ -101,7 +101,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
-            - LOG_LEVEL=DEBUG
+            - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks

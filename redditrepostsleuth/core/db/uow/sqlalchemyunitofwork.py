@@ -1,11 +1,13 @@
 from sqlalchemy.orm import scoped_session
 
+from redditrepostsleuth.core.db.databasemodels import InvestigatePost
 from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
+from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
 from redditrepostsleuth.core.db.repository.memetemplaterepository import MemeTemplateRepository
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
@@ -92,3 +94,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def bot_comment(self) -> BotCommentRepo:
         return BotCommentRepo(self.session)
+
+    @property
+    def investigate_post(self) -> InvestigatePostRepo:
+        return InvestigatePostRepo(self.session)

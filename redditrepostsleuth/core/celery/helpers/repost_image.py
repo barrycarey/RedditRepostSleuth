@@ -2,13 +2,15 @@ from typing import List
 
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost
+from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, InvestigatePost
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.util.helpers import is_image_still_available
 
+
+# TODO - Drop logging lines
 
 def find_matching_images(post: Post, dup_service: DuplicateImageService) -> RepostWrapper:
     """
@@ -58,6 +60,11 @@ def save_image_repost_result(repost: RepostWrapper, uowm: UnitOfWorkManager) -> 
             uow.posts.update(repost_of.post)
             uow.repost.add(new_repost)
             repost.matches = final_matches
+
+            if len(repost.matches) > 20:
+                log.info('Adding Investigate Post')
+                inv_post = InvestigatePost(post_id=repost.checked_post.post_id, matches=len(repost.matches))
+                uow.investigate_post.add(inv_post)
 
         uow.posts.update(repost.checked_post)
         uow.commit()

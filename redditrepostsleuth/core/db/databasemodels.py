@@ -160,14 +160,6 @@ class IndexBuildTimes(Base):
     build_end = Column(DateTime, nullable=False)
     build_minutes = Column(Integer)
 
-class PostReply(Base):
-    __tablename__ = 'reddit_post_reply'
-
-    id = Column(Integer, primary_key=True)
-    post_id = Column(String(100), nullable=False, unique=True)
-    reply_id = Column(String(100), unique=True)
-    reply_body = Column(String(1000, collation='utf8mb4_general_ci'))
-
 class MonitoredSub(Base):
     __tablename__ = 'reddit_monitored_sub'
 
@@ -221,3 +213,11 @@ class MemeTemplate(Base):
             'example': self.example,
             'template_detection_hamming': self.template_detection_hamming
         }
+
+class InvestigatePost(Base):
+    __tablename__ = 'investigate_post'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    matches = Column(Integer)
+    found_at = Column(DateTime, default=func.utc_timestamp())

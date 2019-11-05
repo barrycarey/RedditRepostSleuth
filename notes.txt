@@ -30,3 +30,7 @@ Track raw index search time and total after filter
 
 !! Log all comments we leave
 Create mixin for logging comments
+Scan biggest subs and look for repost rules
+
+For top post monitor check if sub is monitored and obey rules
+Add indexes to SQLAlchemy models

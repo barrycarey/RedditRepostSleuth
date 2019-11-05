@@ -45,7 +45,7 @@ class PostIngestor:
                 if len(seen_posts) > 10000:
                     seen_posts = []
                 submissions = [sub for sub in self.reddit.subreddit('all').new(limit=500)]
-                log.info('%s posts from API', len(submissions))
+                log.debug('%s posts from API', len(submissions))
                 for submission in submissions:
                     if submission.id in seen_posts:
                         continue
