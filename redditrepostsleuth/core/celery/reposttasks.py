@@ -1,5 +1,6 @@
 from time import perf_counter
 
+import requests
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
@@ -26,6 +27,10 @@ def ingest_repost_check(post):
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> RepostWrapper:
+    r = requests.head(post.url)
+    if r.status_code != 200:
+        log.info('Skipping image that is deleted %s', post.url)
+        return
 
     if post.crosspost_parent:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
