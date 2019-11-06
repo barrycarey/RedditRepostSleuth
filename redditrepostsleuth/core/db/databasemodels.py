@@ -221,3 +221,14 @@ class InvestigatePost(Base):
     post_id = Column(String(100), nullable=False, unique=True)
     matches = Column(Integer)
     found_at = Column(DateTime, default=func.utc_timestamp())
+    url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'matches': self.matches,
+            'found_at': str(self.found_at),
+            'shortlink': f'https://redd.it/{self.post_id}',
+            'url': self.url
+        }

@@ -43,7 +43,8 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
         event_type='repost_found' if result.matches else 'repost_check',
         status='success',
         post_type='image',
-        repost_of=result.matches[0].post.post_id if result.matches else None
+        repost_of=result.matches[0].post.post_id if result.matches else None,
+
     ))
 
     return result

@@ -106,7 +106,16 @@ class PostIngestor:
                 if not start_time:
                     start_time = data['data'][0]['created_utc']
 
-                save_pushshift_results.apply_async((data['data'],), queue='pushshift')
+                try:
+                    save_pushshift_results.apply_async((data['data'],), queue='pushshift')
+                except Exception as e:
+                    log.exception('Failed to send to pushshift')
+                    time.sleep(5)
+                    try:
+                        save_pushshift_results.apply_async((data['data'],), queue='pushshift')
+                    except Exception:
+                        pass
+
 
                 start_end_dif = start_time - oldest_id
                 if start_end_dif > 3600:

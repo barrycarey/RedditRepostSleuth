@@ -138,7 +138,7 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
     :param uowm: UnitOfWorkManager
     """
     msg_values = {
-        'total_searched': search_results.index_size,
+        'total_searched': f'{search_results.index_size:,}',
         'search_time': search_results.search_time,
         'total_posts': 0,
         'match_count': len(search_results.matches),
@@ -163,6 +163,6 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
 
     if uowm:
         with uowm.start() as uow:
-            msg_values['total_posts'] = uow.posts.get_newest_post().id
+            msg_values['total_posts'] = f'{uow.posts.get_newest_post().id:,}'
 
     return msg_values

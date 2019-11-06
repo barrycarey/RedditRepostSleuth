@@ -63,7 +63,7 @@ def save_image_repost_result(repost: RepostWrapper, uowm: UnitOfWorkManager) -> 
 
             if len(repost.matches) > 20:
                 log.info('Adding Investigate Post')
-                inv_post = InvestigatePost(post_id=repost.checked_post.post_id, matches=len(repost.matches))
+                inv_post = InvestigatePost(post_id=repost_of.post.post_id, matches=len(repost.matches), url=repost.checked_post.url)
                 uow.investigate_post.add(inv_post)
 
         uow.posts.update(repost.checked_post)

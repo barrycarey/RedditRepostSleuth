@@ -15,6 +15,7 @@ Host Post Monitor
 Summoning:
     Make summons abide by distances rules for specific subs
     If 1 summons throws and unexpected exception it will loop ou
+    If index is out of date influx events loop
 
 Move repost checking logic to API
 Move critical config options to ENV
@@ -34,3 +35,4 @@ Scan biggest subs and look for repost rules
 
 For top post monitor check if sub is monitored and obey rules
 Add indexes to SQLAlchemy models
+Build response service that handles comments

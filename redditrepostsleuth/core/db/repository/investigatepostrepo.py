@@ -8,5 +8,11 @@ class InvestigatePostRepo:
     def add(self, item: InvestigatePost):
         self.db_session.add(item)
 
+    def get_by_id(self, id: int):
+        return self.db_session.query(InvestigatePost).filter(InvestigatePost.id == id).first()
+
     def get_all(self):
-        return self.db_session.query(InvestigatePost).all()
+        return self.db_session.query(InvestigatePost).order_by(InvestigatePost.matches.desc()).limit(20).all()
+
+    def remove(self, item: InvestigatePost):
+        self.db_session.delete(item)

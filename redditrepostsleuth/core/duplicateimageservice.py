@@ -155,7 +155,8 @@ class DuplicateImageService:
                                     target_hamming_distance: int = None,
                                     target_annoy_distance: float = None,
                                     same_sub: bool = False, date_cutff: int = None,
-                                    filter_dead_matches: bool = True) -> List[ImageMatch]:
+                                    filter_dead_matches: bool = True,
+                                    only_older_matches: bool = True) -> List[ImageMatch]:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -193,7 +194,7 @@ class DuplicateImageService:
                 continue
             if checked_post.post_id == match.post.post_id:
                 continue
-            if match.post.created_at > checked_post.created_at:
+            if only_older_matches and match.post.created_at > checked_post.created_at:
                 log.debug('Date Filter Reject: Target: %s Actual: %s - %s', checked_post.created_at.strftime('%Y-%d-%m'), match.post.created_at.strftime('%Y-%d-%m'), f'https://redd.it/{match.post.post_id}')
                 continue
             if date_cutff and (datetime.utcnow() - match.post.created_at).days > date_cutff:
@@ -249,7 +250,8 @@ class DuplicateImageService:
                                  target_annoy_distance: float = None,
                                  same_sub: bool = False,
                                  date_cutff: int = None,
-                                 filter_dead_matches: bool = True) -> ImageRepostWrapper:
+                                 filter_dead_matches: bool = True,
+                                 only_older_matches=True) -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -276,7 +278,13 @@ class DuplicateImageService:
                 target_annoy_distance = meme_template.target_annoy
                 log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
-            result.matches = self._filter_results_for_reposts(result.matches, post, target_annoy_distance=target_annoy_distance, target_hamming_distance=target_hamming_distance, same_sub=same_sub, date_cutff=date_cutff, filter_dead_matches=filter_dead_matches)
+            result.matches = self._filter_results_for_reposts(result.matches, post,
+                                                              target_annoy_distance=target_annoy_distance,
+                                                              target_hamming_distance=target_hamming_distance,
+                                                              same_sub=same_sub,
+                                                              date_cutff=date_cutff,
+                                                              filter_dead_matches=filter_dead_matches,
+                                                              only_older_matches=only_older_matches)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)

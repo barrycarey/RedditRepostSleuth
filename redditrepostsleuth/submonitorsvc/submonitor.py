@@ -166,7 +166,7 @@ class SubMonitor:
             comment = submission.reply(msg)
             log.info('PRAW Comment Time %s', round(time.perf_counter() - start, 4))
             if comment:
-                self._leave_comment(comment, search_results.checked_post)
+                self._log_comment(comment, search_results.checked_post)
                 log.info(f'https://reddit.com{comment.permalink}')
                 if monitored_sub.sticky_comment:
                     comment.mod.distinguish(sticky=True)
@@ -213,7 +213,7 @@ class SubMonitor:
             post_id=post.post_id,
             comment_body=comment.body,
             perma_link=comment.permalink,
-            source='toppost',
+            source='submonitor',
             comment_id=comment.id,
             subreddit=post.subreddit
         )
