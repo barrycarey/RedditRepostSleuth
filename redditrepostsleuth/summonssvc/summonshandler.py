@@ -5,8 +5,8 @@ from datetime import datetime
 from praw import Reddit
 from praw.models import Comment
 
-from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.config.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
+from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
     WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, OC_MESSAGE_TEMPLATE, \
     IMAGE_REPOST_ALL, FAILED_TO_LEAVE_RESPONSE
 from redditrepostsleuth.core.exception import NoIndexException

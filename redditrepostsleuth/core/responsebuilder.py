@@ -1,4 +1,4 @@
-from redditrepostsleuth.core.config.replytemplates import DEFAULT_REPOST_COMMENT
+from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_COMMENT
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 

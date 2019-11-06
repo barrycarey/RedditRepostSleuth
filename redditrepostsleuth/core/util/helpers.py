@@ -3,7 +3,7 @@ from typing import Dict, List
 
 import imagehash
 
-from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate

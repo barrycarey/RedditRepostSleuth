@@ -6,9 +6,9 @@ from praw.models import Comment
 from redlock import RedLockError
 
 from redditrepostsleuth.core.config import config
-from redditrepostsleuth.core.config.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
+from redditrepostsleuth.core.util.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
     NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.config.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.util.replytemplates import OC_MESSAGE_TEMPLATE
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
