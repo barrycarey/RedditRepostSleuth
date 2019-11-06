@@ -14,6 +14,7 @@ from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.helpers import is_image_still_available
+from redditrepostsleuth.core.util.imagehashing import set_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts
@@ -216,6 +217,7 @@ class DuplicateImageService:
 
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
+        results = self._final_meme_filter(set_image_hashes(checked_post, hash_size=32), results)
         return sort_reposts(results)
 
 
@@ -277,6 +279,7 @@ class DuplicateImageService:
                 target_hamming_distance = meme_template.target_hamming
                 target_annoy_distance = meme_template.target_annoy
                 log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
+
 
             result.matches = self._filter_results_for_reposts(result.matches, post,
                                                               target_annoy_distance=target_annoy_distance,
@@ -341,4 +344,20 @@ class DuplicateImageService:
                 log.error('Match %s missing dhash_h', match.post.post_id)
                 continue
             match.hamming_distance = hamming(searched_post.dhash_h, match.post.dhash_h)
+        return matches
+
+    def _final_meme_filter(self, searched_post: Post, matches: List[ImageMatch]):
+        matches = self._ramp_meme_hashes(matches)
+        matches = self._set_match_hamming(searched_post, matches)
+        result = []
+        for match in matches:
+            if match.hamming_distance > 10:
+                log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
+                          match.hamming_distance, f'https://redd.it/{match.post.post_id}')
+                continue
+        #return [match for match in matches if match.hamming_distance < 10]
+
+    def _ramp_meme_hashes(self, matches: List[ImageMatch]) -> List[ImageMatch]:
+        for match in matches:
+            set_image_hashes(match.post, hash_size=32)
         return matches

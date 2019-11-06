@@ -120,7 +120,7 @@ def get_bit_count(img: Image, hash_size: int = 16) -> int:
 
     return count[True]
 
-def set_image_hashes(post: Post) -> Post:
+def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
     log.debug('Hashing image post %s', post.post_id)
     try:
         img = generate_img_by_url(post.url)
@@ -128,9 +128,9 @@ def set_image_hashes(post: Post) -> Post:
         raise
 
     try:
-        dhash_h = imagehash.dhash(img, hash_size=16)
-        dhash_v = imagehash.dhash_vertical(img, hash_size=16)
-        ahash = imagehash.average_hash(img, hash_size=16)
+        dhash_h = imagehash.dhash(img, hash_size=hash_size)
+        dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
+        ahash = imagehash.average_hash(img, hash_size=hash_size)
         post.dhash_h = str(dhash_h)
         post.dhash_v = str(dhash_v)
         post.ahash = str(ahash)
