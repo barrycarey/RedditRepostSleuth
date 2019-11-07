@@ -33,6 +33,8 @@ class SummonsMonitor:
                     if comment is None:
                         continue
                     if self.check_for_summons(comment.body, config.summon_command):
+                        if comment.author == 'sneakpeekbot':
+                            continue
                         self._save_summons(comment)
             except Exception as e:
                 log.exception('Praw summons thread died', exc_info=True)
