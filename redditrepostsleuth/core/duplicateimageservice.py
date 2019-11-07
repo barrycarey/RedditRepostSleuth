@@ -56,7 +56,7 @@ class DuplicateImageService:
         created_at = datetime.fromtimestamp(os.stat(index_file).st_ctime)
         delta = datetime.now() - created_at
 
-        if delta.seconds > 30000:
+        if delta.seconds > 86400:
             log.info('Existing index is too old.  Skipping repost check')
             raise NoIndexException('Existing index is too old')
 
