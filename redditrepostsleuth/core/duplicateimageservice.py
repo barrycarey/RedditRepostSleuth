@@ -95,7 +95,8 @@ class DuplicateImageService:
                                     target_annoy_distance: float = None,
                                     same_sub: bool = False, date_cutff: int = None,
                                     filter_dead_matches: bool = True,
-                                    only_older_matches: bool = True) -> List[ImageMatch]:
+                                    only_older_matches: bool = True,
+                                    is_meme: bool = False) -> List[ImageMatch]:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -155,7 +156,9 @@ class DuplicateImageService:
 
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
-        results = self._final_meme_filter(set_image_hashes(checked_post, hash_size=32), results)
+        if is_meme:
+            results = self._final_meme_filter(set_image_hashes(checked_post, hash_size=32), results)
+
         return sort_reposts(results)
 
     def check_duplicates_wrapped(self, post: Post,
@@ -200,7 +203,8 @@ class DuplicateImageService:
                                                               same_sub=same_sub,
                                                               date_cutff=date_cutff,
                                                               filter_dead_matches=filter_dead_matches,
-                                                              only_older_matches=only_older_matches)
+                                                              only_older_matches=only_older_matches,
+                                                              is_meme=meme_template or False)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)
@@ -268,7 +272,9 @@ class DuplicateImageService:
                 log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
+            result.append(match)
         #return [match for match in matches if match.hamming_distance < 10]
+        return result
 
     def _ramp_meme_hashes(self, matches: List[ImageMatch]) -> List[ImageMatch]:
         for match in matches:
