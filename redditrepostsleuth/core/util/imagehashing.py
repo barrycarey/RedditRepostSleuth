@@ -143,7 +143,30 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
     return post
 
 def get_image_hashes(post: Post, hash_size: int = 16) -> Dict:
-    pass
+    result = {
+        'dhash_h': None,
+        'dhash_v': None,
+        'ahash': None,
+    }
+    log.debug('Hashing image post %s', post.post_id)
+    try:
+        img = generate_img_by_url(post.url)
+    except ImageConversioinException as e:
+        raise
+
+    try:
+        dhash_h = imagehash.dhash(img, hash_size=hash_size)
+        dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
+        ahash = imagehash.average_hash(img, hash_size=hash_size)
+        result['dhash_h'] = str(dhash_h)
+        result['dhash_v'] = str(dhash_v)
+        result['ahash'] = str(ahash)
+    except Exception as e:
+        # TODO: Specific exception
+        log.exception('Error creating hash', exc_info=True)
+        raise
+
+    return result
 
 def set_image_hashes_api(post: Post, api_url: str) -> Post:
     log.debug('Hashing image post using api %s', post.post_id)

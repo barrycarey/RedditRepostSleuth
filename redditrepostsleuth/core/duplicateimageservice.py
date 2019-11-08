@@ -14,7 +14,7 @@ from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.helpers import is_image_still_available
-from redditrepostsleuth.core.util.imagehashing import set_image_hashes
+from redditrepostsleuth.core.util.imagehashing import set_image_hashes, get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts
@@ -148,11 +148,14 @@ class DuplicateImageService:
                 log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
-            log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}', round(match.annoy_distance, 5), match.hamming_distance)
+
             if filter_dead_matches:
                 if not is_image_still_available(match.post.url):
                     log.debug('Active Image Reject: Imgae has been deleted from post https://redd.it/%s', match.post.post_id)
                     continue
+
+            log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}',
+                      round(match.annoy_distance, 5), match.hamming_distance)
 
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
@@ -207,7 +210,7 @@ class DuplicateImageService:
                                                               date_cutff=date_cutff,
                                                               filter_dead_matches=filter_dead_matches,
                                                               only_older_matches=only_older_matches,
-                                                              is_meme=False)
+                                                              is_meme=meme_template or False)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)
@@ -267,18 +270,34 @@ class DuplicateImageService:
         return matches
 
     def _final_meme_filter(self, searched_post: Post, matches: List[ImageMatch]):
-        matches = self._ramp_meme_hashes(matches)
-        matches = self._set_match_hamming(searched_post, matches)
-        result = []
-        for match in matches:
-            if match.hamming_distance > 10:
-                log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
-                          match.hamming_distance, f'https://redd.it/{match.post.post_id}')
-                continue
-            result.append(match)
-        #return [match for match in matches if match.hamming_distance < 10]
-        return result
+        results = []
+        try:
+            target_hashes = get_image_hashes(searched_post, hash_size=32)
+        except Exception as e:
+            log.exception('Failed to convert target post for meme check', exc_info=True)
+            return matches
 
+        for match in matches:
+            try:
+                match_hashes = get_image_hashes(match.post, hash_size=32)
+            except Exception as e:
+                log.error('Failed to get meme hash for %s', match.post.id)
+                continue
+
+            h_distance = hamming(target_hashes['dhash_h'], match_hashes['dhash_h'])
+
+            if h_distance > 10:
+                log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
+                          h_distance, f'https://redd.it/{match.post.post_id}')
+                continue
+
+            log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
+                       h_distance)
+            results.append(match)
+
+        return results
+
+    @DeprecationWarning
     def _ramp_meme_hashes(self, matches: List[ImageMatch]) -> List[ImageMatch]:
         for match in matches:
             set_image_hashes(match.post, hash_size=32)
