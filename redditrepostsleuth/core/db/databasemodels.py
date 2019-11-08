@@ -11,6 +11,8 @@ class Post(Base):
     def __repr__(self) -> str:
         return 'Post ID: {} - Type: {} - URL: {} - Source: {} - Created: {}'.format(self.post_id, self.post_type, self.url, self.ingested_from, self.created_at)
 
+    # TODO - Move to_dict methods into JSON encoders
+
     __tablename__ = 'reddit_post'
 
     id = Column(Integer, primary_key=True)
@@ -180,6 +182,27 @@ class MonitoredSub(Base):
     repost_response_template = Column(String(2000))
     oc_response_template = Column(String(2000))
     search_depth = Column(Integer, default=100)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'active': self.active,
+            'repost_only': self.repost_only,
+            'report_submission': self.report_submission,
+            'report_msg': self.report_msg,
+            'requestor': self.requestor,
+            'added_at': str(self.added_at),
+            'target_hamming': self.target_hamming,
+            'target_annoy': self.target_annoy,
+            'target_days_old': self.target_days_old,
+            'same_sub_only': self.same_sub_only,
+            'notes': self.notes,
+            'sticky_comment': self.sticky_comment,
+            'repost_response_template': self.repost_response_template,
+            'oc_response_template': self.oc_response_template,
+            'search_depth': self.search_depth
+        }
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'reddit_monitored_sub_checked'

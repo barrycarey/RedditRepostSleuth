@@ -5,7 +5,9 @@ from waitress import serve
 from redditrepostsleuth.core.db import db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.imageapi.endpoints import ImageSleuth, MemeTemplate, InvestigatePost
+from redditrepostsleuth.imageapi.endpoints.investigate_posts import InvestigatePost
+from redditrepostsleuth.imageapi.endpoints.meme_templates import MemeTemplate
+from redditrepostsleuth.imageapi.endpoints.repost_checker import ImageSleuth
 
 uowm = SqlAlchemyUnitOfWorkManager(db_engine)
 dup = DuplicateImageService(uowm)
