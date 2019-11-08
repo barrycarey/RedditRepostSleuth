@@ -14,6 +14,7 @@ from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.helpers import is_image_still_available
+from redditrepostsleuth.core.util.imagehashing import set_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts
@@ -87,68 +88,6 @@ class DuplicateImageService:
         else:
             log.debug('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
 
-    # TODO - Remove this method
-    def _clean_results(self, results: List[ImageMatch], orig_id: int, target_hamming_distance: int = None, target_annoy_distance: float = None) -> List[ImageMatch]:
-        """
-        Take a list of matches and filter out the results.
-        :param results: List of ImageMatch
-        :param orig_id: ID of the post we are checked for reposts
-        :return:
-        """
-
-        # Prefers passed in targets, defaults to config
-        target_hamming_distance = target_hamming_distance or config.hamming_cutoff
-        target_annoy_distance = target_annoy_distance or config.annoy_match_cutoff
-
-        with self.uowm.start() as uow:
-            original = uow.posts.get_by_id(orig_id)
-
-        final_results = []
-        log.debug('Original: %s', f'http://redd.it/{original.post_id}')
-        for match in results:
-
-
-            if match.annoy_distance > target_annoy_distance:
-                continue
-
-            # Skip original query (result[0] is DB ID)
-            if match.match_id == match.original_id:
-                continue
-
-            with self.uowm.start() as uow:
-                # Hacky but we need this to get the original database post ID from the RedditImagePost object
-                original_image_post = uow.image_post.get_by_id(match.match_id)
-                match_post = uow.posts.get_by_post_id(original_image_post.post_id)
-
-                match.post = match_post
-                match.match_id = match_post.id
-
-            if original.author == match.post.author:
-                log.debug('Skipping post with same Author')
-                continue
-
-            if match.post.created_at > original.created_at:
-                log.debug('Skipping match that is newer than the post we are checking. Original: %s - Match: %s', original.created_at, match.post.created_at)
-                continue
-
-            if match.post.crosspost_parent:
-                log.debug("Skipping match that is a crosspost")
-                continue
-
-            if not original.dhash_h or not match.post.dhash_h:
-                log.error('Missing dash in dup check. Original(%s): %s - Match (%s): %s', original.post_id, original.dhash_h, match.post.post_id, match.post.dhash_h)
-                continue
-            match.hamming_distance = hamming(original.dhash_h, match.post.dhash_h)
-
-            if match.hamming_distance <= target_hamming_distance:
-                log.debug('Match %s: Annoy %s - Ham: %s', match.match_id, match.hamming_distance, match.annoy_distance)
-                final_results.append(match)
-            else:
-                #log.debug('Passed annoy and failed hamming. (Anny: %s - Ham: %s) - %s', result[1], hamming_distance, result[0])
-                log.info('Post %s missed hamming cutoff of %s with %s', match.post.post_id, config.hamming_cutoff, match.hamming_distance)
-                pass
-
-        return sort_reposts(final_results)
 
     def _filter_results_for_reposts(self, matches: List[ImageMatch],
                                     checked_post: Post,
@@ -156,7 +95,8 @@ class DuplicateImageService:
                                     target_annoy_distance: float = None,
                                     same_sub: bool = False, date_cutff: int = None,
                                     filter_dead_matches: bool = True,
-                                    only_older_matches: bool = True) -> List[ImageMatch]:
+                                    only_older_matches: bool = True,
+                                    is_meme: bool = False) -> List[ImageMatch]:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -216,32 +156,10 @@ class DuplicateImageService:
 
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
+        if is_meme:
+            results = self._final_meme_filter(set_image_hashes(checked_post, hash_size=32), results)
+
         return sort_reposts(results)
-
-
-    # TODO - Phase this out
-    def check_duplicate(self, post: Post, filter: bool = True, max_matches: int = 50, target_hamming_distance: int = None, target_annoy_distance: float = None, same_sub: bool = False, date_cutff: int = None) -> List[ImageMatch]:
-        """
-        Take a given post and check it against the index for matches
-        :rtype: List[ImageMatch]
-        :param post: Post object
-        :param filter: Filter the returned result or return raw results
-        :param target_hamming_distance: Only return matches below this value
-        :param target_annoy_distance: Only return matches below this value.  This is checked first
-        :return: List of matching images
-        """
-        # TODO: Load and append post object to each match
-        self._load_index_file()
-        log.debug('%s - Checking %s for duplicates', os.getpid(), post.post_id)
-        log.debug('Image hash: %s', post.dhash_h)
-        search_array = bytearray(post.dhash_h, encoding='utf-8')
-        r = self.index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
-        results = list(zip(r[0], r[1]))
-        matches = [annoy_result_to_image_match(match, post.id) for match in results]
-        if filter:
-            return self._clean_results(matches, post.id, target_hamming_distance, target_annoy_distance)
-        else:
-            return matches
 
     def check_duplicates_wrapped(self, post: Post,
                                  filter: bool = True,
@@ -278,13 +196,15 @@ class DuplicateImageService:
                 target_annoy_distance = meme_template.target_annoy
                 log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
+
             result.matches = self._filter_results_for_reposts(result.matches, post,
                                                               target_annoy_distance=target_annoy_distance,
                                                               target_hamming_distance=target_hamming_distance,
                                                               same_sub=same_sub,
                                                               date_cutff=date_cutff,
                                                               filter_dead_matches=filter_dead_matches,
-                                                              only_older_matches=only_older_matches)
+                                                              only_older_matches=only_older_matches,
+                                                              is_meme=meme_template or False)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)
@@ -341,4 +261,22 @@ class DuplicateImageService:
                 log.error('Match %s missing dhash_h', match.post.post_id)
                 continue
             match.hamming_distance = hamming(searched_post.dhash_h, match.post.dhash_h)
+        return matches
+
+    def _final_meme_filter(self, searched_post: Post, matches: List[ImageMatch]):
+        matches = self._ramp_meme_hashes(matches)
+        matches = self._set_match_hamming(searched_post, matches)
+        result = []
+        for match in matches:
+            if match.hamming_distance > 10:
+                log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
+                          match.hamming_distance, f'https://redd.it/{match.post.post_id}')
+                continue
+            result.append(match)
+        #return [match for match in matches if match.hamming_distance < 10]
+        return result
+
+    def _ramp_meme_hashes(self, matches: List[ImageMatch]) -> List[ImageMatch]:
+        for match in matches:
+            set_image_hashes(match.post, hash_size=32)
         return matches
