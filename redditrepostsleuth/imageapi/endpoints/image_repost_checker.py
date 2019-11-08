@@ -8,7 +8,7 @@ from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
 
 
-class ImageSleuth:
+class ImageRepostChecker:
 
     def __init__(self, image_svc: DuplicateImageService, uowm: UnitOfWorkManager):
         self.image_svc = image_svc
@@ -56,7 +56,8 @@ class ImageSleuth:
                                            target_hamming_distance=post_filter,
                                            target_annoy_distance=pre_filter,
                                             only_older_matches=only_older,
-                                            same_sub=same_sub)
+                                            same_sub=same_sub,
+                                            meme_filter=meme_filter)
         except Exception as e:
             log.exception('Problem checking duplicates for post %s', post_id)
             response['status'] = 'error'

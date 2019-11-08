@@ -128,7 +128,7 @@ def is_image_still_available(url: str) -> bool:
 def build_markdown_list(matches: List[ImageMatch]) -> str:
     result = ''
     for match in matches:
-        result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
+        result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
     return result
 
 def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None) -> dict:

@@ -169,7 +169,8 @@ class DuplicateImageService:
                                  same_sub: bool = False,
                                  date_cutff: int = None,
                                  filter_dead_matches: bool = True,
-                                 only_older_matches=True) -> ImageRepostWrapper:
+                                 only_older_matches=True,
+                                 meme_filter=False) -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -189,12 +190,14 @@ class DuplicateImageService:
         result.search_time = round(perf_counter() - start, 5)
         result.index_size = self.index.get_n_items()
         if filter:
+            meme_template = None
             # TODO - Possibly make this optional instead of running on each check
-            meme_template = self.get_meme_template(post)
-            if meme_template:
-                target_hamming_distance = meme_template.target_hamming
-                target_annoy_distance = meme_template.target_annoy
-                log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
+            if meme_filter:
+                meme_template = self.get_meme_template(post)
+                if meme_template:
+                    target_hamming_distance = meme_template.target_hamming
+                    target_annoy_distance = meme_template.target_annoy
+                    log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
 
             result.matches = self._filter_results_for_reposts(result.matches, post,
@@ -204,7 +207,7 @@ class DuplicateImageService:
                                                               date_cutff=date_cutff,
                                                               filter_dead_matches=filter_dead_matches,
                                                               only_older_matches=only_older_matches,
-                                                              is_meme=meme_template or False)
+                                                              is_meme=False)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)
@@ -269,7 +272,7 @@ class DuplicateImageService:
         result = []
         for match in matches:
             if match.hamming_distance > 10:
-                log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
+                log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
             result.append(match)

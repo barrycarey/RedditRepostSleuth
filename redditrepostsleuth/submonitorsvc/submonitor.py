@@ -68,36 +68,24 @@ class SubMonitor:
                 if not post:
                     log.info('Post %s has not been ingested yet.  Skipping')
                     continue
-                    """
-                    log.info('Post %s not in database, attempting to ingest', sub.id)
-                    post = self._save_unknown_post(sub)
-                    uow.posts.add(post)
-                    try:
-                        uow.commit()
-                    except Exception as e:
-                        log.error('Failed to save new post.. %s', str(e))
-                        continue
-                    if not post.id:
-                        log.error('Failed to save post %s', sub.id)
-                        continue
-                    """
-                if post.left_comment:
-                    continue
 
-                if post.post_type not in ['image']:
-                    continue
+            if post.left_comment:
+                continue
 
-                if not post.dhash_h:
-                    log.error('Post %s has no dhash. Post type %s', post.post_id, post.post_type)
-                    continue
+            if post.post_type not in ['image']:
+                continue
 
-                if post.crosspost_parent:
-                    log.debug('Skipping crosspost')
-                    continue
+            if not post.dhash_h:
+                log.error('Post %s has no dhash. Post type %s', post.post_id, post.post_type)
+                continue
 
-                self._check_for_repost(post, sub, monitored_sub)
-                uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id, subreddit=post.subreddit))
-                uow.commit()
+            if post.crosspost_parent:
+                log.debug('Skipping crosspost')
+                continue
+
+            self._check_for_repost(post, sub, monitored_sub)
+            uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id, subreddit=post.subreddit))
+
 
 
 
@@ -112,7 +100,8 @@ class SubMonitor:
                                                                          target_annoy_distance=monitored_sub.target_annoy,
                                                                          target_hamming_distance=monitored_sub.target_hamming,
                                                                          date_cutff=monitored_sub.target_days_old,
-                                                                         same_sub=monitored_sub.same_sub_only)
+                                                                         same_sub=monitored_sub.same_sub_only,
+                                                                         meme_filter=True)
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return

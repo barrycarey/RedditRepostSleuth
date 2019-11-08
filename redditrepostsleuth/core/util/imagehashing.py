@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 
 import requests
 from collections import Counter
@@ -140,6 +141,9 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
         raise
 
     return post
+
+def get_image_hashes(post: Post, hash_size: int = 16) -> Dict:
+    pass
 
 def set_image_hashes_api(post: Post, api_url: str) -> Post:
     log.debug('Hashing image post using api %s', post.post_id)
