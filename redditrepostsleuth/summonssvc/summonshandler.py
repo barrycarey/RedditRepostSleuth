@@ -2,29 +2,26 @@ import re
 import time
 from datetime import datetime
 
-from praw import Reddit
-from praw.models import Comment
-
-from redditrepostsleuth.core.model.comment_reply import CommentReply
-from redditrepostsleuth.core.services.reddit_manager import RedditManager
-from redditrepostsleuth.core.services.response_handler import ResponseHandler
-from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
-    WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, OC_MESSAGE_TEMPLATE, \
-    IMAGE_REPOST_ALL, FAILED_TO_LEAVE_RESPONSE
+from redditrepostsleuth.core.db.databasemodels import Summons, Post
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search
-from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.reposthelpers import verify_oc, check_link_repost
-from redditrepostsleuth.core.db.databasemodels import Summons, RepostWatch, Post, BotComment
-from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.services.eventlogging import EventLogging
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
+from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, LINK_ALL, \
+    REPOST_NO_RESULT, OC_MESSAGE_TEMPLATE, \
+    IMAGE_REPOST_ALL
+from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -160,7 +157,7 @@ class SummonsHandler:
                 response.message = IMAGE_REPOST_ALL.format(
                     count=len(search_results.matches),
                     searched_posts=self._searched_post_str(post, search_results.index_size),
-                    firstseen=self._create_first_seen(search_results.matches[0].post),
+                    firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
                     time=search_results.search_time
 
                 )
@@ -183,15 +180,6 @@ class SummonsHandler:
         reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons', send_pm_on_fail=True)
         response.message = reply.body # TODO - I don't like this.  Make save_resposne take a CommentReply
         self._save_response(response, reply)
-
-
-    def _send_direct_message(self, comment: Comment, response: RepostResponseBase):
-        log.info('Sending direct message to %s', comment.author.name)
-        try:
-            comment.author.message('Repost Check', response.message)
-            self._save_response(response, None)
-        except Exception as e:
-            log.error('Failed to send private message to %s', comment.author.name)
 
     def _save_response(self, response: RepostResponseBase, reply: CommentReply, subreddit: str = None):
         with self.uowm.start() as uow:
@@ -226,22 +214,6 @@ class SummonsHandler:
                 log.exception('Problem saving new post', exc_info=True)
 
         return post
-
-
-    def _create_first_seen(self, post: Post) -> str:
-        # TODO - Move to helper. Dupped in hot post
-        if post.subreddit in NO_LINK_SUBREDDITS:
-            firstseen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')} by u/{post.author}"
-        else:
-            if post.shortlink:
-                original_link = post.shortlink
-            else:
-                original_link = 'https://reddit.com' + post.perma_link
-
-            firstseen = f"First seen at [{post.subreddit}]({original_link}) on {post.created_at.strftime('%Y-%m-%d')}"
-
-        log.debug('First Seen String: %s', firstseen)
-        return firstseen
 
     def _searched_post_str(self, post: Post, count: int) -> str:
         # TODO - Move to helper. Dupped in host post
