@@ -52,4 +52,5 @@ def process_image_post(post: Post, hash_api) -> RedditImagePost:
     image_post.post_id = post.post_id
     image_post.dhash_h = post.dhash_h
     image_post.dhash_v = post.dhash_v
+    image_post.created_at = post.created_at
     return image_post

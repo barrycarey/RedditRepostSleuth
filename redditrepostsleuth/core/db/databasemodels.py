@@ -58,6 +58,7 @@ class RedditImagePost(Base):
     __tablename__ = 'reddit_image_post'
 
     id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime)
     post_id = Column(String(100), nullable=False, unique=True)
     dhash_v = Column(String(64))
     dhash_h = Column(String(64))

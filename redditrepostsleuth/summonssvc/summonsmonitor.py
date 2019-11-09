@@ -7,6 +7,7 @@ from datetime import datetime
 import requests
 from praw import Reddit
 from praw.models import Comment
+from sqlalchemy.exc import DataError
 
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.config import config
@@ -62,11 +63,15 @@ class SummonsMonitor:
                 uow.commit()
 
     def monitor_for_mentions(self):
+        bad_mentions = []
         while True:
             try:
                 for comment in self.reddit.inbox.mentions():
                     if comment.created_utc < datetime.utcnow().timestamp() - 86400:
                         log.debug('Skipping old mention. Created at %s', datetime.fromtimestamp(comment.created_utc))
+                        continue
+
+                    if comment.id in bad_mentions:
                         continue
 
                     with self.uowm.start() as uow:
@@ -83,7 +88,12 @@ class SummonsMonitor:
                             subreddit=comment.subreddit.display_name
                         )
                         uow.summons.add(summons)
-                        uow.commit()
+                        try:
+                            uow.commit()
+                        except DataError as e:
+                            log.error('SQLAlchemy Data error saving comment')
+                            bad_mentions.append(comment.id)
+                            continue
             except Exception as e:
                 log.exception('Mention monitor failed', exc_info=True)
 

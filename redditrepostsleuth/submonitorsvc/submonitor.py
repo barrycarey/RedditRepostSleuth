@@ -84,7 +84,9 @@ class SubMonitor:
                 continue
 
             self._check_for_repost(post, sub, monitored_sub)
-            uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id, subreddit=post.subreddit))
+            with self.uowm.start() as uow:
+                uow.monitored_sub_checked.add(MonitoredSubChecks(post_id=sub.id, subreddit=post.subreddit))
+                uow.commit()
 
 
 

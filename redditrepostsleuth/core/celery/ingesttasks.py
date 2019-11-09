@@ -68,3 +68,17 @@ def save_pushshift_results_archive(self, data):
             post = pushshift_to_post(submission)
             log.debug('Saving pushshift post: %s', submission['id'])
             save_new_post.apply_async((post,), queue='pushshift_ingest')
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def set_image_post_created_at(self, data):
+    with self.uowm.start() as uow:
+        for image_post in data:
+
+            post = uow.posts.get_by_post_id(image_post.post_id)
+            image_post.created_at = post.created_at
+        print(data[-1].id)
+        uow.image_post.bulk_save(data)
+
+        uow.commit()
+    print('Finished Batch')
