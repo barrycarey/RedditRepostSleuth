@@ -5,20 +5,13 @@ from praw.models import Submission
 
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
-
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
-
-
-# TODO: Should be able to safely remove this now
-
-
 from redditrepostsleuth.core.util.objectmapping import post_to_repost_match
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
+@DeprecationWarning
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
     """
     Take a raw list if matched images.  Filter one ones meeting the following criteria.
@@ -31,7 +24,7 @@ def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post
     # TODO - Clean this up
     return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
 
-
+@DeprecationWarning
 def clean_repost_matches(repost: RepostWrapper) -> List[RepostMatch]:
     """
     Take a list of reposts, remove any cross posts and deleted posts
@@ -53,35 +46,6 @@ def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
 def remove_newer_posts(posts: List[Post], repost_check: Post):
     return [post for post in posts if post.created_at < repost_check.created_at]
 
-def get_crosspost_parent(post: Post, reddit: Reddit):
-    submission = reddit.submission(id=post.post_id)
-    if submission:
-        try:
-            result = submission.crosspost_parent
-            log.debug('Post %s has corsspost parent %s', post.post_id, result)
-            return result
-        except AttributeError:
-            log.debug('No crosspost parent for post %s', post.post_id)
-            return None
-    log.error('Failed to find submission with ID %s', post.post_id)
-
-def set_shortlink(post: Post) -> Post:
-    # TODO - Strip this out
-    """
-    Take a post and set its short link if it doesn't exist
-    :param post:
-    :return:
-    """
-    if not post.shortlink:
-        reddit = get_reddit_instance()
-        try:
-            post.shortlink = reddit.submission(post.post_id).shortlink
-        except Exception as e:
-            # TODO: Specific exception
-            log.error('Failed to set shortlink for post %s. Exception type: %s', post.post_id, type(e))
-
-    return post
-
 def get_crosspost_parent_batch(ids: List[str], reddit: Reddit):
     submissions = reddit.info(fullnames=ids)
     result = []
@@ -90,7 +54,6 @@ def get_crosspost_parent_batch(ids: List[str], reddit: Reddit):
             'id': submission.id,
             'crosspost_Parent': submission.__dict__.get('crosspost_parent', None)
         })
-    log.info('Crosspost Parent Results: %s', result)
     return result
 
 def verify_oc(submission: Submission, repost_service) -> bool:
@@ -100,14 +63,11 @@ def verify_oc(submission: Submission, repost_service) -> bool:
     :param repost_service: Repost processing service
     :return: boolean
     """
-    log.info('Checking submission %s is OC', submission.id)
     result = repost_service.find_all_occurrences(submission)
     matches = [match for match in result.matches if not match.post.crosspost_parent]
     if matches:
-        log.info('Submission %s is not OC.  Found %s matches', submission.id, len(matches))
         return False
     else:
-        log.info('Submission %s is OC', submission.id)
         return True
 
 def check_link_repost(post: Post, uowm: UnitOfWorkManager) -> RepostWrapper:

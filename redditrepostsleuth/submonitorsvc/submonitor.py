@@ -5,8 +5,8 @@ from praw.models import Submission, Comment
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.config.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.config.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
+from redditrepostsleuth.core.util.replytemplates import OC_MESSAGE_TEMPLATE
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, BotComment
