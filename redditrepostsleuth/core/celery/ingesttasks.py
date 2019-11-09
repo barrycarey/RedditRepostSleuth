@@ -72,13 +72,18 @@ def save_pushshift_results_archive(self, data):
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def set_image_post_created_at(self, data):
+    image_posts = []
     with self.uowm.start() as uow:
-        for image_post in data:
-
+        for rawipost in data:
+            image_post = uow.image_post.get_by_id(rawipost['id'])
             post = uow.posts.get_by_post_id(image_post.post_id)
+            if not post:
+                print(f'Post {image_post.post_id} Missing from posts')
+                continue
             image_post.created_at = post.created_at
-        print(data[-1].id)
-        uow.image_post.bulk_save(data)
+            image_posts.append(image_post)
+        print(image_posts[-1].id)
+        uow.image_post.bulk_save(image_posts)
 
         uow.commit()
     print('Finished Batch')
