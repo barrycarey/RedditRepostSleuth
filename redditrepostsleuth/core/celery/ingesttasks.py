@@ -1,3 +1,5 @@
+from time import perf_counter
+
 from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.logging import log
@@ -72,6 +74,7 @@ def save_pushshift_results_archive(self, data):
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def set_image_post_created_at(self, data):
+    start = perf_counter()
     with self.uowm.start() as uow:
         for image_post in data:
 
@@ -79,11 +82,13 @@ def set_image_post_created_at(self, data):
             if not post:
                 continue
             image_post.created_at = post.created_at
-        print(data[-1].id)
+            #uow.image_post.update(image_post)
+
         uow.image_post.bulk_save(data)
 
         uow.commit()
-    print('Finished Batch')
+        print(f'Last ID {data[-1].id} - Time: {perf_counter() - start}')
+    #print('Finished Batch')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def set_image_post_created_at2(self, data):
