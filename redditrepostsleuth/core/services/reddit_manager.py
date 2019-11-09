@@ -18,19 +18,19 @@ class RedditManager:
         for comment in self.comments:
             if comment.id == comment_id:
                 return comment
-            new_comment = self.reddit.comment(comment_id)
-            if new_comment:
-                self.comments.append(new_comment)
-                return new_comment
+        new_comment = self.reddit.comment(comment_id)
+        if new_comment:
+            self.comments.append(new_comment)
+            return new_comment
 
     def submission(self, submission_id: str):
-        return self._return_comment(submission_id)
+        return self._return_submission(submission_id)
 
     def _return_submission(self, submission_id: str):
         for submission in self.submissions:
             if submission.id == submission_id:
                 return submission
-            new_submission = self.reddit.comment(submission_id)
-            if new_submission:
-                self.submissions.append(new_submission)
-                return new_submission
+        new_submission = self.reddit.comment(submission_id)
+        if new_submission:
+            self.submissions.append(new_submission)
+            return new_submission

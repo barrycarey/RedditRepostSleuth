@@ -207,7 +207,7 @@ class DuplicateImageService:
                                                               date_cutff=date_cutff,
                                                               filter_dead_matches=filter_dead_matches,
                                                               only_older_matches=only_older_matches,
-                                                              is_meme=False)
+                                                              is_meme=meme_template or False)
         else:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)

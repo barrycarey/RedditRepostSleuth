@@ -5,6 +5,9 @@ from datetime import datetime
 from praw import Reddit
 from praw.models import Comment
 
+from redditrepostsleuth.core.model.comment_reply import CommentReply
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, STATS, WATCH_NOT_OC, \
     WATCH_DUPLICATE, WATCH_ENABLED, WATCH_NOT_FOUND, WATCH_DISABLED, LINK_ALL, REPOST_NO_RESULT, OC_MESSAGE_TEMPLATE, \
@@ -26,13 +29,15 @@ from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
 class SummonsHandler:
-    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: Reddit, response_builder: ResponseBuilder, event_logger: EventLogging = None, summons_disabled=False):
+    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: RedditManager, response_builder: ResponseBuilder, response_handler: ResponseHandler, event_logger: EventLogging = None, summons_disabled=False):
         self.uowm = uowm
         self.image_service = image_service
         self.reddit = reddit
         self.summons_disabled = summons_disabled
         self.response_builder = response_builder
+        self.response_handler = response_handler
         self.event_logger = event_logger
+
 
     def handle_summons(self):
         """
@@ -62,6 +67,9 @@ class SummonsHandler:
         response = RepostResponseBase(summons_id=summons.id)
 
         if not post:
+            response.message = 'Sorry, an error is preventing me from checking this post.'
+            self._send_response(summons.comment_id, response)
+            return
             log.info('Post ID %s does not exist in database.  Attempting to ingest', summons.post_id)
             post = self.save_unknown_post(summons.post_id)
             if not post.id:
@@ -70,6 +78,7 @@ class SummonsHandler:
                 self._send_response(summons.comment_id, response)
                 return
 
+        # TODO - Send PM instead of comment reply
         if self.summons_disabled:
             log.info('Sending summons disabled message')
             response.message = 'Bot summons is disabled right now.  We\'re working on feedback from the launch. I\'ll be back in 48 hours'
@@ -93,95 +102,13 @@ class SummonsHandler:
             sub_command = sub_command.strip()
 
         # TODO handle case when no command is passed
-        if parsed_command.group('command').lower() == 'watch':
-            self.process_watch_request(summons, sub_command=sub_command)
-        elif parsed_command.group('command').lower() == 'unwatch':
-            self.process_unwatch_request(summons)
-        elif parsed_command.group('command').lower() == 'stats':
-            self.process_stat_request(summons)
-        elif parsed_command.group('command').lower() == 'check':
+        if parsed_command.group('command').lower() == 'check':
             self.process_repost_request(summons, post, sub_command=sub_command)
         else:
             log.error('Unknown command')
             response.message = UNKNOWN_COMMAND
             self._send_response(summons.comment_id, response)
 
-
-    def process_stat_request(self, summons: Summons):
-
-        response = RepostResponseBase(summons_id=summons.id)
-        with self.uowm.start() as uow:
-            video_count = uow.posts.count_by_type('video')
-            video_count += uow.posts.count_by_type('hosted:video')
-            video_count += uow.posts.count_by_type('rich:video')
-            image_count = uow.posts.count_by_type('image')
-            text_count = uow.posts.count_by_type('text')
-            link_count = uow.posts.count_by_type('link')
-            summons_count = uow.summons.get_count()
-            post_count = uow.posts.get_count()
-            oldest_post = uow.posts.get_oldest_post()
-
-        response.message = STATS.format(
-            post_count=post_count,
-            images=image_count,
-            links=link_count,
-            video=video_count,
-            text=text_count,
-            oldest=str(oldest_post.created_at),
-            reposts=0,
-            summoned=summons_count
-        )
-
-        self._send_response(summons.comment_id, response)
-
-    def process_watch_request(self, summons: Summons, sub_command: str = None):
-        # TODO - Add check for existing watch
-        response = RepostResponseBase(summons_id=summons.id)
-        comment = self.reddit.comment(id=summons.comment_id)
-        submission = self.reddit.submission(id=summons.post_id)
-
-        if not verify_oc(submission, self.image_service):
-            response.message = WATCH_NOT_OC
-            self._send_response(comment, response)
-            return
-
-        with self.uowm.start() as uow:
-            post_count = uow.posts.count_by_type('image')
-
-        with self.uowm.start() as uow:
-            watch = uow.repostwatch.find_existing_watch(comment.author.name, summons.post_id)
-            if watch:
-                log.info('Found duplicate watch')
-                response.message = WATCH_DUPLICATE
-                self._send_response(comment, response)
-                return
-
-            watch = RepostWatch(post_id=summons.post_id, user=comment.author.name)
-            watch.response_type = sub_command if sub_command else 'message'
-            log.info('Creating watch request on post %s for user %s', summons.post_id, comment.author.name)
-            response.message = WATCH_ENABLED.format(check_count=post_count, response=watch.response_type)
-
-            uow.repostwatch.add(watch)
-            # TODO - Probably need to catch exception here
-            uow.commit()
-
-        self._send_response(comment, response)
-
-    def process_unwatch_request(self, summons: Summons):
-        response = RepostResponseBase(summons_id=summons.id)
-        comment = self.reddit.comment(id=summons.comment_id)
-        with self.uowm.start() as uow:
-            log.debug('Looking up existing watch for post %s from user %s', summons.post_id, comment.author.name)
-            watch = uow.repostwatch.find_existing_watch(comment.author.name, summons.post_id)
-            if not watch:
-                log.debug('Unable to locate existing repost watch')
-                response.message = WATCH_NOT_FOUND
-                self._send_response(comment, response)
-                return
-            uow.repostwatch.remove(watch)
-            uow.commit()
-            response.message = WATCH_DISABLED
-            self._send_response(comment, response)
 
     def process_repost_request(self, summons: Summons, post: Post, sub_command: str = None):
         if post.post_type == 'image':
@@ -241,7 +168,7 @@ class SummonsHandler:
                 if len(search_results.matches) > 4:
                     log.info('Sending check all results via PM with %s matches', len(search_results.matches))
                     comment = self.reddit.comment(summons.comment_id)
-                    self._send_direct_message(comment, response)
+                    self.response_handler.send_private_message(comment.author, response.message)
                     response.message = f'I found {len(search_results.matches)} matches.  I\'m sending them to you via PM to reduce comment spam'
 
                 response.message = response.message
@@ -252,32 +179,11 @@ class SummonsHandler:
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
-        comment = self.reddit.comment(comment_id)
-        if not comment.author:
-            log.error('Comment has no author')
-            response.message = 'NO AUTHOR ON COMMENT'
-            self._save_response(response, None)
-            return
+        log.debug('Sending response to summons comment %s. MESSAGE: %s', comment_id, response.message)
+        reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons', send_pm_on_fail=True)
+        response.message = reply.body # TODO - I don't like this.  Make save_resposne take a CommentReply
+        self._save_response(response, reply)
 
-        try:
-            log.debug('Sending response to summons comment %s. MESSAGE: %s', comment.id, response.message)
-
-            reply = comment.reply(response.message)
-            if reply.id:
-                log.debug(f'Left response at: https://reddit.com{reply.permalink}')
-                self._save_response(response, reply)
-                return
-            log.error('Did not receive reply ID when replying to comment')
-        except Exception as e:
-            log.exception('Problem replying to comment', exc_info=True)
-
-            if hasattr(e, 'error_type') and e.error_type in ['DELETED_COMMENT']:
-                response.message = 'COMMENT DELETED'
-            else:
-                response.message = FAILED_TO_LEAVE_RESPONSE.format(
-                    sub=comment.subreddit_name_prefixed) + response.message
-                self._send_direct_message(comment, response)
-            self._save_response(response, None)
 
     def _send_direct_message(self, comment: Comment, response: RepostResponseBase):
         log.info('Sending direct message to %s', comment.author.name)
@@ -287,27 +193,15 @@ class SummonsHandler:
         except Exception as e:
             log.error('Failed to send private message to %s', comment.author.name)
 
-
-    def _save_response(self, response: RepostResponseBase, reply: Comment, subreddit: str = None):
+    def _save_response(self, response: RepostResponseBase, reply: CommentReply, subreddit: str = None):
         with self.uowm.start() as uow:
             summons = uow.summons.get_by_id(response.summons_id)
             if summons:
                 summons.comment_reply = response.message
                 summons.summons_replied_at = datetime.utcnow()
-                summons.comment_reply_id = reply.id if reply else None # TODO: Hacky
+                summons.comment_reply_id = reply.comment.id if reply.comment else None # TODO: Hacky
                 uow.commit()
                 log.debug('Committed summons response to database')
-            if reply:
-                bot_comment = BotComment(
-                    post_id=summons.post_id,
-                    comment_body=response.message,
-                    perma_link=reply.permalink,
-                    source='summons',
-                    comment_id=reply.id,
-                    subreddit=reply.subreddit.display_name
-                )
-                uow.bot_comment.add(bot_comment)
-                uow.commit()
 
     def _save_post(self, post: Post):
         with self.uowm.start() as uow:
@@ -321,7 +215,7 @@ class SummonsHandler:
         :return:
         """
         # TODO - Deal with case of not finding post ID.  Should be rare since this is triggered directly via a comment
-        submission = self.reddit.submission(id=post_id)
+        submission = self.reddit.submission(post_id)
         post = pre_process_post(submission_to_post(submission), self.uowm, None)
         with self.uowm.start() as uow:
             try:
