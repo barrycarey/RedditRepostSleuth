@@ -1,5 +1,4 @@
-from redditrepostsleuth.core.config.replytemplates import DEFAULT_REPOST_COMMENT, DEFAULT_REPOST_COMMENT_ONE_MATCH
-from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_COMMENT
+from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_COMMENT, DEFAULT_REPOST_COMMENT_ONE_MATCH
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 
