@@ -117,7 +117,7 @@ class TopPostMonitor:
                 return
             msg = self.response_builder.build_default_oc_comment(msg_values)
 
-        self.response_handler.reply_to_submission(post.post_id, msg)
+        self.response_handler.reply_to_submission(post.post_id, msg, source='toppost')
 
 
         with self.uowm.start() as uow:
