@@ -26,7 +26,7 @@ class DuplicateImageService:
         self.historical_index  = AnnoyIndex(64)
         self.historical_index_built_at = None
         self.historical_index_size = 0
-        self.curent_index = AnnoyIndex(64)
+        self.current_index = AnnoyIndex(64)
         self.current_index_built_at = None
         self.current_index_size = 0
         log.info('Created dup image service')
@@ -36,7 +36,7 @@ class DuplicateImageService:
             self._load_current_index_file()
         except NoIndexException:
             log.error('No current image index found.  Continuing with historical')
-            self.curent_index = None
+            self.current_index = None
 
         self._load_historical_index_file()
 
@@ -71,25 +71,25 @@ class DuplicateImageService:
         if not self.current_index_built_at:
             with redlock.create_lock('index_load', ttl=30000):
                 log.debug('Loading existing index')
-                self.curent_index = AnnoyIndex(64)
-                self.curent_index.load(config.current_image_index)
+                self.current_index = AnnoyIndex(64)
+                self.current_index.load(config.current_image_index)
                 self.current_index_built_at = created_at
-                self.current_index_size = self.curent_index.get_n_items()
-                log.info('Loaded current image index with %s items', self.curent_index.get_n_items())
+                self.current_index_size = self.current_index.get_n_items()
+                log.info('Loaded current image index with %s items', self.current_index.get_n_items())
                 return
 
         if created_at > self.current_index_built_at:
             log.info('Existing current image index is newer than loaded index.  Loading new index')
             with redlock.create_lock('index_load', ttl=30000):
                 log.info('Got index lock')
-                self.curent_index.load(config.current_image_index)
+                self.current_index.load(config.current_image_index)
                 self.current_index_built_at = created_at
-                log.error('New file has %s items', self.curent_index.get_n_items())
-                log.info('New current image index loaded with %s items', self.curent_index.get_n_items())
-                if self.curent_index.get_n_items() < self.current_index_size:
+                log.error('New file has %s items', self.current_index.get_n_items())
+                log.info('New current image index loaded with %s items', self.current_index.get_n_items())
+                if self.current_index.get_n_items() < self.current_index_size:
                     log.critical('New current image index has less items than old. Aborting repost check')
                     raise NoIndexException('New current image index has less items than last index')
-                self.current_index_size = self.curent_index.get_n_items()
+                self.current_index_size = self.current_index.get_n_items()
 
         else:
             log.debug('Loaded index is up to date.  Using with %s items', self.historical_index.get_n_items())
@@ -248,16 +248,18 @@ class DuplicateImageService:
         historical_r = self.historical_index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
         historical_results = list(zip(historical_r[0], historical_r[1]))
         result.matches = [annoy_result_to_image_match(match, post.id) for match in historical_results]
+        result.index_size = self.historical_index.get_n_items()
 
-        if self.curent_index:
-            current_r = self.curent_index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
+        if self.current_index:
+            current_r = self.current_index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
             current_results = list(zip(current_r[0], current_r[1]))
-            result.matches = [result.matches.append(annoy_result_to_image_match(match, post.id)) for match in current_results]
+            result.matches = self._merge_search_results(result.matches, [annoy_result_to_image_match(match, post.id) for match in current_results])
+            result.index_size = result.index_size + self.current_index.get_n_items()
         else:
             log.error('No current image index loaded.  Only using historical results')
 
         result.search_time = round(perf_counter() - start, 5)
-        result.index_size = self.historical_index.get_n_items()
+
         if filter:
             meme_template = None
             # TODO - Possibly make this optional instead of running on each check
@@ -282,6 +284,17 @@ class DuplicateImageService:
             self._set_match_hamming(post, result.matches)
         result.checked_post = post
         return result
+
+    def _merge_search_results(self, first: List[ImageMatch], second: List[ImageMatch]) -> List[ImageMatch]:
+        results = first.copy()
+        for a in second:
+            match = next((x for x in results if x.match_id == a.match_id), None)
+            if match:
+                continue
+            results.append(a)
+
+        return results
+
 
     def _set_match_posts(self, matches: List[ImageMatch]) -> List[ImageMatch]:
         """
