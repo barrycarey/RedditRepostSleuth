@@ -32,6 +32,7 @@ def save_new_post(self, post):
 
         try:
             uow.posts.add(post)
+            # TODO - Cleanly deal with this.  This is hacked in for now
             if post.post_type == 'image':
                 image_current = RedditImagePostCurrent(post_id=post.post_id, created_at=post.created_at, dhash_v=post.dhash_v, dhash_h=post.dhash_h)
                 uow.image_post_current.add(image_current)
