@@ -21,7 +21,13 @@ class ImagePostRepository:
     def get_by_post_id(self, id: str) -> RedditImagePost:
         return self.db_session.query(RedditImagePost).filter(RedditImagePost.post_id == id).first()
 
-    def page_by_id(self, id: int, limit: int = None):
+    def get_after_date(self, date: datetime) -> List[RedditImagePost]:
+        return self.db_session.query(RedditImagePost).filter(RedditImagePost.created_at > date).all()
+
+    def get_before_date(self, date: datetime) -> List[RedditImagePost]:
+        return self.db_session.query(RedditImagePost).filter(RedditImagePost.created_at < date).all()
+
+    def page_by_id(self, id: int, limit: int = None) -> List[RedditImagePost]:
         return self.db_session.query(RedditImagePost).filter(RedditImagePost.id > id).order_by(RedditImagePost.id).limit(limit).all()
 
     def bulk_save(self, items: List[RedditImagePost]):

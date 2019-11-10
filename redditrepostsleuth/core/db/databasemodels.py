@@ -3,6 +3,14 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
+
+
+#op.create_index('ingest_source', 'reddit_post', ['created_at', 'ingested_from'], unique=False)
+#op.create_index('ingest_graph', 'reddit_post', ['ingested_at', 'post_type'], unique=False)
+#op.create_index('image_repost_check', 'reddit_post', ['post_type', 'checked_repost', 'crosspost_parent', 'dhash_h'], unique=False)
+#op.create_index('image_hash', 'reddit_post', ['post_type', 'dhash_h'], unique=False)
+#op.create_index('create_at_index', 'reddit_image_post', ['created_at'], unique=False)
+
 class Post(Base):
 
     def __lt__(self, other):

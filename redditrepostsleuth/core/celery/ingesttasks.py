@@ -1,6 +1,7 @@
 from time import perf_counter
 
 from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
@@ -31,6 +32,9 @@ def save_new_post(self, post):
 
         try:
             uow.posts.add(post)
+            if post.post_type == 'image':
+                image_current = RedditImagePostCurrent(post_id=post.post_id, created_at=post.created_at, dhash_v=post.dhash_v, dhash_h=post.dhash_h)
+                uow.image_post_current.add(image_current)
             uow.commit()
             log.debug('Commited Post: %s', post)
             ingest_repost_check.apply_async((post,), queue='repost')
@@ -91,19 +95,21 @@ def set_image_post_created_at(self, data):
     #print('Finished Batch')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def set_image_post_created_at2(self, data):
-    image_posts = []
+def populate_image_post_current(self, data):
+    batch = []
     with self.uowm.start() as uow:
-        for rawipost in data:
-            image_post = uow.image_post.get_by_id(rawipost['id'])
-            post = uow.posts.get_by_post_id(image_post.post_id)
-            if not post:
-                print(f'Post {image_post.post_id} Missing from posts')
+        for post in data:
+            existing = uow.image_post_current.get_by_post_id(post.post_id)
+            if existing:
                 continue
-            image_post.created_at = post.created_at
-            image_posts.append(image_post)
-        print(image_posts[-1].id)
-        uow.image_post.bulk_save(image_posts)
+            new = RedditImagePostCurrent(
+                post_id=post.post_id,
+                created_at=post.created_at,
+                dhash_h=post.dhash_h,
+                dhash_v=post.dhash_v
+            )
+            batch.append(new)
 
+        uow.image_post_current.bulk_save(batch)
         uow.commit()
-    print('Finished Batch')
+        print('Saved batch')
