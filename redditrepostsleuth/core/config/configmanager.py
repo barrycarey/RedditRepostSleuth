@@ -51,7 +51,9 @@ class ConfigManager:
         self.machine_id = self.config['IMAGES'].get('machine_id', fallback='1')
         self.index_tree_count = self.config['IMAGES'].getint('index_tree_count', fallback=20)
         self.index_keep_alive = self.config['IMAGES'].getint('index_keep_alive', fallback=20)
-        self.index_file_name = self.config['IMAGES'].get('index_file_name', fallback='images.ann')
+        self.historical_image_index = self.config['IMAGES'].get('historical_image_index', fallback='images_historical.ann')
+        self.current_image_index = self.config['IMAGES'].get('current_image_index',
+                                                                fallback='images.ann')
         self.annoy_match_cutoff = self.config['IMAGES'].getfloat('annoy_match_cutoff', fallback=0.25)
         self.hamming_cutoff = self.config['IMAGES'].getint('hamming_cutoff', fallback=8)
         self.annoy_total_neighbors = self.config['IMAGES'].getint('annoy_total_neighbors', fallback=50)

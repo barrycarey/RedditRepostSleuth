@@ -23,70 +23,130 @@ from redditrepostsleuth.core.util.reposthelpers import sort_reposts
 class DuplicateImageService:
     def __init__(self, uowm: UnitOfWorkManager):
         self.uowm = uowm
-        self.index  = AnnoyIndex(64)
-        self.index_built_at = None
-        self.index_size = 0
-        #self._load_index_file()
+        self.historical_index  = AnnoyIndex(64)
+        self.historical_index_built_at = None
+        self.historical_index_size = 0
+        self.curent_index = AnnoyIndex(64)
+        self.current_index_built_at = None
+        self.current_index_size = 0
         log.info('Created dup image service')
 
+    def _load_index_files(self) -> None:
+        try:
+            self._load_current_index_file()
+        except NoIndexException:
+            log.error('No current image index found.  Continuing with historical')
+            self.curent_index = None
 
-    def _load_index_file(self) -> None:
+        self._load_historical_index_file()
+
+    def _load_current_index_file(self) -> None:
         """
-        Check if index file exists.  If it does, check it's age.  If it's fresh enough use it, if not build one
+        Loads the current month index
         :return:
         """
-
-        if self.index_built_at and (datetime.now() - self.index_built_at).seconds < 1200:
+        if self.current_index_built_at and (datetime.now() - self.current_index_built_at).seconds < 1200:
             log.debug('Loaded index is less than 20 minutes old.  Skipping load')
             return
 
-        index_file = os.path.join('/opt/imageindex', config.index_file_name)
-        log.debug('Index file is %s', index_file)
-        if not os.path.isfile(index_file):
-            if not self.index_built_at:
+        log.debug('Index file is %s', config.current_image_index)
+        if not os.path.isfile(config.current_image_index):
+            if not self.current_index_built_at:
                 log.error('No existing index found and no index loaded in memory')
                 raise NoIndexException('No existing index found')
-            elif self.index_built_at and (datetime.now() - self.index_built_at).seconds > 21600:
+            elif self.current_index_built_at and (datetime.now() - self.current_index_built_at).seconds > 7200:
                 log.error('No existing index found and loaded index is too old')
                 raise NoIndexException('No existing index found')
             else:
                 log.info('No existing index found, using in memory index')
                 return
 
-
-        created_at = datetime.fromtimestamp(os.stat(index_file).st_ctime)
+        created_at = datetime.fromtimestamp(os.stat(config.current_image_index).st_ctime)
         delta = datetime.now() - created_at
 
-        if delta.seconds > 86400:
-            log.info('Existing index is too old.  Skipping repost check')
-            raise NoIndexException('Existing index is too old')
+        if delta.seconds > 7200:
+            log.info('Existing current index is too old.  Skipping repost check')
+            raise NoIndexException('Existing current index is too old')
 
-        if not self.index_built_at:
+        if not self.current_index_built_at:
             with redlock.create_lock('index_load', ttl=30000):
                 log.debug('Loading existing index')
-                self.index = AnnoyIndex(64)
-                self.index.load(index_file)
-                self.index_built_at = created_at
-                self.index_size = self.index.get_n_items()
-                log.info('Loaded existing index with %s items', self.index.get_n_items())
+                self.curent_index = AnnoyIndex(64)
+                self.curent_index.load(config.current_image_index)
+                self.current_index_built_at = created_at
+                self.current_index_size = self.curent_index.get_n_items()
+                log.info('Loaded current image index with %s items', self.curent_index.get_n_items())
                 return
 
-        if created_at > self.index_built_at:
-            log.info('Existing index is newer than loaded index.  Loading new index')
-            log.error('Loading newer index file.  Old file had %s items,', self.index.get_n_items())
+        if created_at > self.current_index_built_at:
+            log.info('Existing current image index is newer than loaded index.  Loading new index')
             with redlock.create_lock('index_load', ttl=30000):
                 log.info('Got index lock')
-                self.index.load(index_file)
-                self.index_built_at = created_at
-                log.error('New file has %s items', self.index.get_n_items())
-                log.info('New index loaded with %s items', self.index.get_n_items())
-                if self.index.get_n_items() < self.index_size:
-                    log.critical('New index has less items than old. Aborting repost check')
-                    raise NoIndexException('New index has less items than last index')
-                self.index_size = self.index.get_n_items()
+                self.curent_index.load(config.current_image_index)
+                self.current_index_built_at = created_at
+                log.error('New file has %s items', self.curent_index.get_n_items())
+                log.info('New current image index loaded with %s items', self.curent_index.get_n_items())
+                if self.curent_index.get_n_items() < self.current_index_size:
+                    log.critical('New current image index has less items than old. Aborting repost check')
+                    raise NoIndexException('New current image index has less items than last index')
+                self.current_index_size = self.curent_index.get_n_items()
 
         else:
-            log.debug('Loaded index is up to date.  Using with %s items', self.index.get_n_items())
+            log.debug('Loaded index is up to date.  Using with %s items', self.historical_index.get_n_items())
+
+    def _load_historical_index_file(self) -> None:
+        """
+        Check if index file exists.  If it does, check it's age.  If it's fresh enough use it, if not build one
+        :return:
+        """
+
+        if self.historical_index_built_at and (datetime.now() - self.historical_index_built_at).seconds < 259200:
+            log.debug('Loaded index is less than 72 hours old.  Skipping load')
+            return
+
+        log.debug('Historical image index file is %s', config.historical_image_index)
+        if not os.path.isfile(config.historical_image_index):
+            if not self.historical_index_built_at:
+                log.error('No existing historical image index found and no index loaded in memory')
+                raise NoIndexException('No existing index found')
+            else:
+                # Hits this if no index file but one already loaded in memeory
+                log.info('No existing index found, using in memory index')
+                return
+
+        created_at = datetime.fromtimestamp(os.stat(config.historical_image_index).st_ctime)
+        delta = datetime.now() - created_at
+
+        if created_at.month < datetime.now().month:
+            log.info('Existing historical image index is too old. Index month: %s, current month %s Skipping repost check', created_at.month, datetime.now().month)
+            raise NoIndexException('Existing historical image index is too old')
+
+        if not self.historical_index_built_at:
+            with redlock.create_lock('index_load', ttl=30000):
+                log.debug('Loading existing historical image index')
+                self.historical_index = AnnoyIndex(64)
+                self.historical_index.load(config.historical_image_index)
+                self.historical_index_built_at = created_at
+                self.historical_index_size = self.historical_index.get_n_items()
+                log.info('Loaded existing historical image index with %s items', self.historical_index.get_n_items())
+                return
+
+        if created_at > self.historical_index_built_at:
+            log.info('Existing historical image index is newer than loaded index.  Loading new index')
+            log.error('Loading newer historical image index file.  Old file had %s items,', self.historical_index.get_n_items())
+            with redlock.create_lock('index_load', ttl=30000):
+                log.info('Got index lock')
+                self.historical_index.load(config.historical_image_index)
+                self.historical_index_built_at = created_at
+                log.error('New file has %s items', self.historical_index.get_n_items())
+                log.info('New historical image index loaded with %s items', self.historical_index.get_n_items())
+                if self.historical_index.get_n_items() < self.historical_index_size:
+                    log.critical('New historical image index has less items than old. Aborting repost check')
+                    raise NoIndexException('New historical image index has less items than last index')
+                self.historical_index_size = self.historical_index.get_n_items()
+
+        else:
+            log.debug('Loaded index is up to date.  Using with %s items', self.historical_index.get_n_items())
 
 
     def _filter_results_for_reposts(self, matches: List[ImageMatch],
@@ -180,15 +240,24 @@ class DuplicateImageService:
         :param target_annoy_distance: Only return matches below this value.  This is checked first
         :return: List of matching images
         """
-        self._load_index_file()
+        self._load_index_files()
         result = ImageRepostWrapper()
         start = perf_counter()
         search_array = bytearray(post.dhash_h, encoding='utf-8')
-        r = self.index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
-        search_results = list(zip(r[0], r[1]))
-        result.matches = [annoy_result_to_image_match(match, post.id) for match in search_results]
+
+        historical_r = self.historical_index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
+        historical_results = list(zip(historical_r[0], historical_r[1]))
+        result.matches = [annoy_result_to_image_match(match, post.id) for match in historical_results]
+
+        if self.curent_index:
+            current_r = self.curent_index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
+            current_results = list(zip(current_r[0], current_r[1]))
+            result.matches = [result.matches.append(annoy_result_to_image_match(match, post.id)) for match in current_results]
+        else:
+            log.error('No current image index loaded.  Only using historical results')
+
         result.search_time = round(perf_counter() - start, 5)
-        result.index_size = self.index.get_n_items()
+        result.index_size = self.historical_index.get_n_items()
         if filter:
             meme_template = None
             # TODO - Possibly make this optional instead of running on each check
