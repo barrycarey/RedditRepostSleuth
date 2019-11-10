@@ -4,6 +4,7 @@ from redditrepostsleuth.core.db.databasemodels import InvestigatePost
 from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
+from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
@@ -74,6 +75,10 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def image_post(self) -> ImagePostRepository:
         return ImagePostRepository(self.session)
+
+    @property
+    def image_post_current(self) -> ImagePostCurrentRepository:
+        return ImagePostCurrentRepository(self.session)
 
     @property
     def index_build_time(self) -> IndexBuildTimesRepository:

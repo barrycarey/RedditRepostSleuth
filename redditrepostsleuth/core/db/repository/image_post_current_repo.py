@@ -5,7 +5,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import RedditImagePost
 
 
-class ImagePostRepository:
+class ImagePostCurrentRepository:
     def __init__(self, db_session):
         self.db_session = db_session
 
@@ -33,6 +33,3 @@ class ImagePostRepository:
     def remove(self, item: RedditImagePost):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
-
-    def find_all_images_with_hash_return_id_hash(self, limit: int = None, id: int = 0):
-        return self.db_session.query(RedditImagePost).filter(RedditImagePost.id > id).with_entities(RedditImagePost.id, RedditImagePost.dhash_h).limit(limit).all()

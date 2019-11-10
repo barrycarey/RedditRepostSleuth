@@ -4,6 +4,7 @@ from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.comment_reply import CommentReply
+from redditrepostsleuth.core.model.events.response_event import ResponseEvent
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 
@@ -14,6 +15,7 @@ class ResponseHandler:
         self.uowm = uowm
         self.reddit = reddit
         self.log_response = log_response
+        self.event_logger = event_logger
 
     def reply_to_submission(self, submission_id: str, comment_body) -> Comment:
         submission = self.reddit.submission(submission_id)
@@ -70,14 +72,16 @@ class ResponseHandler:
 
     def _log_response(self, comment: Comment, comment_body: str, source: str = None):
         self._log_response_to_db(comment, comment_body, source=source)
-        self._log_response_to_influxdb(comment)
+        self._log_response_to_influxdb(comment, source)
 
-    def _log_response_to_influxdb(self, response):
+    def _log_response_to_influxdb(self, comment: Comment, source: str = None):
         """
         Take a given response and log it to InfluxDB
         :param response:
         """
-        pass
+        self.event_logger.save_event(
+            ResponseEvent(comment.subreddit.display_name, source, event_type='response')
+        )
 
     def _log_response_to_db(self, comment: Comment, comment_body: str, source: str = None):
         """

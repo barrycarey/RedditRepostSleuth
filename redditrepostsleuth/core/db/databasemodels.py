@@ -63,6 +63,15 @@ class RedditImagePost(Base):
     dhash_v = Column(String(64))
     dhash_h = Column(String(64))
 
+class RedditImagePostCurrent(Base):
+    __tablename__ = 'reddit_image_post_current'
+    # Dirty but we need to maintain a seperate table to build indexes from
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime)
+    post_id = Column(String(100), nullable=False, unique=True)
+    dhash_v = Column(String(64))
+    dhash_h = Column(String(64))
+
 
 class Summons(Base):
     __tablename__ = 'reddit_bot_summons'

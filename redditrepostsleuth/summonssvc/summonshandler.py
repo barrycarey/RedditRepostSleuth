@@ -78,7 +78,7 @@ class SummonsHandler:
         # TODO - Send PM instead of comment reply
         if self.summons_disabled:
             log.info('Sending summons disabled message')
-            response.message = 'Bot summons is disabled right now.  We\'re working on feedback from the launch. I\'ll be back in 48 hours'
+            response.message = 'I\m currently down for maintenance, check back in an hour'
             self._send_response(summons.comment_id, response)
             return
 
@@ -138,20 +138,11 @@ class SummonsHandler:
             log.error('No available index for image repost check.  Trying again later')
             return
 
-        with self.uowm.start() as uow:
-            newest_post = uow.posts.get_newest_post()
-
-
+        msg_values = msg_values = build_msg_values_from_search(search_results, self.uowm)
 
         if not search_results.matches:
-            response.message = DEFAULT_COMMENT_OC.format(count=f'{search_results.index_size:,}',
-                                                         time=search_results.search_time,
-                                                         post_type=post.post_type,
-                                                         promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
-                                                         )
+            response.message = self.response_builder.build_default_oc_comment(msg_values)
         else:
-
-            msg_values = msg_values = build_msg_values_from_search(search_results, self.uowm)
 
             if sub_command == 'all':
                 response.message = IMAGE_REPOST_ALL.format(
