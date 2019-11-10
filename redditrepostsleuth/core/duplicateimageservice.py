@@ -160,7 +160,7 @@ class DuplicateImageService:
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
         if is_meme:
-            results = self._final_meme_filter(set_image_hashes(checked_post, hash_size=32), results)
+            results = self._final_meme_filter(checked_post, results)
 
         return sort_reposts(results)
 

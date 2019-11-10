@@ -19,7 +19,7 @@ def find_matching_images(post: Post, dup_service: DuplicateImageService) -> Repo
     :param dup_service: Dup Image Service
     :return: RepostWrapper
     """
-    result = dup_service.check_duplicates_wrapped(post, filter_dead_matches=False)
+    result = dup_service.check_duplicates_wrapped(post, filter_dead_matches=False, meme_filter=True)
     log.debug('Found %s matching images', len(result.matches))
     return result
 
