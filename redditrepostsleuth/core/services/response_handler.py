@@ -24,7 +24,7 @@ class ResponseHandler:
         try:
             comment = submission.reply(comment_body)
             log.info('Left comment at: https://reddit.com%s', comment.permalink)
-            log.debug(comment_bod)
+            log.debug(comment_body)
             self._log_response(comment, comment_body, source='submonitor')
             return comment
         except Exception as e:
