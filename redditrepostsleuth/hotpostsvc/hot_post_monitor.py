@@ -6,6 +6,8 @@ from praw.models import Comment
 from redlock import RedLockError
 
 from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
     NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC
@@ -22,11 +24,12 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
 class TopPostMonitor:
 
-    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager, image_service: DuplicateImageService, response_builder: ResponseBuilder):
+    def __init__(self, reddit: RedditManager, uowm: UnitOfWorkManager, image_service: DuplicateImageService, response_builder: ResponseBuilder, response_handler: ResponseHandler):
         self.reddit = reddit
         self.uowm = uowm
         self.image_service = image_service
         self.response_builder = response_builder
+        self.response_handler = response_handler
 
 
     def monitor(self):
@@ -50,6 +53,11 @@ class TopPostMonitor:
 
                     if post.crosspost_parent:
                         log.info('Skipping cross post')
+                        continue
+
+                    monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
+                    if monitored_sub:
+                        log.info('Skipping monitored sub %s', post.subreddit)
                         continue
 
                     self.check_for_repost(post)
@@ -100,36 +108,23 @@ class TopPostMonitor:
             return
 
     def add_comment(self, post: Post, search_results):
-        # TODO - Use new wrapper dup search method
-        submission = self.reddit.submission(post.post_id)
+        msg_values = build_msg_values_from_search(search_results, self.uowm)
+        if search_results.matches:
+            msg = self.response_builder.build_default_repost_comment(msg_values)
+        else:
+            if not config.comment_on_oc:
+                log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
+                return
+            msg = self.response_builder.build_default_oc_comment(msg_values)
+
+        log.info('Leaving comment on post %s. %s.  In sub %s', post.post_id, post.shortlink, submission.subreddit)
+        log.debug('Leaving message %s', msg)
+
+        self.response_handler.reply_to_submission(post.post_id, msg)
+
 
         with self.uowm.start() as uow:
-            if search_results.matches:
-                msg_values = build_msg_values_from_search(search_results, self.uowm)
-                msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values)
-            else:
-                if post.subreddit in ONLY_COMMENT_REPOST_SUBS or not config.comment_on_oc:
-                    log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
-                    return
-
-                msg = DEFAULT_COMMENT_OC.format(count=f'{search_results.index_size:,}',
-                                                time=search_results.search_time,
-                                                post_type=post.post_type,
-                                                promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
-                                                )
-            log.info('Leaving comment on post %s. %s.  In sub %s', post.post_id, post.shortlink, submission.subreddit)
-            log.debug('Leaving message %s', msg)
-            try:
-                comment = submission.reply(msg)
-                if comment:
-                    self._log_comment(comment, post)
-                    log.info(f'https://reddit.com{comment.permalink}')
-            except Exception as e:
-                log.exception('Failed to leave comment on post %s', post.post_id)
-                return
-
             post.left_comment = True
-
             uow.posts.update(post)
             uow.commit()
 
