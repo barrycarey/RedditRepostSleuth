@@ -46,7 +46,7 @@ class SummonsHandler:
                     summons = uow.summons.get_unreplied()
                     for s in summons:
                         self.handle_repost_request(s)
-                        summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds, s.summons_received_at, event_type='summons')
+                        summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds, s.summons_received_at, s.requestor, event_type='summons')
                         self._send_event(summons_event)
                 time.sleep(2)
             except Exception as e:
