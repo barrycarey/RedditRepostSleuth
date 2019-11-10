@@ -177,7 +177,6 @@ class DuplicateImageService:
         self._set_match_posts(matches)
         self._set_match_hamming(checked_post, matches)
         results = []
-        log.info('Checking %s %s for duplicates', checked_post.post_id, f'https://redd.it/{checked_post.post_id}')
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.debug('Matches pre-filter: %s', len(matches))
         for match in matches:
@@ -240,6 +239,7 @@ class DuplicateImageService:
         :param target_annoy_distance: Only return matches below this value.  This is checked first
         :return: List of matching images
         """
+        log.info('Checking %s for duplicates - https://redd.it/%s', post.post_id, post.post_id)
         self._load_index_files()
         result = ImageRepostWrapper()
         start = perf_counter()

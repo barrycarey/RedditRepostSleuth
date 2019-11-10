@@ -150,7 +150,7 @@ class SubMonitor:
 
         try:
             start = time.perf_counter()
-            comment = self.resposne_handler.reply_to_submission(submission.id, msg)
+            comment = self.resposne_handler.reply_to_submission(submission.id, msg, source='submonitor')
             log.info('PRAW Comment Time %s', round(time.perf_counter() - start, 4))
             if comment:
                 if monitored_sub.sticky_comment:

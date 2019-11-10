@@ -17,7 +17,7 @@ class ResponseHandler:
         self.log_response = log_response
         self.event_logger = event_logger
 
-    def reply_to_submission(self, submission_id: str, comment_body) -> Comment:
+    def reply_to_submission(self, submission_id: str, comment_body, source: str = None) -> Comment:
         submission = self.reddit.submission(submission_id)
         if not submission:
             log.error('Failed to get submission %s', submission_id)
@@ -27,7 +27,7 @@ class ResponseHandler:
             comment = submission.reply(comment_body)
             log.info('Left comment at: https://reddit.com%s', comment.permalink)
             log.debug(comment_body)
-            self._log_response(comment, comment_body, source='submonitor')
+            self._log_response(comment, comment_body, source=source)
             return comment
         except Exception as e:
             log.exception('Failed to leave comment on post https://redd.it/%s', submission_id, exc_info=True)
