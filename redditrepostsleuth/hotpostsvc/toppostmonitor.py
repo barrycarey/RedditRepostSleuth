@@ -8,7 +8,7 @@ from redlock import RedLockError
 from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.util.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
     NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.util.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
@@ -17,7 +17,7 @@ from redditrepostsleuth.core.db.databasemodels import Post, BotComment
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
 
 class TopPostMonitor:
@@ -112,11 +112,11 @@ class TopPostMonitor:
                     log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
                     return
 
-                msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
-                                                 time=search_results.search_time,
-                                                 post_type=post.post_type,
-                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
-                                                 )
+                msg = DEFAULT_COMMENT_OC.format(count=f'{search_results.index_size:,}',
+                                                time=search_results.search_time,
+                                                post_type=post.post_type,
+                                                promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
+                                                )
             log.info('Leaving comment on post %s. %s.  In sub %s', post.post_id, post.shortlink, submission.subreddit)
             log.debug('Leaving message %s', msg)
             try:

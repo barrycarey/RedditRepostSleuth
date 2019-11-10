@@ -86,9 +86,10 @@ class TestHelpers(TestCase):
         match = ImageMatch()
         match.post = Post(created_at=datetime.fromtimestamp(1572799193),
                                 shortlink='http://redd.it',
-                                subreddit='somesub')
+                                subreddit='somesub',
+                                post_id='1234')
         match.hamming_distance = 5
-        expected = f'* {match.post.created_at.strftime("%d-%m-%Y")} - [{match.post.shortlink}]({match.post.shortlink}) [{match.post.subreddit}] [95.00% match]\n'
+        expected = f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/1234](https://redd.it/1234) [{match.post.subreddit}] [95.00% match]\n'
         self.assertEqual(expected, build_markdown_list([match]))
 
     def test_build_msg_values_from_search_key_total(self):
@@ -110,3 +111,41 @@ class TestHelpers(TestCase):
         self.assertEqual(21, len(result.keys()))
         # TODO - Maybe test return values.  Probably not needed
 
+    def test_build_msg_values_from_search_no_match_key_total(self):
+        wrapper = ImageRepostWrapper()
+        wrapper.checked_post = Post(subreddit='sub2')
+        wrapper.index_size = 100
+        wrapper.search_time = 0.111
+        result = build_msg_values_from_search(wrapper)
+
+        self.assertEqual(8, len(result.keys()))
+
+    def test_build_msg_values_from_search_no_match_custom_key_total(self):
+        wrapper = ImageRepostWrapper()
+        wrapper.checked_post = Post(subreddit='sub2')
+        wrapper.index_size = 100
+        wrapper.search_time = 0.111
+        result = build_msg_values_from_search(wrapper, test1='test')
+
+        self.assertEqual(9, len(result.keys()))
+
+    def test_build_msg_values_from_search_extra_values(self):
+        match1 = ImageMatch()
+        match1.hamming_distance = 5
+        match1.post = Post(url='www.example.com',
+                           created_at=datetime.fromtimestamp(1572799193),
+                           post_id='1234',
+                           subreddit='somesub')
+        wrapper = ImageRepostWrapper()
+        wrapper.matches.append(match1)
+        wrapper.matches.append(match1)
+        wrapper.checked_post = Post(subreddit='sub2')
+        wrapper.index_size = 100
+        wrapper.search_time = 0.111
+
+        result = build_msg_values_from_search(wrapper, item1='value1', item2='value2')
+
+        self.assertTrue('item1' in result)
+        self.assertTrue('item2' in result)
+        self.assertEqual(result['item1'], 'value1')
+        self.assertEqual(result['item2'], 'value2')

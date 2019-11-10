@@ -12,7 +12,7 @@ class ImagePostRepository:
         self.db_session.add(item)
 
     def get_all_without_created_at(self, limit: int = None):
-        return self.db_session.query(RedditImagePost).filter(RedditImagePost.created_at == None, RedditImagePost.id > 61565925).limit(limit).all()
+        return self.db_session.query(RedditImagePost).filter(RedditImagePost.created_at == None).limit(limit).all()
 
     def get_by_id(self, id: int) -> RedditImagePost:
         return self.db_session.query(RedditImagePost).filter(RedditImagePost.id == id).first()

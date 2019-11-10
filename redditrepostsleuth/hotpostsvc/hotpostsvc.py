@@ -6,7 +6,7 @@ import sys
 sys.path.append('./')
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService

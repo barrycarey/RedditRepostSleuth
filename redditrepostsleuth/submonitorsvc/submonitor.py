@@ -1,12 +1,13 @@
 import time
 
-from praw import Reddit
 from praw.models import Submission, Comment
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.util.replytemplates import OC_MESSAGE_TEMPLATE
+from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, BotComment
@@ -16,17 +17,18 @@ from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
 class SubMonitor:
 
-    def __init__(self, image_service: DuplicateImageService, uowm: SqlAlchemyUnitOfWorkManager, reddit: Reddit, response_builder: ResponseBuilder):
+    def __init__(self, image_service: DuplicateImageService, uowm: SqlAlchemyUnitOfWorkManager, reddit: RedditManager, response_builder: ResponseBuilder, response_handler: ResponseHandler):
         self.image_service = image_service
         self.uowm = uowm
         self.reddit = reddit
         self.response_builder = response_builder
+        self.resposne_handler = response_handler
         self.checked_posts = []
 
     def run(self):
@@ -126,39 +128,31 @@ class SubMonitor:
                 log.exception('Failed to report submissioni', exc_info=True)
 
 
+    def _mod_actions(self, monitored_sub: MonitoredSub, **kwargs):
+        pass
+
+    def _sticky_reply(self, monitored_sub: MonitoredSub, comment_id: str):
+        pass
+
+    def _report_submission(self, monitored_sub: MonitoredSub, submission_id: str):
+        pass
 
     def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> None:
 
-
+        msg_values = build_msg_values_from_search(search_results, self.uowm, target_days=monitored_sub.target_days_old)
         if search_results.matches:
-            msg_values = build_msg_values_from_search(search_results, self.uowm)
-            msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values)
+            msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values,)
         else:
-            if search_results.checked_post.subreddit.lower() == 'the_dedede':
-                msg = 'This post is unique over the last {days} days! I checked {count} {post_type} posts in {time} seconds and didn\'t find a match\n\n' \
-                      '*Feedback? Hate? Send me a PM{promo}'.format(count=f'{search_results.index_size:,}',
-                                                             time=search_results.search_time,
-                                                             post_type=search_results.checked_post.post_type,
-                                                             promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*',
-                                                             days=monitored_sub.target_days_old
-                                                             )
-            else:
+            msg = self.response_builder.build_sub_oc_comment(search_results.checked_post.subreddit, msg_values)
 
-                msg = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
-                                                 time=search_results.search_time,
-                                                 post_type=search_results.checked_post.post_type,
-                                                 promo='*' if search_results.checked_post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
-                                                 )
-
-        log.info('Leaving comment on post %s', f'https://redd.it/{search_results.checked_post.post_id}')
+        log.info('Leaving comment in %s on post %s', search_results.checked_post.subreddit, f'https://redd.it/{search_results.checked_post.post_id}')
         log.debug('Leaving message %s', msg)
+
         try:
             start = time.perf_counter()
-            comment = submission.reply(msg)
+            comment = self.resposne_handler.reply_to_submission(submission.id, msg)
             log.info('PRAW Comment Time %s', round(time.perf_counter() - start, 4))
             if comment:
-                self._log_comment(comment, search_results.checked_post)
-                log.info(f'https://reddit.com{comment.permalink}')
                 if monitored_sub.sticky_comment:
                     comment.mod.distinguish(sticky=True)
                     log.debug('Made comment sticky')
@@ -195,22 +189,3 @@ class SubMonitor:
 
         return post
 
-    def _log_comment(self, comment: Comment, post: Post):
-        """
-        Log reply comment to database
-        :param comment:
-        """
-        bot_comment = BotComment(
-            post_id=post.post_id,
-            comment_body=comment.body,
-            perma_link=comment.permalink,
-            source='submonitor',
-            comment_id=comment.id,
-            subreddit=post.subreddit
-        )
-        with self.uowm.start() as uow:
-            uow.bot_comment.add(bot_comment)
-            try:
-                uow.commit()
-            except Exception as e:
-                log.exception('Failed to save bot comment', exc_info=True)

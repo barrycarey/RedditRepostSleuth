@@ -11,7 +11,7 @@ from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.core.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -19,7 +19,7 @@ from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, LINK_ALL, \
-    REPOST_NO_RESULT, OC_MESSAGE_TEMPLATE, \
+    REPOST_NO_RESULT, DEFAULT_COMMENT_OC, \
     IMAGE_REPOST_ALL
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
@@ -144,11 +144,11 @@ class SummonsHandler:
 
 
         if not search_results.matches:
-            response.message = OC_MESSAGE_TEMPLATE.format(count=f'{search_results.index_size:,}',
-                                                 time=search_results.search_time,
-                                                 post_type=post.post_type,
-                                                 promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
-                                                 )
+            response.message = DEFAULT_COMMENT_OC.format(count=f'{search_results.index_size:,}',
+                                                         time=search_results.search_time,
+                                                         post_type=post.post_type,
+                                                         promo='*' if post.subreddit in NO_LINK_SUBREDDITS else ' or visit r/RepostSleuthBot*'
+                                                         )
         else:
 
             msg_values = msg_values = build_msg_values_from_search(search_results, self.uowm)

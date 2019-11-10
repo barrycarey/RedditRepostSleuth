@@ -131,38 +131,45 @@ def build_markdown_list(matches: List[ImageMatch]) -> str:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
     return result
 
-def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None) -> dict:
+def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
     :param uowm: UnitOfWorkManager
     """
-    msg_values = {
+    base_values = {
         'total_searched': f'{search_results.index_size:,}',
         'search_time': search_results.search_time,
         'total_posts': 0,
         'match_count': len(search_results.matches),
-        'oldest_created_at': search_results.matches[0].post.created_at,
-        'oldest_url': search_results.matches[0].post.url,
-        'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
-        'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
-        'oldest_sub': search_results.matches[0].post.subreddit,
-        'newest_created_at': search_results.matches[-1].post.created_at,
-        'newest_url': search_results.matches[-1].post.url,
-        'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
-        'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
-        'newest_sub': search_results.matches[-1].post.subreddit,
-        'match_list': build_markdown_list(search_results.matches),
-        'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
-        'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
         'post_type': search_results.checked_post.post_type,
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.index_size),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}'
     }
 
+
+    results_values = {}
+
+    if search_results.matches:
+        results_values = {
+            'oldest_created_at': search_results.matches[0].post.created_at,
+            'oldest_url': search_results.matches[0].post.url,
+            'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
+            'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+            'oldest_sub': search_results.matches[0].post.subreddit,
+            'newest_created_at': search_results.matches[-1].post.created_at,
+            'newest_url': search_results.matches[-1].post.url,
+            'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
+            'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
+            'newest_sub': search_results.matches[-1].post.subreddit,
+            'match_list': build_markdown_list(search_results.matches),
+            'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
+            'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
+        }
+
     if uowm:
         with uowm.start() as uow:
-            msg_values['total_posts'] = f'{uow.posts.get_newest_post().id:,}'
+            base_values['total_posts'] = f'{uow.posts.get_newest_post().id:,}'
 
-    return msg_values
+    return {**base_values, **results_values, **kwargs}
