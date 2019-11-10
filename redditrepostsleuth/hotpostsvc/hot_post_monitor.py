@@ -117,9 +117,6 @@ class TopPostMonitor:
                 return
             msg = self.response_builder.build_default_oc_comment(msg_values)
 
-        log.info('Leaving comment on post %s. %s.  In sub %s', post.post_id, post.shortlink, submission.subreddit)
-        log.debug('Leaving message %s', msg)
-
         self.response_handler.reply_to_submission(post.post_id, msg)
 
 

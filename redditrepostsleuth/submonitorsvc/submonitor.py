@@ -105,7 +105,7 @@ class SubMonitor:
                                                                          target_hamming_distance=monitored_sub.target_hamming,
                                                                          date_cutff=monitored_sub.target_days_old,
                                                                          same_sub=monitored_sub.same_sub_only,
-                                                                         meme_filter=True)
+                                                                         meme_filter=False)
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return
