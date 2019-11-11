@@ -3,17 +3,21 @@ from time import sleep
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 
 
 class EventLogging:
-    def __init__(self):
+    def __init__(self, config: Config = None):
+        if config:
+            self.config = config
+        else:
+            self.config = Config()
         self._influx_client = InfluxDBClient(
-            config.influx_address,
-            config.influx_port,
-            database=config.influx_database,
+            self.config.influx_host,
+            self.config.influx_port,
+            database=self.config.influx_database,
             ssl=config.influx_ssl,
             verify_ssl=config.influx_verify_ssl,
             username=config.influx_user,

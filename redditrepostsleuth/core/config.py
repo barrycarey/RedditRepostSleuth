@@ -1,8 +1,10 @@
 import configparser
+import json
 import os
+import sys
 from typing import List
 
-from redditrepostsleuth.core.config_base import ConfigBase
+
 
 class _NotSet:
     def __bool__(self):
@@ -13,7 +15,7 @@ class _NotSet:
     def __str__(self):
         return 'NotSet'
 
-class Config(ConfigBase):
+class Config:
     """ Class containing all the config data.
     This is based on Praw's own config class because I'm an unoriginal bastard"""
 
@@ -22,20 +24,42 @@ class Config(ConfigBase):
 
     @classmethod
     def _load_config(cls):
-        config = configparser.RawConfigParser()
-        # TODO - Add logic to search for config locations
-        config_file = os.path.join(os.getcwd(), 'config_dev.ini')
-        config.read(config_file)
-        cls.CONFIG = config
+        config_file = None
+        # TODO - Add more locations
+        module_dir = os.path.dirname(sys.modules[__name__].__file__)
+        if os.path.isfile(os.path.join(module_dir, 'sleuth_config.json')):
+            config_file = os.path.join(module_dir, 'sleuth_config.json')
+
+        if os.getenv('bot_config', None):
+            if os.path.isfile(os.getenv('bot_config')):
+                config_file = os.getenv('bot_config')
+
+        if config_file is None:
+            print('Unable to locate sleuth_config.json')
+            sys.exit(1)
+
+        with open(config_file, 'r') as f:
+            cls.CONFIG = json.loads(f.read())
+
+    @staticmethod
+    def _flatten_config(cfg: dict):
+        r = {}
+        for k, v in cfg.items():
+            if isinstance(v, dict):
+                r = {**r, **Config._flatten_config(v)}
+                continue
+            r[k] = v
+        return r
 
     def __init__(self, service_names: List[str], **settings):
 
         if Config.CONFIG is None:
             self._load_config()
 
+        self.custom = Config._flatten_config(Config.CONFIG)
+
         self._settings = self.custom = settings
-        for svc in service_names:
-            self.custom = dict(Config.CONFIG.items(svc), **self.custom)
+        self.custom = Config._flatten_config(Config.CONFIG)
 
         self._initialize_attributes()
 
@@ -67,6 +91,7 @@ class Config(ConfigBase):
             'db_host',
             'db_port',
             'db_user',
+            'db_password'
             'db_name',
             'reddit_client_id',
             'reddit_client_secret',
@@ -77,7 +102,18 @@ class Config(ConfigBase):
             'influx_port',
             'influx_user',
             'influx_password',
-            'log_level'
+            'influx_database',
+            'influx_verify_ssl',
+            'log_level',
+            'index_current_max_age',
+            'index_current_skip_load_age',
+            'index_current_file',
+            'index_historical_skip_load_age',
+            'index_historical_file',
+            'default_hamming_distance',
+            'default_annoy_distance',
+            'repost_image_check_on_ingest',
+            'repost_link_check_on_ingest'
         ]
 
         for attribute in attrbs:
