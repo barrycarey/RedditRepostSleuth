@@ -3,9 +3,10 @@ from typing import List
 
 from distance import hamming
 from time import perf_counter
+
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 from annoy import AnnoyIndex
@@ -21,7 +22,8 @@ from redditrepostsleuth.core.util.reposthelpers import sort_reposts
 
 
 class DuplicateImageService:
-    def __init__(self, uowm: UnitOfWorkManager):
+    def __init__(self, uowm: UnitOfWorkManager, config: Config = None):
+
         self.uowm = uowm
         self.historical_index  = AnnoyIndex(64)
         self.historical_index_built_at = None
@@ -29,6 +31,12 @@ class DuplicateImageService:
         self.current_index = AnnoyIndex(64)
         self.current_index_built_at = None
         self.current_index_size = 0
+
+        if config:
+            self.config = config
+        else:
+            self.config = Config()
+
         log.info('Created dup image service')
 
     def _load_index_files(self) -> None:
@@ -45,12 +53,12 @@ class DuplicateImageService:
         Loads the current month index
         :return:
         """
-        if self.current_index_built_at and (datetime.now() - self.current_index_built_at).seconds < 1200:
+        if self.current_index_built_at and (datetime.now() - self.current_index_built_at).seconds < self.config.index_current_skip_load_age:
             log.debug('Loaded index is less than 20 minutes old.  Skipping load')
             return
 
-        log.debug('Index file is %s', config.current_image_index)
-        if not os.path.isfile(config.current_image_index):
+        log.debug('Index file is %s', self.config.index_current_file)
+        if not os.path.isfile(self.config.index_current_file):
             if not self.current_index_built_at:
                 log.error('No existing index found and no index loaded in memory')
                 raise NoIndexException('No existing index found')
@@ -61,7 +69,7 @@ class DuplicateImageService:
                 log.info('No existing index found, using in memory index')
                 return
 
-        created_at = datetime.fromtimestamp(os.stat(config.current_image_index).st_ctime)
+        created_at = datetime.fromtimestamp(os.stat(self.config.index_current_file).st_ctime)
         delta = datetime.now() - created_at
 
         if delta.seconds > 7200:
@@ -72,7 +80,7 @@ class DuplicateImageService:
             with redlock.create_lock('index_load', ttl=30000):
                 log.debug('Loading existing index')
                 self.current_index = AnnoyIndex(64)
-                self.current_index.load(config.current_image_index)
+                self.current_index.load(self.config.index_current_file)
                 self.current_index_built_at = created_at
                 self.current_index_size = self.current_index.get_n_items()
                 log.info('Loaded current image index with %s items', self.current_index.get_n_items())
@@ -83,7 +91,7 @@ class DuplicateImageService:
             with redlock.create_lock('index_load', ttl=30000):
                 log.info('Got index lock')
                 self.current_index = AnnoyIndex(64)
-                self.current_index.load(config.current_image_index)
+                self.current_index.load(self.config.index_current_file)
                 self.current_index_built_at = created_at
                 log.error('New file has %s items', self.current_index.get_n_items())
                 log.info('New current image index loaded with %s items', self.current_index.get_n_items())
@@ -101,12 +109,12 @@ class DuplicateImageService:
         :return:
         """
 
-        if self.historical_index_built_at and (datetime.now() - self.historical_index_built_at).seconds < 259200:
+        if self.historical_index_built_at and (datetime.now() - self.historical_index_built_at).seconds < self.config.index_historical_skip_load_age:
             log.debug('Loaded index is less than 72 hours old.  Skipping load')
             return
 
-        log.debug('Historical image index file is %s', config.historical_image_index)
-        if not os.path.isfile(config.historical_image_index):
+        log.debug('Historical image index file is %s', self.config.index_historical_file)
+        if not os.path.isfile(self.config.index_historical_file):
             if not self.historical_index_built_at:
                 log.error('No existing historical image index found and no index loaded in memory')
                 raise NoIndexException('No existing index found')
@@ -115,7 +123,7 @@ class DuplicateImageService:
                 log.info('No existing index found, using in memory index')
                 return
 
-        created_at = datetime.fromtimestamp(os.stat(config.historical_image_index).st_ctime)
+        created_at = datetime.fromtimestamp(os.stat(self.config.index_historical_file).st_ctime)
         delta = datetime.now() - created_at
 
         if created_at.month < datetime.now().month:
@@ -126,7 +134,7 @@ class DuplicateImageService:
             with redlock.create_lock('index_load', ttl=30000):
                 log.debug('Loading existing historical image index')
                 self.historical_index = AnnoyIndex(64)
-                self.historical_index.load(config.historical_image_index)
+                self.historical_index.load(self.config.index_historical_file)
                 self.historical_index_built_at = created_at
                 self.historical_index_size = self.historical_index.get_n_items()
                 log.info('Loaded existing historical image index with %s items', self.historical_index.get_n_items())
@@ -138,7 +146,7 @@ class DuplicateImageService:
             with redlock.create_lock('index_load', ttl=30000):
                 log.info('Got index lock')
                 self.historical_index = AnnoyIndex(64)
-                self.historical_index.load(config.historical_image_index)
+                self.historical_index.load(self.config.index_historical_file)
                 self.historical_index_built_at = created_at
                 log.error('New file has %s items', self.historical_index.get_n_items())
                 log.info('New historical image index loaded with %s items', self.historical_index.get_n_items())
@@ -173,9 +181,9 @@ class DuplicateImageService:
         if target_hamming_distance == 0:
             target_hamming_distance = 0
         else:
-            target_hamming_distance = target_hamming_distance or config.hamming_cutoff
+            target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
 
-        target_annoy_distance = target_annoy_distance or config.annoy_match_cutoff
+        target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
         self._set_match_posts(matches)
         self._set_match_hamming(checked_post, matches)
         results = []

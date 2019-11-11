@@ -9,8 +9,8 @@ from praw import Reddit
 from praw.models import Comment
 from sqlalchemy.exc import DataError
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Summons
 
@@ -18,9 +18,10 @@ from redditrepostsleuth.core.db.databasemodels import Summons
 
 class SummonsMonitor:
 
-    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager):
+    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager, config: Config):
         self.reddit = reddit
         self.uowm = uowm
+        self.config = config
         #self.request_service = request_service
 
     def monitor_for_summons(self, subreddits: str = 'all'):
@@ -33,7 +34,7 @@ class SummonsMonitor:
                 for comment in self.reddit.subreddit(subreddits).stream.comments():
                     if comment is None:
                         continue
-                    if self.check_for_summons(comment.body, config.summon_command):
+                    if self.check_for_summons(comment.body, '\?repost'):
                         if comment.author == 'sneakpeekbot':
                             continue
                         self._save_summons(comment)
@@ -159,7 +160,7 @@ class SummonsMonitor:
 
     def process_pushshift_comments(self, comments) -> None:
             for comment in comments:
-                if self.check_for_summons(comment['body'], config.summon_command):
+                if self.check_for_summons(comment['body'], '\?repost'):
                     detection_diff = (datetime.utcnow() - datetime.utcfromtimestamp(comment['created_utc'])).seconds / 60
                     log.info('Summons detection diff %s minutes', detection_diff)
                     comment_obj = self.reddit.comment(comment['id'])

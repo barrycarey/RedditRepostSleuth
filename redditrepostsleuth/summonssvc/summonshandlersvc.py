@@ -4,6 +4,7 @@ import sys
 
 
 sys.path.append('./')
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -18,11 +19,12 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 
 if __name__ == '__main__':
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine())
-    dup = DuplicateImageService(uowm)
+    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    dup = DuplicateImageService(uowm, config=config)
     response_builder = ResponseBuilder(uowm)
-    reddit_manager = RedditManager(get_reddit_instance())
-    event_logger = EventLogging()
+    reddit_manager = RedditManager(get_reddit_instance(config))
+    event_logger = EventLogging(config=config)
     summons = SummonsHandler(uowm, dup, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger), event_logger=event_logger, summons_disabled=False)
 
     while True:

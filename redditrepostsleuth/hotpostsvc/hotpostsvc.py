@@ -4,6 +4,7 @@ import sys
 
 
 sys.path.append('./')
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -18,12 +19,20 @@ from redditrepostsleuth.hotpostsvc.hot_post_monitor import TopPostMonitor
 
 if __name__ == '__main__':
     while True:
-        uowm = SqlAlchemyUnitOfWorkManager(get_db_engine())
-        dup = DuplicateImageService(uowm)
+        config = Config()
+        uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+        dup = DuplicateImageService(uowm, config=config)
         response_builder = ResponseBuilder(uowm)
-        reddit_manager = RedditManager(get_reddit_instance())
-        event_logger = EventLogging()
-        top = TopPostMonitor(reddit_manager, uowm, dup, response_builder, ResponseHandler(reddit_manager, uowm, event_logger))
+        reddit_manager = RedditManager(get_reddit_instance(config))
+        event_logger = EventLogging(config=config)
+        top = TopPostMonitor(
+            reddit_manager,
+            uowm,
+            dup,
+            response_builder,
+            ResponseHandler(reddit_manager, uowm, event_logger),
+            config=config
+        )
         try:
             top.monitor()
         except Exception as e:

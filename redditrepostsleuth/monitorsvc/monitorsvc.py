@@ -3,17 +3,18 @@ import sys
 import redis
 
 sys.path.append('./')
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.model.events.celerytask import CeleryQueueSize
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 
+config = Config()
 
 def log_queue_size(event_logger):
     skip_keys = ['unacked_index', 'unacked_mutex', 'unacked']
     while True:
         try:
-            client = redis.Redis(host=config.redis_host, port=6379, db=0, password=config.redis_password)
+            client = redis.Redis(host=config.redis_host, port=config.redis_port, db=0, password=config.redis_password)
 
             for queue in client.scan_iter():
                 queue_name = queue.decode('utf-8')

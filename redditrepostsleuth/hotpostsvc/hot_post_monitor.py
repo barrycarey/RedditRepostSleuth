@@ -5,7 +5,7 @@ from praw import Reddit
 from praw.models import Comment
 from redlock import RedLockError
 
-from redditrepostsleuth.core.config import config
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
@@ -24,12 +24,25 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
 class TopPostMonitor:
 
-    def __init__(self, reddit: RedditManager, uowm: UnitOfWorkManager, image_service: DuplicateImageService, response_builder: ResponseBuilder, response_handler: ResponseHandler):
+    def __init__(
+            self,
+            reddit: RedditManager,
+            uowm: UnitOfWorkManager,
+            image_service: DuplicateImageService,
+            response_builder: ResponseBuilder,
+            response_handler: ResponseHandler,
+            config: Config = None,
+    ):
+
         self.reddit = reddit
         self.uowm = uowm
         self.image_service = image_service
         self.response_builder = response_builder
         self.response_handler = response_handler
+        if config:
+            self.config = config
+        else:
+            self.config = Config()
 
 
     def monitor(self):
@@ -112,7 +125,7 @@ class TopPostMonitor:
         if search_results.matches:
             msg = self.response_builder.build_default_repost_comment(msg_values)
         else:
-            if not config.comment_on_oc:
+            if not self.config.hot_post_comment_on_oc:
                 log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
                 return
             msg = self.response_builder.build_default_oc_comment(msg_values)

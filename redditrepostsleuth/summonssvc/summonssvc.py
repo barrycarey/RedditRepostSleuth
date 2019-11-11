@@ -6,21 +6,20 @@ import sys
 
 
 sys.path.append('./')
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.summonssvc.summonsmonitor import SummonsMonitor
 
 
-
-
 if __name__ == '__main__':
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine())
-    summons = SummonsMonitor(get_reddit_instance(), uowm)
+    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    summons = SummonsMonitor(get_reddit_instance(config), uowm, config)
     threading.Thread(target=summons.monitor_for_mentions, name='mention_summons').start()
     threading.Thread(target=summons.monitor_for_summons_pushshift, name='pushshift_summons').start()
-    threading.Thread(target=summons.monitor_for_summons, name='praw_summons', args=(config.subreddit_summons,)).start()
+    threading.Thread(target=summons.monitor_for_summons, name='praw_summons', args=(config.summons_subreddits,)).start()
     #threading.Thread(target=summons.monitor_for_summons, name='praw_summons_all').start()
 
     while True:

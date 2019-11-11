@@ -6,7 +6,6 @@ services:
             dockerfile: redditrepostsleuth/ingestsvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - SLEUTHCONFIG=testconfig.ini
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
 
     hot_post:
@@ -15,7 +14,6 @@ services:
             dockerfile: redditrepostsleuth/hotpostsvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - SLEUTHCONFIG=testconfig.ini
         entrypoint: python -u /src/redditrepostsleuth/hotpostsvc/hotpostsvc.py
         volumes:
             - /opt/imageindex:/opt/imageindex
@@ -26,7 +24,6 @@ services:
             dockerfile: redditrepostsleuth/summonssvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - SLEUTHCONFIG=testconfig.ini
         entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
 
     stat_monitor_svc:
@@ -35,7 +32,6 @@ services:
             dockerfile: redditrepostsleuth/monitorsvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - SLEUTHCONFIG=testconfig.ini
         entrypoint: python -u /src/redditrepostsleuth/monitorsvc/monitorsvc.py
 
     summons_handler:
@@ -44,7 +40,6 @@ services:
             dockerfile: redditrepostsleuth/summonssvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - SLEUTHCONFIG=testconfig.ini
         entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonshandlersvc.py
         volumes:
             - /opt/imageindex:/opt/imageindex
@@ -66,7 +61,6 @@ services:
             dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
             - HASH_API=http://157.230.64.152:8000/hash
@@ -86,10 +80,9 @@ services:
     image_repost_worker:
         build:
             context: .
-            dockerfile: redditrepostsleuth/workers/Dockerfile
+            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 1
