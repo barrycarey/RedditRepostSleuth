@@ -16,7 +16,7 @@ from redditrepostsleuth.ingestsvc.postingestor import PostIngestor
 if __name__ == '__main__':
     log.info('Starting post ingestor')
     print('Starting post ingestor')
-    config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
+    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     ingestor = PostIngestor(get_reddit_instance(config), uowm)
     ingestor.ingest_without_stream()

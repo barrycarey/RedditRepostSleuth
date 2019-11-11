@@ -26,18 +26,21 @@ class Config:
     def _load_config(cls, config_file=None):
 
         if config_file:
+            print(f'Checking provided config file: {config_file}')
             if not os.path.isfile(config_file):
                 print('Provided config file is invalid')
                 config_file = None
 
         module_dir = os.path.dirname(sys.modules[__name__].__file__)
-        print('Module Dir:' + module_dir)
+        print('Checking for config in module dir:' + module_dir)
         if os.path.isfile(os.path.join(module_dir, 'sleuth_config.json')):
             config_file = os.path.join(module_dir, 'sleuth_config.json')
 
+        print(f'Checking for config in current dir: {os.getcwd()}')
         if os.path.isfile('sleuth_config.json'):
             config_file = os.path.join(os.getcwd(), 'sleuth_config.json')
 
+        print('Checking ENV for config file')
         if os.getenv('bot_config', None):
             if os.path.isfile(os.getenv('bot_config')):
                 config_file = os.getenv('bot_config')
