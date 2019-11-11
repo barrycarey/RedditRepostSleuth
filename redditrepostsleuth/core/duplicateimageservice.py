@@ -82,6 +82,7 @@ class DuplicateImageService:
             log.info('Existing current image index is newer than loaded index.  Loading new index')
             with redlock.create_lock('index_load', ttl=30000):
                 log.info('Got index lock')
+                self.current_index = AnnoyIndex(64)
                 self.current_index.load(config.current_image_index)
                 self.current_index_built_at = created_at
                 log.error('New file has %s items', self.current_index.get_n_items())
@@ -136,6 +137,7 @@ class DuplicateImageService:
             log.error('Loading newer historical image index file.  Old file had %s items,', self.historical_index.get_n_items())
             with redlock.create_lock('index_load', ttl=30000):
                 log.info('Got index lock')
+                self.historical_index = AnnoyIndex(64)
                 self.historical_index.load(config.historical_image_index)
                 self.historical_index_built_at = created_at
                 log.error('New file has %s items', self.historical_index.get_n_items())
