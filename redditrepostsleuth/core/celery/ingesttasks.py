@@ -1,6 +1,5 @@
 from time import perf_counter
 
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.logging import log
@@ -19,7 +18,7 @@ def save_new_post(self, post):
             return
         try:
             log.debug(post)
-            post = pre_process_post(post, self.uowm, config.hash_api)
+            post = pre_process_post(post, self.uowm, self.config.image_hash_api)
         except (ImageConversioinException, ConnectionError) as e:
             if isinstance(e, ConnectionError):
                 log.exception('Issue getting URL during save', exc_info=True)
@@ -38,17 +37,17 @@ def save_new_post(self, post):
                 uow.image_post_current.add(image_current)
             uow.commit()
             log.debug('Commited Post: %s', post)
-            ingest_repost_check.apply_async((post,), queue='repost')
+            ingest_repost_check.apply_async((post,self.config), queue='repost')
         except Exception as e:
             log.exception('Problem saving new post', exc_info=True)
 
 @celery.task(ignore_results=True)
-def ingest_repost_check(post):
-    if post.post_type == 'image' and config.check_new_images_for_repost:
+def ingest_repost_check(post, config):
+    if post.post_type == 'image' and config.repost_image_check_on_ingest:
         #check_image_repost_save.apply_async((post,), queue='repost_image')
         # TODO - Make sure this works
         celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post], queue='repost_image')
-    elif post.post_type == 'link' and config.check_new_links_for_repost:
+    elif post.post_type == 'link' and config.repost_link_check_on_ingest:
         celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]], queue='repost_link')
         #link_repost_check().apply_async(([post],))
 

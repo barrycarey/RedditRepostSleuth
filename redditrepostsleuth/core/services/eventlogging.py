@@ -14,14 +14,15 @@ class EventLogging:
             self.config = config
         else:
             self.config = Config()
+
         self._influx_client = InfluxDBClient(
             self.config.influx_host,
             self.config.influx_port,
             database=self.config.influx_database,
-            ssl=config.influx_ssl,
-            verify_ssl=config.influx_verify_ssl,
-            username=config.influx_user,
-            password=config.influx_password,
+            ssl=self.config.influx_verify_ssl,
+            verify_ssl=self.config.influx_verify_ssl,
+            username=self.config.influx_user,
+            password=self.config.influx_password,
             timeout=5,
             pool_size=50
         )
@@ -35,7 +36,7 @@ class EventLogging:
             sleep(10)
             if hasattr(e, 'code') and e.code == 404:
                 #log.error('Database %s Does Not Exist.  Attempting To Create', config.influx_database)
-                self._influx_client.create_database(config.influx_database)
+                self._influx_client.create_database(self.config.influx_database)
                 self._influx_client.write_points(event.get_influx_event())
                 return
 

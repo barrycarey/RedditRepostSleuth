@@ -23,12 +23,20 @@ class Config:
     CONFIG_NOT_SET = _NotSet()
 
     @classmethod
-    def _load_config(cls):
-        config_file = None
-        # TODO - Add more locations
+    def _load_config(cls, config_file=None):
+
+        if config_file:
+            if not os.path.isfile(config_file):
+                print('Provided config file is invalid')
+                config_file = None
+
         module_dir = os.path.dirname(sys.modules[__name__].__file__)
+        print('Module Dir:' + module_dir)
         if os.path.isfile(os.path.join(module_dir, 'sleuth_config.json')):
             config_file = os.path.join(module_dir, 'sleuth_config.json')
+
+        if os.path.isfile('sleuth_config.json'):
+            config_file = os.path.join(os.getcwd(), 'sleuth_config.json')
 
         if os.getenv('bot_config', None):
             if os.path.isfile(os.getenv('bot_config')):
@@ -38,6 +46,7 @@ class Config:
             print('Unable to locate sleuth_config.json')
             sys.exit(1)
 
+        print(f'Loading Config {config_file}')
         with open(config_file, 'r') as f:
             cls.CONFIG = json.loads(f.read())
 
@@ -51,10 +60,10 @@ class Config:
             r[k] = v
         return r
 
-    def __init__(self, service_names: List[str], **settings):
+    def __init__(self, config_file=None, **settings):
 
         if Config.CONFIG is None:
-            self._load_config()
+            self._load_config(config_file)
 
         self.custom = Config._flatten_config(Config.CONFIG)
 
@@ -91,7 +100,7 @@ class Config:
             'db_host',
             'db_port',
             'db_user',
-            'db_password'
+            'db_password',
             'db_name',
             'reddit_client_id',
             'reddit_client_secret',
@@ -113,7 +122,8 @@ class Config:
             'default_hamming_distance',
             'default_annoy_distance',
             'repost_image_check_on_ingest',
-            'repost_link_check_on_ingest'
+            'repost_link_check_on_ingest',
+            'image_hash_api'
         ]
 
         for attribute in attrbs:
