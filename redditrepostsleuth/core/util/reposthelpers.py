@@ -11,7 +11,6 @@ from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.objectmapping import post_to_repost_match
 
 
-@DeprecationWarning
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
     """
     Take a raw list if matched images.  Filter one ones meeting the following criteria.
@@ -24,7 +23,6 @@ def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post
     # TODO - Clean this up
     return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
 
-@DeprecationWarning
 def clean_repost_matches(repost: RepostWrapper) -> List[RepostMatch]:
     """
     Take a list of reposts, remove any cross posts and deleted posts
@@ -42,6 +40,7 @@ def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
     :param posts:
     """
     return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
+
 
 def remove_newer_posts(posts: List[Post], repost_check: Post):
     return [post for post in posts if post.created_at < repost_check.created_at]

@@ -1,5 +1,5 @@
 
-UNSUPPORTED_POST_TYPE = 'Sorry, I don\'t support this post type right now.  Feel free to check back in the future!'
+UNSUPPORTED_POST_TYPE = 'Sorry, I don\'t support this post type () right now.  Feel free to check back in the future!'
 
 
 
