@@ -1,23 +1,20 @@
 import time
 
-from praw.models import Submission, Comment
+from praw.models import Submission
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.services.reddit_manager import RedditManager
-from redditrepostsleuth.core.services.response_handler import ResponseHandler
-from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC
-from redditrepostsleuth.core.exception import NoIndexException
-from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, BotComment
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
-
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
-from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 

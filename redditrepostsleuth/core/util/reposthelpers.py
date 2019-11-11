@@ -24,7 +24,6 @@ def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post
     # TODO - Clean this up
     return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
 
-@DeprecationWarning
 def clean_repost_matches(repost: RepostWrapper) -> List[RepostMatch]:
     """
     Take a list of reposts, remove any cross posts and deleted posts

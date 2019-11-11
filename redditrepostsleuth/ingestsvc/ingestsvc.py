@@ -16,12 +16,11 @@ from redditrepostsleuth.ingestsvc.postingestor import PostIngestor
 if __name__ == '__main__':
     log.info('Starting post ingestor')
     print('Starting post ingestor')
-    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config()
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     ingestor = PostIngestor(get_reddit_instance(config), uowm)
-    ingestor.ingest_without_stream()
     threading.Thread(target=ingestor.ingest_without_stream, name='praw_ingest').start()
-    #threading.Thread(target=ingestor.ingest_pushshift, name='pushshift_ingest').start()
+    threading.Thread(target=ingestor.ingest_pushshift, name='pushshift_ingest').start()
 
     while True:
         sleep(10)

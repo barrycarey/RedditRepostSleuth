@@ -4,7 +4,6 @@ import requests
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.config import config
 from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
@@ -20,9 +19,9 @@ from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost
 
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
-    if post.post_type == 'image' and config.check_new_images_for_repost:
+    if post.post_type == 'image':
         check_image_repost_save.apply_async((post,), queue='repost_image')
-    elif post.post_type == 'link' and config.check_new_links_for_repost:
+    elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 20, 'countdown': 300})
