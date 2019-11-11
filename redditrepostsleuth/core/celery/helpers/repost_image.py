@@ -61,7 +61,12 @@ def save_image_repost_result(repost: RepostWrapper, uowm: UnitOfWorkManager) -> 
             uow.repost.add(new_repost)
             repost.matches = final_matches
 
-            if len(repost.matches) > 10 and 'meme' in repost.checked_post.subreddit.lower():
+            if len(repost.matches) > 5 and repost.checked_post.subreddit.lower() == 'memes':
+                log.info('Adding Investigate Post: High match meme')
+                inv_post = InvestigatePost(post_id=repost_of.post.post_id, matches=len(repost.matches),
+                                           url=repost.checked_post.url, flag_reason='meme match')
+                uow.investigate_post.add(inv_post)
+            elif len(repost.matches) > 10 and 'meme' in repost.checked_post.subreddit.lower():
                 log.info('Adding Investigate Post: High match meme')
                 inv_post = InvestigatePost(post_id=repost_of.post.post_id, matches=len(repost.matches), url=repost.checked_post.url, flag_reason='High match meme')
                 uow.investigate_post.add(inv_post)

@@ -200,6 +200,7 @@ class MonitoredSub(Base):
     repost_response_template = Column(String(2000))
     oc_response_template = Column(String(2000))
     search_depth = Column(Integer, default=100)
+    meme_filter = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -219,7 +220,8 @@ class MonitoredSub(Base):
             'sticky_comment': self.sticky_comment,
             'repost_response_template': self.repost_response_template,
             'oc_response_template': self.oc_response_template,
-            'search_depth': self.search_depth
+            'search_depth': self.search_depth,
+            'meme_filter': self.meme_filter
         }
 
 class MonitoredSubChecks(Base):

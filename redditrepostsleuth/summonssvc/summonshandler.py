@@ -133,7 +133,7 @@ class SummonsHandler:
         response = RepostResponseBase(summons_id=summons.id)
 
         try:
-            search_results = self.image_service.check_duplicates_wrapped(post)
+            search_results = self.image_service.check_duplicates_wrapped(post, meme_filter=True)
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             return

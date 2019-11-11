@@ -203,8 +203,9 @@ class DuplicateImageService:
                 # TODO - Need logic to check age and sub of matching posts with same author
                 continue
 
-            if match.hamming_distance > target_hamming_distance:
-                log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
+            # TODO - Clean up this cluster fuck
+            if match.hamming_distance > (target_hamming_distance if not is_meme else 0):
+                log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance if not is_meme else 0,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
 
@@ -219,7 +220,7 @@ class DuplicateImageService:
             results.append(match)
         log.info('Matches post-filter: %s', len(results))
         if is_meme:
-            results = self._final_meme_filter(checked_post, results)
+            results = self._final_meme_filter(checked_post, results, target_hamming_distance)
 
         return sort_reposts(results)
 
@@ -261,7 +262,7 @@ class DuplicateImageService:
         else:
             log.error('No current image index loaded.  Only using historical results')
 
-        result.search_time = round(perf_counter() - start, 5)
+
 
         if filter:
             meme_template = None
@@ -269,6 +270,7 @@ class DuplicateImageService:
             if meme_filter:
                 meme_template = self.get_meme_template(post)
                 if meme_template:
+                    result.meme_template = meme_template
                     target_hamming_distance = meme_template.target_hamming
                     target_annoy_distance = meme_template.target_annoy
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
@@ -286,6 +288,7 @@ class DuplicateImageService:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)
         result.checked_post = post
+        result.search_time = round(perf_counter() - start, 5)
         return result
 
     def _merge_search_results(self, first: List[ImageMatch], second: List[ImageMatch]) -> List[ImageMatch]:
@@ -351,7 +354,7 @@ class DuplicateImageService:
             match.hamming_distance = hamming(searched_post.dhash_h, match.post.dhash_h)
         return matches
 
-    def _final_meme_filter(self, searched_post: Post, matches: List[ImageMatch]):
+    def _final_meme_filter(self, searched_post: Post, matches: List[ImageMatch], target_hamming):
         results = []
         try:
             target_hashes = get_image_hashes(searched_post, hash_size=32)
@@ -368,13 +371,14 @@ class DuplicateImageService:
 
             h_distance = hamming(target_hashes['dhash_h'], match_hashes['dhash_h'])
 
-            if h_distance > 10:
-                log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', 10,
+            if h_distance > target_hamming:
+                log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
                           h_distance, f'https://redd.it/{match.post.post_id}')
                 continue
 
             log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                        h_distance)
+            match.hamming_distance = h_distance
             results.append(match)
 
         return results

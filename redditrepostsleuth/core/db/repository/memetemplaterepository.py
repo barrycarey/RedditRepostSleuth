@@ -14,7 +14,7 @@ class MemeTemplateRepository:
         return self.db_session.query(MemeTemplate).filter(MemeTemplate.id == id).first()
 
     def get_all(self) -> List[MemeTemplate]:
-        return self.db_session.query(MemeTemplate).all()
+        return self.db_session.query(MemeTemplate).order_by(MemeTemplate.name).all()
 
     def get_by_name(self, name: str) -> MemeTemplate:
         return self.db_session.query(MemeTemplate).filter(MemeTemplate.name == name).first()
