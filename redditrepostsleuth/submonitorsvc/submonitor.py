@@ -139,7 +139,7 @@ class SubMonitor:
 
     def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> None:
 
-        msg_values = build_msg_values_from_search(search_results, self.uowm, target_days=monitored_sub.target_days_old)
+        msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
         if search_results.matches:
             msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values,)
         else:
