@@ -1,9 +1,18 @@
+from datetime import datetime
+from typing import List
+
 from redditrepostsleuth.core.db.databasemodels import BotComment
 
 
 class BotCommentRepo:
     def __init__(self, db_session):
         self.db_session = db_session
+
+    def get_all(self, limit: int = None) -> List[BotComment]:
+        return self.db_session.query(BotComment).limit(limit).all()
+
+    def get_after_date(self, date: datetime) -> List[BotComment]:
+        return self.db_session.query(BotComment).filter(BotComment.comment_left_at > date).all()
 
     def add(self, item: BotComment):
         self.db_session.add(item)

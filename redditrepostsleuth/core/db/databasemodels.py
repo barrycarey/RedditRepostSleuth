@@ -106,6 +106,9 @@ class BotComment(Base):
     source = Column(String(20), nullable=False)
     comment_id = Column(String(20), nullable=False)
     subreddit = Column(String(100), nullable=False)
+    karma = Column(Integer)
+    active = Column(Boolean, default=True)
+    needs_review = Column(Boolean, default=False)
 
 
 class Comment(Base):
