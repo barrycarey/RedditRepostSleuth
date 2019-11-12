@@ -4,6 +4,8 @@ from typing import List, Tuple
 from distance import hamming
 from time import perf_counter
 
+from sqlalchemy import Float
+
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
@@ -321,6 +323,10 @@ class DuplicateImageService:
     def _convert_annoy_results(self, annoy_results, checked_post_id: int):
         results = self._zip_annoy_results(annoy_results)
         return [annoy_result_to_image_match(match, checked_post_id) for match in results]
+
+    def _annoy_filter(self, target_annoy_distance: Float):
+        def annoy_distance_filter(match):
+            return match[0] < target_annoy_distance
 
     def _log_search_time(self, search_results: ImageRepostWrapper):
         self.event_logger.save_event(
