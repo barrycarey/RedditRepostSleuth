@@ -187,7 +187,6 @@ class DuplicateImageService:
             target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
 
         target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
-        self._set_match_posts(matches)
         self._set_match_hamming(checked_post, matches)
         results = []
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
@@ -246,7 +245,8 @@ class DuplicateImageService:
                                  date_cutff: int = None,
                                  filter_dead_matches: bool = True,
                                  only_older_matches=True,
-                                 meme_filter=False) -> ImageRepostWrapper:
+                                 meme_filter=False,
+                                 debug_find=None) -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -258,24 +258,44 @@ class DuplicateImageService:
         """
         log.info('Checking %s for duplicates - https://redd.it/%s', post.post_id, post.post_id)
         self._load_index_files()
-        result = ImageRepostWrapper()
+        search_results = ImageRepostWrapper()
         start = perf_counter()
         search_array = bytearray(post.dhash_h, encoding='utf-8')
 
         historical_r = self.historical_index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
         historical_results = list(zip(historical_r[0], historical_r[1]))
-        result.matches = [annoy_result_to_image_match(match, post.id) for match in historical_results]
-        result.index_size = self.historical_index.get_n_items()
+        search_results.matches = [annoy_result_to_image_match(match, post.id) for match in historical_results]
+        if filter:
+            self._set_match_posts_historical(search_results.matches)
+        if debug_find:
+            target = [x for x in search_results.matches if x.match_id == debug_find]
+            if target:
+                log.debug('Found target in historical results')
+            else:
+                log.debug('Did not find target in historical')
+        search_results.index_size = self.historical_index.get_n_items()
 
         if self.current_index:
             current_r = self.current_index.get_nns_by_vector(list(search_array), max_matches, search_k=20000, include_distances=True)
             current_results = list(zip(current_r[0], current_r[1]))
-            result.matches = self._merge_search_results(result.matches, [annoy_result_to_image_match(match, post.id) for match in current_results])
-            result.index_size = result.index_size + self.current_index.get_n_items()
+            current_image_matches = [annoy_result_to_image_match(match, post.id) for match in current_results]
+
+            search_results.index_size = search_results.index_size + self.current_index.get_n_items()
+            if filter:
+                self._set_match_posts_current(search_results.matches)
+
+            search_results.matches = self._merge_search_results(search_results.matches, current_image_matches)
+
+            if debug_find:
+                target = [x for x in search_results.matches if x.match_id == debug_find]
+                if target:
+                    log.debug('Found target in current index')
+                else:
+                    log.debug('Did not find target in current index')
         else:
             log.error('No current image index loaded.  Only using historical results')
 
-        result.index_search_time = round(perf_counter() - start, 5)
+        search_results.index_search_time = round(perf_counter() - start, 5)
 
         if filter:
             meme_template = None
@@ -283,13 +303,13 @@ class DuplicateImageService:
             if meme_filter:
                 meme_template = self.get_meme_template(post)
                 if meme_template:
-                    result.meme_template = meme_template
+                    search_results.meme_template = meme_template
                     target_hamming_distance = meme_template.target_hamming
                     target_annoy_distance = meme_template.target_annoy
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
 
-            result.matches = self._filter_results_for_reposts(result.matches, post,
+            search_results.matches = self._filter_results_for_reposts(search_results.matches, post,
                                                               target_annoy_distance=target_annoy_distance,
                                                               target_hamming_distance=target_hamming_distance,
                                                               same_sub=same_sub,
@@ -298,12 +318,18 @@ class DuplicateImageService:
                                                               only_older_matches=only_older_matches,
                                                               is_meme=meme_template or False)
         else:
-            self._set_match_posts(result.matches)
-            self._set_match_hamming(post, result.matches)
-        result.checked_post = post
-        result.total_search_time = round(perf_counter() - start, 5)
-        self._log_search_time(result)
-        return result
+            self._set_match_posts_historical(search_results.matches)
+            self._set_match_hamming(post, search_results.matches)
+        search_results.checked_post = post
+        search_results.total_search_time = round(perf_counter() - start, 5)
+        self._log_search_time(search_results)
+        if debug_find:
+            target = [x for x in search_results.matches if x.match_id == debug_find]
+            if target:
+                log.debug('Found match after filter')
+            else:
+                log.debug('Did not find match after filter')
+        return search_results
 
     def _log_search_time(self, search_results: ImageRepostWrapper):
         self.event_logger.save_event(
@@ -326,7 +352,7 @@ class DuplicateImageService:
         return results
 
 
-    def _set_match_posts(self, matches: List[ImageMatch]) -> List[ImageMatch]:
+    def _set_match_posts_historical(self, matches: List[ImageMatch]) -> List[ImageMatch]:
         """
         Attach each matches corresponding database entry
         :rtype: List[ImageMatch]
@@ -338,6 +364,25 @@ class DuplicateImageService:
                 # Hacky but we need this to get the original database post ID from the RedditImagePost object
                 # TODO - Clean this shit up once I fix relationships
                 original_image_post = uow.image_post.get_by_id(match.match_id)
+                match_post = uow.posts.get_by_post_id(original_image_post.post_id)
+                match.post = match_post
+                match.match_id = match_post.id
+        log.debug('Time to set match posts: %s', perf_counter() - start)
+        return matches
+
+    def _set_match_posts_current(self, matches: List[ImageMatch]) -> List[ImageMatch]:
+        """
+                Attach each matches corresponding database entry
+                :rtype: List[ImageMatch]
+                :param matches: List of matches
+                """
+        start = perf_counter()
+        with self.uowm.start() as uow:
+            for match in matches:
+                # Hacky but we need this to get the original database post ID from the RedditImagePost object
+                # TODO - Clean this shit up once I fix relationships
+                log.info('Checking current ID %s', match.match_id)
+                original_image_post = uow.image_post_current.get_by_id(match.match_id)
                 match_post = uow.posts.get_by_post_id(original_image_post.post_id)
                 match.post = match_post
                 match.match_id = match_post.id

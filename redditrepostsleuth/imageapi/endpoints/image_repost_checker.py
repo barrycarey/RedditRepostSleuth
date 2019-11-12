@@ -57,7 +57,8 @@ class ImageRepostChecker:
                                            target_annoy_distance=pre_filter,
                                             only_older_matches=only_older,
                                             same_sub=same_sub,
-                                            meme_filter=meme_filter)
+                                            meme_filter=meme_filter,
+                                            debug_find=2351318)
         except Exception as e:
             log.exception('Problem checking duplicates for post %s', post_id)
             response['status'] = 'error'
