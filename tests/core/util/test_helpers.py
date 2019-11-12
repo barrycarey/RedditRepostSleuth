@@ -104,7 +104,7 @@ class TestHelpers(TestCase):
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
         wrapper.index_size = 100
-        wrapper.search_time = 0.111
+        wrapper.total_search_time = 0.111
 
         result = build_msg_values_from_search(wrapper)
 
@@ -115,7 +115,7 @@ class TestHelpers(TestCase):
         wrapper = ImageRepostWrapper()
         wrapper.checked_post = Post(subreddit='sub2')
         wrapper.index_size = 100
-        wrapper.search_time = 0.111
+        wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper)
 
         self.assertEqual(8, len(result.keys()))
@@ -124,7 +124,7 @@ class TestHelpers(TestCase):
         wrapper = ImageRepostWrapper()
         wrapper.checked_post = Post(subreddit='sub2')
         wrapper.index_size = 100
-        wrapper.search_time = 0.111
+        wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper, test1='test')
 
         self.assertEqual(9, len(result.keys()))
@@ -141,7 +141,7 @@ class TestHelpers(TestCase):
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
         wrapper.index_size = 100
-        wrapper.search_time = 0.111
+        wrapper.total_search_time = 0.111
 
         result = build_msg_values_from_search(wrapper, item1='value1', item2='value2')
 

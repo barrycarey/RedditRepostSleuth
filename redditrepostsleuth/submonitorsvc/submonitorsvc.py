@@ -16,10 +16,10 @@ from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
 if __name__ == '__main__':
     config = Config()
+    event_logger = EventLogging(config=config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     response_builder = ResponseBuilder(uowm)
-    dup = DuplicateImageService(uowm, config=config)
+    dup = DuplicateImageService(uowm, event_logger, config=config)
     reddit_manager = RedditManager(get_reddit_instance(config))
-    event_logger = EventLogging(config=config)
     monitor = SubMonitor(dup, uowm, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger))
     monitor.run()

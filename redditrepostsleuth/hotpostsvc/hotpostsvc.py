@@ -21,10 +21,10 @@ if __name__ == '__main__':
     while True:
         config = Config()
         uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-        dup = DuplicateImageService(uowm, config=config)
+        event_logger = EventLogging(config=config)
+        dup = DuplicateImageService(uowm, event_logger, config=config)
         response_builder = ResponseBuilder(uowm)
         reddit_manager = RedditManager(get_reddit_instance(config))
-        event_logger = EventLogging(config=config)
         top = TopPostMonitor(
             reddit_manager,
             uowm,

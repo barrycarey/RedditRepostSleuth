@@ -35,13 +35,9 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
-    start = perf_counter()
     result = find_matching_images(post, self.dup_service)
-    search_time = perf_counter() - start
 
     save_image_repost_result(result, self.uowm)
-
-    self.event_logger.save_event(AnnoySearchEvent(search_time, 0, event_type='find_matching_images'))
 
     self.event_logger.save_event(RepostEvent(
         event_type='repost_found' if result.matches else 'repost_check',

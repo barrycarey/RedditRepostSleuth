@@ -20,11 +20,11 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 if __name__ == '__main__':
     config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    event_logger = EventLogging(config=config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    dup = DuplicateImageService(uowm, config=config)
+    dup = DuplicateImageService(uowm, event_logger, config=config)
     response_builder = ResponseBuilder(uowm)
     reddit_manager = RedditManager(get_reddit_instance(config))
-    event_logger = EventLogging(config=config)
     summons = SummonsHandler(uowm, dup, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger), event_logger=event_logger, summons_disabled=False)
 
     while True:

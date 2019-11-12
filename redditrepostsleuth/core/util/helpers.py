@@ -139,7 +139,7 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
     """
     base_values = {
         'total_searched': f'{search_results.index_size:,}',
-        'search_time': search_results.search_time,
+        'search_time': search_results.total_search_time,
         'total_posts': 0,
         'match_count': len(search_results.matches),
         'post_type': search_results.checked_post.post_type,

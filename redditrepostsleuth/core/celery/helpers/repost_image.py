@@ -4,6 +4,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, InvestigatePost
 from redditrepostsleuth.core.model.imagematch import ImageMatch
+from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -12,7 +13,7 @@ from redditrepostsleuth.core.util.helpers import is_image_still_available
 
 # TODO - Drop logging lines
 
-def find_matching_images(post: Post, dup_service: DuplicateImageService) -> RepostWrapper:
+def find_matching_images(post: Post, dup_service: DuplicateImageService) -> ImageRepostWrapper:
     """
     Take a given post and dup image service and return all matches
     :param post: Reddit Post

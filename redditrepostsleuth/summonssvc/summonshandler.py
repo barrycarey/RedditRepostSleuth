@@ -149,7 +149,7 @@ class SummonsHandler:
                     count=len(search_results.matches),
                     searched_posts=self._searched_post_str(post, search_results.index_size),
                     firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
-                    time=search_results.search_time
+                    time=search_results.total_search_time
 
                 )
                 response.message = response.message + build_markdown_list(search_results.matches)

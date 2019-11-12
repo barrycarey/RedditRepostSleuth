@@ -12,8 +12,10 @@ from datetime import datetime
 from annoy import AnnoyIndex
 
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.helpers import is_image_still_available
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes, get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
@@ -22,7 +24,7 @@ from redditrepostsleuth.core.util.reposthelpers import sort_reposts
 
 
 class DuplicateImageService:
-    def __init__(self, uowm: UnitOfWorkManager, config: Config = None):
+    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, config: Config = None):
 
         self.uowm = uowm
         self.historical_index  = AnnoyIndex(64)
@@ -31,6 +33,7 @@ class DuplicateImageService:
         self.current_index = AnnoyIndex(64)
         self.current_index_built_at = None
         self.current_index_size = 0
+        self.event_logger = event_logger
 
         if config:
             self.config = config
@@ -272,7 +275,7 @@ class DuplicateImageService:
         else:
             log.error('No current image index loaded.  Only using historical results')
 
-
+        result.index_search_time = round(perf_counter() - start, 5)
 
         if filter:
             meme_template = None
@@ -298,8 +301,19 @@ class DuplicateImageService:
             self._set_match_posts(result.matches)
             self._set_match_hamming(post, result.matches)
         result.checked_post = post
-        result.search_time = round(perf_counter() - start, 5)
+        result.total_search_time = round(perf_counter() - start, 5)
+        self._log_search_time(result)
         return result
+
+    def _log_search_time(self, search_results: ImageRepostWrapper):
+        self.event_logger.save_event(
+            AnnoySearchEvent(
+                total_search_time=search_results.total_search_time,
+                index_search_time=search_results.index_search_time,
+                index_size=search_results.index_size,
+                event_type='duplicate_image_search'
+            )
+        )
 
     def _merge_search_results(self, first: List[ImageMatch], second: List[ImageMatch]) -> List[ImageMatch]:
         results = first.copy()
@@ -346,7 +360,6 @@ class DuplicateImageService:
                 log.info('Post %s matches meme template %s', f'https://redd.it/{check_post.post_id}', template.name)
                 return template
 
-
     def _set_match_hamming(self, searched_post: Post, matches: List[ImageMatch]) -> List[ImageMatch]:
         """
         Take a list of ImageMatches and set the hamming distance vs origional post
@@ -392,9 +405,3 @@ class DuplicateImageService:
             results.append(match)
 
         return results
-
-    @DeprecationWarning
-    def _ramp_meme_hashes(self, matches: List[ImageMatch]) -> List[ImageMatch]:
-        for match in matches:
-            set_image_hashes(match.post, hash_size=32)
-        return matches
