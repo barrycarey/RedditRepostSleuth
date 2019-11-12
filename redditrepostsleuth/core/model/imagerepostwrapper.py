@@ -8,7 +8,7 @@ class ImageRepostWrapper(RepostWrapper):
 
         self.total_search_time: float = None
         self.index_search_time: float= None
-        self.index_size: int = None
+        self.index_size: int = 0
         self.meme_template: MemeTemplate = None
 
     def to_dict(self):
