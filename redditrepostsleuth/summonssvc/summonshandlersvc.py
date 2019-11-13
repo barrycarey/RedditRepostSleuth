@@ -19,7 +19,7 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 
 if __name__ == '__main__':
-    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config()
     event_logger = EventLogging(config=config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     dup = DuplicateImageService(uowm, event_logger, config=config)
