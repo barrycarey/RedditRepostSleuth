@@ -1,7 +1,9 @@
 import re
 import time
 from datetime import datetime
+from typing import Tuple
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -16,7 +18,8 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen
+from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen, \
+    searched_post_str
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, LINK_ALL, \
     REPOST_NO_RESULT, DEFAULT_COMMENT_OC, \
@@ -26,7 +29,17 @@ from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
 class SummonsHandler:
-    def __init__(self, uowm: UnitOfWorkManager, image_service: DuplicateImageService, reddit: RedditManager, response_builder: ResponseBuilder, response_handler: ResponseHandler, event_logger: EventLogging = None, summons_disabled=False):
+    def __init__(
+            self,
+            uowm: UnitOfWorkManager,
+            image_service: DuplicateImageService,
+            reddit: RedditManager,
+            response_builder: ResponseBuilder,
+            response_handler: ResponseHandler,
+            config: Config = None,
+            event_logger: EventLogging = None,
+            summons_disabled=False
+    ):
         self.uowm = uowm
         self.image_service = image_service
         self.reddit = reddit
@@ -34,6 +47,7 @@ class SummonsHandler:
         self.response_builder = response_builder
         self.response_handler = response_handler
         self.event_logger = event_logger
+        self.config = config or Config()
 
 
     def handle_summons(self):
@@ -132,10 +146,18 @@ class SummonsHandler:
 
         response = RepostResponseBase(summons_id=summons.id)
 
+        target_hamming_distance, target_annoy_distance = self._get_target_distances(post.subreddit)
+
         try:
-            search_results = self.image_service.check_duplicates_wrapped(post, meme_filter=True)
+            search_results = self.image_service.check_duplicates_wrapped(
+                post,
+                target_annoy_distance=target_annoy_distance,
+                target_hamming_distance=target_hamming_distance,
+                meme_filter=True
+            )
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
+            time.sleep(10)
             return
 
         msg_values = msg_values = build_msg_values_from_search(search_results, self.uowm)
@@ -147,7 +169,7 @@ class SummonsHandler:
             if sub_command == 'all':
                 response.message = IMAGE_REPOST_ALL.format(
                     count=len(search_results.matches),
-                    searched_posts=self._searched_post_str(post, search_results.index_size),
+                    searched_posts=searched_post_str(post, search_results.index_size),
                     firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
                     time=search_results.total_search_time
 
@@ -165,6 +187,19 @@ class SummonsHandler:
                 response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values)
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
+
+    def _get_target_distances(self, subreddit: str) -> Tuple[int, float]:
+        """
+        Check if the post we were summoned on is in a monitored sub.  If it is get the target distances for that sub
+        :rtype: Tuple[int,float]
+        :param subreddit: Subreddit name
+        :return: Tuple with target hamming and annoy
+        """
+        with self.uowm.start() as uow:
+            monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
+            if monitored_sub:
+                return monitored_sub.target_hamming, monitored_sub.target_annoy
+            return self.config.default_hamming_distance, self.config.default_annoy_distance
 
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
         log.debug('Sending response to summons comment %s. MESSAGE: %s', comment_id, response.message)
@@ -205,17 +240,6 @@ class SummonsHandler:
                 log.exception('Problem saving new post', exc_info=True)
 
         return post
-
-    def _searched_post_str(self, post: Post, count: int) -> str:
-        # TODO - Move to helper. Dupped in host post
-        # **Searched Images:** {index_size}
-        output = '**Searched '
-        if post.post_type == 'image':
-            output = output + f'Images:** {count:,}'
-        elif post.post_type == 'link':
-            output = output + f'Links:** {count:,}'
-
-        return output
 
     def _send_event(self, event: InfluxEvent):
         if self.event_logger:
