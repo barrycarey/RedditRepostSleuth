@@ -52,13 +52,12 @@ class ImageRepostChecker:
             return
 
         try:
-            search_results = self.image_svc.check_duplicates_wrapped(post, filter=True,
-                                           target_hamming_distance=post_filter,
-                                           target_annoy_distance=pre_filter,
-                                            only_older_matches=only_older,
-                                            same_sub=same_sub,
-                                            meme_filter=meme_filter,
-                                            debug_find=2351318)
+            search_results = self.image_svc.check_duplicates_wrapped(post, result_filter=True,
+                                                                     target_hamming_distance=post_filter,
+                                                                     target_annoy_distance=pre_filter,
+                                                                     only_older_matches=only_older,
+                                                                     same_sub=same_sub,
+                                                                     meme_filter=meme_filter)
         except Exception as e:
             log.exception('Problem checking duplicates for post %s', post_id)
             response['status'] = 'error'
