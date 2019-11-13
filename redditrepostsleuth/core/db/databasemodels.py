@@ -259,7 +259,9 @@ class MemeTemplate(Base):
             'target_hamming': self.target_hamming,
             'target_annoy': self.target_annoy,
             'example': self.example,
-            'template_detection_hamming': self.template_detection_hamming
+            'template_detection_hamming': self.template_detection_hamming,
+            'created_from_submission': self.created_from_submission,
+            'approved': self.approved
         }
 
 class InvestigatePost(Base):

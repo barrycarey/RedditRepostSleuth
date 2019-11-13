@@ -18,6 +18,7 @@ class MemeTemplate:
             'payload': None
         }
         id = req.params.get('id')
+        approved = req.params.get('approved')
 
 
         with self.uowm.start() as uow:
@@ -25,6 +26,11 @@ class MemeTemplate:
                 template = uow.meme_template.get_by_id(id)
                 response['status'] = 'success'
                 response['payload'] = [template.to_dict()]
+                resp.body = response
+            elif approved:
+                templates = uow.meme_template.get_all_unapproved()
+                response['status'] = 'success'
+                response['payload'] = [template.to_dict() for template in templates]
                 resp.body = response
             else:
 
