@@ -21,3 +21,6 @@ class MemeTemplateRepository:
 
     def update(self, item: MemeTemplate):
         self.db_session.merge(item)
+
+    def remove(self, item: MemeTemplate):
+        self.db_session.delete(item)
