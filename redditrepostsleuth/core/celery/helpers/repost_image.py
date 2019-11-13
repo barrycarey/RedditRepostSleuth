@@ -8,7 +8,7 @@ from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.util.helpers import is_image_still_available
+from redditrepostsleuth.core.util.helpers import is_image_still_available, create_meme_template
 
 
 # TODO - Drop logging lines
@@ -31,6 +31,7 @@ def save_image_repost_result(repost: RepostWrapper, uowm: UnitOfWorkManager) -> 
     :param uowm:
     :return:
     """
+    # TODO - This whole function needs to be broken up
     with uowm.start() as uow:
 
         repost.checked_post.checked_repost = True
@@ -66,10 +67,28 @@ def save_image_repost_result(repost: RepostWrapper, uowm: UnitOfWorkManager) -> 
                 log.info('Adding Investigate Post: High match meme')
                 inv_post = InvestigatePost(post_id=repost_of.post.post_id, matches=len(repost.matches),
                                            url=repost.checked_post.url, flag_reason='meme match')
+
+                try:
+                    meme_template = create_meme_template(repost.checked_post.url, repost.checked_post.title)
+                    meme_template.approved = False
+                    meme_template.created_from_submission = f'https://redd.it/{repost.checked_post.post_id}'
+                    uow.meme_template.add(meme_template)
+                except Exception as e:
+                    log.exception('Failed to create meme templaet', exc_info=True)
+
                 uow.investigate_post.add(inv_post)
             elif len(repost.matches) > 10 and 'meme' in repost.checked_post.subreddit.lower():
                 log.info('Adding Investigate Post: High match meme')
                 inv_post = InvestigatePost(post_id=repost_of.post.post_id, matches=len(repost.matches), url=repost.checked_post.url, flag_reason='High match meme')
+
+                try:
+                    meme_template = create_meme_template(repost.checked_post.url, repost.checked_post.title)
+                    meme_template.approved = False
+                    meme_template.created_from_submission = f'https://redd.it/{repost.checked_post.post_id}'
+                    uow.meme_template.add(meme_template)
+                except Exception as e:
+                    log.exception('Failed to create meme templaet', exc_info=True)
+
                 uow.investigate_post.add(inv_post)
             elif len(repost.matches) > 40:
                 log.info('Adding Investigate Post: High match meme')

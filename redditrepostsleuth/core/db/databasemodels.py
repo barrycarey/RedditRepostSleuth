@@ -246,6 +246,8 @@ class MemeTemplate(Base):
     target_annoy = Column(Float)
     example = Column(String(500))
     template_detection_hamming = Column(Integer)
+    created_from_submission = Column(String(100))
+    approved = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
