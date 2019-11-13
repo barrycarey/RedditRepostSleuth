@@ -12,7 +12,7 @@ class InvestigatePostRepo:
         return self.db_session.query(InvestigatePost).filter(InvestigatePost.id == id).first()
 
     def get_all(self):
-        return self.db_session.query(InvestigatePost).order_by(InvestigatePost.matches.desc()).limit(100).all()
+        return self.db_session.query(InvestigatePost).filter(InvestigatePost.flag_reason == 'High match meme').order_by(InvestigatePost.matches.desc()).limit(100).all()
 
     def remove(self, item: InvestigatePost):
         self.db_session.delete(item)

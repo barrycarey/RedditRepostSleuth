@@ -218,7 +218,7 @@ class DuplicateImageService:
                 continue
 
             # TODO - Clean up this cluster fuck
-            if match.hamming_distance > (target_hamming_distance if not is_meme else 0):
+            if match.hamming_distance > (target_hamming_distance if not is_meme else 0): # If it's a meme use 0 first pass on default hash.
                 log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance if not is_meme else 0,
                           match.hamming_distance, f'https://redd.it/{match.post.post_id}')
                 continue
@@ -321,6 +321,7 @@ class DuplicateImageService:
         return search_results
 
     def _filter_search_results(self):
+        pass
 
     def _search_index_by_vector(self, vector: bytearray, index: AnnoyIndex, max_matches=50) -> List[ImageMatch]:
         r = index.get_nns_by_vector(list(vector), max_matches, search_k=20000, include_distances=True)
