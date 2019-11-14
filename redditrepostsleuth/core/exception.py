@@ -26,3 +26,7 @@ class SubmissionNotFoundException(RepostSleuthException):
 class RateLimitException(RepostSleuthException):
     def __init__(self, message):
         super(RateLimitException, self).__init__(message)
+
+class InvalidImageUrlException(RepostSleuthException):
+    def __init__(self, message):
+        super(InvalidImageUrlException, self).__init__(message)
