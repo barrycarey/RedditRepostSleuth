@@ -32,18 +32,6 @@ from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts, clean_repost_matches
 
 
-@celery.task
-def image_hash(data):
-    try:
-        img = generate_img_by_url(data['url'])
-        data['hash'] = generate_dhash(img)
-    except ImageConversioinException as e:
-        data['delete'] = True
-
-    return data
-
-
-
 
 @celery.task(bind=True, base=EventLoggerTask, ignore_results=True, serializer='pickle')
 def log_event(self, event):

@@ -11,35 +11,14 @@ from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post):
-    # TODO - This whole mess needs to be cleaned up
     with self.uowm.start() as uow:
         existing = uow.posts.get_by_post_id(post.post_id)
         if existing:
             return
-        try:
-            log.debug(post)
-            post = pre_process_post(post, self.uowm, self.config.image_hash_api)
-        except (ImageConversioinException, ConnectionError) as e:
-            if isinstance(e, ConnectionError):
-                log.exception('Issue getting URL during save', exc_info=True)
-                log.error(post.url)
-                return
-            log.error('Failed to hash image post %s', post.post_id)
-            return
+        log.debug(post)
+        post = pre_process_post(post, self.uowm, self.config.image_hash_api)
+        ingest_repost_check.apply_async((post,self.config), queue='repost')
 
-        # TODO - Move into function
-
-        try:
-            uow.posts.add(post)
-            # TODO - Cleanly deal with this.  This is hacked in for now
-            if post.post_type == 'image':
-                image_current = RedditImagePostCurrent(post_id=post.post_id, created_at=post.created_at, dhash_v=post.dhash_v, dhash_h=post.dhash_h)
-                uow.image_post_current.add(image_current)
-            uow.commit()
-            log.debug('Commited Post: %s', post)
-            ingest_repost_check.apply_async((post,self.config), queue='repost')
-        except Exception as e:
-            log.exception('Problem saving new post', exc_info=True)
 
 @celery.task(ignore_results=True)
 def ingest_repost_check(post, config):
