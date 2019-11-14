@@ -1,3 +1,5 @@
+import json
+
 import requests
 from typing import Dict, List
 
@@ -148,7 +150,6 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}'
     }
 
-
     results_values = {}
 
     if search_results.matches:
@@ -166,6 +167,13 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
             'match_list': build_markdown_list(search_results.matches),
             'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
             'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
+            'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
+            'false_positive_data': json.dumps(
+                {
+                    'post': base_values['post_shortlink'],
+                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
+                }
+            )
         }
 
     if uowm:
