@@ -28,12 +28,13 @@ class TestResponseBuilder(TestCase):
             'newest_percent_match': '100',
             'post_shortlink': 'https://redd.it/1234',
             'stats_searched_post_str': 'search str',
-            'total_posts': 100
+            'total_posts': 100,
+            'false_positive_data': '{"post": "https://redd.it/1234", "meme_template": 10}'
         }
         expected = 'test 10 image 5\n\n' \
                    'search str | **Indexed Posts:** 100 | **Search Time:** 5s \n\n' \
                    '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report ' \
-                   '[ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message=https://redd.it/1234) ]*'
+                   '[ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={"post": "https://redd.it/1234", "meme_template": 10}) ]*'
         result = response_builder.build_sub_repost_comment('test', msg_values, signature=True, stats=True)
         self.assertEqual(expected, result)
 
@@ -94,7 +95,7 @@ class TestResponseBuilder(TestCase):
         expected = 'Looks like a repost. I\'ve seen this image 5 times. \n\n' \
                          'test 100 match. test 100 match \n\n' \
                    '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report ' \
-                   '[ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message=https://redd.it/1234) ]*'
+                   '[ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={"post": "https://redd.it/1234", "meme_template": 10}) ]*'
         msg_values = {
             'total_searched': 10,
             'post_type': 'image',
@@ -105,7 +106,8 @@ class TestResponseBuilder(TestCase):
             'oldest_percent_match': '100',
             'last_seen': 'test',
             'newest_percent_match': '100',
-            'post_shortlink': 'https://redd.it/1234'
+            'post_shortlink': 'https://redd.it/1234',
+            'false_positive_data': '{"post": "https://redd.it/1234", "meme_template": 10}'
         }
         result = response_builder.build_default_repost_comment(msg_values, signature=True, stats=False)
         self.assertEqual(expected, result)
@@ -116,7 +118,7 @@ class TestResponseBuilder(TestCase):
                          'test 100 match. test 100 match \n\n' \
                    'search str | **Indexed Posts:** 100 | **Search Time:** 5s \n\n' \
                    '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report ' \
-                   '[ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message=https://redd.it/1234) ]*'
+                   '[ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={"post": "https://redd.it/1234", "meme_template": 10}) ]*'
         msg_values = {
             'total_searched': 10,
             'post_type': 'image',
@@ -129,7 +131,8 @@ class TestResponseBuilder(TestCase):
             'newest_percent_match': '100',
             'post_shortlink': 'https://redd.it/1234',
             'stats_searched_post_str': 'search str',
-            'total_posts': 100
+            'total_posts': 100,
+            'false_positive_data': '{"post": "https://redd.it/1234", "meme_template": 10}'
         }
         result = response_builder.build_default_repost_comment(msg_values, signature=True, stats=True)
         self.assertEqual(expected, result)

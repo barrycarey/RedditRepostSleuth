@@ -18,7 +18,7 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n'
 
-COMMENT_SIGNATURE_REPOST = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={post_shortlink}) ]*'
+COMMENT_SIGNATURE_REPOST = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]*'
 COMMENT_SIGNATURE_OC = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={post_shortlink}) ]*'
 
 DEFAULT_REPOST_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
