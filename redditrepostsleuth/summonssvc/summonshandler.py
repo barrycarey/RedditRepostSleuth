@@ -3,6 +3,8 @@ import time
 from datetime import datetime
 from typing import Tuple
 
+from praw.exceptions import APIException
+
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -203,7 +205,10 @@ class SummonsHandler:
 
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
         log.debug('Sending response to summons comment %s. MESSAGE: %s', comment_id, response.message)
-        reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons', send_pm_on_fail=True)
+        try:
+            reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons', send_pm_on_fail=True)
+        except APIException as e:
+            return
         response.message = reply.body # TODO - I don't like this.  Make save_resposne take a CommentReply
         self._save_response(response, reply)
 

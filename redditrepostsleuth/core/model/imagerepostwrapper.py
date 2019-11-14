@@ -19,3 +19,6 @@ class ImageRepostWrapper(RepostWrapper):
             'meme_template': self.meme_template.to_dict() if self.meme_template else None
         }
         return {**r, **super(ImageRepostWrapper,self).to_dict()}
+
+    def __repr__(self):
+        return f'Checked Post: {self.checked_post.post_id} - Matches: {len(self.matches)} - Meme Template: {self.meme_template} - Search Time: {self.total_search_time}'
