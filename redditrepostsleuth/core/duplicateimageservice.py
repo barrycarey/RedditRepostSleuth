@@ -298,6 +298,7 @@ class DuplicateImageService:
                     search_results.meme_template = meme_template
                     target_hamming_distance = meme_template.target_hamming
                     target_annoy_distance = meme_template.target_annoy
+                    log.info('Using meme filter %s', meme_template.name)
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
 
