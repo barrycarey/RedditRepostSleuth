@@ -133,7 +133,8 @@ class Config:
             'repost_link_check_on_ingest',
             'image_hash_api',
             'summons_subreddits',
-            'hot_post_comment_on_oc'
+            'hot_post_comment_on_oc',
+            'supported_post_types'
         ]
 
         for attribute in attrbs:

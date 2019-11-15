@@ -98,7 +98,7 @@ class SummonsHandler:
             self._send_response(summons.comment_id, response)
             return
 
-        if post.post_type is None or post.post_type not in ['image']:
+        if post.post_type is None or post.post_type not in config.supported_post_types:
             log.error('Submission has no post hint.  Cannot process summons')
             response.status = 'error'
             response.message = UNSUPPORTED_POST_TYPE
