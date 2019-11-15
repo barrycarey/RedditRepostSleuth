@@ -5,6 +5,7 @@ from praw.models import Submission, Comment
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -27,13 +28,18 @@ class SubMonitor:
             uowm: SqlAlchemyUnitOfWorkManager,
             reddit: RedditManager,
             response_builder: ResponseBuilder,
-            response_handler: ResponseHandler
+            response_handler: ResponseHandler,
+            config: Config = None
     ):
         self.image_service = image_service
         self.uowm = uowm
         self.reddit = reddit
         self.response_builder = response_builder
         self.resposne_handler = response_handler
+        if config:
+            self.config = config
+        else:
+            self.config = Config()
 
     def run(self):
         while True:
@@ -65,7 +71,7 @@ class SubMonitor:
         if post.left_comment:
             return False
 
-        if post.post_type not in ['image']:
+        if post.post_type not in self.config.supported_post_types:
             return False
 
         if not post.dhash_h:
