@@ -1,7 +1,7 @@
 from time import perf_counter
 
 from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent
-from redditrepostsleuth.core.exception import ImageConversioinException
+from redditrepostsleuth.core.exception import ImageConversioinException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.core.celery import celery
@@ -9,26 +9,27 @@ from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,), retry_kwargs={'max_retries': 20, 'countdown': 300})
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post):
     with self.uowm.start() as uow:
         existing = uow.posts.get_by_post_id(post.post_id)
         if existing:
             return
-        log.debug(post)
+        log.debug('Post %s: Ingesting', post.post_id)
         post = pre_process_post(post, self.uowm, self.config.image_hash_api)
-        ingest_repost_check.apply_async((post,self.config), queue='repost')
+        if post:
+            ingest_repost_check.apply_async((post,self.config), queue='repost')
+            log.debug('Post %s: Sent post to repost queue', post.post_id)
+        else:
+            log.error('Post %s: Failed to ingest', post.post_id)
 
 
 @celery.task(ignore_results=True)
 def ingest_repost_check(post, config):
     if post.post_type == 'image' and config.repost_image_check_on_ingest:
-        #check_image_repost_save.apply_async((post,), queue='repost_image')
-        # TODO - Make sure this works
         celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post], queue='repost_image')
     elif post.post_type == 'link' and config.repost_link_check_on_ingest:
         celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]], queue='repost_link')
-        #link_repost_check().apply_async(([post],))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results(self, data):

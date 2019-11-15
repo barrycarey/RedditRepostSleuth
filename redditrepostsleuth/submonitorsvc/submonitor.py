@@ -57,8 +57,10 @@ class SubMonitor:
                 return False
             post = uow.posts.get_by_post_id(submission.id)
             if not post:
-                log.info('Post %s has not been ingested yet.  Skipping')
-                return False
+                post = self.save_unknown_post(submission.id)
+                if not post:
+                    log.info('Post %s has not been ingested yet.  Skipping')
+                    return False
 
         if post.left_comment:
             return False
@@ -191,27 +193,18 @@ class SubMonitor:
 
         return self.resposne_handler.reply_to_submission(submission.id, msg, source='submonitor')
 
-    def _save_unknown_post(self, submission: Submission) -> Post:
+    def save_unknown_post(self, post_id: str) -> Post:
         """
         If we received a request on a post we haven't ingest save it
         :param submission: Reddit Submission
         :return:
         """
-        post = submission_to_post(submission)
-        try:
-            post = pre_process_post(post, self.uowm, None)
-        except IntegrityError as e:
-            log.error('Image post already exists')
-
-        return post
-        with self.uowm.start() as uow:
-            try:
-                uow.posts.add(post)
-                uow.commit()
-                uow.posts.remove_from_session(post)
-                log.debug('Commited Post: %s', post)
-            except Exception as e:
-                log.exception('Problem saving new post', exc_info=True)
+        log.info('Post %s does not exist, attempting to ingest', post_id)
+        submission = self.reddit.submission(post_id)
+        post = pre_process_post(submission_to_post(submission), self.uowm, None)
+        if not post or post.post_type != 'image':
+            log.error('Problem ingesting post.  Either failed to save or it is not an image')
+            return
 
         return post
 
