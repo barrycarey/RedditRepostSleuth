@@ -1,7 +1,7 @@
 import re
 import time
 from datetime import datetime
-from typing import Tuple
+from typing import Tuple, Text
 
 from praw.exceptions import APIException
 
@@ -28,6 +28,7 @@ from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, U
     IMAGE_REPOST_ALL
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
+from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
 
 class SummonsHandler:
@@ -50,6 +51,7 @@ class SummonsHandler:
         self.response_handler = response_handler
         self.event_logger = event_logger
         self.config = config or Config()
+        self.command_parser = CommandParser()
 
 
     def handle_summons(self):
@@ -68,11 +70,13 @@ class SummonsHandler:
             except Exception as e:
                 log.exception('Exception in handle summons thread')
 
+    def handle_summons(self, summons: Summons):
+        base_command = self.command_parser
+
+    def _strip_summons_flags(self, comment_body: Text) -> Text:
+
+
     def handle_repost_request(self, summons: Summons):
-
-        parsed_command = re.search('\?repost\s(?P<command>[^\s]+)(?P<subcommand>\s[^\s]+)?', summons.comment_body, re.IGNORECASE)
-
-        log.info('Processing request for comment %s. Body: %s', summons.comment_id, summons.comment_body)
 
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(summons.post_id)
