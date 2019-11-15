@@ -80,16 +80,13 @@ class SummonsHandler:
         response = RepostResponseBase(summons_id=summons.id)
 
         if not post:
-            response.message = 'Sorry, an error is preventing me from checking this post.'
+            post = self.save_unknown_post(summons.post_id)
+
+        if not post:
+            response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
+            log.info('Failed to ingest post %s.  Sending error response', summons.post_id)
             self._send_response(summons.comment_id, response)
             return
-            log.info('Post ID %s does not exist in database.  Attempting to ingest', summons.post_id)
-            post = self.save_unknown_post(summons.post_id)
-            if not post.id:
-                log.exception('Failed to save unknown post %s', summons.post_id)
-                response.message = 'Sorry, an error is preventing me from checking this post.'
-                self._send_response(summons.comment_id, response)
-                return
 
         # TODO - Send PM instead of comment reply
         if self.summons_disabled:
@@ -233,16 +230,11 @@ class SummonsHandler:
         :param submission: Reddit Submission
         :return:
         """
-        # TODO - Deal with case of not finding post ID.  Should be rare since this is triggered directly via a comment
         submission = self.reddit.submission(post_id)
         post = pre_process_post(submission_to_post(submission), self.uowm, None)
-        with self.uowm.start() as uow:
-            try:
-                uow.posts.add(post)
-                uow.commit()
-                log.debug('Commited Post: %s', post)
-            except Exception as e:
-                log.exception('Problem saving new post', exc_info=True)
+        if not post or post.post_type != 'image':
+            log.error('Problem ingesting post.  Either failed to save or it is not an image')
+            return
 
         return post
 

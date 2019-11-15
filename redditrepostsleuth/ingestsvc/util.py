@@ -9,22 +9,25 @@ from redditrepostsleuth.core.db.databasemodels import RedditImagePost, Post, Red
 
 from hashlib import md5
 
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes_api, set_image_hashes
-from redditrepostsleuth.core.util.objectmapping import post_to_image_post, post_to_image_post_current
+from redditrepostsleuth.core.util.objectmapping import post_to_image_post, post_to_image_post_current, \
+    submission_to_post
 
 
 def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
     log.debug(post)
     with uowm.start() as uow:
         if post.post_type == 'image':
+            log.debug('Post %s: Is an image', post.post_id)
             post, image_post, image_post_current = process_image_post(post, hash_api)
             if image_post is None or image_post_current is None:
-                log.error('Failed to save image post. One of the post objects is null')
+                log.error('Post %s: Failed to save image post. One of the post objects is null', post.post_id)
                 log.error('Image Post: %s - Image Post Current: %s', image_post, image_post_current)
                 return
 
             if not post.dhash_h:
-                log.error('Post %s is missing dhash', post.post_id)
+                log.error('Post %s: is missing dhash', post.post_id)
                 return
 
             uow.image_post.add(image_post)
@@ -38,8 +41,9 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
         try:
             uow.posts.add(post)
             uow.commit()
+            log.debug('Post %s: Commited post to database', post.post_id)
         except Exception as e:
-            log.exception('Failed to save now post')
+            log.exception('Post %s: Database save failed', post.post_id, exc_info=True)
             return
 
     return post
@@ -49,18 +53,20 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, Redd
     try: # Make sure URL is still valid
         r = requests.head(post.url)
     except ConnectionError as e:
-        log.error('Failed to verify image URL at %s', post.url)
+        log.error('Post %s: Failed to verify image URL at %s', post.post_id, post.url)
         raise
 
     if r.status_code != 200:
-        log.error('Image no longer exists %s: %s', r.status_code, post.url)
-        raise InvalidImageUrlException('Image URL no longer valid')
+        log.error('Post %s: Image no longer exists %s: %s', post.post_id, r.status_code, post.url)
+        raise InvalidImageUrlException(f'Image URL no longer valid.  Status Code {r.status_code}')
 
-    log.info('Hashing URL: %s', post.url)
+    log.info('Post %s: Hashing with URL: %s', post.post_id, post.url)
 
     if hash_api:
+        log.debug('Post %s: Using hash API: %s', post.post_id, hash_api)
         set_image_hashes_api(post, hash_api)
     else:
+        log.debug('Post %s: Using local hashing', post.post_id)
         set_image_hashes(post)
 
     return create_image_posts(post)
@@ -73,5 +79,19 @@ def create_image_posts(post: Post) -> Tuple[Post,RedditImagePost, RedditImagePos
     """
     image_post = post_to_image_post(post)
     image_post_current = post_to_image_post_current(post)
-
+    log.debug('Post %s: Created image_post and image_post_current', post.post_id)
     return post, image_post, image_post_current
+
+def save_unknown_post(post_id: str, uowm: UnitOfWorkManager, reddit: RedditManager) -> Post:
+    """
+    If we received a request on a post we haven't ingest save it
+    :param submission: Reddit Submission
+    :return:
+    """
+    submission = reddit.submission(post_id)
+    post = pre_process_post(submission_to_post(submission), uowm, None)
+    if not post or post.post_type != 'image':
+        log.error('Problem ingesting post.  Either failed to save or it is not an image')
+        return
+
+    return post
