@@ -74,7 +74,13 @@ class SummonsHandler:
         base_command = self.command_parser
 
     def _strip_summons_flags(self, comment_body: Text) -> Text:
-
+        log.debug('Attempting to parse summons comment')
+        log.debug(comment_body)
+        user_tag = comment_body.lower().find('repostsleuthbot')
+        keyword_tag = comment_body.lower().find('?repost')
+        if user_tag < 1 and keyword_tag < 1:
+            log.error('Unable to find summons tag in: %s', comment_body)
+            return
 
     def handle_repost_request(self, summons: Summons):
 
