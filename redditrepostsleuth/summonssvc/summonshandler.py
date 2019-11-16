@@ -164,29 +164,31 @@ class SummonsHandler:
 
         response = RepostResponseBase(summons_id=summons.id)
         cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
-        search_results = check_link_repost(post, self.uowm)
+        search_results = check_link_repost(post, self.uowm, get_total=True)
         msg_values = build_msg_values_from_search(search_results, self.uowm)
 
-        # TODO - Move this to message builder
-        if cmd.all_matches:
-            response.message = IMAGE_REPOST_ALL.format(
-                count=len(search_results.matches),
-                searched_posts=searched_post_str(post, search_results.index_size),
-                firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
-                time=search_results.total_search_time
-
-            )
-            response.message = response.message + build_markdown_list(search_results.matches)
-            if len(search_results.matches) > 4:
-                log.info('Sending check all results via PM with %s matches', len(search_results.matches))
-                comment = self.reddit.comment(summons.comment_id)
-                self.response_handler.send_private_message(comment.author, response.message)
-                response.message = f'I found {len(search_results.matches)} matches.  I\'m sending them to you via PM to reduce comment spam'
-
-            response.message = response.message
+        if not search_results.matches:
+            response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
         else:
+        # TODO - Move this to message builder
+            if cmd.all_matches:
+                response.message = IMAGE_REPOST_ALL.format(
+                    count=len(search_results.matches),
+                    searched_posts=searched_post_str(post, search_results.index_size),
+                    firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
+                    time=search_results.total_search_time
 
-            response.message = self.response_builder.build_provided_comment_template(post.subreddit, msg_values)
+                )
+                response.message = response.message + build_markdown_list(search_results.matches)
+                if len(search_results.matches) > 4:
+                    log.info('Sending check all results via PM with %s matches', len(search_results.matches))
+                    comment = self.reddit.comment(summons.comment_id)
+                    self.response_handler.send_private_message(comment.author, response.message)
+                    response.message = f'I found {len(search_results.matches)} matches.  I\'m sending them to you via PM to reduce comment spam'
+
+                response.message = response.message
+            else:
+                response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
 
         self._send_response(summons.comment_id, response)
 
@@ -219,7 +221,7 @@ class SummonsHandler:
         msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
 
         if not search_results.matches:
-            response.message = self.response_builder.build_default_oc_comment(msg_values)
+            response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
         else:
 
             # TODO - Move this to message builder
@@ -241,7 +243,7 @@ class SummonsHandler:
                 response.message = response.message
             else:
 
-                response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values)
+                response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
