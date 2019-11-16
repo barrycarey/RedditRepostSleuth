@@ -1,4 +1,3 @@
-import re
 import time
 from datetime import datetime
 from typing import Tuple, Text
@@ -17,17 +16,16 @@ from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
-from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
+from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen, \
     searched_post_str
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, UNKNOWN_COMMAND, LINK_ALL, \
-    REPOST_NO_RESULT, DEFAULT_COMMENT_OC, \
-    IMAGE_REPOST_ALL
+from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, LINK_ALL, \
+    REPOST_NO_RESULT, IMAGE_REPOST_ALL
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
@@ -55,7 +53,6 @@ class SummonsHandler:
         self.config = config or Config()
         self.command_parser = CommandParser(config=self.config)
 
-
     def handle_summons(self):
         """
         Continually check the summons table for new requests.  Handle them as they are found
@@ -77,7 +74,8 @@ class SummonsHandler:
                             continue
 
                         self.process_summons(s, post)
-                        summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds, s.summons_received_at, s.requestor, event_type='summons')
+                        summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
+                                                     s.summons_received_at, s.requestor, event_type='summons')
                         self._send_event(summons_event)
                 time.sleep(2)
             except Exception as e:
@@ -119,8 +117,6 @@ class SummonsHandler:
         else:
             log.error('Unable to find summons tag in: %s', comment_body)
             return
-
-
 
     def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
@@ -248,10 +244,11 @@ class SummonsHandler:
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
         log.debug('Sending response to summons comment %s. MESSAGE: %s', comment_id, response.message)
         try:
-            reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons', send_pm_on_fail=True)
+            reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons',
+                                                           send_pm_on_fail=True)
         except APIException as e:
             return
-        response.message = reply.body # TODO - I don't like this.  Make save_resposne take a CommentReply
+        response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
         self._save_response(response, reply)
 
     def _save_response(self, response: RepostResponseBase, reply: CommentReply, subreddit: str = None):
@@ -260,7 +257,7 @@ class SummonsHandler:
             if summons:
                 summons.comment_reply = response.message
                 summons.summons_replied_at = datetime.utcnow()
-                summons.comment_reply_id = reply.comment.id if reply.comment else None # TODO: Hacky
+                summons.comment_reply_id = reply.comment.id if reply.comment else None  # TODO: Hacky
                 uow.commit()
                 log.debug('Committed summons response to database')
 

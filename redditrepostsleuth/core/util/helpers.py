@@ -5,16 +5,11 @@ from typing import Dict, List
 
 import imagehash
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
-
-# TODO - Move praw dependant helpers to own file to reduce dependency
-
-
-
-# TODO - Pull this out and retest
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
@@ -44,15 +39,13 @@ def get_post_type_pushshift(submission: Dict) -> str:
     if post_hint:
         return post_hint
 
-    #log.debug('No post_hint for post %s. Trying to guess post type', submission['id'])
-    #TODO - add tests
     image_exts = ['.jpg', '.png', '.jpeg', '.gif']
     for ext in image_exts:
         if ext in submission['url']:
             #log.debug('Post URL %s is an image', submission['url'])
             return 'image'
 
-    reddit = get_reddit_instance()
+    reddit = get_reddit_instance(config=Config())
     is_video = submission.get('is_video', None)
     if is_video:
         #log.debug('Post %s has is_video value of %s. It is a video', submission['id'], is_video)
