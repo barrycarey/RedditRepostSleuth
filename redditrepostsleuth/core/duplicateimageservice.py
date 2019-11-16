@@ -265,7 +265,10 @@ class DuplicateImageService:
         self._load_index_files()
         search_results = ImageRepostWrapper()
         start = perf_counter()
-        search_array = bytearray(post.dhash_h, encoding='utf-8')
+        try:
+            search_array = bytearray(post.dhash_h, encoding='utf-8')
+        except Exception as e:
+            print('')
         current_results = []
 
         raw_results = self._search_index_by_vector(search_array, self.historical_index, max_matches=max_matches)
