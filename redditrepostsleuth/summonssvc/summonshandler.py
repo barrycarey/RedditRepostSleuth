@@ -9,8 +9,10 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.commands.repost_base_cmd import RepostBaseCmd
+from redditrepostsleuth.core.model.commands.repost_image_cmd import RepostImageCmd
 from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
@@ -51,7 +53,7 @@ class SummonsHandler:
         self.response_handler = response_handler
         self.event_logger = event_logger
         self.config = config or Config()
-        self.command_parser = CommandParser()
+        self.command_parser = CommandParser(config=self.config)
 
 
     def handle_summons(self):
@@ -63,78 +65,104 @@ class SummonsHandler:
                 with self.uowm.start() as uow:
                     summons = uow.summons.get_unreplied()
                     for s in summons:
-                        self.handle_repost_request(s)
+                        post = uow.posts.get_by_post_id(s.post_id)
+                        if not post:
+                            post = self.save_unknown_post(s.post_id)
+
+                        if not post:
+                            response = RepostResponseBase(summons_id=s.id)
+                            response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
+                            log.info('Failed to ingest post %s.  Sending error response', s.post_id)
+                            self._send_response(s.comment_id, response)
+                            continue
+
+                        self.process_summons(s, post)
                         summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds, s.summons_received_at, s.requestor, event_type='summons')
                         self._send_event(summons_event)
                 time.sleep(2)
             except Exception as e:
                 log.exception('Exception in handle summons thread')
 
-    def handle_summons(self, summons: Summons):
-        base_command = self.command_parser
+    def _get_summons_cmd(self, cmd_body: Text, post_type: Text) -> RepostBaseCmd:
+        cmd_str = self._strip_summons_flags(cmd_body.comment_body)
+        try:
+            base_command = self.command_parser.parse_root_command(cmd_str)
+            if base_command == 'repost':
+                return self._get_repost_cmd(cmd_body, post_type)
+        except InvalidCommandException:
+            log.error('Received command is invalid: %s', cmd_body.comment_body)
+
+        return self._get_repost_cmd(cmd_body, post_type)
+
+    def _get_repost_cmd(self, post_type: Text, cmd_body: Text) -> RepostBaseCmd:
+        if post_type == 'image':
+            return self._get_image_repost_cmd(cmd_body)
+        elif post_type == 'link':
+            return self._get_link_repost_cmd(cmd_body)
+
+    def _get_image_repost_cmd(self, cmd_body: Text) -> RepostImageCmd:
+        return self.command_parser.parse_repost_image_cmd(cmd_body)
+
+    def _get_link_repost_cmd(self, cmd_body: Text):
+        pass
 
     def _strip_summons_flags(self, comment_body: Text) -> Text:
         log.debug('Attempting to parse summons comment')
         log.debug(comment_body)
         user_tag = comment_body.lower().find('repostsleuthbot')
         keyword_tag = comment_body.lower().find('?repost')
-        if user_tag < 1 and keyword_tag < 1:
+        if user_tag > 1:
+            # TODO - Possibly return none if len > 100
+            return comment_body[user_tag + 15:].strip()
+        elif keyword_tag > 1:
+            return comment_body[keyword_tag + 7:].strip()
+        else:
             log.error('Unable to find summons tag in: %s', comment_body)
             return
 
-    def handle_repost_request(self, summons: Summons):
 
-        with self.uowm.start() as uow:
-            post = uow.posts.get_by_post_id(summons.post_id)
 
-        response = RepostResponseBase(summons_id=summons.id)
-
-        if not post:
-            post = self.save_unknown_post(summons.post_id)
-
-        if not post:
-            response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
-            log.info('Failed to ingest post %s.  Sending error response', summons.post_id)
-            self._send_response(summons.comment_id, response)
-            return
-
-        # TODO - Send PM instead of comment reply
+    def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
-            log.info('Sending summons disabled message')
-            response.message = 'I\m currently down for maintenance, check back in an hour'
-            self._send_response(summons.comment_id, response)
+            self._send_summons_disable_msg(summons)
+        try:
+            base_command = self.command_parser.parse_root_command(summons.comment_body)
+        except InvalidCommandException:
+            log.error('Invalid command in summons: %s', summons.comment_body)
+            base_command = 'repost'
+
+        # TODO - Create command registry instead of manually defining
+        if base_command == 'stats':
+            pass
+        elif base_command == 'watch':
+            pass
+
+        if post.post_type is None or post.post_type not in self.config.supported_post_types:
+            log.error('Post %s: Type %s not support', f'https://redd.it/{post.post_id}', post.post_type)
+            self._send_unsupported_msg(summons)
             return
 
-        if post.post_type is None or post.post_type not in config.supported_post_types:
-            log.error('Submission has no post hint.  Cannot process summons')
-            response.status = 'error'
-            response.message = UNSUPPORTED_POST_TYPE
-            self._send_response(summons.comment_id, response)
-            return
+        self.process_repost_request(summons, post)
 
-        # We just got the summons flag without a command.  Default to repost check
-        if not parsed_command:
-            self.process_repost_request(summons, post)
-            return
+    def _send_unsupported_msg(self, summons: Summons):
+        response = RepostResponseBase(summons_id=summons.id)
+        response.status = 'error'
+        response.message = UNSUPPORTED_POST_TYPE
+        self._send_response(summons.comment_id, response)
 
-        sub_command = parsed_command.group('subcommand')
-        if sub_command:
-            sub_command = sub_command.strip()
+    def _send_summons_disable_msg(self, summons: Summons):
+        # TODO - Send PM instead of comment reply
+        response = RepostResponseBase(summons_id=summons.id)
+        log.info('Sending summons disabled message')
+        response.message = 'I\m currently down for maintenance, check back in an hour'
+        self._send_response(summons.comment_id, response)
+        return
 
-        # TODO handle case when no command is passed
-        if parsed_command.group('command').lower() == 'check':
-            self.process_repost_request(summons, post, sub_command=sub_command)
-        else:
-            log.error('Unknown command')
-            response.message = UNKNOWN_COMMAND
-            self._send_response(summons.comment_id, response)
-
-
-    def process_repost_request(self, summons: Summons, post: Post, sub_command: str = None):
+    def process_repost_request(self, summons: Summons, post: Post):
         if post.post_type == 'image':
-            self.process_image_repost_request(summons, post, sub_command=sub_command)
+            self.process_image_repost_request(summons, post)
         elif post.post_type == 'link':
-            self.process_link_repost_request(summons, post, sub_command=sub_command)
+            self.process_link_repost_request(summons, post)
 
     def process_link_repost_request(self, summons: Summons, post: Post, sub_command: str = None):
 
@@ -151,18 +179,25 @@ class SummonsHandler:
                 response.message = REPOST_NO_RESULT.format(total=search_count)
             self._send_response(summons.comment_id, response)
 
-    def process_image_repost_request(self, summons: Summons, post: Post, sub_command: str = None):
+    def process_image_repost_request(self, summons: Summons, post: Post):
+
+        cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
 
         response = RepostResponseBase(summons_id=summons.id)
 
-        target_hamming_distance, target_annoy_distance = self._get_target_distances(post.subreddit)
+        target_hamming_distance, target_annoy_distance = self._get_target_distances(
+            post.subreddit,
+            override_hamming_distance=cmd.strictness
+        )
 
         try:
             search_results = self.image_service.check_duplicates_wrapped(
                 post,
                 target_annoy_distance=target_annoy_distance,
                 target_hamming_distance=target_hamming_distance,
-                meme_filter=True
+                meme_filter=cmd.meme_filter,
+                same_sub=cmd.same_sub,
+                date_cutoff=cmd.match_age
             )
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
@@ -175,7 +210,7 @@ class SummonsHandler:
             response.message = self.response_builder.build_default_oc_comment(msg_values)
         else:
 
-            if sub_command == 'all':
+            if cmd.all_matches:
                 response.message = IMAGE_REPOST_ALL.format(
                     count=len(search_results.matches),
                     searched_posts=searched_post_str(post, search_results.index_size),
@@ -197,7 +232,7 @@ class SummonsHandler:
 
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
-    def _get_target_distances(self, subreddit: str) -> Tuple[int, float]:
+    def _get_target_distances(self, subreddit: str, override_hamming_distance: int = None) -> Tuple[int, float]:
         """
         Check if the post we were summoned on is in a monitored sub.  If it is get the target distances for that sub
         :rtype: Tuple[int,float]
@@ -207,8 +242,8 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
             if monitored_sub:
-                return monitored_sub.target_hamming, monitored_sub.target_annoy
-            return self.config.default_hamming_distance, self.config.default_annoy_distance
+                return override_hamming_distance or monitored_sub.target_hamming, monitored_sub.target_annoy
+            return override_hamming_distance or self.config.default_hamming_distance, self.config.default_annoy_distance
 
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
         log.debug('Sending response to summons comment %s. MESSAGE: %s', comment_id, response.message)
