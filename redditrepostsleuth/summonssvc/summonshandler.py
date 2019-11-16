@@ -22,7 +22,7 @@ from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen, \
-    searched_post_str
+    searched_post_str, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, LINK_ALL, \
     REPOST_NO_RESULT, IMAGE_REPOST_ALL
@@ -102,7 +102,7 @@ class SummonsHandler:
         return self.command_parser.parse_repost_image_cmd(cmd_body)
 
     def _get_link_repost_cmd(self, cmd_body: Text):
-        pass
+        return self.command_parser.parse_repost_link_cmd(cmd_body)
 
     def _strip_summons_flags(self, comment_body: Text) -> Text:
         log.debug('Attempting to parse summons comment')
@@ -135,15 +135,15 @@ class SummonsHandler:
 
         if post.post_type is None or post.post_type not in self.config.supported_post_types:
             log.error('Post %s: Type %s not support', f'https://redd.it/{post.post_id}', post.post_type)
-            self._send_unsupported_msg(summons)
+            self._send_unsupported_msg(summons, post.post_type)
             return
 
         self.process_repost_request(summons, post)
 
-    def _send_unsupported_msg(self, summons: Summons):
+    def _send_unsupported_msg(self, summons: Summons, post_type: Text):
         response = RepostResponseBase(summons_id=summons.id)
         response.status = 'error'
-        response.message = UNSUPPORTED_POST_TYPE
+        response.message = UNSUPPORTED_POST_TYPE.format(post_type=post_type)
         self._send_response(summons.comment_id, response)
 
     def _send_summons_disable_msg(self, summons: Summons):
@@ -160,20 +160,35 @@ class SummonsHandler:
         elif post.post_type == 'link':
             self.process_link_repost_request(summons, post)
 
-    def process_link_repost_request(self, summons: Summons, post: Post, sub_command: str = None):
+    def process_link_repost_request(self, summons: Summons, post: Post):
 
         response = RepostResponseBase(summons_id=summons.id)
-        with self.uowm.start() as uow:
-            search_count = (uow.posts.get_newest_post()).id
-            result = check_link_repost(post, self.uowm)
-            if len(result.matches) > 0:
-                response.message = LINK_ALL.format(occurrences=len(result.matches),
-                                                   searched=search_count,
-                                                   original_href='https://reddit.com' + result.matches[0].perma_link,
-                                                   link_text=result.matches[0].perma_link)
-            else:
-                response.message = REPOST_NO_RESULT.format(total=search_count)
-            self._send_response(summons.comment_id, response)
+        cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
+        search_results = check_link_repost(post, self.uowm)
+        msg_values = build_msg_values_from_search(search_results, self.uowm)
+
+        # TODO - Move this to message builder
+        if cmd.all_matches:
+            response.message = IMAGE_REPOST_ALL.format(
+                count=len(search_results.matches),
+                searched_posts=searched_post_str(post, search_results.index_size),
+                firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
+                time=search_results.total_search_time
+
+            )
+            response.message = response.message + build_markdown_list(search_results.matches)
+            if len(search_results.matches) > 4:
+                log.info('Sending check all results via PM with %s matches', len(search_results.matches))
+                comment = self.reddit.comment(summons.comment_id)
+                self.response_handler.send_private_message(comment.author, response.message)
+                response.message = f'I found {len(search_results.matches)} matches.  I\'m sending them to you via PM to reduce comment spam'
+
+            response.message = response.message
+        else:
+
+            response.message = self.response_builder.build_provided_comment_template(post.subreddit, msg_values)
+
+        self._send_response(summons.comment_id, response)
 
     def process_image_repost_request(self, summons: Summons, post: Post):
 
@@ -200,16 +215,18 @@ class SummonsHandler:
             time.sleep(10)
             return
 
-        msg_values = msg_values = build_msg_values_from_search(search_results, self.uowm)
+        msg_values = build_msg_values_from_search(search_results, self.uowm)
+        msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
 
         if not search_results.matches:
             response.message = self.response_builder.build_default_oc_comment(msg_values)
         else:
 
+            # TODO - Move this to message builder
             if cmd.all_matches:
                 response.message = IMAGE_REPOST_ALL.format(
                     count=len(search_results.matches),
-                    searched_posts=searched_post_str(post, search_results.index_size),
+                    searched_posts=searched_post_str(post, search_results.total_searched),
                     firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
                     time=search_results.total_search_time
 

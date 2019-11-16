@@ -103,7 +103,7 @@ class TestHelpers(TestCase):
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         wrapper.meme_template = MemeTemplate(id=10)
         result = build_msg_values_from_search(wrapper)
@@ -120,7 +120,7 @@ class TestHelpers(TestCase):
         wrapper = ImageRepostWrapper()
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(post_id=1234)
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         wrapper.meme_template = MemeTemplate(id=10)
         result = build_msg_values_from_search(wrapper)
@@ -138,7 +138,7 @@ class TestHelpers(TestCase):
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
 
         result = build_msg_values_from_search(wrapper)
@@ -149,7 +149,7 @@ class TestHelpers(TestCase):
     def test_build_msg_values_from_search_no_match_key_total(self):
         wrapper = ImageRepostWrapper()
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper)
 
@@ -158,7 +158,7 @@ class TestHelpers(TestCase):
     def test_build_msg_values_from_search_no_match_custom_key_total(self):
         wrapper = ImageRepostWrapper()
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper, test1='test')
 
@@ -175,7 +175,7 @@ class TestHelpers(TestCase):
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
 
         result = build_msg_values_from_search(wrapper, item1='value1', item2='value2')

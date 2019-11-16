@@ -285,7 +285,7 @@ class DuplicateImageService:
             )  # Pre-filter results on default annoy value
             current_results = self._convert_annoy_results(raw_results, post.id)
             self._set_match_posts(current_results, historical=False)
-            search_results.index_size = search_results.index_size + self.current_index.get_n_items()
+            search_results.total_searched = search_results.total_searched + self.current_index.get_n_items()
         else:
             log.error('No current image index loaded.  Only using historical results')
 
@@ -320,8 +320,8 @@ class DuplicateImageService:
 
         search_results.checked_post = post
         search_results.total_search_time = round(perf_counter() - start, 5)
-        search_results.index_size = self.current_index.get_n_items() if self.current_index else 0
-        search_results.index_size = search_results.index_size + self.historical_index.get_n_items()
+        search_results.total_searched = self.current_index.get_n_items() if self.current_index else 0
+        search_results.total_searched = search_results.total_searched + self.historical_index.get_n_items()
         self._log_search_time(search_results)
         return search_results
 
@@ -351,7 +351,7 @@ class DuplicateImageService:
             AnnoySearchEvent(
                 total_search_time=search_results.total_search_time,
                 index_search_time=search_results.index_search_time,
-                index_size=search_results.index_size,
+                index_size=search_results.total_searched,
                 event_type='duplicate_image_search'
             )
         )
