@@ -13,8 +13,14 @@ class MonitoredSubRepository:
     def get_all(self, limit: int = None) -> List[MonitoredSub]:
         return self.db_session.query(MonitoredSub).limit(limit).all()
 
+    def get_by_id(self, id: int) -> MonitoredSub:
+        return self.db_session.query(MonitoredSub).filter(MonitoredSub.id == id).first()
+
     def get_by_sub(self, sub: str) -> MonitoredSub:
         return self.db_session.query(MonitoredSub).filter(MonitoredSub.name == sub).first()
+
+    def update(self, item: MonitoredSub):
+        self.db_session.merge(item)
 
     def remove(self, item: MonitoredSub):
         self.db_session.delete(item)
