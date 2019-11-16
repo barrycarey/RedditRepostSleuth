@@ -225,11 +225,12 @@ class SubMonitor:
         """
         log.info('Post %s does not exist, attempting to ingest', post_id)
         submission = self.reddit.submission(post_id)
+        post = None
         try:
             post = pre_process_post(submission_to_post(submission), self.uowm, None)
         except InvalidImageUrlException:
-            log.error('Failed to ingest post %s.  URL appears to be bad', post.post_id)
-        if not post or post.post_type != 'image':
+            log.error('Failed to ingest post %s.  URL appears to be bad', post_id)
+        if not post:
             log.error('Problem ingesting post.  Either failed to save or it is not an image')
             return
 
