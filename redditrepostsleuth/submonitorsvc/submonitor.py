@@ -15,7 +15,7 @@ from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
@@ -193,6 +193,7 @@ class SubMonitor:
     def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> Comment:
 
         msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
+        msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
         if search_results.matches:
             msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values,)
         else:
