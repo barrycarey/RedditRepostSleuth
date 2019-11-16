@@ -83,7 +83,7 @@ class SummonsMonitor:
                         summons = Summons(
                             post_id=comment.submission.id,
                             comment_id=comment.id,
-                            comment_body=comment.body,
+                            comment_body=comment.body.replace('\\',''),
                             summons_received_at=datetime.fromtimestamp(comment.created_utc),
                             requestor=comment.author.name,
                             subreddit=comment.subreddit.display_name

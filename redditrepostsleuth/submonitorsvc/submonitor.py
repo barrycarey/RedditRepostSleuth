@@ -112,6 +112,7 @@ class SubMonitor:
             if not search_results.matches and monitored_sub.repost_only:
                 log.debug('No matches for post %s and comment OC is disabled',
                          f'https://redd.it/{search_results.checked_post.post_id}')
+                self._create_checked_post(post)
                 continue
 
             try:
@@ -167,7 +168,7 @@ class SubMonitor:
             post,
             target_annoy_distance=monitored_sub.target_annoy,
             target_hamming_distance=monitored_sub.target_hamming,
-            date_cutff=monitored_sub.target_days_old,
+            date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter
         )

@@ -136,7 +136,12 @@ class Config:
             'hot_post_comment_on_oc',
             'supported_post_types',
             'summons_match_strictness_loose',
-            'summons_match_strictness_tight'
+            'summons_match_strictness_tight',
+            'summons_meme_filter',
+            'summons_all_matches',
+            'summons_same_sub',
+            'summons_max_age'
+
         ]
 
         for attribute in attrbs:
