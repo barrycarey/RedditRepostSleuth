@@ -10,13 +10,13 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
     NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC
+from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC, FRONTPAGE_LINK_REPOST
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post, BotComment
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
@@ -94,8 +94,14 @@ class TopPostMonitor:
                     log.info('Using custom filter values for sub %s', post.subreddit)
                     target_annoy = CUSTOM_FILTER_LEVELS.get(post.subreddit)['annoy']
                     target_hamming = CUSTOM_FILTER_LEVELS.get(post.subreddit)['hamming']
-                search_results = self.image_service.check_duplicates_wrapped(post, target_hamming_distance=target_hamming,
-                                                                      target_annoy_distance=target_annoy, same_sub=True, meme_filter=True)
+
+                search_results = self.image_service.check_duplicates_wrapped(
+                    post,
+                    target_hamming_distance=target_hamming,
+                    target_annoy_distance=target_annoy,
+                    same_sub=True,
+                    meme_filter=True
+                )
             except NoIndexException:
                 log.error('No available index for image repost check.  Trying again later')
                 return
@@ -104,26 +110,22 @@ class TopPostMonitor:
                 return
             self.add_comment(post, search_results)
         elif post.post_type == 'link':
-            return
-            # TODO - Deal with imgur posts marked as link
-            # TODO - Change link reposts to use same wrapper as image reposts
-            if 'imgur' in post.url:
-                log.info('Skipping imgur post marked as link')
-                return
-            start = perf_counter()
-            search_results = check_link_repost(post, self.uowm).matches
-            search_time = perf_counter() - start
-            with self.uowm.start() as uow:
-                total_searched = uow.posts.count_by_type('link')
-            self.add_comment(post, search_results, search_time, total_searched)
+            search_results = check_link_repost(post, self.uowm, get_total=True)
+            self.add_comment(post, search_results)
         else:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
 
     def add_comment(self, post: Post, search_results):
         msg_values = build_msg_values_from_search(search_results, self.uowm)
+        if search_results.checked_post.post_type == 'image':
+            msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
+
         if search_results.matches:
-            msg = self.response_builder.build_default_repost_comment(msg_values)
+            if post.post_type == 'image':
+                msg = self.response_builder.build_default_repost_comment(msg_values)
+            else:
+                msg = self.response_builder.build_provided_comment_template(msg_values, FRONTPAGE_LINK_REPOST, post.post_type)
         else:
             if not self.config.hot_post_comment_on_oc:
                 log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
