@@ -30,3 +30,7 @@ class RateLimitException(RepostSleuthException):
 class InvalidImageUrlException(RepostSleuthException):
     def __init__(self, message):
         super(InvalidImageUrlException, self).__init__(message)
+
+class InvalidCommandException(RepostSleuthException):
+    def __init__(self, message):
+        super(InvalidCommandException, self).__init__(message)

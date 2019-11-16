@@ -5,16 +5,11 @@ from typing import Dict, List
 
 import imagehash
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
-
-# TODO - Move praw dependant helpers to own file to reduce dependency
-
-
-
-# TODO - Pull this out and retest
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
@@ -44,15 +39,13 @@ def get_post_type_pushshift(submission: Dict) -> str:
     if post_hint:
         return post_hint
 
-    #log.debug('No post_hint for post %s. Trying to guess post type', submission['id'])
-    #TODO - add tests
     image_exts = ['.jpg', '.png', '.jpeg', '.gif']
     for ext in image_exts:
         if ext in submission['url']:
             #log.debug('Post URL %s is an image', submission['url'])
             return 'image'
 
-    reddit = get_reddit_instance()
+    reddit = get_reddit_instance(config=Config())
     is_video = submission.get('is_video', None)
     if is_video:
         #log.debug('Post %s has is_video value of %s. It is a video', submission['id'], is_video)
@@ -133,20 +126,39 @@ def build_markdown_list(matches: List[ImageMatch]) -> str:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
     return result
 
-def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> dict:
+def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+    results_values = {}
+    if search_results.matches:
+        results_values = {
+            'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
+            'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+            'match_list': build_markdown_list(search_results.matches),
+            'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
+            'false_positive_data': json.dumps(
+                {
+                    'post': f'https://redd.it/{search_results.checked_post.post_id}',
+                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
+                }
+            )
+        }
+
+    return {**results_values, **kwargs}
+
+
+def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
     :param uowm: UnitOfWorkManager
     """
     base_values = {
-        'total_searched': f'{search_results.index_size:,}',
+        'total_searched': f'{search_results.total_searched:,}',
         'search_time': search_results.total_search_time,
         'total_posts': 0,
         'match_count': len(search_results.matches),
         'post_type': search_results.checked_post.post_type,
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
-        'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.index_size),
+        'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}'
     }
 
@@ -157,23 +169,14 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
             'oldest_created_at': search_results.matches[0].post.created_at,
             'oldest_url': search_results.matches[0].post.url,
             'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
-            'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
             'oldest_sub': search_results.matches[0].post.subreddit,
             'newest_created_at': search_results.matches[-1].post.created_at,
             'newest_url': search_results.matches[-1].post.url,
             'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
-            'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
             'newest_sub': search_results.matches[-1].post.subreddit,
-            'match_list': build_markdown_list(search_results.matches),
             'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
             'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
-            'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
-            'false_positive_data': json.dumps(
-                {
-                    'post': base_values['post_shortlink'],
-                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
-                }
-            )
+
         }
 
     if uowm:

@@ -1,5 +1,5 @@
 
-UNSUPPORTED_POST_TYPE = 'Sorry, I don\'t support this post type () right now.  Feel free to check back in the future!'
+UNSUPPORTED_POST_TYPE = 'Sorry, I don\'t support this post type ({post_type}) right now.  Feel free to check back in the future!'
 
 
 
@@ -17,14 +17,19 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 
 COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n'
+IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]*'
+IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={post_shortlink}) ]*'
+LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
+FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}. Please consider making a crosspost next time \n\n' \
+                        '{first_seen}. {last_seen} \n\n' \
 
-COMMENT_SIGNATURE_REPOST = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]*'
-COMMENT_SIGNATURE_OC = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={post_shortlink}) ]*'
-
-DEFAULT_REPOST_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
+DEFAULT_REPOST_IMAGE_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
                          '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n' \
 
-DEFAULT_REPOST_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
+DEFAULT_REPOST_LINK_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
+                         '{first_seen}. {last_seen} \n\n' \
+
+DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
                                 '{first_seen} {oldest_percent_match} match. \n\n' \
 
 DEFAULT_COMMENT_OC = 'This looks like unique content! I checked {total_searched} {post_type} posts in {search_time} seconds and didn\'t find a match\n\n' \
