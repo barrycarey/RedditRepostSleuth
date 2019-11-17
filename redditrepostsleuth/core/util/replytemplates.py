@@ -37,4 +37,5 @@ DEFAULT_COMMENT_OC = 'This looks like unique content! I checked {total_searched}
 
 IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\n\n**Search Time:** {time}s \n\nHere are all the instances I\'ve seen:\n\n'
 
-SUMMONS_CROSSPOST = ''
+SUMMONS_CROSSPOST = 'This is a crosspost. I\'ve seen the same {post_type} {match_count} {times_word}' \
+                    '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n'
