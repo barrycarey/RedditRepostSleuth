@@ -35,9 +35,17 @@ class BotCommentMonitor:
 
         bot_comment.karma = self._get_score(reddit_comment)
         print(bot_comment.karma)
-        if bot_comment.karma <= -5:
+        if bot_comment.karma <= self.config.bot_comment_karma_flag_threshold:
             log.info('Comment %s has karma of %s.  Flagging for review', bot_comment.comment_id, bot_comment.karma)
             bot_comment.needs_review = True
+        elif bot_comment.karma <= self.config.bot_comment_karma_remove_threshold:
+            log.info('Comment %s has karma of %s.  Removing', bot_comment.comment_id, bot_comment.karma)
+            try:
+                reddit_comment.delete()
+            except Exception as e:
+                log.exception('Failed to delete comment %s', bot_comment.comment_id, exc_info=True)
+            bot_comment.needs_review = True
+            bot_comment.active = False
 
     def _get_score(self, comment: Comment):
         try:

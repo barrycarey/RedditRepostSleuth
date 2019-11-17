@@ -1,6 +1,7 @@
 import sys
 import time
 
+from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
 from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -17,7 +18,10 @@ if __name__ == '__main__':
         uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
         reddit_manager = RedditManager(get_reddit_instance(config))
         comment_monitor = BotCommentMonitor(reddit_manager, uowm, config)
-        comment_monitor.check_comments()
         stats_updater = StatsUpdater()
+        activation_monitor = NewActivationMonitor(uowm, get_reddit_instance(config))
+
+        activation_monitor.check_for_new_invites()
+        comment_monitor.check_comments()
         stats_updater.run_update()
         time.sleep(1800)
