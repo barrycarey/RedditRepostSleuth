@@ -4,7 +4,7 @@ import requests
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck
+from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck, IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
@@ -24,7 +24,7 @@ def ingest_repost_check(post):
     elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException), retry_kwargs={'max_retries': 20, 'countdown': 300})
+@celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> RepostWrapper:
     r = requests.head(post.url)
     if r.status_code != 200:
