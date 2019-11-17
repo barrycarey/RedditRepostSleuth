@@ -1,5 +1,9 @@
 from typing import Dict, Text
 
+from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.db_utils import get_db_engine
+from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COMMENT, \
     DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH, \
     DEFAULT_COMMENT_OC, COMMENT_STATS, IMAGE_REPOST_SIGNATURE, IMAGE_OC_SIGNATURE, DEFAULT_REPOST_LINK_COMMENT, \
@@ -34,7 +38,11 @@ class ResponseBuilder:
                 if msg[-2:] != '\n\n':
                     msg = msg + '\n\n'
                 msg = msg + IMAGE_REPOST_SIGNATURE
-            return msg.format(**values)
+            try:
+                return msg.format(**values)
+            except KeyError:
+                log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
+                return self.build_default_repost_comment(values, post_type, signature=False, stats=False)
 
     def build_default_repost_comment(self, values: Dict, post_type: Text,  stats: bool = True, signature: bool = True):
         # TODO - Why am I doing this? There should be matches if calling this method
@@ -74,7 +82,7 @@ class ResponseBuilder:
 
         return msg.format(**values)
 
-    def build_sub_oc_comment(self, sub: str, values: Dict, post_type: Text,  signature: bool = True):
+    def build_sub_oc_comment(self, sub: str, values: Dict, post_type: Text,  signature: bool = True) -> Text:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(sub)
             if not monitored_sub or not monitored_sub.oc_response_template:
@@ -87,7 +95,11 @@ class ResponseBuilder:
                     msg = msg + self.default_templates['image_oc_signature']
                 elif post_type == 'link':
                     msg = msg + self.default_templates['link_signature']
-            return msg.format(**values)
+            try:
+                return msg.format(**values)
+            except KeyError:
+                log.error('Custom oc template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
+                return self.build_default_oc_comment(values, post_type)
 
     def build_default_oc_comment(self, values: Dict, post_type: Text,  signature: bool = True):
         if post_type == 'image':
@@ -101,3 +113,8 @@ class ResponseBuilder:
             elif post_type == 'link':
                 msg = msg + self.default_templates['link_signature']
         return msg.format(**values)
+
+if __name__ == '__main__':
+    config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    resp = ResponseBuilder(uowm)
