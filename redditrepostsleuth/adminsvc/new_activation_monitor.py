@@ -71,7 +71,7 @@ class NewActivationMonitor:
                 report_msg='RepostSleuthBot-Repost',
                 target_hamming=5,
                 same_sub_only=True,
-                sticky_comment=False,
+                sticky_comment=True,
                 search_depth=100,
                 meme_filter=False
             )
