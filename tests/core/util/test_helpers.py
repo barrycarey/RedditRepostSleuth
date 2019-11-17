@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
@@ -92,6 +92,41 @@ class TestHelpers(TestCase):
         expected = f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/1234](https://redd.it/1234) [{match.post.subreddit}] [95.00% match]\n'
         self.assertEqual(expected, build_markdown_list([match]))
 
+    def test_build_msg_values_include_meme_template(self):
+        match1 = ImageMatch()
+        match1.hamming_distance = 5
+        match1.post = Post(url='www.example.com',
+                           created_at=datetime.fromtimestamp(1572799193),
+                           post_id='1234',
+                           subreddit='somesub')
+        wrapper = ImageRepostWrapper()
+        wrapper.matches.append(match1)
+        wrapper.matches.append(match1)
+        wrapper.checked_post = Post(subreddit='sub2')
+        wrapper.total_searched = 100
+        wrapper.total_search_time = 0.111
+        wrapper.meme_template = MemeTemplate(id=10)
+        result = build_msg_values_from_search(wrapper)
+        self.assertIn('meme_template_id', result)
+        self.assertEqual(10, result['meme_template_id'])
+
+    def test_build_msg_values_include_false_positive_data(self):
+        match1 = ImageMatch()
+        match1.hamming_distance = 5
+        match1.post = Post(url='www.example.com',
+                           created_at=datetime.fromtimestamp(1572799193),
+                           post_id='1234',
+                           subreddit='somesub')
+        wrapper = ImageRepostWrapper()
+        wrapper.matches.append(match1)
+        wrapper.checked_post = Post(post_id=1234)
+        wrapper.total_searched = 100
+        wrapper.total_search_time = 0.111
+        wrapper.meme_template = MemeTemplate(id=10)
+        result = build_msg_values_from_search(wrapper)
+        self.assertIn('false_positive_data', result)
+        self.assertEqual(result['false_positive_data'], '{"post": "https://redd.it/1234", "meme_template": 10}')
+
     def test_build_msg_values_from_search_key_total(self):
         match1 = ImageMatch()
         match1.hamming_distance = 5
@@ -103,18 +138,18 @@ class TestHelpers(TestCase):
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
 
         result = build_msg_values_from_search(wrapper)
 
-        self.assertEqual(21, len(result.keys()))
+        self.assertEqual(23, len(result.keys()))
         # TODO - Maybe test return values.  Probably not needed
 
     def test_build_msg_values_from_search_no_match_key_total(self):
         wrapper = ImageRepostWrapper()
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper)
 
@@ -123,7 +158,7 @@ class TestHelpers(TestCase):
     def test_build_msg_values_from_search_no_match_custom_key_total(self):
         wrapper = ImageRepostWrapper()
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper, test1='test')
 
@@ -140,7 +175,7 @@ class TestHelpers(TestCase):
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
-        wrapper.index_size = 100
+        wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
 
         result = build_msg_values_from_search(wrapper, item1='value1', item2='value2')
