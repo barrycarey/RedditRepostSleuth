@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pymysql
+from prawcore import BadRequest
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
@@ -139,7 +140,10 @@ class StatsUpdater:
         self.get_all_stats()
         output = self.build_template()
         wiki = self.reddit.subreddit('RepostSleuthBot').wiki['stats']
-        wiki.edit(output)
+        try:
+            wiki.edit(output)
+        except BadRequest:
+            log.error('Failed to update wiki page')
 
 if __name__ == '__main__':
     config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')

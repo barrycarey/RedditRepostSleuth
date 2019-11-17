@@ -3,6 +3,7 @@ from time import perf_counter
 
 from praw import Reddit
 from praw.models import Comment
+from prawcore import Forbidden
 from redlock import RedLockError
 
 from redditrepostsleuth.core.config import Config
@@ -132,7 +133,10 @@ class TopPostMonitor:
                 return
             msg = self.response_builder.build_default_oc_comment(msg_values)
 
-        self.response_handler.reply_to_submission(post.post_id, msg, source='toppost')
+        try:
+            self.response_handler.reply_to_submission(post.post_id, msg, source='toppost')
+        except Forbidden:
+            log.error('Failed to leave comment on %s in %s.  Looks like we are banned', post.post_id, post.subreddit)
 
 
         with self.uowm.start() as uow:
