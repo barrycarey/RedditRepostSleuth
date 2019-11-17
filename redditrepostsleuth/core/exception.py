@@ -34,3 +34,7 @@ class InvalidImageUrlException(RepostSleuthException):
 class InvalidCommandException(RepostSleuthException):
     def __init__(self, message):
         super(InvalidCommandException, self).__init__(message)
+
+class IngestHighMatchMeme(RepostSleuthException):
+    def __init__(self, message):
+        super(IngestHighMatchMeme, self).__init__(message)

@@ -88,7 +88,7 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def create_meme_template(url: str, name: str = None, target_hamming=5, target_annoy=0) -> MemeTemplate:
+def create_meme_template(url: str, name: str = None, target_hamming=9, target_annoy=0) -> MemeTemplate:
     """
     Take a given URL and create a meme template from it
     :param url: URL to create template from
