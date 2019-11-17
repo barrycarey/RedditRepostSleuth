@@ -75,8 +75,8 @@ def save_image_repost_result(repost: RepostWrapper, uowm: UnitOfWorkManager) -> 
                     uow.meme_template.add(meme_template)
                 except Exception as e:
                     log.exception('Failed to create meme templaet', exc_info=True)
-
                 uow.investigate_post.add(inv_post)
+
             elif len(repost.matches) > 10 and 'meme' in repost.checked_post.subreddit.lower():
                 log.info('Adding Investigate Post: High match meme')
                 inv_post = InvestigatePost(post_id=repost_of.post.post_id, matches=len(repost.matches), url=repost.checked_post.url, flag_reason='High match meme')
