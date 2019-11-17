@@ -1,4 +1,5 @@
 import sys
+import time
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -16,3 +17,4 @@ if __name__ == '__main__':
         reddit_manager = RedditManager(get_reddit_instance(config))
         comment_monitor = BotCommentMonitor(reddit_manager, uowm, config)
         comment_monitor.check_comments()
+        time.sleep(1800)

@@ -10,18 +10,19 @@ import requests
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout, InvalidSchema, InvalidURL
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.config import USER_AGENTS
+from redditrepostsleuth.core.celery.basetasks import EventLoggerTask, SqlAlchemyTask, RepostLogger, RedditTask
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.logging import log
 
 from redditrepostsleuth.core.db.databasemodels import Comment, ImageRepost, VideoHash, AudioFingerPrint, RedditImagePost
-from redditrepostsleuth.core.model import BatchedEvent
-from redditrepostsleuth.core.model import InfluxEvent
-from redditrepostsleuth.core.model import RepostEvent
+from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
+from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
+from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.core.util import generate_img_by_url, generate_dhash, \
-    generate_img_by_file
+from redditrepostsleuth.core.util.constants import USER_AGENTS
+from redditrepostsleuth.core.util.imagehashing import generate_img_by_url, generate_dhash, generate_img_by_file
+
 from redditrepostsleuth.core.util.videohelpers import generate_thumbnails_from_url, download_file, \
     generate_thumbnails_from_file
 
@@ -29,18 +30,6 @@ from redditrepostsleuth.core.services.audiofingerprint import fingerprint_audio_
 
 from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts, clean_repost_matches
-
-
-@celery.task
-def image_hash(data):
-    try:
-        img = generate_img_by_url(data['url'])
-        data['hash'] = generate_dhash(img)
-    except ImageConversioinException as e:
-        data['delete'] = True
-
-    return data
-
 
 
 
@@ -434,7 +423,7 @@ def ingest_pushshift_url(self, url):
             if existing:
                 return
             post = pushshift_to_post(submission)
-            save_new_post.apply_async((post,), queue='postingest')
+            #save_new_post.apply_async((post,), queue='postingest')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def save_image_post(self, posts):

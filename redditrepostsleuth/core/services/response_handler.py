@@ -1,7 +1,10 @@
+from praw.exceptions import APIException
 from praw.models import Comment, Redditor
+from prawcore import Forbidden
 
 from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.exception import RateLimitException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
@@ -29,8 +32,16 @@ class ResponseHandler:
             log.debug(comment_body)
             self._log_response(comment, comment_body, source=source)
             return comment
+        except APIException as e:
+            if e.error_type == 'RATELIMIT':
+                log.exception('Reddit rate limit')
+                raise RateLimitException('Hit rate limit')
+            else:
+                log.exception('Unknown error type of APIException', exc_info=True)
+                raise
         except Exception as e:
-            log.exception('Failed to leave comment on post https://redd.it/%s', submission_id, exc_info=True)
+            log.exception('Unknown exception leaving comment on post https://redd.it/%s', submission_id, exc_info=True)
+            raise
 
 
     def reply_to_comment(self, comment_id: str, comment_body: str, source: str = None, send_pm_on_fail: bool = False) -> CommentReply:
@@ -48,24 +59,33 @@ class ResponseHandler:
             self._log_response(comment, comment_body, source=source)
             log.info('Left comment at: https://reddit.com%s', response.permalink)
             return comment_reply
-        except Exception as e:
-            log.exception('Failed to leave comment', exc_info=True)
-            if hasattr(e, 'error_type') and e.error_type in ['DELETED_COMMENT']:
-                comment_reply.body = 'DELETED COMMENT'
-                return comment_reply
-            else:
-                if send_pm_on_fail:
-                    msg = 'I\'m unable to reply to your comment.  I might be banned in that sub.  Here is my response. \n\n *** \n\n'
-                    msg = msg + comment_body
-                    msg = self.send_private_message(comment.author, msg)
-                    comment_reply.body = msg
+        except APIException as e:
+            if hasattr(e, 'error_type'):
+                if e.error_type == 'DELETED_COMMENT':
+                    log.debug('Comment %s has been deleted', comment_id)
+                    comment_reply.body = 'DELETED COMMENT'
                     return comment_reply
+                elif e.error_type == 'RATELIMIT':
+                    log.exception('PRAW Ratelimit exception', exc_info=False)
+                    raise
+                else:
+                    log.exception('APIException without error_type', exc_info=True)
+        except Forbidden:
+            log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
+            if send_pm_on_fail:
+                msg = 'I\'m unable to reply to your comment.  I might be banned in that sub.  Here is my response. \n\n *** \n\n'
+                msg = msg + comment_body
+                msg = self.send_private_message(comment.author, msg)
+                comment_reply.body = msg
+                return comment_reply
+        except Exception as e:
+            log.exception('Unknown exception leaving comment', exc_info=True)
 
     def send_private_message(self, user: Redditor, message_body) -> str:
         try:
             user.message('Repost Check', message_body)
             log.info('Send PM to %s. ', user.name)
-            return  message_body
+            return message_body
         except Exception as e:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)
             return 'Failed to send PM'

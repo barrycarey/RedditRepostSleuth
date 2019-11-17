@@ -164,14 +164,17 @@ class DuplicateImageService:
             log.debug('Loaded index is up to date.  Using with %s items', self.historical_index.get_n_items())
 
 
-    def _filter_results_for_reposts(self, matches: List[ImageMatch],
-                                    checked_post: Post,
-                                    target_hamming_distance: int = None,
-                                    target_annoy_distance: float = None,
-                                    same_sub: bool = False, date_cutff: int = None,
-                                    filter_dead_matches: bool = True,
-                                    only_older_matches: bool = True,
-                                    is_meme: bool = False) -> List[ImageMatch]:
+    def _filter_results_for_reposts(
+            self,
+            matches: List[ImageMatch],
+            checked_post: Post,
+            target_hamming_distance: int = None,
+            target_annoy_distance: float = None,
+            same_sub: bool = False,
+            date_cutoff: int = None,
+            filter_dead_matches: bool = True,
+            only_older_matches: bool = True,
+            is_meme: bool = False) -> List[ImageMatch]:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -192,6 +195,7 @@ class DuplicateImageService:
 
         results = []
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
+        log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
         log.debug('Matches pre-filter: %s', len(matches))
         for match in matches:
             if not match.post.dhash_h:
@@ -210,8 +214,8 @@ class DuplicateImageService:
             if only_older_matches and match.post.created_at > checked_post.created_at:
                 log.debug('Date Filter Reject: Target: %s Actual: %s - %s', checked_post.created_at.strftime('%Y-%d-%m'), match.post.created_at.strftime('%Y-%d-%m'), f'https://redd.it/{match.post.post_id}')
                 continue
-            if date_cutff and (datetime.utcnow() - match.post.created_at).days > date_cutff:
-                log.debug('Date Cutoff Reject: Target: %s Actual: %s - %s', date_cutff, (datetime.utcnow() - match.post.created_at).days, f'https://redd.it/{match.post.post_id}')
+            if date_cutoff and (datetime.utcnow() - match.post.created_at).days > date_cutoff:
+                log.debug('Date Cutoff Reject: Target: %s Actual: %s - %s', date_cutoff, (datetime.utcnow() - match.post.created_at).days, f'https://redd.it/{match.post.post_id}')
                 continue
             if checked_post.author == match.post.author:
                 # TODO - Need logic to check age and sub of matching posts with same author
@@ -244,7 +248,7 @@ class DuplicateImageService:
                                  target_hamming_distance: int = None,
                                  target_annoy_distance: float = None,
                                  same_sub: bool = False,
-                                 date_cutff: int = None,
+                                 date_cutoff: int = None,
                                  filter_dead_matches: bool = True,
                                  only_older_matches=True,
                                  meme_filter=False) -> ImageRepostWrapper:
@@ -261,7 +265,10 @@ class DuplicateImageService:
         self._load_index_files()
         search_results = ImageRepostWrapper()
         start = perf_counter()
-        search_array = bytearray(post.dhash_h, encoding='utf-8')
+        try:
+            search_array = bytearray(post.dhash_h, encoding='utf-8')
+        except Exception as e:
+            print('')
         current_results = []
 
         raw_results = self._search_index_by_vector(search_array, self.historical_index, max_matches=max_matches)
@@ -281,7 +288,7 @@ class DuplicateImageService:
             )  # Pre-filter results on default annoy value
             current_results = self._convert_annoy_results(raw_results, post.id)
             self._set_match_posts(current_results, historical=False)
-            search_results.index_size = search_results.index_size + self.current_index.get_n_items()
+            search_results.total_searched = search_results.total_searched + self.current_index.get_n_items()
         else:
             log.error('No current image index loaded.  Only using historical results')
 
@@ -298,25 +305,26 @@ class DuplicateImageService:
                     search_results.meme_template = meme_template
                     target_hamming_distance = meme_template.target_hamming
                     target_annoy_distance = meme_template.target_annoy
+                    log.info('Using meme filter %s', meme_template.name)
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
 
             search_results.matches = self._filter_results_for_reposts(search_results.matches, post,
-                                                              target_annoy_distance=target_annoy_distance,
-                                                              target_hamming_distance=target_hamming_distance,
-                                                              same_sub=same_sub,
-                                                              date_cutff=date_cutff,
-                                                              filter_dead_matches=filter_dead_matches,
-                                                              only_older_matches=only_older_matches,
-                                                              is_meme=meme_template or False)
+                                                                      target_annoy_distance=target_annoy_distance,
+                                                                      target_hamming_distance=target_hamming_distance,
+                                                                      same_sub=same_sub,
+                                                                      date_cutoff=date_cutoff,
+                                                                      filter_dead_matches=filter_dead_matches,
+                                                                      only_older_matches=only_older_matches,
+                                                                      is_meme=meme_template or False)
         else:
             self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
 
         search_results.checked_post = post
         search_results.total_search_time = round(perf_counter() - start, 5)
-        search_results.index_size = self.current_index.get_n_items() if self.current_index else 0
-        search_results.index_size = search_results.index_size + self.historical_index.get_n_items()
+        search_results.total_searched = self.current_index.get_n_items() if self.current_index else 0
+        search_results.total_searched = search_results.total_searched + self.historical_index.get_n_items()
         self._log_search_time(search_results)
         return search_results
 
@@ -346,7 +354,7 @@ class DuplicateImageService:
             AnnoySearchEvent(
                 total_search_time=search_results.total_search_time,
                 index_search_time=search_results.index_search_time,
-                index_size=search_results.index_size,
+                index_size=search_results.total_searched,
                 event_type='duplicate_image_search'
             )
         )

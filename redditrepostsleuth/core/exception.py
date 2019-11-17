@@ -18,3 +18,19 @@ class CrosspostRepostCheck(RepostSleuthException):
 class NoIndexException(RepostSleuthException):
     def __init__(self, message):
         super(NoIndexException, self).__init__(message)
+
+class SubmissionNotFoundException(RepostSleuthException):
+    def __init__(self, message):
+        super(SubmissionNotFoundException, self).__init__(message)
+
+class RateLimitException(RepostSleuthException):
+    def __init__(self, message):
+        super(RateLimitException, self).__init__(message)
+
+class InvalidImageUrlException(RepostSleuthException):
+    def __init__(self, message):
+        super(InvalidImageUrlException, self).__init__(message)
+
+class InvalidCommandException(RepostSleuthException):
+    def __init__(self, message):
+        super(InvalidCommandException, self).__init__(message)
