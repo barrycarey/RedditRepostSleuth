@@ -13,9 +13,6 @@ class TestCommandParser(TestCase):
         self.assertEqual(r.strictness, 'tight')
         self.assertFalse(r.same_sub)
 
-    def test_parse_watch_command(self):
-        self.fail()
-
     def test_parse_root_command__valid_command(self):
         parser = CommandParser(config=Config(redis_host='dummy'))
         r = parser.parse_root_command('repost -meme -strict tight')

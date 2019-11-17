@@ -7,20 +7,6 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 
 class TestSummonsHandler(TestCase):
-    def test_handle_summons(self):
-        self.fail()
-
-    def test_handle_repost_request(self):
-        self.fail()
-
-    def test_process_repost_request(self):
-        self.fail()
-
-    def test_process_link_repost_request(self):
-        self.fail()
-
-    def test_process_image_repost_request(self):
-        self.fail()
 
     def test__strip_summons_flags__clean_input_usertag(self):
         config = Config(redis_host='dummy')
@@ -78,20 +64,3 @@ class TestSummonsHandler(TestCase):
         self.assertEqual(3, target_hamming)
         self.assertEqual(4.0, target_annoy)
 
-    def test__send_response(self):
-        self.fail()
-
-    def test__save_response(self):
-        self.fail()
-
-    def test__save_post(self):
-        self.fail()
-
-    def test_save_unknown_post(self):
-        self.fail()
-
-    def test__searched_post_str(self):
-        self.fail()
-
-    def test__send_event(self):
-        self.fail()
