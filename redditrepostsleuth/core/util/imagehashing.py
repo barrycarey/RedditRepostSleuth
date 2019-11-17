@@ -58,69 +58,6 @@ def generate_img_by_file(path: str) -> Image:
 
     return img if img else None
 
-def generate_dhash(img: Image, hash_size: int = 16) -> dict:
-
-    result = {
-        'hash': None,
-        'bits_set': None
-    }
-
-    # Grayscale and shrink the image
-    try:
-        image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
-    except (TypeError, OSError, AttributeError) as e:
-        #log.error('Problem creating image hash for image.  Error: %s', str(e))
-        raise ImageConversioinException(str(e))
-
-    pixels = list(image.getdata())
-
-    # Compare Adjacent Pixels
-    difference = []
-    for row in list(range(hash_size)):
-        for col in list(range(hash_size)):
-            pixel_left = image.getpixel((col, row))
-            pixel_right = image.getpixel((col + 1, row))
-            difference.append(pixel_left > pixel_right)
-
-    # Convert to binary array to hexadecimal string
-    decimal_value = 0
-    hex_string = []
-    for index, value in enumerate(difference):
-        if value:
-            decimal_value += 2 ** (index % 8)
-        if (index % 8) == 7:
-            hex_string.append(hex(decimal_value)[2:].rjust(2, '0'))
-            decimal_value = 0
-    log.debug('Generate Hash: %s', ''.join(hex_string))
-
-    count = Counter(difference)
-    result['bits_set'] = count[True]
-    result['hash'] = ''.join(hex_string)
-    return result
-
-def get_bit_count(img: Image, hash_size: int = 16) -> int:
-    # TODO: Remove
-    # Grayscale and shrink the image
-    try:
-        image = img.convert('L').resize((hash_size + 1, hash_size), Image.ANTIALIAS)
-    except (TypeError, OSError, AttributeError) as e:
-        #log.error('Problem creating image hash for image.  Error: %s', str(e))
-        raise ImageConversioinException(str(e))
-
-    pixels = list(image.getdata())
-
-    # Compare Adjacent Pixels
-    difference = []
-    for row in list(range(hash_size)):
-        for col in list(range(hash_size)):
-            pixel_left = image.getpixel((col, row))
-            pixel_right = image.getpixel((col + 1, row))
-            difference.append(pixel_left > pixel_right)
-
-    count = Counter(difference)
-
-    return count[True]
-
 def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
     log.debug('Hashing image post %s', post.post_id)
     try:
@@ -169,19 +106,25 @@ def get_image_hashes(post: Post, hash_size: int = 16) -> Dict:
     return result
 
 def set_image_hashes_api(post: Post, api_url: str) -> Post:
+    """
+    Call an external API to create image hashes.
+    This allows us to offload bandwidth to another server.  In the current case, a Digital Ocean Load Balancer
+    :param post: Post to hash
+    :param api_url: API URL to call
+    :return: Dict of hashes
+    """
     log.debug('Hashing image post using api %s', post.post_id)
-
     r = requests.get(api_url, params={'url': post.url})
-
     if r.status_code != 200:
         log.error('Back statuscode from DO API %s', r.status_code)
         raise ImageConversioinException('Bad response from DO API')
 
     hashes = json.loads(r.text)
-    log.info(hashes)
+    log.debug(hashes)
 
     post.dhash_h = hashes['dhash_h']
     post.dhash_v = hashes['dhash_v']
     post.ahash = hashes['ahash']
 
     return post
+

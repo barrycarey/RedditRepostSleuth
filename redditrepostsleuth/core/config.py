@@ -4,6 +4,7 @@ import os
 import sys
 from typing import List
 
+from redditrepostsleuth.core.logging import log
 
 
 class _NotSet:
@@ -19,25 +20,27 @@ class Config:
     """ Class containing all the config data.
     This is based on Praw's own config class because I'm an unoriginal bastard"""
 
-    CONFIG = None
+    CONFIG = {}
     CONFIG_NOT_SET = _NotSet()
 
     @classmethod
     def _load_config(cls, config_file=None):
 
         if config_file:
-            print(f'Checking provided config file: {config_file}')
+            log.info('Checking provided config file: %s', config_file)
             if not os.path.isfile(config_file):
-                print('Provided config file is invalid')
+                log.error('Provided config does not exist')
                 config_file = None
 
         module_dir = os.path.dirname(sys.modules[__name__].__file__)
-        print('Checking for config in module dir:' + module_dir)
+        log.info('Checking for config in module dir: %s', module_dir)
         if os.path.isfile(os.path.join(module_dir, 'sleuth_config.json')):
+            log.info('Found sleuth_config.json in module dir')
             config_file = os.path.join(module_dir, 'sleuth_config.json')
 
-        print(f'Checking for config in current dir: {os.getcwd()}')
+        log.info(f'Checking for config in current dir: %s', os.getcwd())
         if os.path.isfile('sleuth_config.json'):
+            log.info('Found sleuth_config.json in current directory')
             config_file = os.path.join(os.getcwd(), 'sleuth_config.json')
 
         print('Checking ENV for config file')
@@ -46,8 +49,8 @@ class Config:
                 config_file = os.getenv('bot_config')
 
         if config_file is None:
-            print('Unable to locate sleuth_config.json')
-            sys.exit(1)
+            log.error('Failed to locate sleuth_config.json')
+            return
 
         print(f'Loading Config {config_file}')
         with open(config_file, 'r') as f:
@@ -65,13 +68,15 @@ class Config:
 
     def __init__(self, config_file=None, **settings):
 
-        if Config.CONFIG is None:
+        if not Config.CONFIG:
             self._load_config(config_file)
 
-        self.custom = Config._flatten_config(Config.CONFIG)
+        self._settings = settings
+        self.custom = Config._flatten_config(dict(Config.CONFIG, **settings))
 
-        self._settings = self.custom = settings
-        self.custom = Config._flatten_config(Config.CONFIG)
+        if not self.custom:
+            log.critical('No config values defined.  Aborting')
+            sys.exit(1)
 
         self._initialize_attributes()
 
@@ -128,7 +133,15 @@ class Config:
             'repost_link_check_on_ingest',
             'image_hash_api',
             'summons_subreddits',
-            'hot_post_comment_on_oc'
+            'hot_post_comment_on_oc',
+            'supported_post_types',
+            'summons_match_strictness_loose',
+            'summons_match_strictness_tight',
+            'summons_meme_filter',
+            'summons_all_matches',
+            'summons_same_sub',
+            'summons_max_age'
+
         ]
 
         for attribute in attrbs:

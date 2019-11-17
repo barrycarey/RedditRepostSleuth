@@ -5,7 +5,7 @@ from datetime import datetime
 
 from prawcore import Forbidden
 
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, RedditImagePost, RedditImagePostCurrent
 from redditrepostsleuth.core.model.hashwrapper import HashWrapper
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
@@ -96,3 +96,18 @@ def post_to_repost_match(post: Post, orig_id: int) -> RepostMatch:
     match.original_id = orig_id
     return match
 
+def post_to_image_post(post: Post) -> RedditImagePost:
+    return RedditImagePost(
+        dhash_h=post.dhash_h,
+        dhash_v=post.dhash_v,
+        post_id=post.post_id,
+        created_at=post.created_at
+    )
+
+def post_to_image_post_current(post: Post) -> RedditImagePostCurrent:
+    return RedditImagePostCurrent(
+        dhash_h=post.dhash_h,
+        dhash_v=post.dhash_v,
+        post_id=post.post_id,
+        created_at=post.created_at
+    )

@@ -85,3 +85,17 @@ class MemeTemplate:
 
             resp.body = json.dumps(response)
 
+
+    def on_delete(self, req: Request, resp: Response):
+        # TODO - Error handling
+        data = req.media
+        id = data.get('id', None)
+        if not id:
+            log.error('No ID provided to delete')
+            return
+        with self.uowm.start() as uow:
+            template = uow.meme_template.get_by_id(id)
+            if template:
+                uow.meme_template.remove(template)
+                uow.commit()
+                log.info('Deleted Template ID %s', id)
