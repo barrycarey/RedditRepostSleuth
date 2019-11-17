@@ -1,1 +1,3 @@
 pymysql
+praw
+sqlalchemy
