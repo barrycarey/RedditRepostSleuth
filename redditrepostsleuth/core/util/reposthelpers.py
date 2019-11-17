@@ -124,7 +124,7 @@ def filter_repost_results(
             continue
 
         if exclude_crossposts and match.post.crosspost_parent is not None:
-            log.debug('Crosspost Reject: %s', f'https://redd.it/{match.post_post_id}')
+            log.debug('Crosspost Reject: %s', f'https://redd.it/{match.post.post_id}')
 
         results.append(match)
 
