@@ -123,7 +123,7 @@ class TopPostMonitor:
 
         if search_results.matches:
             if post.post_type == 'image':
-                msg = self.response_builder.build_default_repost_comment(msg_values)
+                msg = self.response_builder.build_default_repost_comment(msg_values, post.post_type)
             else:
                 msg = self.response_builder.build_provided_comment_template(msg_values, FRONTPAGE_LINK_REPOST, post.post_type)
         else:
