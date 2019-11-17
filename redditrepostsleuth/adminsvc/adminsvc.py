@@ -1,5 +1,6 @@
 import sys
 import time
+sys.path.append('./')
 
 from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
 from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
@@ -10,7 +11,7 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 
-sys.path.append('./')
+
 
 if __name__ == '__main__':
     while True:
@@ -24,4 +25,4 @@ if __name__ == '__main__':
         activation_monitor.check_for_new_invites()
         comment_monitor.check_comments()
         stats_updater.run_update()
-        time.sleep(1800)
+        time.sleep(600)

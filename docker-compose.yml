@@ -7,6 +7,13 @@ services:
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
+              
+    admin_svc:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/adminsvc/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
 
     hot_post:
         build:
