@@ -5,17 +5,19 @@ from praw.models import Submission, Comment
 from redlock import RedLockError
 from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.exception import NoIndexException, RateLimitException
+from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -27,13 +29,18 @@ class SubMonitor:
             uowm: SqlAlchemyUnitOfWorkManager,
             reddit: RedditManager,
             response_builder: ResponseBuilder,
-            response_handler: ResponseHandler
+            response_handler: ResponseHandler,
+            config: Config = None
     ):
         self.image_service = image_service
         self.uowm = uowm
         self.reddit = reddit
         self.response_builder = response_builder
         self.resposne_handler = response_handler
+        if config:
+            self.config = config
+        else:
+            self.config = Config()
 
     def run(self):
         while True:
@@ -57,17 +64,15 @@ class SubMonitor:
                 return False
             post = uow.posts.get_by_post_id(submission.id)
             if not post:
-                log.info('Post %s has not been ingested yet.  Skipping')
-                return False
+                post = self.save_unknown_post(submission.id)
+                if not post:
+                    log.info('Post %s has not been ingested yet.  Skipping')
+                    return False
 
         if post.left_comment:
             return False
 
-        if post.post_type not in ['image']:
-            return False
-
-        if not post.dhash_h:
-            log.error('Post %s has no dhash. Post type %s', post.post_id, post.post_type)
+        if post.post_type not in self.config.supported_post_types:
             return False
 
         if post.crosspost_parent:
@@ -92,8 +97,15 @@ class SubMonitor:
             with self.uowm.start() as uow:
                 post = uow.posts.get_by_post_id(submission.id)
 
+            if post.post_type == 'image' and post.dhash_h is None:
+                log.error('Post %s has no dhash', post.post_id)
+                continue
+
             try:
-                search_results = self._check_for_repost(post, monitored_sub)
+                if post.post_type == 'image':
+                    search_results = self._check_for_repost(post, monitored_sub)
+                elif post.post_type == 'link':
+                    search_results = self._check_for_link_repost(post)
             except NoIndexException:
                 log.error('No search index available.  Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
                 continue
@@ -104,6 +116,7 @@ class SubMonitor:
             if not search_results.matches and monitored_sub.repost_only:
                 log.debug('No matches for post %s and comment OC is disabled',
                          f'https://redd.it/{search_results.checked_post.post_id}')
+                self._create_checked_post(post)
                 continue
 
             try:
@@ -148,6 +161,9 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
 
+    def _check_for_link_repost(self, post: Post):
+        return check_link_repost(post, self.uowm, get_total=True)
+
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageRepostWrapper:
         """
         Check if provided post is a repost
@@ -159,7 +175,7 @@ class SubMonitor:
             post,
             target_annoy_distance=monitored_sub.target_annoy,
             target_hamming_distance=monitored_sub.target_hamming,
-            date_cutff=monitored_sub.target_days_old,
+            date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter
         )
@@ -184,34 +200,39 @@ class SubMonitor:
     def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> Comment:
 
         msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
+        if search_results.checked_post.post_type == 'image':
+            msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
+
         if search_results.matches:
-            msg = self.response_builder.build_sub_repost_comment(search_results.checked_post.subreddit, msg_values,)
+            msg = self.response_builder.build_sub_repost_comment(
+                search_results.checked_post.subreddit,
+                msg_values,
+                search_results.checked_post.post_type
+            )
         else:
-            msg = self.response_builder.build_sub_oc_comment(search_results.checked_post.subreddit, msg_values)
+            msg = self.response_builder.build_sub_oc_comment(
+                search_results.checked_post.subreddit,
+                msg_values, search_results.checked_post.post_type
+            )
 
         return self.resposne_handler.reply_to_submission(submission.id, msg, source='submonitor')
 
-    def _save_unknown_post(self, submission: Submission) -> Post:
+    def save_unknown_post(self, post_id: str) -> Post:
         """
         If we received a request on a post we haven't ingest save it
         :param submission: Reddit Submission
         :return:
         """
-        post = submission_to_post(submission)
+        log.info('Post %s does not exist, attempting to ingest', post_id)
+        submission = self.reddit.submission(post_id)
+        post = None
         try:
-            post = pre_process_post(post, self.uowm, None)
-        except IntegrityError as e:
-            log.error('Image post already exists')
-
-        return post
-        with self.uowm.start() as uow:
-            try:
-                uow.posts.add(post)
-                uow.commit()
-                uow.posts.remove_from_session(post)
-                log.debug('Commited Post: %s', post)
-            except Exception as e:
-                log.exception('Problem saving new post', exc_info=True)
+            post = pre_process_post(submission_to_post(submission), self.uowm, None)
+        except InvalidImageUrlException:
+            log.error('Failed to ingest post %s.  URL appears to be bad', post_id)
+        if not post:
+            log.error('Problem ingesting post.  Either failed to save or it is not an image')
+            return
 
         return post
 

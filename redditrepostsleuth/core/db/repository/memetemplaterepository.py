@@ -10,6 +10,9 @@ class MemeTemplateRepository:
     def add(self, item):
         self.db_session.add(item)
 
+    def get_all_unapproved(self) -> List[MemeTemplate]:
+        return self.db_session.query(MemeTemplate).filter(MemeTemplate.approved == False).all()
+
     def get_by_id(self, id: int) -> MemeTemplate:
         return self.db_session.query(MemeTemplate).filter(MemeTemplate.id == id).first()
 

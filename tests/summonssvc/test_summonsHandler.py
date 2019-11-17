@@ -7,20 +7,30 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 
 class TestSummonsHandler(TestCase):
-    def test_handle_summons(self):
-        self.fail()
 
-    def test_handle_repost_request(self):
-        self.fail()
+    def test__strip_summons_flags__clean_input_usertag(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = '/repostsleuthbot'
+        self.assertIsNone(sum_handler._strip_summons_flags(summons))
 
-    def test_process_repost_request(self):
-        self.fail()
+    def test__strip_summons_flags__junk_input_usertag(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = 'This test u/repostsleuthbot some junk'
+        self.assertEqual(sum_handler._strip_summons_flags(summons), 'some junk')
 
-    def test_process_link_repost_request(self):
-        self.fail()
+    def test__strip_summons_flags__clean_input_commandtag(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = '?repost'
+        self.assertIsNone(sum_handler._strip_summons_flags(summons))
 
-    def test_process_image_repost_request(self):
-        self.fail()
+    def test__strip_summons_flags__junk_input_commandtag(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = 'This test ?repost some junk'
+        self.assertEqual(sum_handler._strip_summons_flags(summons), 'some junk')
 
     def test__get_target_distances__monitored_sub(self):
         sub_repo = MagicMock()
@@ -54,20 +64,3 @@ class TestSummonsHandler(TestCase):
         self.assertEqual(3, target_hamming)
         self.assertEqual(4.0, target_annoy)
 
-    def test__send_response(self):
-        self.fail()
-
-    def test__save_response(self):
-        self.fail()
-
-    def test__save_post(self):
-        self.fail()
-
-    def test_save_unknown_post(self):
-        self.fail()
-
-    def test__searched_post_str(self):
-        self.fail()
-
-    def test__send_event(self):
-        self.fail()

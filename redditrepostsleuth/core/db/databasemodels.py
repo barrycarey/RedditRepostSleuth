@@ -246,6 +246,8 @@ class MemeTemplate(Base):
     target_annoy = Column(Float)
     example = Column(String(500))
     template_detection_hamming = Column(Integer)
+    created_from_submission = Column(String(100))
+    approved = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -257,7 +259,9 @@ class MemeTemplate(Base):
             'target_hamming': self.target_hamming,
             'target_annoy': self.target_annoy,
             'example': self.example,
-            'template_detection_hamming': self.template_detection_hamming
+            'template_detection_hamming': self.template_detection_hamming,
+            'created_from_submission': self.created_from_submission,
+            'approved': self.approved
         }
 
 class InvestigatePost(Base):
