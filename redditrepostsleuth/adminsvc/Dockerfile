@@ -3,7 +3,7 @@ MAINTAINER Barry Carey <mcarey66@gmail.com>
 
 VOLUME /src/
 COPY sleuth_config.json /src/
-COPY /wiki/bot_config.md /src/adminsvc/
+COPY /wiki/bot_config.md /src/redditrepostsleuth/adminsvc/
 COPY redditrepostsleuth/adminsvc/requirements.txt /src/
 ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src
