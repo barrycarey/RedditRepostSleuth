@@ -72,6 +72,9 @@ class SummonsMonitor:
                         log.debug('Skipping old mention. Created at %s', datetime.fromtimestamp(comment.created_utc))
                         continue
 
+                    if comment.author == 'sneakpeekbot':
+                        continue
+
                     if comment.id in bad_mentions:
                         continue
 
