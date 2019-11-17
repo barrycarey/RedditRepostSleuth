@@ -88,7 +88,7 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def create_meme_template(url: str, name: str = None) -> MemeTemplate:
+def create_meme_template(url: str, name: str = None, target_hamming=9, target_annoy=0) -> MemeTemplate:
     """
     Take a given URL and create a meme template from it
     :param url: URL to create template from
@@ -110,7 +110,9 @@ def create_meme_template(url: str, name: str = None) -> MemeTemplate:
         ahash=str(ahash),
         name=name,
         example=url,
-        template_detection_hamming=10
+        template_detection_hamming=10,
+        target_annoy=target_annoy,
+        target_hamming=target_hamming
     )
 
 def is_image_still_available(url: str) -> bool:
