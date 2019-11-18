@@ -1,4 +1,5 @@
 import json
+import time
 from json import JSONDecodeError
 from typing import Text, List, NoReturn
 
@@ -27,10 +28,15 @@ class SubredditConfigUpdater:
         self.response_handler = response_handler
 
     def update_configs(self):
-        with self.uowm.start() as uow:
-            monitored_subs = uow.monitored_sub.get_all()
-            for sub in monitored_subs:
-                self.check_for_config_update(sub)
+        while True:
+            try:
+                with self.uowm.start() as uow:
+                    monitored_subs = uow.monitored_sub.get_all()
+                    for sub in monitored_subs:
+                        self.check_for_config_update(sub)
+                    time.sleep(180)
+            except Exception as e:
+                log.exception('Config update thread crashed', exc_info=True)
 
     def check_for_config_update(self, monitored_sub: MonitoredSub):
         subreddit = self.reddit.subreddit(monitored_sub.name)

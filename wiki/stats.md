@@ -1,4 +1,4 @@
-###General Status
+###General Stats
 
 Last Updated at {last_updated}
 
