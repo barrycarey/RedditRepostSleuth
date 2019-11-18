@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 import pymysql
@@ -131,6 +132,7 @@ class StatsUpdater:
         return final_msg
 
     def get_template(self):
+        print(os.getcwd())
         with open('stats.md', 'r') as f:
             template = f.read()
 
