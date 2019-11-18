@@ -235,6 +235,18 @@ class MonitoredSubChecks(Base):
     checked_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(100))
 
+class MonitoredSubConfigRevision(Base):
+    __tablename__ = 'reddit_monitored_sub_config_revision'
+    id = Column(Integer, primary_key=True)
+    revision_id = Column(String(36), nullable=False, unique=True)
+    revised_by = Column(String(100), nullable=False)
+    config = Column(String(1000), nullable=False)
+    config_loaded_at = Column(DateTime)
+    is_valid = Column(Boolean, default=False)
+    notified = Column(Boolean, default=False)
+    subreddit = Column(String(100), nullable=False)
+
+
 class MemeTemplate(Base):
     __tablename__ = 'meme_template'
     id = Column(Integer, primary_key=True)

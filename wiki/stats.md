@@ -1,7 +1,6 @@
-
 ###General Status
 
-Last updated at {last_updated}
+Last Updated at {last_updated}
 
 **Times Summoned:** {summon_total}
 
@@ -11,7 +10,7 @@ Last updated at {last_updated}
 
 **Image Reposts Found:** {total_image_repost}
 
-**Link Reposts Found:** {total_link_reposts}
+**Link Reposts Found:** {total_link_repost}
 
 ### Archive Stats
 **Total Posts:** {total_posts}
@@ -22,7 +21,7 @@ Last updated at {last_updated}
 
 **Text Posts:** {total_text_posts}
 
-**Video Posts** {oldest_post}
+**Video Posts** {total_video_posts}
 
 ### Top 5 Most Active Subs
 {top_5_active_subs}

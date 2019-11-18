@@ -20,6 +20,7 @@ class BotCommentMonitor:
 
 
     def check_comments(self):
+        log.info('Checking comments from last 6 hours')
         with self.uowm.start() as uow:
             comments = uow.bot_comment.get_after_date(datetime.utcnow() - timedelta(hours=8))
             for comment in comments:
@@ -34,7 +35,6 @@ class BotCommentMonitor:
             return
 
         bot_comment.karma = self._get_score(reddit_comment)
-        print(bot_comment.karma)
         if bot_comment.karma <= self.config.bot_comment_karma_flag_threshold:
             log.info('Comment %s has karma of %s.  Flagging for review', bot_comment.comment_id, bot_comment.karma)
             bot_comment.needs_review = True
