@@ -10,6 +10,7 @@ from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRep
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
 from redditrepostsleuth.core.db.repository.memetemplaterepository import MemeTemplateRepository
+from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo import MonitoredSubConfigRevisionRepo
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
@@ -103,3 +104,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def investigate_post(self) -> InvestigatePostRepo:
         return InvestigatePostRepo(self.session)
+
+    @property
+    def monitored_sub_config_revision(self) -> MonitoredSubConfigRevisionRepo:
+        return MonitoredSubConfigRevisionRepo(self.session)

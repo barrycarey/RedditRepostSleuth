@@ -1,3 +1,5 @@
+from typing import Text
+
 from praw.exceptions import APIException
 from praw.models import Comment, Redditor
 from prawcore import Forbidden
@@ -81,9 +83,9 @@ class ResponseHandler:
         except Exception as e:
             log.exception('Unknown exception leaving comment', exc_info=True)
 
-    def send_private_message(self, user: Redditor, message_body) -> str:
+    def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> str:
         try:
-            user.message('Repost Check', message_body)
+            user.message(subject, message_body)
             log.info('Send PM to %s. ', user.name)
             return message_body
         except Exception as e:
