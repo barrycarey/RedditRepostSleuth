@@ -1,12 +1,9 @@
 import sys
 import time
-
+sys.path.append('./')
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
-
-sys.path.append('./')
-
 from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
 from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
 from redditrepostsleuth.core.config import Config
