@@ -267,7 +267,12 @@ class SummonsHandler:
                                                            send_pm_on_fail=True)
         except APIException as e:
             return
-        response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
+        if reply:
+            response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
+        else:
+            log.error('Failed to get reply from comment %s', comment_id)
+            response.message = 'FAILED REPLY' \
+                               ''
         self._save_response(response, reply)
 
     def _save_response(self, response: RepostResponseBase, reply: CommentReply, subreddit: str = None):

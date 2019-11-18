@@ -67,11 +67,16 @@ class ResponseHandler:
                     log.debug('Comment %s has been deleted', comment_id)
                     comment_reply.body = 'DELETED COMMENT'
                     return comment_reply
+                elif e.error_type == 'THREAD_LOCKED':
+                    log.info('Comment %s is in a locked thread', comment_id)
+                    comment_reply.body = 'THREAD LOCKED'
+                    return comment_reply
                 elif e.error_type == 'RATELIMIT':
                     log.exception('PRAW Ratelimit exception', exc_info=False)
                     raise
                 else:
                     log.exception('APIException without error_type', exc_info=True)
+                    raise
         except Forbidden:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
             if send_pm_on_fail:
