@@ -1,3 +1,5 @@
+from typing import List
+
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
@@ -12,6 +14,7 @@ class ImageRepostWrapper(RepostWrapper):
         self.total_searched: int = 0
         self.meme_template: MemeTemplate = None
         self.closest_match: ImageMatch = None
+        self.matches = List[ImageMatch]
 
     def to_dict(self):
         r = {
