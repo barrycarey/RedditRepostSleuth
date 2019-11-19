@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Text
 
 from redditrepostsleuth.core.logging import log
@@ -38,3 +39,29 @@ def hamming_distance_filter(target_hamming_distance: float):
                   match.hamming_distance, f'https://redd.it/{match.post.post_id}')
         return False
     return hamming_filter
+
+def filter_newer_matches(cutoff_date: datetime):
+    def date_filter(match: RepostMatch):
+        if match.post.created_at >= cutoff_date:
+            log.debug('Date Filter Reject: Target: %s Actual: %s - %s', cutoff_date.strftime('%Y-%d-%m %H:%M:%S'),
+                      match.post.created_at.strftime('%Y-%d-%m %H:%M:%S'), f'https://redd.it/{match.post.post_id}')
+            return False
+        return True
+    return date_filter
+
+def filter_days_old_matches(cutoff_days: int):
+    def days_filter(match: RepostMatch):
+        if (datetime.utcnow() - match.post.created_at).days > cutoff_days:
+            log.debug('Date Cutoff Reject: Target: %s Actual: %s - %s', cutoff_days,
+                      (datetime.utcnow() - match.post.created_at).days, f'https://redd.it/{match.post.post_id}')
+            return False
+        return True
+    return days_filter
+
+def filter_same_author(author: Text):
+    def filter_author(match: RepostMatch):
+        if author == match.post.author:
+            log.debug('Author Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
+            return False
+        return True
+    return filter_author
