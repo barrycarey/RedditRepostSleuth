@@ -22,7 +22,7 @@ from redditrepostsleuth.core.util.helpers import is_image_still_available
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes, get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.redlock import redlock
-from redditrepostsleuth.core.util.reposthelpers import sort_reposts
+from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest_image_match
 
 
 class DuplicateImageService:
@@ -308,7 +308,7 @@ class DuplicateImageService:
                     log.info('Using meme filter %s', meme_template.name)
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
-
+            search_results.closest_match = get_closest_image_match(search_results.matches)
             search_results.matches = self._filter_results_for_reposts(search_results.matches, post,
                                                                       target_annoy_distance=target_annoy_distance,
                                                                       target_hamming_distance=target_hamming_distance,
@@ -428,6 +428,8 @@ class DuplicateImageService:
                 log.error('Match %s missing dhash_h', match.post.post_id)
                 continue
             match.hamming_distance = hamming(searched_post.dhash_h, match.post.dhash_h)
+            match.hash_size = len(searched_post.dhash_h)
+            match.hamming_match_percent = 100 - (match.hamming_distance / len(searched_post.dhash_h)) * 100
         return matches
 
     def _final_meme_filter(self, searched_post: Post, matches: List[ImageMatch], target_hamming):
@@ -455,6 +457,8 @@ class DuplicateImageService:
             log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                        h_distance)
             match.hamming_distance = h_distance
+            match.hamming_match_percent = 100 - (h_distance / len(searched_post.dhash_h)) * 100
+            match.hash_size = len(target_hashes['dhash_h'])
             results.append(match)
 
         return results
