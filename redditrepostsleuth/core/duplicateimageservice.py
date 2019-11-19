@@ -22,6 +22,9 @@ from redditrepostsleuth.core.util.helpers import is_image_still_available
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes, get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.redlock import redlock
+from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
+    filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
+    filter_no_dhash
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest_image_match
 
 
@@ -166,8 +169,7 @@ class DuplicateImageService:
 
     def _filter_results_for_reposts(
             self,
-            matches: List[ImageMatch],
-            checked_post: Post,
+            search_results: ImageRepostWrapper,
             target_hamming_distance: int = None,
             target_annoy_distance: float = None,
             same_sub: bool = False,
@@ -179,7 +181,7 @@ class DuplicateImageService:
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
         :param checked_post: The post we're finding matches for
-        :param matches: A cleaned list of matches
+        :param search_results: A cleaned list of matches
         :param target_hamming_distance: Hamming cutoff for matches
         :param target_annoy_distance: Annoy cutoff for matches
         :rtype: List[ImageMatch]
@@ -190,14 +192,33 @@ class DuplicateImageService:
             target_hamming_distance = 0
         else:
             target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
-
         target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
 
         results = []
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
-        log.debug('Matches pre-filter: %s', len(matches))
-        for match in matches:
+        log.debug('Matches pre-filter: %s', len(search_results))
+        matches = search_results.matches
+        matches = list(filter(filter_same_post, matches))
+        matches = list(filter(filter_same_author, matches))
+        matches = list(filter(cross_post_filter, matches))
+        matches = list(filter(filter_no_dhash, matches))
+
+        if only_older_matches:
+            matches = list(filter(filter_newer_matches(search_results.checked_post.created_at), matches))
+
+        search_results.closest_match = get_closest_image_match(matches)
+
+        if same_sub:
+            matches = list(filter(same_sub_filter(search_results.checked_post.subreddit), matches))
+
+        if date_cutoff:
+            matches = list(filter(filter_days_old_matches(date_cutoff), matches))
+
+        matches = list(filter(annoy_distance_filter(target_annoy_distance), matches))
+        matches = list(filter(hamming_distance_filter(target_hamming_distance if not is_meme else 0), matches))
+
+        for match in search_results:
             if not match.post.dhash_h:
                 log.debug('Match %s missing dhash_h', match.post.post_id)
                 continue
@@ -308,7 +329,7 @@ class DuplicateImageService:
                     log.info('Using meme filter %s', meme_template.name)
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
-            search_results.closest_match = get_closest_image_match(search_results.matches)
+
             search_results.matches = self._filter_results_for_reposts(search_results.matches, post,
                                                                       target_annoy_distance=target_annoy_distance,
                                                                       target_hamming_distance=target_hamming_distance,

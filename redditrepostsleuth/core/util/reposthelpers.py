@@ -47,6 +47,8 @@ def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
 
 
 def get_closest_image_match(posts: List[ImageMatch], reverse=True) -> ImageMatch:
+    if not posts:
+        return None
     return sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)[0]
 
 

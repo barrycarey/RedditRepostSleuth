@@ -19,3 +19,8 @@ class Test_Repost_Helpers(TestCase):
 
         r = get_closest_image_match(matches)
         self.assertEqual(r, match1)
+
+    def test_get_closest_image_match__empty_list(self):
+        matches = []
+        r = get_closest_image_match(matches)
+        self.assertIsNone(r)

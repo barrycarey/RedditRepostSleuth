@@ -13,6 +13,7 @@ def cross_post_filter(match: RepostMatch) -> bool:
     else:
         return True
 
+
 def same_sub_filter(subreddit: Text):
     def sub_filter(match):
         if match.post.subreddit != subreddit:
@@ -21,6 +22,7 @@ def same_sub_filter(subreddit: Text):
             return False
         return True
     return sub_filter
+
 
 def annoy_distance_filter(target_annoy_distance: float):
     def annoy_filter(match: ImageMatch):
@@ -31,6 +33,7 @@ def annoy_distance_filter(target_annoy_distance: float):
         return False
     return annoy_filter
 
+
 def hamming_distance_filter(target_hamming_distance: float):
     def hamming_filter(match: ImageMatch):
         if match.annoy_distance <= target_hamming_distance:
@@ -39,6 +42,7 @@ def hamming_distance_filter(target_hamming_distance: float):
                   match.hamming_distance, f'https://redd.it/{match.post.post_id}')
         return False
     return hamming_filter
+
 
 def filter_newer_matches(cutoff_date: datetime):
     def date_filter(match: RepostMatch):
@@ -49,6 +53,7 @@ def filter_newer_matches(cutoff_date: datetime):
         return True
     return date_filter
 
+
 def filter_days_old_matches(cutoff_days: int):
     def days_filter(match: RepostMatch):
         if (datetime.utcnow() - match.post.created_at).days > cutoff_days:
@@ -58,6 +63,7 @@ def filter_days_old_matches(cutoff_days: int):
         return True
     return days_filter
 
+
 def filter_same_author(author: Text):
     def filter_author(match: RepostMatch):
         if author == match.post.author:
@@ -65,3 +71,19 @@ def filter_same_author(author: Text):
             return False
         return True
     return filter_author
+
+
+def filter_same_post(post_id: Text):
+    def same_post(match: ImageMatch):
+        if match.post.post_id == post_id:
+            log.debug('Same Post Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
+            return False
+        return True
+    return same_post
+
+
+def filter_no_dhash(match: ImageMatch):
+    if not match.post.dhash_h:
+        log.debug('Dhash Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
+        return False
+    return True
