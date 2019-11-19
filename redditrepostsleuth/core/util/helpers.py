@@ -132,8 +132,9 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
     results_values = {}
     if search_results.matches:
         results_values = {
-            'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
-            'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+            'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent:.2%}',
+            'oldest_percent_match': f'{search_results.matches[0].hamming_match_percent:.2%}',
+            'closest_percent_match': f'{search_results.matches[0].hamming_match_percent:.2%}',
             'match_list': build_markdown_list(search_results.matches),
             'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
             'false_positive_data': json.dumps(
@@ -141,7 +142,11 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
                     'post': f'https://redd.it/{search_results.checked_post.post_id}',
                     'meme_template': search_results.meme_template.id if search_results.meme_template else None
                 }
-            )
+            ),
+            'closest_created_at': search_results.closest_match.post.created_at,
+            'closest_url': search_results.closest_match.post.url,
+            'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}',
+            'closest_sub': search_results.closest_match.post.subreddit
         }
 
     return {**results_values, **kwargs}

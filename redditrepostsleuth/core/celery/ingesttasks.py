@@ -20,8 +20,6 @@ def save_new_post(self, post):
         if post:
             ingest_repost_check.apply_async((post,self.config), queue='repost')
             log.debug('Post %s: Sent post to repost queue', post.post_id)
-        else:
-            log.error('Post %s: Failed to ingest', post.post_id)
 
 
 @celery.task(ignore_results=True)
