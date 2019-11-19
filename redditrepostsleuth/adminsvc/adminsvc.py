@@ -29,11 +29,6 @@ if __name__ == '__main__':
     threading.Thread(target=config_updater.update_configs, name='config_update').start()
     threading.Thread(target=activation_monitor.check_for_new_invites, name='activation').start()
     while True:
-
-
-        #config_updater.update_configs()
-
-        #activation_monitor.check_for_new_invites()
         comment_monitor.check_comments()
         stats_updater.run_update()
         time.sleep(600)
