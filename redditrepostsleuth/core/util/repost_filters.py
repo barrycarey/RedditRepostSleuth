@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Text
 
+import requests
+
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
@@ -74,7 +76,7 @@ def filter_same_author(author: Text):
 
 
 def filter_same_post(post_id: Text):
-    def same_post(match: ImageMatch):
+    def same_post(match: RepostMatch):
         if match.post.post_id == post_id:
             log.debug('Same Post Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
             return False
@@ -87,3 +89,11 @@ def filter_no_dhash(match: ImageMatch):
         log.debug('Dhash Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
         return False
     return True
+
+def filter_dead_urls(match: ImageMatch):
+    r = requests.head(match.post.url)
+    if r.status_code == 200:
+        return True
+    else:
+        log.debug('Active URL Reject:  https://redd.it/%s', match.post.post_id)
+        return False

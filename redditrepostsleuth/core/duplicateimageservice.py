@@ -24,7 +24,7 @@ from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_mat
 from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
-    filter_no_dhash
+    filter_no_dhash, filter_dead_urls
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest_image_match
 
 
@@ -176,7 +176,7 @@ class DuplicateImageService:
             date_cutoff: int = None,
             filter_dead_matches: bool = True,
             only_older_matches: bool = True,
-            is_meme: bool = False) -> List[ImageMatch]:
+            is_meme: bool = False) -> ImageRepostWrapper:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -194,7 +194,6 @@ class DuplicateImageService:
             target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
         target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
 
-        results = []
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
         log.debug('Matches pre-filter: %s', len(search_results))
@@ -218,50 +217,19 @@ class DuplicateImageService:
         matches = list(filter(annoy_distance_filter(target_annoy_distance), matches))
         matches = list(filter(hamming_distance_filter(target_hamming_distance if not is_meme else 0), matches))
 
-        for match in search_results:
-            if not match.post.dhash_h:
-                log.debug('Match %s missing dhash_h', match.post.post_id)
-                continue
-            if match.post.crosspost_parent:
-                continue
-            if same_sub and checked_post.subreddit != match.post.subreddit:
-                log.debug('Same Sub Reject: Orig sub: %s - Match Sub: %s - %s', checked_post.subreddit, match.post.subreddit, f'https://redd.it/{match.post.post_id}')
-                continue
-            if match.annoy_distance > target_annoy_distance:
-                log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance, f'https://redd.it/{match.post.post_id}')
-                continue
-            if checked_post.post_id == match.post.post_id:
-                continue
-            if only_older_matches and match.post.created_at > checked_post.created_at:
-                log.debug('Date Filter Reject: Target: %s Actual: %s - %s', checked_post.created_at.strftime('%Y-%d-%m'), match.post.created_at.strftime('%Y-%d-%m'), f'https://redd.it/{match.post.post_id}')
-                continue
-            if date_cutoff and (datetime.utcnow() - match.post.created_at).days > date_cutoff:
-                log.debug('Date Cutoff Reject: Target: %s Actual: %s - %s', date_cutoff, (datetime.utcnow() - match.post.created_at).days, f'https://redd.it/{match.post.post_id}')
-                continue
-            if checked_post.author == match.post.author:
-                # TODO - Need logic to check age and sub of matching posts with same author
-                continue
+        if filter_dead_matches:
+            matches = list(filter(filter_dead_urls, matches))
 
-            # TODO - Clean up this cluster fuck
-            if match.hamming_distance > (target_hamming_distance if not is_meme else 0): # If it's a meme use 0 first pass on default hash.
-                log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance if not is_meme else 0,
-                          match.hamming_distance, f'https://redd.it/{match.post.post_id}')
-                continue
-
-            if filter_dead_matches:
-                if not is_image_still_available(match.post.url):
-                    log.debug('Active Image Reject: Imgae has been deleted from post https://redd.it/%s', match.post.post_id)
-                    continue
-
+        for match in matches:
             log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}',
                       round(match.annoy_distance, 5), match.hamming_distance)
 
-            results.append(match)
-        log.info('Matches post-filter: %s', len(results))
+        log.info('Matches post-filter: %s', len(matches))
         if is_meme:
-            results = self._final_meme_filter(checked_post, results, target_hamming_distance)
+            matches = self._final_meme_filter(search_results.checked_post, matches, target_hamming_distance)
 
-        return sort_reposts(results)
+        search_results.matches = sort_reposts(matches)
+        return search_results
 
     def check_duplicates_wrapped(self, post: Post,
                                  result_filter: bool = True,
@@ -285,6 +253,7 @@ class DuplicateImageService:
         log.info('Checking %s for duplicates - https://redd.it/%s', post.post_id, post.post_id)
         self._load_index_files()
         search_results = ImageRepostWrapper()
+        search_results.checked_post = post
         start = perf_counter()
         try:
             search_array = bytearray(post.dhash_h, encoding='utf-8')
@@ -330,19 +299,21 @@ class DuplicateImageService:
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
 
-            search_results.matches = self._filter_results_for_reposts(search_results.matches, post,
-                                                                      target_annoy_distance=target_annoy_distance,
-                                                                      target_hamming_distance=target_hamming_distance,
-                                                                      same_sub=same_sub,
-                                                                      date_cutoff=date_cutoff,
-                                                                      filter_dead_matches=filter_dead_matches,
-                                                                      only_older_matches=only_older_matches,
-                                                                      is_meme=meme_template or False)
+            self._filter_results_for_reposts(
+                  search_results.matches,
+                  post,
+                  target_annoy_distance=target_annoy_distance,
+                  target_hamming_distance=target_hamming_distance,
+                  same_sub=same_sub,
+                  date_cutoff=date_cutoff,
+                  filter_dead_matches=filter_dead_matches,
+                  only_older_matches=only_older_matches,
+                  is_meme=meme_template or False
+            )
         else:
             self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
 
-        search_results.checked_post = post
         search_results.total_search_time = round(perf_counter() - start, 5)
         search_results.total_searched = self.current_index.get_n_items() if self.current_index else 0
         search_results.total_searched = search_results.total_searched + self.historical_index.get_n_items()

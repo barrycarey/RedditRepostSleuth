@@ -115,12 +115,6 @@ def create_meme_template(url: str, name: str = None, target_hamming=9, target_an
         target_hamming=target_hamming
     )
 
-def is_image_still_available(url: str) -> bool:
-    r = requests.head(url)
-    if r.status_code == 200:
-        return True
-    else:
-        return False
 
 def build_markdown_list(matches: List[ImageMatch]) -> str:
     result = ''
