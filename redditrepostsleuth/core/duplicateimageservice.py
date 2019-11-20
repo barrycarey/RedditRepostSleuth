@@ -18,7 +18,6 @@ from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEve
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import is_image_still_available
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes, get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.redlock import redlock
