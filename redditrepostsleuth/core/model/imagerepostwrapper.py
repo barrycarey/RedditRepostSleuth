@@ -14,6 +14,9 @@ class ImageRepostWrapper(RepostWrapper):
         self.total_searched: int = 0
         self.meme_template: MemeTemplate = None
         self.closest_match: ImageMatch = None
+        self.meme_filter_time: float = None
+        self.meme_detection_time: float = None
+        self.total_filter_time: float = None
         self.matches = List[ImageMatch]
 
     def to_dict(self):
@@ -22,7 +25,7 @@ class ImageRepostWrapper(RepostWrapper):
             'index_search_time': self.index_search_time,
             'index_size': self.total_searched,
             'meme_template': self.meme_template.to_dict() if self.meme_template else None,
-            'closest_match': self.closest_match.to_dict() if self.closest_match else None
+            'closest_match': self.closest_match.to_dict() if self.closest_match else None,
         }
         return {**r, **super(ImageRepostWrapper,self).to_dict()}
 
