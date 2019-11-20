@@ -65,4 +65,4 @@ class ImageRepostChecker:
             resp.body = json.dumps(response)
             return
 
-        resp.body = json.dumps(search_results.matches, cls=ImageRepostWrapperEncoder)
+        resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)

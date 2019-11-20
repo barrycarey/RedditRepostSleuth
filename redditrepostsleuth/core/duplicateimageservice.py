@@ -186,6 +186,7 @@ class DuplicateImageService:
         :param target_annoy_distance: Annoy cutoff for matches
         :rtype: List[ImageMatch]
         """
+        start_time = perf_counter()
         # TODO - Allow array of filters to be passed
         # Dumb fix for 0 evaling to False
         if target_hamming_distance == 0:
@@ -226,7 +227,7 @@ class DuplicateImageService:
 
         log.info('Matches post-filter: %s', len(matches))
         if is_meme:
-            matches = self._final_meme_filter(search_results.checked_post, matches, target_hamming_distance)
+            matches, search_results.meme_filter_time = self._final_meme_filter(search_results.checked_post, matches, target_hamming_distance)
 
         search_results.matches = sort_reposts(matches)
         return search_results
@@ -287,25 +288,22 @@ class DuplicateImageService:
 
         if result_filter:
             self._set_match_hamming(post, search_results.matches)
-            meme_template = None
-            # TODO - Possibly make this optional instead of running on each check
             if meme_filter:
-                meme_template = self.get_meme_template(post)
-                if meme_template:
-                    search_results.meme_template = meme_template
-                    target_hamming_distance = meme_template.target_hamming
-                    target_annoy_distance = meme_template.target_annoy
-                    log.info('Using meme filter %s', meme_template.name)
+                search_results = self.get_meme_template(search_results)
+                if search_results.meme_template:
+                    target_hamming_distance = search_results.meme_template.target_hamming
+                    target_annoy_distance = search_results.meme_template.target_annoy
+                    log.info('Using meme filter %s', search_results.meme_template.name)
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
-            search_results.matches = self._filter_results_for_reposts(search_results,
+            search_results = self._filter_results_for_reposts(search_results,
                                                                       target_annoy_distance=target_annoy_distance,
                                                                       target_hamming_distance=target_hamming_distance,
                                                                       same_sub=same_sub,
                                                                       date_cutoff=date_cutoff,
                                                                       filter_dead_matches=filter_dead_matches,
                                                                       only_older_matches=only_older_matches,
-                                                                      is_meme=meme_template or False)
+                                                                      is_meme=search_results.meme_template or False)
         else:
             self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
@@ -343,7 +341,10 @@ class DuplicateImageService:
                 total_search_time=search_results.total_search_time,
                 index_search_time=search_results.index_search_time,
                 index_size=search_results.total_searched,
-                event_type='duplicate_image_search'
+                event_type='duplicate_image_search',
+                meme_detection_time=search_results.meme_detection_time,
+                meme_filter_time=search_results.meme_filter_time
+
             )
         )
 
@@ -385,21 +386,26 @@ class DuplicateImageService:
                 match.match_id = match_post.id
         return matches
 
-    def get_meme_template(self, check_post: Post) -> MemeTemplate:
+    def get_meme_template(self, search_results: ImageRepostWrapper) -> ImageRepostWrapper:
         """
         Check if a given post matches a known meme template.  If it is, use that templates distance override
         :param check_post: Post we're checking
         :rtype: List[ImageMatch]
         """
+        start_time = perf_counter()
         with self.uowm.start() as uow:
             templates = uow.meme_template.get_all()
 
         for template in templates:
-            h_distance = hamming(check_post.dhash_h, template.dhash_h)
+            h_distance = hamming(search_results.checked_post.dhash_h, template.dhash_h)
             log.debug('Meme template %s: Hamming %s', template.name, h_distance)
             if (h_distance <= template.template_detection_hamming):
-                log.info('Post %s matches meme template %s', f'https://redd.it/{check_post.post_id}', template.name)
-                return template
+                log.info('Post %s matches meme template %s', f'https://redd.it/{search_results.checked_post.post_id}', template.name)
+                search_results.meme_template = template
+                search_results.meme_filter_time = round(perf_counter() - start_time, 5)
+                return search_results
+        search_results.meme_filter_time = round(perf_counter() - start_time, 5)
+        return search_results
 
     def _set_match_hamming(self, searched_post: Post, matches: List[ImageMatch]) -> List[ImageMatch]:
         """
@@ -420,8 +426,14 @@ class DuplicateImageService:
             match.hamming_match_percent = 100 - (match.hamming_distance / len(searched_post.dhash_h)) * 100
         return matches
 
-    def _final_meme_filter(self, searched_post: Post, matches: List[ImageMatch], target_hamming):
+    def _final_meme_filter(
+            self,
+            searched_post: Post,
+            matches: List[ImageMatch],
+            target_hamming
+    ) -> Tuple[List[ImageMatch], float]:
         results = []
+        start_time = perf_counter()
         try:
             target_hashes = get_image_hashes(searched_post, hash_size=32)
         except Exception as e:
@@ -445,8 +457,8 @@ class DuplicateImageService:
             log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                        h_distance)
             match.hamming_distance = h_distance
-            match.hamming_match_percent = 100 - (h_distance / len(searched_post.dhash_h)) * 100
+            match.hamming_match_percent = 100 - (h_distance / len(target_hashes['dhash_h'])) * 100
             match.hash_size = len(target_hashes['dhash_h'])
             results.append(match)
 
-        return results
+        return results, round(perf_counter() - start_time, 5)
