@@ -169,13 +169,14 @@ class DuplicateImageService:
     def _filter_results_for_reposts(
             self,
             search_results: ImageRepostWrapper,
-            target_hamming_distance: int = None,
             target_annoy_distance: float = None,
+            target_hamming_distance: int = None,
             same_sub: bool = False,
             date_cutoff: int = None,
             filter_dead_matches: bool = True,
             only_older_matches: bool = True,
-            is_meme: bool = False) -> ImageRepostWrapper:
+            is_meme: bool = False
+    ) -> ImageRepostWrapper:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
@@ -195,7 +196,7 @@ class DuplicateImageService:
 
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
-        log.debug('Matches pre-filter: %s', len(search_results))
+        log.debug('Matches pre-filter: %s', len(search_results.matches))
         matches = search_results.matches
         matches = list(filter(filter_same_post, matches))
         matches = list(filter(filter_same_author, matches))
@@ -297,18 +298,14 @@ class DuplicateImageService:
                     log.info('Using meme filter %s', meme_template.name)
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
 
-
-            self._filter_results_for_reposts(
-                  search_results.matches,
-                  post,
-                  target_annoy_distance=target_annoy_distance,
-                  target_hamming_distance=target_hamming_distance,
-                  same_sub=same_sub,
-                  date_cutoff=date_cutoff,
-                  filter_dead_matches=filter_dead_matches,
-                  only_older_matches=only_older_matches,
-                  is_meme=meme_template or False
-            )
+            search_results.matches = self._filter_results_for_reposts(search_results,
+                                                                      target_annoy_distance=target_annoy_distance,
+                                                                      target_hamming_distance=target_hamming_distance,
+                                                                      same_sub=same_sub,
+                                                                      date_cutoff=date_cutoff,
+                                                                      filter_dead_matches=filter_dead_matches,
+                                                                      only_older_matches=only_older_matches,
+                                                                      is_meme=meme_template or False)
         else:
             self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)

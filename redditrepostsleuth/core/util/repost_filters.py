@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Text
 
 import requests
+from requests.exceptions import SSLError
 
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.imagematch import ImageMatch
@@ -91,7 +92,10 @@ def filter_no_dhash(match: ImageMatch):
     return True
 
 def filter_dead_urls(match: ImageMatch):
-    r = requests.head(match.post.url)
+    try:
+        r = requests.head(match.post.url)
+    except (ConnectionError, SSLError):
+        return False
     if r.status_code == 200:
         return True
     else:
