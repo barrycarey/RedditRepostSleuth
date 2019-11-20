@@ -194,13 +194,14 @@ class DuplicateImageService:
         else:
             target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
         target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
+        search_results.target_match_percent = round(100 - (target_hamming_distance / len(search_results.checked_post.dhash_h)) * 100, 2)
 
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
         log.debug('Matches pre-filter: %s', len(search_results.matches))
         matches = search_results.matches
-        matches = list(filter(filter_same_post, matches))
-        matches = list(filter(filter_same_author, matches))
+        matches = list(filter(filter_same_post(search_results.checked_post.post_id), matches))
+        matches = list(filter(filter_same_author(search_results.checked_post.author), matches))
         matches = list(filter(cross_post_filter, matches))
         matches = list(filter(filter_no_dhash, matches))
 
@@ -228,6 +229,7 @@ class DuplicateImageService:
         log.info('Matches post-filter: %s', len(matches))
         if is_meme:
             matches, search_results.meme_filter_time = self._final_meme_filter(search_results.checked_post, matches, target_hamming_distance)
+            search_results.target_match_percent = round(100 - (target_hamming_distance / 256) * 100, 2)
 
         search_results.matches = sort_reposts(matches)
         return search_results
@@ -343,8 +345,8 @@ class DuplicateImageService:
                 index_size=search_results.total_searched,
                 event_type='duplicate_image_search',
                 meme_detection_time=search_results.meme_detection_time,
-                meme_filter_time=search_results.meme_filter_time
-
+                meme_filter_time=search_results.meme_filter_time,
+                total_filter_time=search_results.total_filter_time
             )
         )
 
@@ -423,7 +425,7 @@ class DuplicateImageService:
                 continue
             match.hamming_distance = hamming(searched_post.dhash_h, match.post.dhash_h)
             match.hash_size = len(searched_post.dhash_h)
-            match.hamming_match_percent = 100 - (match.hamming_distance / len(searched_post.dhash_h)) * 100
+            match.hamming_match_percent = round(100 - (match.hamming_distance / len(searched_post.dhash_h)) * 100, 2)
         return matches
 
     def _final_meme_filter(
@@ -457,8 +459,9 @@ class DuplicateImageService:
             log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                        h_distance)
             match.hamming_distance = h_distance
-            match.hamming_match_percent = 100 - (h_distance / len(target_hashes['dhash_h'])) * 100
+            match.hamming_match_percent = round(100 - (h_distance / len(target_hashes['dhash_h'])) * 100, 2)
             match.hash_size = len(target_hashes['dhash_h'])
             results.append(match)
+
 
         return results, round(perf_counter() - start_time, 5)
