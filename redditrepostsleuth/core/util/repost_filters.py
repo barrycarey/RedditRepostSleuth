@@ -39,7 +39,7 @@ def annoy_distance_filter(target_annoy_distance: float):
 
 def hamming_distance_filter(target_hamming_distance: float):
     def hamming_filter(match: ImageMatch):
-        if match.annoy_distance <= target_hamming_distance:
+        if match.hamming_distance <= target_hamming_distance:
             return True
         log.debug('Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming_distance,
                   match.hamming_distance, f'https://redd.it/{match.post.post_id}')

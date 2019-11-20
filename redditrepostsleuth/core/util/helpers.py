@@ -124,11 +124,18 @@ def build_markdown_list(matches: List[ImageMatch]) -> str:
 
 def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     results_values = {}
+    base_values = {
+        'closest_sub': search_results.closest_match.post.subreddit,
+        'target_match_percent': f'{search_results.target_match_percent}%',
+        'closest_url': search_results.closest_match.post.url,
+        'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}',
+        'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%',
+        'closest_created_at': search_results.closest_match.post.created_at,
+    }
     if search_results.matches:
         results_values = {
-            'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent:.2%}',
-            'oldest_percent_match': f'{search_results.matches[0].hamming_match_percent:.2%}',
-            'closest_percent_match': f'{search_results.matches[0].hamming_match_percent:.2%}',
+            'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent}%',
+            'oldest_percent_match': f'{search_results.matches[0].hamming_match_percent}%',
             'match_list': build_markdown_list(search_results.matches),
             'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
             'false_positive_data': json.dumps(
@@ -137,13 +144,9 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
                     'meme_template': search_results.meme_template.id if search_results.meme_template else None
                 }
             ),
-            'closest_created_at': search_results.closest_match.post.created_at,
-            'closest_url': search_results.closest_match.post.url,
-            'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}',
-            'closest_sub': search_results.closest_match.post.subreddit
         }
 
-    return {**results_values, **kwargs}
+    return {**results_values, **base_values, **kwargs}
 
 
 def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
@@ -158,6 +161,7 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
         'total_posts': 0,
         'match_count': len(search_results.matches),
         'post_type': search_results.checked_post.post_type,
+        'this_subreddit': search_results.checked_post.subreddit,
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}'

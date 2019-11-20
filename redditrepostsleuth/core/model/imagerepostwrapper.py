@@ -17,6 +17,7 @@ class ImageRepostWrapper(RepostWrapper):
         self.meme_filter_time: float = None
         self.meme_detection_time: float = None
         self.total_filter_time: float = None
+        self.target_match_percent: float = None
         self.matches = List[ImageMatch]
 
     def to_dict(self):

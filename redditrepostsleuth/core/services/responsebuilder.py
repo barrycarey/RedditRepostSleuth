@@ -1,4 +1,4 @@
-dfrom typing import Dict, Text
+from typing import Dict, Text
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
