@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -296,3 +297,20 @@ class InvestigatePost(Base):
             'url': self.url,
             'flag_reason': self.flag_reason
         }
+
+class ImageSearches(Base):
+    __tablename__ = 'reddit_image_searches'
+    id = Column(Integer, primary_key=True)
+    search_id = Column(UUID, nullable=False)
+    post_id = Column(String(100), nullable=False, unique=True)
+    used_historical_index = Column(Boolean, nullable=False)
+    used_current_index = Column(Boolean, nullable=False)
+    target_hamming_distance = Column(Integer, nullable=False)
+    target_annoy_distance = Column(Float, nullable=False)
+    same_sub = Column(Boolean, nullable=False)
+    max_days_old = Column(Integer, nullable=False)
+    filter_dead_matches = Column(Boolean, nullable=False)
+    only_older_matches = Column(Boolean, nullable=False)
+    meme_filter = Column(Boolean, nullable=False)
+    meme_template_Used = Column(Integer)
+    search_time = Column(Float, nullable=False)
