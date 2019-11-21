@@ -10,4 +10,4 @@ class TestRepostHelpers(TestCase):
         match = RepostMatch
         match.post = Post(crosspost_parent='xxxx')
         result = filter_matching_images([match], match.post)
-        self.assertIsNone(result)
+        self.assertEqual(0, len(result))
