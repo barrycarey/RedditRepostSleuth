@@ -11,7 +11,7 @@ from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, create_meme_template, \
-    post_type_from_url, build_markdown_list, build_msg_values_from_search
+    post_type_from_url, build_markdown_list, build_msg_values_from_search, build_image_msg_values_from_search
 
 
 class TestHelpers(TestCase):
@@ -106,7 +106,7 @@ class TestHelpers(TestCase):
         wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         wrapper.meme_template = MemeTemplate(id=10)
-        result = build_msg_values_from_search(wrapper)
+        result = build_image_msg_values_from_search(wrapper)
         self.assertIn('meme_template_id', result)
         self.assertEqual(10, result['meme_template_id'])
 
@@ -123,7 +123,7 @@ class TestHelpers(TestCase):
         wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
         wrapper.meme_template = MemeTemplate(id=10)
-        result = build_msg_values_from_search(wrapper)
+        result = build_image_msg_values_from_search(wrapper)
         self.assertIn('false_positive_data', result)
         self.assertEqual(result['false_positive_data'], '{"post": "https://redd.it/1234", "meme_template": 10}')
 
@@ -143,7 +143,7 @@ class TestHelpers(TestCase):
 
         result = build_msg_values_from_search(wrapper)
 
-        self.assertEqual(23, len(result.keys()))
+        self.assertEqual(18, len(result.keys()))
         # TODO - Maybe test return values.  Probably not needed
 
     def test_build_msg_values_from_search_no_match_key_total(self):
