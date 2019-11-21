@@ -194,7 +194,7 @@ class DuplicateImageService:
         else:
             target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
         target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
-        search_results.target_match_percent = round(100 - (target_hamming_distance / len(search_results.checked_post.dhash_h)) * 100, 2)
+        search_results.target_match_percent = round(100 - (target_hamming_distance / len(search_results.checked_post.dhash_h)) * 100, 0)
 
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
@@ -208,7 +208,7 @@ class DuplicateImageService:
         if only_older_matches:
             matches = list(filter(filter_newer_matches(search_results.checked_post.created_at), matches))
 
-        search_results.closest_match = get_closest_image_match(matches)
+        search_results.closest_match = get_closest_image_match(matches, check_url=True)
 
         if same_sub:
             matches = list(filter(same_sub_filter(search_results.checked_post.subreddit), matches))
