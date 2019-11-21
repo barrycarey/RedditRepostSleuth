@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -128,16 +129,6 @@ class RepostWatch(Base):
     response_type = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp())
     last_detection = Column(DateTime)
-
-class Reposts(Base):
-
-    __tablename__ = 'reddit_reposts'
-    id = Column(Integer, primary_key=True)
-    hamming_distance = Column(Integer)
-    post_id = Column(String(100), nullable=False)
-    repost_of = Column(String(100), nullable=False)
-    detected_at = Column(DateTime, default=func.utc_timestamp())
-    post_type = Column(String(20))
 
 class ImageRepost(Base):
 
@@ -296,3 +287,20 @@ class InvestigatePost(Base):
             'url': self.url,
             'flag_reason': self.flag_reason
         }
+
+class ImageSearch(Base):
+    __tablename__ = 'reddit_image_search'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    used_historical_index = Column(Boolean, nullable=False)
+    used_current_index = Column(Boolean, nullable=False)
+    target_hamming_distance = Column(Integer, nullable=False)
+    target_annoy_distance = Column(Float, nullable=False)
+    same_sub = Column(Boolean, nullable=False)
+    max_days_old = Column(Integer, nullable=False)
+    filter_dead_matches = Column(Boolean, nullable=False)
+    only_older_matches = Column(Boolean, nullable=False)
+    meme_filter = Column(Boolean, nullable=False)
+    meme_template_used = Column(Integer)
+    search_time = Column(Float, nullable=False)
+    matches_found = Column(Integer, nullable=False)

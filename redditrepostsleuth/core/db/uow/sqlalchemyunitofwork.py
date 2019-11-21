@@ -5,6 +5,7 @@ from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFing
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
+from redditrepostsleuth.core.db.repository.image_search_repo import ImageSearchRepo
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
@@ -14,7 +15,6 @@ from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo im
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
-from redditrepostsleuth.core.db.repository.repostrepository import RepostRepository
 from redditrepostsleuth.core.db.repository.repostwatchrepository import RepostWatchRepository
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.videohashrepository import VideoHashRepository
@@ -56,10 +56,6 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def repostwatch(self) -> RepostWatchRepository:
         return RepostWatchRepository(self.session)
-
-    @property
-    def repost(self) -> RepostRepository:
-        return RepostRepository(self.session)
 
     @property
     def image_repost(self) -> ImageRepostRepository:
@@ -108,3 +104,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def monitored_sub_config_revision(self) -> MonitoredSubConfigRevisionRepo:
         return MonitoredSubConfigRevisionRepo(self.session)
+
+    @property
+    def image_search(self) -> ImageSearchRepo:
+        return ImageSearchRepo(self.session)
