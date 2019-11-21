@@ -8,26 +8,6 @@ from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
 
 class TestSubMonitor(TestCase):
-    def test__check_sub(self):
-        self.fail()
-
-    def test__check_for_repost(self):
-        self.fail()
-
-    def test__mod_actions(self):
-        self.fail()
-
-    def test__sticky_reply(self):
-        self.fail()
-
-    def test__report_submission(self):
-        self.fail()
-
-    def test__leave_comment(self):
-        self.fail()
-
-    def test__save_unknown_post(self):
-        self.fail()
 
     def test__should_check_post__already_checked_reject(self):
         sub_monitor = SubMonitor(MagicMock(),MagicMock(),MagicMock(),MagicMock(),MagicMock(),)

@@ -9,7 +9,7 @@ from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.util.helpers import is_image_still_available, create_meme_template
+from redditrepostsleuth.core.util.helpers import create_meme_template
 
 
 def check_for_high_match_meme(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager) -> NoReturn:
