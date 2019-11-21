@@ -316,6 +316,14 @@ class DuplicateImageService:
         search_results.total_searched = self.current_index.get_n_items() if self.current_index else 0
         search_results.total_searched = search_results.total_searched + self.historical_index.get_n_items()
         self._log_search_time(search_results)
+        self._log_search(
+            search_results,
+            same_sub,
+            date_cutoff,
+            filter_dead_matches,
+            only_older_matches,
+            meme_filter
+        )
         return search_results
 
     def _filter_search_results(self):
@@ -352,14 +360,38 @@ class DuplicateImageService:
             )
         )
 
-    def _log_search(self, search_results: ImageRepostWrapper):
+    def _log_search(
+            self,
+            search_results: ImageRepostWrapper,
+            same_sub: bool,
+            max_days_old: int,
+            filter_dead_matches: bool,
+            only_older_matches: bool,
+            meme_filter: bool,
+    ):
         image_search = ImageSearch(
-            post_id=self.checked_post.post_id,
+            post_id=search_results.checked_post.post_id,
             used_historical_index=True if self.historical_index else False,
             used_current_index=True if self.current_index else False,
             target_hamming_distance=search_results.target_hamming_distance,
             target_annoy_distance=search_results.target_annoy_distance,
+            same_sub=same_sub,
+            max_days_old=max_days_old,
+            filter_dead_matches=filter_dead_matches,
+            only_older_matches=only_older_matches,
+            meme_filter=meme_filter,
+            meme_template_used=search_results.meme_template.id if search_results.meme_template else None,
+            search_time=search_results.total_search_time,
+            matches_found=len(search_results.matches)
         )
+
+        with self.uowm.start() as uow:
+            uow.image_search.add(image_search)
+            try:
+                uow.commit()
+            except Exception as e:
+                log.exception('Failed to save image search', exc_info=False)
+
 
     def _merge_search_results(self, first: List[ImageMatch], second: List[ImageMatch]) -> List[ImageMatch]:
         results = first.copy()

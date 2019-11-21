@@ -27,7 +27,7 @@ def upgrade():
     sa.Column('target_hamming_distance', sa.Integer(), nullable=False),
     sa.Column('target_annoy_distance', sa.Float(), nullable=False),
     sa.Column('same_sub', sa.Boolean(), nullable=False),
-    sa.Column('max_days_old', sa.Integer(), nullable=False),
+    sa.Column('max_days_old', sa.Integer()),
     sa.Column('filter_dead_matches', sa.Boolean(), nullable=False),
     sa.Column('only_older_matches', sa.Boolean(), nullable=False),
     sa.Column('meme_filter', sa.Boolean(), nullable=False),

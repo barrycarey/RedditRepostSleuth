@@ -301,5 +301,6 @@ class ImageSearch(Base):
     filter_dead_matches = Column(Boolean, nullable=False)
     only_older_matches = Column(Boolean, nullable=False)
     meme_filter = Column(Boolean, nullable=False)
-    meme_template_Used = Column(Integer)
+    meme_template_used = Column(Integer)
     search_time = Column(Float, nullable=False)
+    matches_found = Column(Integer, nullable=False)
