@@ -13,7 +13,7 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from datetime import datetime
 from annoy import AnnoyIndex
 
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, ImageSearch
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
@@ -194,6 +194,8 @@ class DuplicateImageService:
         else:
             target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
         target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
+        search_results.target_hamming_distance = target_hamming_distance
+        search_results.target_annoy_distance = target_annoy_distance
         search_results.target_match_percent = round(100 - (target_hamming_distance / len(search_results.checked_post.dhash_h)) * 100, 0)
 
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
@@ -348,6 +350,15 @@ class DuplicateImageService:
                 meme_filter_time=search_results.meme_filter_time,
                 total_filter_time=search_results.total_filter_time
             )
+        )
+
+    def _log_search(self, search_results: ImageRepostWrapper):
+        image_search = ImageSearch(
+            post_id=self.checked_post.post_id,
+            used_historical_index=True if self.historical_index else False,
+            used_current_index=True if self.current_index else False,
+            target_hamming_distance=search_results.target_hamming_distance,
+            target_annoy_distance=search_results.target_annoy_distance,
         )
 
     def _merge_search_results(self, first: List[ImageMatch], second: List[ImageMatch]) -> List[ImageMatch]:
