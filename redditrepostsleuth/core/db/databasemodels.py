@@ -130,16 +130,6 @@ class RepostWatch(Base):
     created_at = Column(DateTime, default=func.utc_timestamp())
     last_detection = Column(DateTime)
 
-class Reposts(Base):
-
-    __tablename__ = 'reddit_reposts'
-    id = Column(Integer, primary_key=True)
-    hamming_distance = Column(Integer)
-    post_id = Column(String(100), nullable=False)
-    repost_of = Column(String(100), nullable=False)
-    detected_at = Column(DateTime, default=func.utc_timestamp())
-    post_type = Column(String(20))
-
 class ImageRepost(Base):
 
     __tablename__ = 'image_reposts'
@@ -298,8 +288,8 @@ class InvestigatePost(Base):
             'flag_reason': self.flag_reason
         }
 
-class ImageSearches(Base):
-    __tablename__ = 'reddit_image_searches'
+class ImageSearch(Base):
+    __tablename__ = 'reddit_image_searche'
     id = Column(Integer, primary_key=True)
     search_id = Column(UUID, nullable=False)
     post_id = Column(String(100), nullable=False, unique=True)

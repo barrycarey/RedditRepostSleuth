@@ -5,6 +5,7 @@ from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFing
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
+from redditrepostsleuth.core.db.repository.image_search_repo import ImageSearchRepo
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
@@ -108,3 +109,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def monitored_sub_config_revision(self) -> MonitoredSubConfigRevisionRepo:
         return MonitoredSubConfigRevisionRepo(self.session)
+
+    @property
+    def image_search(self) -> ImageSearchRepo:
+        return ImageSearchRepo(self.session)
