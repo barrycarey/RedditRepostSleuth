@@ -32,7 +32,7 @@ DEFAULT_REPOST_LINK_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} 
 DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
                                 '{first_seen} {oldest_percent_match} match. \n\n' \
 
-DEFAULT_COMMENT_OC = 'This looks like a unique post! I checked {total_searched} {post_type} posts and didn\'t find a fitting match\n\n' \
+DEFAULT_COMMENT_OC = 'There\'s a good chance this is unique! I checked {total_searched} {post_type} posts and didn\'t find a close match\n\n' \
                     'The closest match [is this post]({closest_shortlink}) at {closest_percent_match}. The target for r/{this_subreddit} is {target_match_percent}\n\n'
 
 

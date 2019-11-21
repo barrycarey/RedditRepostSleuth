@@ -2,6 +2,7 @@ from datetime import datetime
 from time import perf_counter
 from typing import List
 
+import requests
 from praw import Reddit
 from praw.models import Submission
 
@@ -46,10 +47,14 @@ def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
     return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
 
 
-def get_closest_image_match(posts: List[ImageMatch], reverse=True) -> ImageMatch:
+def get_closest_image_match(posts: List[ImageMatch], reverse=True, check_url=True) -> ImageMatch:
     if not posts:
         return None
-    return sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)[0]
+    if not check_url:
+        return sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)[0]
+    sorted_matches = sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)
+    return get_first_active_match(sorted_matches)
+
 
 
 def remove_newer_posts(posts: List[Post], repost_check: Post):
@@ -142,3 +147,11 @@ def filter_repost_results(
 
     return results
 
+def get_first_active_match(matches: List[RepostMatch]) -> RepostMatch:
+    for match in matches:
+        try:
+            r = requests.head(match.post.url)
+            if r.status_code == 200:
+                return match
+        except Exception as e:
+            continue
