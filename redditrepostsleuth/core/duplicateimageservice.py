@@ -483,7 +483,7 @@ class DuplicateImageService:
             target_hashes = get_image_hashes(searched_post, hash_size=32)
         except Exception as e:
             log.exception('Failed to convert target post for meme check', exc_info=True)
-            return matches
+            return matches, round(perf_counter() - start_time, 5)
 
         for match in matches:
             try:
