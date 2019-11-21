@@ -10,6 +10,7 @@ from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.util.helpers import create_meme_template
+from redditrepostsleuth.core.util.repost_filters import filter_dead_urls
 
 
 def check_for_high_match_meme(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager) -> NoReturn:
@@ -104,5 +105,5 @@ def get_oldest_active_match(matches: List[ImageMatch]) -> ImageMatch:
     :return: ImageMatch
     """
     for match in matches:
-        if is_image_still_available(match.post.url):
+        if filter_dead_urls(match):
             return match

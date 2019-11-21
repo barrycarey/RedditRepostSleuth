@@ -15,7 +15,6 @@ from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo im
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
-from redditrepostsleuth.core.db.repository.repostrepository import RepostRepository
 from redditrepostsleuth.core.db.repository.repostwatchrepository import RepostWatchRepository
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.videohashrepository import VideoHashRepository
@@ -57,10 +56,6 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def repostwatch(self) -> RepostWatchRepository:
         return RepostWatchRepository(self.session)
-
-    @property
-    def repost(self) -> RepostRepository:
-        return RepostRepository(self.session)
 
     @property
     def image_repost(self) -> ImageRepostRepository:
