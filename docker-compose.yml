@@ -76,7 +76,7 @@ services:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-            - HASH_API=http://157.230.64.152:8000/hash
+            #- HASH_API=http://157.230.64.152:8000/hash
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 1
 
     generic_repost_worker:

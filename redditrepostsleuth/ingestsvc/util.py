@@ -53,18 +53,20 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
 
 
 def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, RedditImagePostCurrent]:
-    try: # Make sure URL is still valid
-        r = requests.head(post.url)
-    except ConnectionError as e:
-        log.error('Post %s: Failed to verify image URL at %s', post.post_id, post.url)
-        raise
+    if 'imgur' not in post.url:
+        try: # Make sure URL is still valid
+            r = requests.head(post.url)
+        except ConnectionError as e:
+            log.error('Post %s: Failed to verify image URL at %s', post.post_id, post.url)
+            raise
 
-    if r.status_code != 200:
-        if r.status_code == 404:
-            log.error('Post %s: Image no longer exists %s: %s', post.post_id, r.status_code, post.url)
-            raise ImageRemovedException(f'Post {post.post_id} has been deleted')
-        else:
-            raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')
+        if r.status_code != 200:
+            if r.status_code == 404:
+                log.error('Post %s: Image no longer exists %s: %s', post.post_id, r.status_code, post.url)
+                raise ImageRemovedException(f'Post {post.post_id} has been deleted')
+            else:
+                log.debug('Bad status code from image URL %s', r.status_code)
+                raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')
 
     log.info('Post %s: Hashing with URL: %s', post.post_id, post.url)
 
