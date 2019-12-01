@@ -177,7 +177,8 @@ class SubMonitor:
             target_hamming_distance=monitored_sub.target_hamming,
             date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
-            meme_filter=monitored_sub.meme_filter
+            meme_filter=monitored_sub.meme_filter,
+            source='sub_monitor'
         )
 
         log.debug(search_results)
