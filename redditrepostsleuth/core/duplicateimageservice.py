@@ -248,7 +248,8 @@ class DuplicateImageService:
                                  date_cutoff: int = None,
                                  filter_dead_matches: bool = True,
                                  only_older_matches=True,
-                                 meme_filter=False) -> ImageRepostWrapper:
+                                 meme_filter=False,
+                                 source='unknown') -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -302,7 +303,7 @@ class DuplicateImageService:
                     target_annoy_distance = search_results.meme_template.target_annoy
                     log.info('Using meme filter %s', search_results.meme_template.name)
                     log.debug('Got meme template, overriding distance targets. Target is %s', target_hamming_distance)
-
+            start_time = perf_counter()
             search_results = self._filter_results_for_reposts(search_results,
                                                                       target_annoy_distance=target_annoy_distance,
                                                                       target_hamming_distance=target_hamming_distance,
@@ -311,6 +312,7 @@ class DuplicateImageService:
                                                                       filter_dead_matches=filter_dead_matches,
                                                                       only_older_matches=only_older_matches,
                                                                       is_meme=search_results.meme_template or False)
+            search_results.total_filter_time = round(perf_counter() - start_time, 5)
         else:
             self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
@@ -325,7 +327,8 @@ class DuplicateImageService:
             date_cutoff,
             filter_dead_matches,
             only_older_matches,
-            meme_filter
+            meme_filter,
+            source=source
         )
         return search_results
 
@@ -371,6 +374,7 @@ class DuplicateImageService:
             filter_dead_matches: bool,
             only_older_matches: bool,
             meme_filter: bool,
+            source: str
     ):
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
@@ -378,14 +382,15 @@ class DuplicateImageService:
             used_current_index=True if self.current_index else False,
             target_hamming_distance=search_results.target_hamming_distance,
             target_annoy_distance=search_results.target_annoy_distance,
-            same_sub=same_sub,
-            max_days_old=max_days_old,
+            same_sub=same_sub if same_sub else False,
+            max_days_old=max_days_old if max_days_old else False,
             filter_dead_matches=filter_dead_matches,
             only_older_matches=only_older_matches,
             meme_filter=meme_filter,
             meme_template_used=search_results.meme_template.id if search_results.meme_template else None,
             search_time=search_results.total_search_time,
-            matches_found=len(search_results.matches)
+            matches_found=len(search_results.matches),
+            source=source
         )
 
         with self.uowm.start() as uow:
@@ -450,9 +455,9 @@ class DuplicateImageService:
             if (h_distance <= template.template_detection_hamming):
                 log.info('Post %s matches meme template %s', f'https://redd.it/{search_results.checked_post.post_id}', template.name)
                 search_results.meme_template = template
-                search_results.meme_filter_time = round(perf_counter() - start_time, 5)
+                search_results.meme_detection_time = round(perf_counter() - start_time, 5)
                 return search_results
-        search_results.meme_filter_time = round(perf_counter() - start_time, 5)
+        search_results.meme_detection_time = round(perf_counter() - start_time, 5)
         return search_results
 
     def _set_match_hamming(self, searched_post: Post, matches: List[ImageMatch]) -> List[ImageMatch]:
