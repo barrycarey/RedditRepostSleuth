@@ -56,7 +56,6 @@ def get_closest_image_match(posts: List[ImageMatch], reverse=True, check_url=Tru
     return get_first_active_match(sorted_matches)
 
 
-
 def remove_newer_posts(posts: List[Post], repost_check: Post):
     return [post for post in posts if post.created_at < repost_check.created_at]
 

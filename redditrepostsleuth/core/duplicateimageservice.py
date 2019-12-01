@@ -210,13 +210,15 @@ class DuplicateImageService:
         if only_older_matches:
             matches = list(filter(filter_newer_matches(search_results.checked_post.created_at), matches))
 
-        search_results.closest_match = get_closest_image_match(matches, check_url=True)
-
         if same_sub:
             matches = list(filter(same_sub_filter(search_results.checked_post.subreddit), matches))
 
         if date_cutoff:
             matches = list(filter(filter_days_old_matches(date_cutoff), matches))
+
+        closest_match = get_closest_image_match(matches, check_url=True)
+        if closest_match.hamming_match_percent > 40:
+            search_results.closest_match = closest_match
 
         matches = list(filter(annoy_distance_filter(target_annoy_distance), matches))
         matches = list(filter(hamming_distance_filter(target_hamming_distance if not is_meme else 0), matches))
