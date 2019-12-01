@@ -220,6 +220,7 @@ class DuplicateImageService:
         if closest_match.hamming_match_percent > 40:
             search_results.closest_match = closest_match
 
+
         matches = list(filter(annoy_distance_filter(target_annoy_distance), matches))
         matches = list(filter(hamming_distance_filter(target_hamming_distance if not is_meme else 0), matches))
 
