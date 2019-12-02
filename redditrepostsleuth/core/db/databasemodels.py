@@ -291,7 +291,7 @@ class InvestigatePost(Base):
 class ImageSearch(Base):
     __tablename__ = 'reddit_image_search'
     id = Column(Integer, primary_key=True)
-    post_id = Column(String(100), nullable=False, unique=True)
+    post_id = Column(String(100), nullable=False)
     source = Column(String(50), nullable=False)
     used_historical_index = Column(Boolean, nullable=False)
     used_current_index = Column(Boolean, nullable=False)

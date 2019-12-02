@@ -10,6 +10,7 @@ from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostR
 from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
+from redditrepostsleuth.core.db.repository.link_repost_repo import LinkPostRepo
 from redditrepostsleuth.core.db.repository.memetemplaterepository import MemeTemplateRepository
 from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo import MonitoredSubConfigRevisionRepo
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
@@ -60,6 +61,10 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def image_repost(self) -> ImageRepostRepository:
         return ImageRepostRepository(self.session)
+
+    @property
+    def link_repost(self) -> LinkPostRepo:
+        return LinkPostRepo(self.session)
 
     @property
     def video_hash(self) -> VideoHashRepository:
