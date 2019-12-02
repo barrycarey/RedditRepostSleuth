@@ -5,15 +5,17 @@ from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFing
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
+from redditrepostsleuth.core.db.repository.image_search_repo import ImageSearchRepo
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
+from redditrepostsleuth.core.db.repository.link_repost_repo import LinkPostRepo
 from redditrepostsleuth.core.db.repository.memetemplaterepository import MemeTemplateRepository
+from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo import MonitoredSubConfigRevisionRepo
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
-from redditrepostsleuth.core.db.repository.repostrepository import RepostRepository
 from redditrepostsleuth.core.db.repository.repostwatchrepository import RepostWatchRepository
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.videohashrepository import VideoHashRepository
@@ -57,12 +59,12 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         return RepostWatchRepository(self.session)
 
     @property
-    def repost(self) -> RepostRepository:
-        return RepostRepository(self.session)
-
-    @property
     def image_repost(self) -> ImageRepostRepository:
         return ImageRepostRepository(self.session)
+
+    @property
+    def link_repost(self) -> LinkPostRepo:
+        return LinkPostRepo(self.session)
 
     @property
     def video_hash(self) -> VideoHashRepository:
@@ -103,3 +105,11 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def investigate_post(self) -> InvestigatePostRepo:
         return InvestigatePostRepo(self.session)
+
+    @property
+    def monitored_sub_config_revision(self) -> MonitoredSubConfigRevisionRepo:
+        return MonitoredSubConfigRevisionRepo(self.session)
+
+    @property
+    def image_search(self) -> ImageSearchRepo:
+        return ImageSearchRepo(self.session)

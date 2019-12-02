@@ -6,26 +6,6 @@ from redditrepostsleuth.core.model.imagematch import ImageMatch
 
 
 class TestDuplicateImageService(TestCase):
-    def test__load_index_files(self):
-        self.fail()
-
-    def test__load_current_index_file(self):
-        self.fail()
-
-    def test__load_historical_index_file(self):
-        self.fail()
-
-    def test__filter_results_for_reposts(self):
-        self.fail()
-
-    def test_check_duplicates_wrapped(self):
-        self.fail()
-
-    def test__search_index_by_vector(self):
-        self.fail()
-
-    def test__search_index_by_id(self):
-        self.fail()
 
     def test__zip_annoy_results(self):
         dup = DuplicateImageService(MagicMock(), MagicMock(), config=MagicMock())
@@ -63,9 +43,6 @@ class TestDuplicateImageService(TestCase):
         self.assertEqual(2, r[0][0])
         self.assertEqual(4, r[1][0])
 
-    def test__log_search_time(self):
-        self.fail()
-
     def test__merge_search_results(self):
         dup = DuplicateImageService(MagicMock(), MagicMock(), config=MagicMock())
         match1 = ImageMatch()
@@ -84,14 +61,3 @@ class TestDuplicateImageService(TestCase):
         result = dup._merge_search_results(r1, r2)
         self.assertEqual(len(result), 5)
 
-    def test__set_match_posts_historical(self):
-        self.fail()
-
-    def test_get_meme_template(self):
-        self.fail()
-
-    def test__set_match_hamming(self):
-        self.fail()
-
-    def test__final_meme_filter(self):
-        self.fail()

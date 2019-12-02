@@ -2,6 +2,7 @@ from datetime import datetime
 from time import perf_counter
 from typing import List
 
+import requests
 from praw import Reddit
 from praw.models import Submission
 
@@ -9,6 +10,7 @@ from praw.models import Submission
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.objectmapping import post_to_repost_match
@@ -45,8 +47,18 @@ def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
     return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
 
 
+def get_closest_image_match(posts: List[ImageMatch], reverse=True, check_url=True) -> ImageMatch:
+    if not posts:
+        return None
+    if not check_url:
+        return sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)[0]
+    sorted_matches = sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)
+    return get_first_active_match(sorted_matches)
+
+
 def remove_newer_posts(posts: List[Post], repost_check: Post):
     return [post for post in posts if post.created_at < repost_check.created_at]
+
 
 def get_crosspost_parent_batch(ids: List[str], reddit: Reddit):
     submissions = reddit.info(fullnames=ids)
@@ -57,6 +69,7 @@ def get_crosspost_parent_batch(ids: List[str], reddit: Reddit):
             'crosspost_Parent': submission.__dict__.get('crosspost_parent', None)
         })
     return result
+
 
 def verify_oc(submission: Submission, repost_service) -> bool:
     """
@@ -71,6 +84,7 @@ def verify_oc(submission: Submission, repost_service) -> bool:
         return False
     else:
         return True
+
 
 def check_link_repost(post: Post, uowm: UnitOfWorkManager, get_total: bool = False) -> RepostWrapper:
     with uowm.start() as uow:
@@ -87,12 +101,14 @@ def check_link_repost(post: Post, uowm: UnitOfWorkManager, get_total: bool = Fal
 
     return search_results
 
+
 def check_link_repost_by_post_id(post_id: str, uowm: UnitOfWorkManager) -> RepostWrapper:
     with uowm.start() as uow:
         post = uow.posts.get_by_post_id(post_id)
         if post is None:
             return
     return check_link_repost(post, uowm)
+
 
 def filter_repost_results(
         matches: List[RepostMatch],
@@ -124,9 +140,17 @@ def filter_repost_results(
             continue
 
         if exclude_crossposts and match.post.crosspost_parent is not None:
-            log.debug('Crosspost Reject: %s', f'https://redd.it/{match.post_post_id}')
+            log.debug('Crosspost Reject: %s', f'https://redd.it/{match.post.post_id}')
 
         results.append(match)
 
     return results
 
+def get_first_active_match(matches: List[RepostMatch]) -> RepostMatch:
+    for match in matches:
+        try:
+            r = requests.head(match.post.url)
+            if r.status_code == 200:
+                return match
+        except Exception as e:
+            continue

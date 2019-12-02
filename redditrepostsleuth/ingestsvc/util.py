@@ -3,7 +3,7 @@ from typing import Tuple
 import requests
 from requests.exceptions import ConnectionError
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import ImageConversioinException, InvalidImageUrlException
+from redditrepostsleuth.core.exception import ImageConversioinException, InvalidImageUrlException, ImageRemovedException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import RedditImagePost, Post, RedditImagePostCurrent
 
@@ -20,7 +20,10 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
     with uowm.start() as uow:
         if post.post_type == 'image':
             log.debug('Post %s: Is an image', post.post_id)
-            post, image_post, image_post_current = process_image_post(post, hash_api)
+            try:
+                post, image_post, image_post_current = process_image_post(post, hash_api)
+            except ImageRemovedException:
+                return
             if image_post is None or image_post_current is None:
                 log.error('Post %s: Failed to save image post. One of the post objects is null', post.post_id)
                 log.error('Image Post: %s - Image Post Current: %s', image_post, image_post_current)
@@ -50,15 +53,20 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
 
 
 def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, RedditImagePostCurrent]:
-    try: # Make sure URL is still valid
-        r = requests.head(post.url)
-    except ConnectionError as e:
-        log.error('Post %s: Failed to verify image URL at %s', post.post_id, post.url)
-        raise
+    if 'imgur' not in post.url:
+        try: # Make sure URL is still valid
+            r = requests.head(post.url)
+        except ConnectionError as e:
+            log.error('Post %s: Failed to verify image URL at %s', post.post_id, post.url)
+            raise
 
-    if r.status_code != 200:
-        log.error('Post %s: Image no longer exists %s: %s', post.post_id, r.status_code, post.url)
-        raise InvalidImageUrlException(f'Image URL no longer valid.  Status Code {r.status_code}')
+        if r.status_code != 200:
+            if r.status_code == 404:
+                log.error('Post %s: Image no longer exists %s: %s', post.post_id, r.status_code, post.url)
+                raise ImageRemovedException(f'Post {post.post_id} has been deleted')
+            else:
+                log.debug('Bad status code from image URL %s', r.status_code)
+                raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')
 
     log.info('Post %s: Hashing with URL: %s', post.post_id, post.url)
 

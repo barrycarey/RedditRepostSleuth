@@ -8,7 +8,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException
+from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.commands.repost_base_cmd import RepostBaseCmd
 from redditrepostsleuth.core.model.commands.repost_image_cmd import RepostImageCmd
@@ -210,7 +210,8 @@ class SummonsHandler:
                 target_hamming_distance=target_hamming_distance,
                 meme_filter=cmd.meme_filter,
                 same_sub=cmd.same_sub,
-                date_cutoff=cmd.match_age
+                date_cutoff=cmd.match_age,
+                source='summons'
             )
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
@@ -267,7 +268,12 @@ class SummonsHandler:
                                                            send_pm_on_fail=True)
         except APIException as e:
             return
-        response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
+        if reply:
+            response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
+        else:
+            log.error('Failed to get reply from comment %s', comment_id)
+            response.message = 'FAILED REPLY' \
+                               ''
         self._save_response(response, reply)
 
     def _save_response(self, response: RepostResponseBase, reply: CommentReply, subreddit: str = None):
@@ -292,7 +298,11 @@ class SummonsHandler:
         :return:
         """
         submission = self.reddit.submission(post_id)
-        post = pre_process_post(submission_to_post(submission), self.uowm, None)
+        try:
+            post = pre_process_post(submission_to_post(submission), self.uowm, None)
+        except (InvalidImageUrlException,):
+            return
+
         if not post or post.post_type != 'image':
             log.error('Problem ingesting post.  Either failed to save or it is not an image')
             return

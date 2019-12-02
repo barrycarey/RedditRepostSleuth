@@ -3,6 +3,7 @@ from time import perf_counter
 
 from praw import Reddit
 from praw.models import Comment
+from prawcore import Forbidden
 from redlock import RedLockError
 
 from redditrepostsleuth.core.config import Config
@@ -123,7 +124,7 @@ class TopPostMonitor:
 
         if search_results.matches:
             if post.post_type == 'image':
-                msg = self.response_builder.build_default_repost_comment(msg_values)
+                msg = self.response_builder.build_default_repost_comment(msg_values, post.post_type)
             else:
                 msg = self.response_builder.build_provided_comment_template(msg_values, FRONTPAGE_LINK_REPOST, post.post_type)
         else:
@@ -132,7 +133,10 @@ class TopPostMonitor:
                 return
             msg = self.response_builder.build_default_oc_comment(msg_values)
 
-        self.response_handler.reply_to_submission(post.post_id, msg, source='toppost')
+        try:
+            self.response_handler.reply_to_submission(post.post_id, msg, source='toppost')
+        except Forbidden:
+            log.error('Failed to leave comment on %s in %s.  Looks like we are banned', post.post_id, post.subreddit)
 
 
         with self.uowm.start() as uow:
