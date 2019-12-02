@@ -217,7 +217,7 @@ class DuplicateImageService:
             matches = list(filter(filter_days_old_matches(date_cutoff), matches))
 
         closest_match = get_closest_image_match(matches, check_url=True)
-        if closest_match.hamming_match_percent > 40:
+        if closest_match and closest_match.hamming_match_percent > 40:
             search_results.closest_match = closest_match
 
 
