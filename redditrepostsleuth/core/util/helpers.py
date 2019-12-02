@@ -1,7 +1,7 @@
 import json
 
 import requests
-from typing import Dict, List
+from typing import Dict, List, Text
 
 import imagehash
 
@@ -14,6 +14,8 @@ from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util.replytemplates import CLOSEST_MATCH
+
 
 def post_type_from_url(url: str) -> str:
     """
@@ -115,12 +117,6 @@ def create_meme_template(url: str, name: str = None, target_hamming=9, target_an
         target_hamming=target_hamming
     )
 
-def is_image_still_available(url: str) -> bool:
-    r = requests.head(url)
-    if r.status_code == 200:
-        return True
-    else:
-        return False
 
 def build_markdown_list(matches: List[ImageMatch]) -> str:
     result = ''
@@ -130,10 +126,18 @@ def build_markdown_list(matches: List[ImageMatch]) -> str:
 
 def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     results_values = {}
+    base_values = {
+        'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
+        'target_match_percent': f'{search_results.target_match_percent}%' if search_results.closest_match else None,
+        'closest_url': search_results.closest_match.post.url if search_results.closest_match else None,
+        'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
+        'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
+        'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
+    }
     if search_results.matches:
         results_values = {
-            'newest_percent_match': f'{(100 - search_results.matches[-1].hamming_distance) / 100:.2%}',
-            'oldest_percent_match': f'{(100 - search_results.matches[0].hamming_distance) / 100:.2%}',
+            'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent}%',
+            'oldest_percent_match': f'{search_results.matches[0].hamming_match_percent}%',
             'match_list': build_markdown_list(search_results.matches),
             'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
             'false_positive_data': json.dumps(
@@ -141,10 +145,10 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
                     'post': f'https://redd.it/{search_results.checked_post.post_id}',
                     'meme_template': search_results.meme_template.id if search_results.meme_template else None
                 }
-            )
+            ),
         }
 
-    return {**results_values, **kwargs}
+    return {**results_values, **base_values, **kwargs}
 
 
 def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
@@ -159,6 +163,7 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
         'total_posts': 0,
         'match_count': len(search_results.matches),
         'post_type': search_results.checked_post.post_type,
+        'this_subreddit': search_results.checked_post.subreddit,
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}'
@@ -186,3 +191,4 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
             base_values['total_posts'] = f'{uow.posts.get_newest_post().id:,}'
 
     return {**base_values, **results_values, **kwargs}
+

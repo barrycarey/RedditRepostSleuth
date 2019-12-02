@@ -8,6 +8,19 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
 
+    admin_svc:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/adminsvc/Dockerfile
+        deploy:
+            restart_policy:
+                condition: on-failure
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+        environment:
+            - LOG_LEVEL=INFO
+
     hot_post:
         build:
             context: .
@@ -63,7 +76,7 @@ services:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-            - HASH_API=http://157.230.64.152:8000/hash
+            #- HASH_API=http://157.230.64.152:8000/hash
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 1
 
     generic_repost_worker:

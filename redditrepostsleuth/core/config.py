@@ -140,7 +140,9 @@ class Config:
             'summons_meme_filter',
             'summons_all_matches',
             'summons_same_sub',
-            'summons_max_age'
+            'summons_max_age',
+            'bot_comment_karma_flag_threshold',
+            'bot_comment_karma_remove_threshold'
 
         ]
 

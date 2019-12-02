@@ -77,7 +77,7 @@ def link_repost_check(self, posts, ):
             repost_of.repost_count += 1
             post.checked_repost = True
             uow.posts.update(post)
-            uow.repost.add(new_repost)
+            uow.link_repost.add(new_repost)
             # uow.posts.update(repost.matches[0].post)
             # log_repost.apply_async((repost,))
             try:

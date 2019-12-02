@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -129,16 +130,6 @@ class RepostWatch(Base):
     created_at = Column(DateTime, default=func.utc_timestamp())
     last_detection = Column(DateTime)
 
-class Reposts(Base):
-
-    __tablename__ = 'reddit_reposts'
-    id = Column(Integer, primary_key=True)
-    hamming_distance = Column(Integer)
-    post_id = Column(String(100), nullable=False)
-    repost_of = Column(String(100), nullable=False)
-    detected_at = Column(DateTime, default=func.utc_timestamp())
-    post_type = Column(String(20))
-
 class ImageRepost(Base):
 
     __tablename__ = 'image_reposts'
@@ -235,6 +226,18 @@ class MonitoredSubChecks(Base):
     checked_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(100))
 
+class MonitoredSubConfigRevision(Base):
+    __tablename__ = 'reddit_monitored_sub_config_revision'
+    id = Column(Integer, primary_key=True)
+    revision_id = Column(String(36), nullable=False, unique=True)
+    revised_by = Column(String(100), nullable=False)
+    config = Column(String(1000), nullable=False)
+    config_loaded_at = Column(DateTime)
+    is_valid = Column(Boolean, default=False)
+    notified = Column(Boolean, default=False)
+    subreddit = Column(String(100), nullable=False)
+
+
 class MemeTemplate(Base):
     __tablename__ = 'meme_template'
     id = Column(Integer, primary_key=True)
@@ -284,3 +287,21 @@ class InvestigatePost(Base):
             'url': self.url,
             'flag_reason': self.flag_reason
         }
+
+class ImageSearch(Base):
+    __tablename__ = 'reddit_image_search'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    source = Column(String(50), nullable=False)
+    used_historical_index = Column(Boolean, nullable=False)
+    used_current_index = Column(Boolean, nullable=False)
+    target_hamming_distance = Column(Integer, nullable=False)
+    target_annoy_distance = Column(Float, nullable=False)
+    same_sub = Column(Boolean, nullable=False)
+    max_days_old = Column(Integer)
+    filter_dead_matches = Column(Boolean, nullable=False)
+    only_older_matches = Column(Boolean, nullable=False)
+    meme_filter = Column(Boolean, nullable=False)
+    meme_template_used = Column(Integer)
+    search_time = Column(Float, nullable=False)
+    matches_found = Column(Integer, nullable=False)
