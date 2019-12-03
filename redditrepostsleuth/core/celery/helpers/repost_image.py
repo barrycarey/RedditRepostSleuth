@@ -91,7 +91,7 @@ def save_image_repost_result(search_results: RepostWrapper, uowm: UnitOfWorkMana
                                      annoy_distance=repost_of.annoy_distance)
             repost_of.post.repost_count += 1
             uow.posts.update(repost_of.post)
-            uow.repost.add(new_repost)
+            uow.image_repost.add(new_repost)
             search_results.matches = final_matches
 
         uow.posts.update(search_results.checked_post)
