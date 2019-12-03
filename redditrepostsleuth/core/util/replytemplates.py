@@ -40,3 +40,8 @@ IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\
 
 SUMMONS_CROSSPOST = 'This is a crosspost. I\'ve seen the same {post_type} {match_count} {times_word}' \
                     '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n'
+
+WATCH_ENABLED = 'I have set a watch on this submission.  If anybody reposts it I\'ll send you a PM'
+WATCH_DISABLED = 'I have removed your watch on this post.  You will no longer be notified if it gets reposted'
+WATCH_DISABLED_NOT_FOUND = 'You do not currently have a watch setup for this submission'
+WATCH_ALREADY_ENABLED = 'You already have a watch setup for this submission'

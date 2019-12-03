@@ -129,6 +129,9 @@ class RepostWatch(Base):
     response_type = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp())
     last_detection = Column(DateTime)
+    same_sub = Column(Boolean, default=False, nullable=False)
+    expire_after = Column(Integer)
+    enabled = Column(Boolean, default=True)
 
 class ImageRepost(Base):
 

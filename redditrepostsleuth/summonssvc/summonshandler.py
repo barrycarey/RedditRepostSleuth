@@ -1,11 +1,11 @@
 import time
 from datetime import datetime
-from typing import Tuple, Text
+from typing import Tuple, Text, NoReturn
 
 from praw.exceptions import APIException
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Summons, Post
+from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException, InvalidImageUrlException
@@ -25,7 +25,7 @@ from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_
     searched_post_str, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, LINK_ALL, \
-    REPOST_NO_RESULT, IMAGE_REPOST_ALL
+    REPOST_NO_RESULT, IMAGE_REPOST_ALL, WATCH_ENABLED, WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
@@ -132,6 +132,8 @@ class SummonsHandler:
             pass
         elif base_command == 'watch':
             pass
+        elif base_command == 'unwatch':
+            pass
 
         if post.post_type is None or post.post_type not in self.config.supported_post_types:
             log.error('Post %s: Type %s not support', f'https://redd.it/{post.post_id}', post.post_type)
@@ -153,6 +155,57 @@ class SummonsHandler:
         response.message = 'I\m currently down for maintenance, check back in an hour'
         self._send_response(summons.comment_id, response)
         return
+
+    def _disable_watch(self, summons: Summons) -> NoReturn:
+        response = RepostResponseBase(summons_id=summons.id)
+
+        with self.uowm.start() as uow:
+            existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
+
+            if not existing_watch or (existing_watch and not existing_watch.enabled):
+                response.message = WATCH_DISABLED_NOT_FOUND
+                self._send_response(summons.comment_id, response)
+                return
+
+            existing_watch.enabled = False
+
+            try:
+                uow.commit()
+                response.message = WATCH_DISABLED
+                log.info('Disabled watch for post %s for user %s', summons.post_id, summons.requestor)
+            except Exception as e:
+                log.exception('Failed to disable watch %s', existing_watch.id, exc_info=True)
+                response.message = 'An error prevented me from removing your watch on this post.  Please try again'
+
+            self._send_response(summons.comment_id, response)
+
+    def _enable_watch(self, summons: Summons) -> NoReturn:
+
+        response = RepostResponseBase(summons_id=summons.id)
+
+        with self.uowm.start() as uow:
+            existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
+
+        if existing_watch:
+            response.message = WATCH_ALREADY_ENABLED
+            self._send_response(summons.comment_id, response)
+            return
+
+        repost_watch = RepostWatch(
+            post_id=summons.post_id,
+            user=summons.requestor
+        )
+
+        with self.uowm.start() as uow:
+            uow.repostwatch.add(repost_watch)
+            try:
+                uow.commit()
+                response.message = WATCH_ENABLED
+            except Exception as e:
+                log.exception('Failed save repost watch', exc_info=True)
+                response.message = 'An error prevented me from creating a watch on this post.  Please try again'
+
+        self._send_response(summons.comment_id, response)
 
     def process_repost_request(self, summons: Summons, post: Post):
         if post.post_type == 'image':
