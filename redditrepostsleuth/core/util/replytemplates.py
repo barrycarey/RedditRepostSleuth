@@ -40,3 +40,8 @@ IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\
 
 SUMMONS_CROSSPOST = 'This is a crosspost. I\'ve seen the same {post_type} {match_count} {times_word}' \
                     '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n'
+
+MONITORED_SUB_ADDED = 'Congratulations! Your Subreddit is now monitored by Repost Sleuth Bot. I will start scanning all of your new posts shortly\n\n' \
+                      'If you gave me wiki permissions you can find my configuration file here {wiki_config}\n\n' \
+                      'You can find details about the configuration options [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_configuration)\n\n' \
+                      'If you notice any issues please report them at r/RepostSleuthBot'
