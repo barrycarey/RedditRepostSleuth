@@ -126,7 +126,6 @@ class RepostWatch(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     user = Column(String(100), nullable=False)
-    response_type = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp())
     last_detection = Column(DateTime)
     same_sub = Column(Boolean, default=False, nullable=False)

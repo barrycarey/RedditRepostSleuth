@@ -5,6 +5,7 @@ from redditrepostsleuth.core.exception import InvalidCommandException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.commands.repost_image_cmd import RepostImageCmd
 from redditrepostsleuth.core.model.commands.repost_link_cmd import RepostLinkCmd
+from redditrepostsleuth.core.model.commands.watch_cmd import WatchCmd
 from redditrepostsleuth.summonssvc.commandparsing.argumentparserthrow import ArgumentParserThrow
 
 class CommandParser:
@@ -63,6 +64,26 @@ class CommandParser:
             match_age=args.age
         )
 
+    def parse_watch_cmd(self, cmd: Text) -> WatchCmd:
+        parser = ArgumentParserThrow(cmd)
+        parser.add_argument('command', default=None)
+        parser.add_argument('-samesub', default=False, dest='same_sub',
+                            help="Only search this sub",
+                            action='store_true')
+        parser.add_argument('-expire', type=int, default=None, dest='expire',
+                            help='Expire watch after X days')
+        try:
+            args = parser.parse_args(cmd.split(' '))
+        except InvalidCommandException as e:
+            log.exception('Invalid command error: %s', e)
+            return self.get_default_watch_cmd()
+
+        return WatchCmd(
+            same_sub=args.same_sub,
+            expire=args.expire
+        )
+
+
     def get_default_repost_image_cmd(self):
         return RepostImageCmd(
             meme_filter=self.config.summons_meme_filter,
@@ -79,12 +100,19 @@ class CommandParser:
             match_age=self.config.summons_max_age
         )
 
+    def get_default_watch_cmd(self):
+        return WatchCmd(
+            same_sub=True,
+            expire=None,
+            enabled=True
+        )
+
     def parse_watch_command(self, cmd: Text):
         pass
 
     def parse_root_command(self, command: str):
         parser = ArgumentParserThrow()
-        parser.add_argument('command', default=None, choices=['repost', 'watch'])
+        parser.add_argument('command', default=None, choices=['repost', 'watch', 'unwatch'])
         options, args = parser.parse_known_args(command.split(' '))
         return options.command
 
