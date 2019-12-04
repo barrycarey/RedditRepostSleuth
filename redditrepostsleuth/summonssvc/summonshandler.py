@@ -82,15 +82,21 @@ class SummonsHandler:
                 log.exception('Exception in handle summons thread')
 
     def _get_summons_cmd(self, cmd_body: Text, post_type: Text) -> RepostBaseCmd:
-        cmd_str = self._strip_summons_flags(cmd_body.comment_body)
+        cmd_str = self._strip_summons_flags(cmd_body)
         try:
             base_command = self.command_parser.parse_root_command(cmd_str)
             if base_command == 'repost':
-                return self._get_repost_cmd(cmd_body, post_type)
+                return self._get_repost_cmd(post_type, cmd_str)
+            elif base_command == 'watch':
+                return self.command_parser.parse_watch_cmd(cmd_str)
+            elif base_command == 'unwatch':
+                pass
+            else:
+                return self._get_repost_cmd(post_type, cmd_str)
         except InvalidCommandException:
-            log.error('Received command is invalid: %s', cmd_body.comment_body)
+            log.error('Received command is invalid: %s', cmd_body)
 
-        return self._get_repost_cmd(cmd_body, post_type)
+        return self._get_repost_cmd(post_type, cmd_str)
 
     def _get_repost_cmd(self, post_type: Text, cmd_body: Text) -> RepostBaseCmd:
         if post_type == 'image':
@@ -122,25 +128,28 @@ class SummonsHandler:
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
         try:
-            base_command = self.command_parser.parse_root_command(summons.comment_body)
+            base_command = self.command_parser.parse_root_command(self._strip_summons_flags(summons.comment_body))
         except InvalidCommandException:
             log.error('Invalid command in summons: %s', summons.comment_body)
             base_command = 'repost'
-
-        # TODO - Create command registry instead of manually defining
-        if base_command == 'stats':
-            pass
-        elif base_command == 'watch':
-            pass
-        elif base_command == 'unwatch':
-            pass
 
         if post.post_type is None or post.post_type not in self.config.supported_post_types:
             log.error('Post %s: Type %s not support', f'https://redd.it/{post.post_id}', post.post_type)
             self._send_unsupported_msg(summons, post.post_type)
             return
 
-        self.process_repost_request(summons, post)
+        # TODO - Create command registry instead of manually defining
+        if base_command == 'stats':
+            pass
+        elif base_command == 'watch':
+            self._enable_watch(summons)
+            return
+        elif base_command == 'unwatch':
+            self._disable_watch(summons)
+            return
+        elif base_command == 'repost':
+            self.process_repost_request(summons, post)
+            return
 
     def _send_unsupported_msg(self, summons: Summons, post_type: Text):
         response = RepostResponseBase(summons_id=summons.id)
@@ -181,19 +190,32 @@ class SummonsHandler:
 
     def _enable_watch(self, summons: Summons) -> NoReturn:
 
+        cmd = self._get_summons_cmd(summons.comment_body, '')
+
         response = RepostResponseBase(summons_id=summons.id)
 
         with self.uowm.start() as uow:
             existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
 
-        if existing_watch:
-            response.message = WATCH_ALREADY_ENABLED
-            self._send_response(summons.comment_id, response)
-            return
+            if existing_watch:
+                if not existing_watch.enabled:
+                    log.info('Found existing watch that is disabled.  Enabling watch %s', existing_watch.id)
+                    existing_watch.enabled = True
+                    response.message = WATCH_ENABLED
+                    uow.commit()
+                    self._send_response(summons.comment_id, response)
+                    return
+                else:
+                    response.message = WATCH_ALREADY_ENABLED
+                    self._send_response(summons.comment_id, response)
+                    return
 
         repost_watch = RepostWatch(
             post_id=summons.post_id,
-            user=summons.requestor
+            user=summons.requestor,
+            expire_after=cmd.expire,
+            same_sub=cmd.same_sub,
+            enabled=True
         )
 
         with self.uowm.start() as uow:
@@ -247,7 +269,8 @@ class SummonsHandler:
 
     def process_image_repost_request(self, summons: Summons, post: Post):
 
-        cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
+        #cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
+        cmd = self._get_summons_cmd(summons.comment_body, post.post_type)
 
         response = RepostResponseBase(summons_id=summons.id)
 
