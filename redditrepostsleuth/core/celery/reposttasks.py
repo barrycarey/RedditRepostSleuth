@@ -99,4 +99,6 @@ def link_repost_check(self, posts, ):
 def repost_watch_check(self, matches):
     with self.uowm.start() as uow:
         for match in matches:
-            watch = uow.repost_watch.get_all_by_post_id(match.post.post_id)
+            watches = uow.repost_watch.get_all_by_post_id(match.post.post_id)
+            for watch in watches:
+                pass
