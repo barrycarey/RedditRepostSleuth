@@ -176,7 +176,7 @@ class TestResponseBuilder(TestCase):
         uow.__enter__.return_value = uow
         uowm.start.return_value = uow
         response_builder = ResponseBuilder(uowm)
-        expected = 'This looks like unique content! I checked 10 image posts in 5 seconds and didn\'t find a match\n\n'
+        expected = 'There\'s a good chance this is unique! I checked 10 image posts and didn\'t find a close match\n\n'
         result = response_builder.build_sub_oc_comment('test', {'total_searched': 10, 'post_type': 'image', 'search_time': 5}, 'image', signature=False)
         self.assertEqual(expected, result)
 
@@ -212,14 +212,14 @@ class TestResponseBuilder(TestCase):
     @mock.patch('redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager.SqlAlchemyUnitOfWorkManager')
     def test_build_default_oc_comment_no_sig(self, uowm):
         response_builder = ResponseBuilder(uowm)
-        expected = 'This looks like unique content! I checked 10 image posts in 5 seconds and didn\'t find a match\n\n'
+        expected = 'There\'s a good chance this is unique! I checked 10 image posts and didn\'t find a close match\n\n'
         result = response_builder.build_default_oc_comment({'total_searched': 10, 'post_type': 'image', 'search_time': 5}, 'image', signature=False)
         self.assertEqual(expected, result)
 
     @mock.patch('redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager.SqlAlchemyUnitOfWorkManager')
     def test_build_default_oc_comment_sig(self, uowm):
         response_builder = ResponseBuilder(uowm)
-        expected = 'This looks like unique content! I checked 10 image posts in 5 seconds and didn\'t find a match\n\n' \
+        expected = 'There\'s a good chance this is unique! I checked 10 image posts and didn\'t find a close match\n\n' \
                    '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report ' \
                    '[ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message=http://redd.it/1234) ]*'
         result = response_builder.build_default_oc_comment(

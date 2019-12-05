@@ -17,7 +17,7 @@ class Test_Repost_Helpers(TestCase):
         matches.append(match2)
         matches.append(match3)
 
-        r = get_closest_image_match(matches)
+        r = get_closest_image_match(matches, check_url=False)
         self.assertEqual(r, match1)
 
     def test_get_closest_image_match__empty_list(self):
