@@ -95,3 +95,8 @@ def link_repost_check(self, posts, ):
         self.event_logger.save_event(
             BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
 
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+def repost_watch_check(self, matches):
+    with self.uowm.start() as uow:
+        for match in matches:
+            watch = uow.repost_watch.get_all_by_post_id(match.post.post_id)
