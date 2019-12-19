@@ -1,6 +1,8 @@
 ### 0.1.3 - 
 
 * [feature] - Include link to post and sub name in PM response for banned subs
+* [bugfix] - First seen and last seen were getting swapped on link posts
+* [backend] - Log processing time for subs with monitoring enabled
 
 ### 0.1.2 - 12/01/2019
 
