@@ -1,7 +1,9 @@
 ### 0.1.3 - 
 
 * [feature] - Include link to post and sub name in PM response for banned subs
+* [feature] - Send a confirmation PM to modmail when sub is added to dedicated monitoring
 * [bugfix] - First seen and last seen were getting swapped on link posts
+* [bugfix] - Fixed command flags.  I managed to completely break them at some point
 * [backend] - Log processing time for subs with monitoring enabled
 
 ### 0.1.2 - 12/01/2019
