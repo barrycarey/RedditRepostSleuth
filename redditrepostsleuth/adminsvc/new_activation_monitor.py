@@ -13,6 +13,7 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_ADDED
 
 
 class NewActivationMonitor:
@@ -50,11 +51,22 @@ class NewActivationMonitor:
         except APIException as e:
             if e.error_type == 'NO_INVITE_FOUND':
                 log.error('No open invite to %s', msg.subreddit.display_name)
+            return
         except Exception as e:
             log.exception('Failed to accept invite', exc_info=True)
-
+            return
+        self._notify_added(subreddit)
         self._create_wiki_page(subreddit)
         log.info('%s has been added as a monitored sub', subreddit.display_name)
+
+    def _notify_added(self, subreddit: Subreddit) -> NoReturn:
+        log.info('Sending sucess PM to %s', subreddit.display_name)
+        wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/about/wiki/repost_sleuth_config'
+        try:
+            subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_confing=wiki_url))
+        except Exception as e:
+            log.exception('Failed to send activation PM', exc_info=True)
+
 
     def _create_wiki_page(self, subreddit: Subreddit) -> NoReturn:
         template = self._get_wiki_template()
