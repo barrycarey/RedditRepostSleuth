@@ -15,7 +15,9 @@ class ImageIndexLoader:
 
     def __init__(self, config: Config):
         self.config = config
+        self.indexes = []
         self._init_indexes()
+
 
     def _init_indexes(self):
         self._current_index = ImageIndex(
@@ -24,24 +26,25 @@ class ImageIndexLoader:
             max_age=self.config.index_current_max_age,
             skip_load_seconds=self.config.index_current_skip_load_age
         )
+        self.indexes.append(self._current_index)
         self._historical_index = ImageIndex(
             name='historical',
             file_path=self.config.index_historical_file,
             max_age=self.config.index_historical_max_age,
             skip_load_seconds=self.config.index_historical_skip_load_age
         )
+        self.indexes.append(self._historical_index)
         self._meme_index = ImageIndex(
             name='historical',
             file_path=self.config.index_meme_file,
             max_age=self.config.index_meme_max_age,
             skip_load_seconds=self.config.index_meme_skip_load_age
         )
-        self._load_index(self._current_index)
-        self._load_index(self._historical_index)
-        self._load_index(self._meme_index)
+        self.indexes.append(self._meme_index)
 
     def _load_index(self, index: ImageIndex):
-        if self.current_index_built_at and (
+        log.debug('Attempting to load %s index', index.name)
+        if index.built_at and (
                 datetime.now() - index.built_at).seconds < index.skip_load_seconds:
             log.debug('Loaded %s index is less than %s old.  Skipping load attempt', index.name, index.skip_load_seconds)
             return
@@ -60,7 +63,7 @@ class ImageIndexLoader:
         created_at = datetime.fromtimestamp(os.stat(index.file_path).st_ctime)
         delta = datetime.now() - created_at
 
-        if delta.seconds > 7200:
+        if delta.seconds > index.max_age:
             log.info('Existing %s index is too old.  Skipping repost check', index.name)
             raise NoIndexException(f'Existing {index.name} index is too old')
 
@@ -70,7 +73,7 @@ class ImageIndexLoader:
                 index.loaded_index = AnnoyIndex(64)
                 index.loaded_index.load(index.file_path)
                 index.built_at = created_at
-                index.size = self.current_index.get_n_items()
+                index.size = index.loaded_index.get_n_items()
                 log.info('Loaded %s image index with %s items', index.name, index.loaded_index.get_n_items())
                 return
 
@@ -91,13 +94,16 @@ class ImageIndexLoader:
             log.debug('Loaded %s index is up to date.  Using with %s items', index.name, index.loaded_index.get_n_items())
 
     @property
-    def historical_index(self) -> AnnoyIndex:
-        pass
+    def historical_index(self) -> ImageIndex:
+        self._load_index(self._historical_index)
+        return self._historical_index
 
     @property
-    def current_index(self) -> AnnoyIndex:
-        pass
+    def current_index(self) -> ImageIndex:
+        self._load_index(self._current_index)
+        return self._current_index
 
     @property
-    def meme_index(self) -> AnnoyIndex:
-        pass
+    def meme_index(self) -> ImageIndex:
+        self._load_index(self._meme_index)
+        return self._meme_index
