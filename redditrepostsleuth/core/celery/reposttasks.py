@@ -16,7 +16,8 @@ from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask
-from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result
+from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result, \
+    repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
 
 
@@ -49,6 +50,9 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
         repost_of=result.matches[0].post.post_id if result.matches else None,
 
     ))
+    watches = check_for_post_watch(result, self.uowm)
+    if watches:
+        notify_watch.apply_async((watches,), queue='watch_notify')
 
     return result
 
@@ -98,22 +102,7 @@ def link_repost_check(self, posts, ):
         self.event_logger.save_event(
             BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
-def repost_watch_check(self, matches):
-    with self.uowm.start() as uow:
-        for match in matches:
-            watches = uow.repost_watch.get_all_by_post_id(match.post.post_id)
-            for watch in watches:
-                pass
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def repost_watch_notify(self, watches: List[Dict[ImageMatch, RepostWatch]]):
-    for watch in watches:
-        # TODO - What happens if we don't get redditor back?
-        redditor = self.reddit.redditor(watch.user)
-        msg = WATCH_NOTIFY_OF_MATCH.format(
-            watch_shortlink=f"https://redd.it/{watch['watch'].post_id}",
-            repost_shortlink=watch['match'].post.shortlink,
-            percent_match=watch['match'].hamming_match_percent
-        )
-        self.response_handler.send_private_message(redditor, msg, subject='A post you are watching has been reposted')
+def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]]):
+    repost_watch_notify(watches, self.reddit, self.response_handler)

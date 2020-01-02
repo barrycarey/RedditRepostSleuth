@@ -9,7 +9,10 @@ from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.helpers import create_meme_template
+from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
 from redditrepostsleuth.core.util.repost_filters import filter_dead_urls
 
 
@@ -118,3 +121,15 @@ def check_for_post_watch(matches: List[ImageMatch], uowm: UnitOfWorkManager) -> 
                 for watch in watches:
                     results.append({'match': match, 'watch': watch})
     return results
+
+def repost_watch_notify(watches: List[Dict[ImageMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler):
+    for watch in watches:
+        # TODO - What happens if we don't get redditor back?
+        redditor = reddit.redditor(watch['watch'].user)
+        msg = WATCH_NOTIFY_OF_MATCH.format(
+            watch_shortlink=f"https://redd.it/{watch['watch'].post_id}",
+            repost_shortlink=watch['match'].post.shortlink,
+            percent_match=watch['match'].hamming_match_percent
+        )
+        log.info('Sending repost watch PM to %s', redditor.name)
+        response_handler.send_private_message(redditor, msg, subject='A post you are watching has been reposted')
