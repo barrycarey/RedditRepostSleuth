@@ -18,6 +18,9 @@ class RepostWatchRepo:
     def get_all_by_post_id(self, id: str) -> RepostWatch:
         return self.db_session.query(RepostWatch).filter(RepostWatch.post_id == id).all()
 
+    def get_all_active_by_post_id(self, id: str) -> RepostWatch:
+        return self.db_session.query(RepostWatch).filter(RepostWatch.post_id == id, RepostWatch.enabled == True).all()
+
     def find_existing_watch(self, user: Text, post_id: Text):
         return self.db_session.query(RepostWatch).filter(RepostWatch.user == user, RepostWatch.post_id == post_id).first()
 

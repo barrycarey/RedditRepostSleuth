@@ -1,9 +1,9 @@
-from typing import List, NoReturn
+from typing import List, NoReturn, Dict
 
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, InvestigatePost
+from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, InvestigatePost, RepostWatch
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
@@ -107,3 +107,14 @@ def get_oldest_active_match(matches: List[ImageMatch]) -> ImageMatch:
     for match in matches:
         if filter_dead_urls(match):
             return match
+
+def check_for_post_watch(matches: List[ImageMatch], uowm: UnitOfWorkManager) -> List[Dict[ImageMatch, RepostWatch]]:
+    results = []
+    with uowm.start() as uow:
+        for match in matches:
+            watches = uow.repostwatch.get_all_active_by_post_id(match.post.post_id)
+            if watches:
+                log.info('Found %s active watch requests for post %s', len(watches), match.post.post_id)
+                for watch in watches:
+                    results.append({'match': match, 'watch': watch})
+    return results

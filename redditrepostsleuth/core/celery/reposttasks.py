@@ -1,4 +1,5 @@
 from time import perf_counter
+from typing import List, Dict
 
 import requests
 from redlock import RedLockError
@@ -9,12 +10,14 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
+from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask
+from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask
 from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
 
 
 @celery.task(ignore_results=True)
@@ -102,3 +105,15 @@ def repost_watch_check(self, matches):
             watches = uow.repost_watch.get_all_by_post_id(match.post.post_id)
             for watch in watches:
                 pass
+
+@celery.task(bind=True, base=RedditTask, ignore_results=True)
+def repost_watch_notify(self, watches: List[Dict[ImageMatch, RepostWatch]]):
+    for watch in watches:
+        # TODO - What happens if we don't get redditor back?
+        redditor = self.reddit.redditor(watch.user)
+        msg = WATCH_NOTIFY_OF_MATCH.format(
+            watch_shortlink=f"https://redd.it/{watch['watch'].post_id}",
+            repost_shortlink=watch['match'].post.shortlink,
+            percent_match=watch['match'].hamming_match_percent
+        )
+        self.response_handler.send_private_message(redditor, msg, subject='A post you are watching has been reposted')

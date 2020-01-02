@@ -91,7 +91,7 @@ class ResponseHandler:
     def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> str:
         try:
             user.message(subject, message_body)
-            log.info('Send PM to %s. ', user.name)
+            log.info('Sent PM to %s. ', user.name)
             return message_body
         except Exception as e:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)
