@@ -45,3 +45,10 @@ MONITORED_SUB_ADDED = 'Congratulations! Your Subreddit is now monitored by Repos
                       'If you gave me wiki permissions you can find my configuration file here {wiki_config}\n\n' \
                       'You can find details about the configuration options [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_configuration)\n\n' \
                       'If you notice any issues please report them at r/RepostSleuthBot'
+
+WATCH_ENABLED = 'I have set a watch on this submission.  If anybody reposts it I\'ll send you a PM'
+WATCH_DISABLED = 'I have removed your watch on this post.  You will no longer be notified if it gets reposted'
+WATCH_DISABLED_NOT_FOUND = 'You do not currently have a watch setup for this submission'
+WATCH_ALREADY_ENABLED = 'You already have a watch setup for this submission'
+WATCH_NOTIFY_OF_MATCH = 'It looks like an [image you were watching]({watch_shortlink}) has been reposted. \n\n' \
+                        'I found [this post]({repost_shortlink}) which is a {percent_match} match'

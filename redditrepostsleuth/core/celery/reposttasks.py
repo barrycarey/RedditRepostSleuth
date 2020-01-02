@@ -1,4 +1,5 @@
 from time import perf_counter
+from typing import List, Dict
 
 import requests
 from redlock import RedLockError
@@ -9,12 +10,15 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
+from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask
-from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost
+from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask
+from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result, \
+    repost_watch_notify, check_for_post_watch
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
 
 
 @celery.task(ignore_results=True)
@@ -46,6 +50,9 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
         repost_of=result.matches[0].post.post_id if result.matches else None,
 
     ))
+    watches = check_for_post_watch(result, self.uowm)
+    if watches:
+        notify_watch.apply_async((watches,), queue='watch_notify')
 
     return result
 
@@ -95,8 +102,7 @@ def link_repost_check(self, posts, ):
         self.event_logger.save_event(
             BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
-def repost_watch_check(self, matches):
-    with self.uowm.start() as uow:
-        for match in matches:
-            watch = uow.repost_watch.get_all_by_post_id(match.post.post_id)
+
+@celery.task(bind=True, base=RedditTask, ignore_results=True)
+def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]]):
+    repost_watch_notify(watches, self.reddit, self.response_handler)
