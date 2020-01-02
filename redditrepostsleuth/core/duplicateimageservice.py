@@ -1,26 +1,21 @@
-import os
+from time import perf_counter
 from typing import List, Tuple
 
 from distance import hamming
-from time import perf_counter
-
 from sqlalchemy import Float
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.exception import NoIndexException
-from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from datetime import datetime
-from annoy import AnnoyIndex
-
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, ImageSearch
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
+from redditrepostsleuth.core.model.image_index import ImageIndex
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.imagehashing import set_image_hashes, get_image_hashes
+from redditrepostsleuth.core.services.image_index_loader import ImageIndexLoader
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
-from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
     filter_no_dhash, filter_dead_urls
@@ -31,12 +26,7 @@ class DuplicateImageService:
     def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, config: Config = None):
 
         self.uowm = uowm
-        self.historical_index  = AnnoyIndex(64)
-        self.historical_index_built_at = None
-        self.historical_index_size = 0
-        self.current_index = AnnoyIndex(64)
-        self.current_index_built_at = None
-        self.current_index_size = 0
+
         self.event_logger = event_logger
 
         if config:
@@ -44,127 +34,10 @@ class DuplicateImageService:
         else:
             self.config = Config()
 
+        # TODO - What happens if we don't have config values
+        self.index_loader = ImageIndexLoader(self.config)
+
         log.info('Created dup image service')
-
-    def _load_index_files(self) -> None:
-        try:
-            self._load_current_index_file()
-        except NoIndexException:
-            log.error('No current image index found.  Continuing with historical')
-            self.current_index = None
-
-        self._load_historical_index_file()
-
-    def _load_current_index_file(self) -> None:
-        """
-        Loads the current month index
-        :return:
-        """
-        if self.current_index_built_at and (datetime.now() - self.current_index_built_at).seconds < self.config.index_current_skip_load_age:
-            log.debug('Loaded index is less than 20 minutes old.  Skipping load')
-            return
-
-        log.debug('Index file is %s', self.config.index_current_file)
-        if not os.path.isfile(self.config.index_current_file):
-            if not self.current_index_built_at:
-                log.error('No existing index found and no index loaded in memory')
-                raise NoIndexException('No existing index found')
-            elif self.current_index_built_at and (datetime.now() - self.current_index_built_at).seconds > 7200:
-                log.error('No existing index found and loaded index is too old')
-                raise NoIndexException('No existing index found')
-            else:
-                log.info('No existing index found, using in memory index')
-                return
-
-        created_at = datetime.fromtimestamp(os.stat(self.config.index_current_file).st_ctime)
-        delta = datetime.now() - created_at
-
-        if delta.seconds > 7200:
-            log.info('Existing current index is too old.  Skipping repost check')
-            raise NoIndexException('Existing current index is too old')
-
-        if not self.current_index_built_at:
-            with redlock.create_lock('index_load', ttl=30000):
-                log.debug('Loading existing index')
-                self.current_index = AnnoyIndex(64)
-                self.current_index.load(self.config.index_current_file)
-                self.current_index_built_at = created_at
-                self.current_index_size = self.current_index.get_n_items()
-                log.info('Loaded current image index with %s items', self.current_index.get_n_items())
-                return
-
-        if created_at > self.current_index_built_at:
-            log.info('Existing current image index is newer than loaded index.  Loading new index')
-            with redlock.create_lock('index_load', ttl=30000):
-                log.info('Got index lock')
-                self.current_index = AnnoyIndex(64)
-                self.current_index.load(self.config.index_current_file)
-                self.current_index_built_at = created_at
-                log.error('New file has %s items', self.current_index.get_n_items())
-                log.info('New current image index loaded with %s items', self.current_index.get_n_items())
-                if self.current_index.get_n_items() < self.current_index_size:
-                    log.critical('New current image index has less items than old. Aborting repost check')
-                    raise NoIndexException('New current image index has less items than last index')
-                self.current_index_size = self.current_index.get_n_items()
-
-        else:
-            log.debug('Loaded index is up to date.  Using with %s items', self.historical_index.get_n_items())
-
-    def _load_historical_index_file(self) -> None:
-        """
-        Check if index file exists.  If it does, check it's age.  If it's fresh enough use it, if not build one
-        :return:
-        """
-
-        if self.historical_index_built_at and (datetime.now() - self.historical_index_built_at).seconds < self.config.index_historical_skip_load_age:
-            log.debug('Loaded index is less than 72 hours old.  Skipping load')
-            return
-
-        log.debug('Historical image index file is %s', self.config.index_historical_file)
-        if not os.path.isfile(self.config.index_historical_file):
-            if not self.historical_index_built_at:
-                log.error('No existing historical image index found and no index loaded in memory')
-                raise NoIndexException('No existing index found')
-            else:
-                # Hits this if no index file but one already loaded in memeory
-                log.info('No existing index found, using in memory index')
-                return
-
-        created_at = datetime.fromtimestamp(os.stat(self.config.index_historical_file).st_ctime)
-        delta = datetime.now() - created_at
-
-        if created_at.month < datetime.now().month:
-            log.info('Existing historical image index is too old. Index month: %s, current month %s Skipping repost check', created_at.month, datetime.now().month)
-            raise NoIndexException('Existing historical image index is too old')
-
-        if not self.historical_index_built_at:
-            with redlock.create_lock('index_load', ttl=30000):
-                log.debug('Loading existing historical image index')
-                self.historical_index = AnnoyIndex(64)
-                self.historical_index.load(self.config.index_historical_file)
-                self.historical_index_built_at = created_at
-                self.historical_index_size = self.historical_index.get_n_items()
-                log.info('Loaded existing historical image index with %s items', self.historical_index.get_n_items())
-                return
-
-        if created_at > self.historical_index_built_at:
-            log.info('Existing historical image index is newer than loaded index.  Loading new index')
-            log.error('Loading newer historical image index file.  Old file had %s items,', self.historical_index.get_n_items())
-            with redlock.create_lock('index_load', ttl=30000):
-                log.info('Got index lock')
-                self.historical_index = AnnoyIndex(64)
-                self.historical_index.load(self.config.index_historical_file)
-                self.historical_index_built_at = created_at
-                log.error('New file has %s items', self.historical_index.get_n_items())
-                log.info('New historical image index loaded with %s items', self.historical_index.get_n_items())
-                if self.historical_index.get_n_items() < self.historical_index_size:
-                    log.critical('New historical image index has less items than old. Aborting repost check')
-                    raise NoIndexException('New historical image index has less items than last index')
-                self.historical_index_size = self.historical_index.get_n_items()
-
-        else:
-            log.debug('Loaded index is up to date.  Using with %s items', self.historical_index.get_n_items())
-
 
     def _filter_results_for_reposts(
             self,
@@ -260,7 +133,7 @@ class DuplicateImageService:
         :return: List of matching images
         """
         log.info('Checking %s for duplicates - https://redd.it/%s', post.post_id, post.post_id)
-        self._load_index_files()
+
         search_results = ImageRepostWrapper()
         search_results.checked_post = post
         start = perf_counter()
@@ -270,7 +143,7 @@ class DuplicateImageService:
             print('')
         current_results = []
 
-        raw_results = self._search_index_by_vector(search_array, self.historical_index, max_matches=max_matches)
+        raw_results = self._search_index_by_vector(search_array, self.index_loader.historical_index, max_matches=max_matches)
         raw_results = filter(
             self._annoy_filter(target_annoy_distance or self.config.default_annoy_distance),
             raw_results
@@ -279,8 +152,8 @@ class DuplicateImageService:
         self._set_match_posts(historical_results)
 
         # TODO - I don't like duplicating this code.  Oh well
-        if self.current_index:
-            raw_results = self._search_index_by_vector(search_array, self.current_index, max_matches=max_matches)
+        if self.index_loader.current_index.loaded_index:
+            raw_results = self._search_index_by_vector(search_array, self.index_loader.current_index, max_matches=max_matches)
             raw_results = filter(
                 self._annoy_filter(target_annoy_distance or self.config.default_annoy_distance),
                 raw_results
@@ -332,15 +205,9 @@ class DuplicateImageService:
         )
         return search_results
 
-    def _filter_search_results(self):
-        pass
-
-    def _search_index_by_vector(self, vector: bytearray, index: AnnoyIndex, max_matches=50) -> List[ImageMatch]:
-        r = index.get_nns_by_vector(list(vector), max_matches, search_k=20000, include_distances=True)
+    def _search_index_by_vector(self, vector: bytearray, index: ImageIndex, max_matches=50) -> Tuple[int, float]:
+        r = index.loaded_index.get_nns_by_vector(list(vector), max_matches, search_k=20000, include_distances=True)
         return self._zip_annoy_results(r)
-
-    def _search_index_by_id(self, post_id: int, index: AnnoyIndex) -> List[ImageMatch]:
-        pass
 
     def _zip_annoy_results(self, annoy_results: List[tuple]) -> Tuple[int, float]:
         return list(zip(annoy_results[0], annoy_results[1]))
@@ -400,7 +267,6 @@ class DuplicateImageService:
             except Exception as e:
                 log.exception('Failed to save image search', exc_info=False)
 
-
     def _merge_search_results(self, first: List[ImageMatch], second: List[ImageMatch]) -> List[ImageMatch]:
         results = first.copy()
         for a in second:
@@ -410,7 +276,6 @@ class DuplicateImageService:
             results.append(a)
 
         return results
-
 
     def _set_match_posts(self, matches: List[ImageMatch], historical: bool = True) -> List[ImageMatch]:
         """

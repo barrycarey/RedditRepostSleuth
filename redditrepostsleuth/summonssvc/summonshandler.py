@@ -74,6 +74,7 @@ class SummonsHandler:
                             continue
 
                         self.process_summons(s, post)
+                        # TODO - This sends completed summons events to influx even if they fail
                         summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
                                                      s.summons_received_at, s.requestor, event_type='summons')
                         self._send_event(summons_event)
