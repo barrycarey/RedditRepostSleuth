@@ -10,6 +10,7 @@ class RepostResponseBase:
     message: str = None
     summons_id: int = None
 
+# TODO - Make a generic response instead of repost specific
 @dataclass
 class RepostResponse(RepostResponseBase):
     occurrences: List[Post] = field(default_factory=lambda: [])

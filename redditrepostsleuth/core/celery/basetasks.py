@@ -3,6 +3,8 @@ from celery import Task
 from redditrepostsleuth.core import logging
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
 
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -35,9 +37,10 @@ class AnnoyTask(Task):
 class RedditTask(Task):
     def __init__(self):
         self.config = Config()
-        self.reddit = get_reddit_instance(self.config)
+        self.reddit = RedditManager(get_reddit_instance(self.config))
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
+        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger)
 
 class RepostLogger(Task):
     def __init__(self):

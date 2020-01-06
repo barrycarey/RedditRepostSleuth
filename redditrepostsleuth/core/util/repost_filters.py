@@ -36,6 +36,10 @@ def annoy_distance_filter(target_annoy_distance: float):
         return False
     return annoy_filter
 
+def raw_annoy_filter(target_annoy_distance: float):
+    def annoy_filter(item):
+        return item[1] < target_annoy_distance
+    return annoy_filter
 
 def hamming_distance_filter(target_hamming_distance: float):
     def hamming_filter(match: ImageMatch):
