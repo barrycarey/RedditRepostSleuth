@@ -15,8 +15,6 @@ RedLock
 influxdb
 gensim
 ffmpeg-python
-gi
-t+https://github.com/ytdl-org/youtube-dl.git
 wavio
 pydub==0.20.0
 numpy
