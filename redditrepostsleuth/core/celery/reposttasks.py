@@ -50,8 +50,8 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
         repost_of=result.matches[0].post.post_id if result.matches else None,
 
     ))
-    watches = check_for_post_watch(result, self.uowm)
-    if watches:
+    watches = check_for_post_watch(result.matches, self.uowm)
+    if watches and self.config.enable_repost_watch:
         notify_watch.apply_async((watches,), queue='watch_notify')
 
     return result

@@ -1,3 +1,4 @@
+import webbrowser
 from time import perf_counter
 from typing import List, Tuple
 
@@ -14,6 +15,7 @@ from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.image_index_loader import ImageIndexLoader
+from redditrepostsleuth.core.services.meme_detector import MemeDetector
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
@@ -23,7 +25,7 @@ from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest
 
 
 class DuplicateImageService:
-    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, config: Config = None):
+    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, meme_detector: MemeDetector = None, config: Config = None):
 
         self.uowm = uowm
 
@@ -36,7 +38,7 @@ class DuplicateImageService:
 
         # TODO - What happens if we don't have config values
         self.index_loader = ImageIndexLoader(self.config)
-
+        self.meme_detector = meme_detector or MemeDetector(uowm, config, self.index_loader)
         log.info('Created dup image service')
 
     def _filter_results_for_reposts(
@@ -139,6 +141,7 @@ class DuplicateImageService:
         start = perf_counter()
         try:
             search_array = bytearray(post.dhash_h, encoding='utf-8')
+        # TODO - Figure out what exception we get here and what to do about it
         except Exception as e:
             print('')
         current_results = []
@@ -160,7 +163,7 @@ class DuplicateImageService:
             )  # Pre-filter results on default annoy value
             current_results = self._convert_annoy_results(raw_results, post.id)
             self._set_match_posts(current_results, historical=False)
-            search_results.total_searched = search_results.total_searched + self.current_index.get_n_items()
+            search_results.total_searched = search_results.total_searched + self.index_loader.meme_index.loaded_index.get_n_items()
         else:
             log.error('No current image index loaded.  Only using historical results')
 
@@ -170,8 +173,12 @@ class DuplicateImageService:
         if result_filter:
             self._set_match_hamming(post, search_results.matches)
             if meme_filter:
-                search_results = self.get_meme_template(search_results)
+                meme_start_time = perf_counter()
+                search_results.meme_template = self.meme_detector.detect_meme(post.dhash_h)
+                search_results.meme_detection_time = round(perf_counter() - meme_start_time, 5)
                 if search_results.meme_template:
+                    #webbrowser.open_new_tab(post.url)
+                    #webbrowser.open_new_tab(search_results.meme_template.example)
                     target_hamming_distance = search_results.meme_template.target_hamming
                     target_annoy_distance = search_results.meme_template.target_annoy
                     log.info('Using meme filter %s', search_results.meme_template.name)
@@ -191,8 +198,8 @@ class DuplicateImageService:
             self._set_match_hamming(post, search_results.matches)
 
         search_results.total_search_time = round(perf_counter() - start, 5)
-        search_results.total_searched = self.current_index.get_n_items() if self.current_index else 0
-        search_results.total_searched = search_results.total_searched + self.historical_index.get_n_items()
+        search_results.total_searched = self.index_loader.current_index.loaded_index.get_n_items() if self.index_loader.current_index else 0
+        search_results.total_searched = search_results.total_searched + self.index_loader.historical_index.loaded_index.get_n_items()
         self._log_search_time(search_results)
         self._log_search(
             search_results,
@@ -245,8 +252,8 @@ class DuplicateImageService:
     ):
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
-            used_historical_index=True if self.historical_index else False,
-            used_current_index=True if self.current_index else False,
+            used_historical_index=True if self.index_loader.historical_index else False,
+            used_current_index=True if self.index_loader.current_index else False,
             target_hamming_distance=search_results.target_hamming_distance,
             target_annoy_distance=search_results.target_annoy_distance,
             same_sub=same_sub if same_sub else False,

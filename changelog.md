@@ -6,6 +6,7 @@
 * [bugfix] - Fixed command flags.  I managed to completely break them at some point
 * [backend] - Log processing time for subs with monitoring enabled
 * [backend] - Moved meme detection to search index in increase performance
+* [backend] - Meme detection speed optimized from ~2s to ~3ms
 
 ### 0.1.2 - 12/01/2019
 
