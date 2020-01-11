@@ -2,6 +2,7 @@ import time
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment
+from prawcore import Forbidden
 from redlock import RedLockError
 from time import perf_counter
 from sqlalchemy.exc import IntegrityError
@@ -195,8 +196,14 @@ class SubMonitor:
 
     def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment):
         if monitored_sub.sticky_comment:
-            comment.mod.distinguish(sticky=True)
-            log.info('Made comment %s sticky', comment.id)
+            try:
+                comment.mod.distinguish(sticky=True)
+                log.info('Made comment %s sticky', comment.id)
+            except Forbidden:
+                log.error('Failed to sticky comment, no permissions')
+            except Exception as e:
+                log.exception('Failed to sticky comment', exc_info=True)
+
 
     def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission):
         if not monitored_sub.report_submission:
