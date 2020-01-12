@@ -1,3 +1,13 @@
+### 0.1.3 - 
+
+* [feature] - Include link to post and sub name in PM response for banned subs
+* [feature] - Send a confirmation PM to modmail when sub is added to dedicated monitoring
+* [bugfix] - First seen and last seen were getting swapped on link posts
+* [bugfix] - Fixed command flags.  I managed to completely break them at some point
+* [bugfix] - Fixed edge case that resulted in repeating comments on monitored sub post if sticky comment was enabled but bot didn't have permissions
+* [backend] - Log processing time for subs with monitoring enabled
+* [backend] - Moved meme detection to search index in increase performance
+* [backend] - Meme detection speed optimized from ~2s to ~3ms
 
 ### 0.1.2 - 12/01/2019
 
@@ -5,6 +15,7 @@
 * [backend] - Log all searches for easier debugging
 * [backend] - Log detailed search time metrics
 * [feature] - Auto add your sub.  Make the bot a mod and it will automatically enable sub monitoring
+* [feature] - Initial support for setting a watch on a post. Not enabled but support is now there
 * [feature] - Change bot settings via wiki page.  Monitored subs now have a wiki page created with customizable settings
 * [bugfix] - Bot was marking crossposts as resposts when summoned
 * [bugfix] - Fix crash when custom message template uses invalid variable

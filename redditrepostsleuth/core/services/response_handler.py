@@ -80,7 +80,7 @@ class ResponseHandler:
         except Forbidden:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
             if send_pm_on_fail:
-                msg = 'I\'m unable to reply to your comment.  I might be banned in that sub.  Here is my response. \n\n *** \n\n'
+                msg = f'I\'m unable to reply to your comment at https://redd.it/{comment.submission.id}.  I\'m probably banned from r/{comment.submission.subreddit.display_name}.  Here is my response. \n\n *** \n\n'
                 msg = msg + comment_body
                 msg = self.send_private_message(comment.author, msg)
                 comment_reply.body = msg
@@ -91,7 +91,7 @@ class ResponseHandler:
     def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> str:
         try:
             user.message(subject, message_body)
-            log.info('Send PM to %s. ', user.name)
+            log.info('Sent PM to %s. ', user.name)
             return message_body
         except Exception as e:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)

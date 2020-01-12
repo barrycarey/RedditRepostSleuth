@@ -40,14 +40,17 @@ class TestCross_post_filter(TestCase):
     def test_hamming_distance_filter__remove_higher_distance(self):
         matches = []
         match1 = ImageMatch()
+        match1.post = Post(id=1)
         match2 = ImageMatch()
+        match2.post = Post(id=2)
         match3 = ImageMatch()
+        match3.post = Post(id=3)
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
         match1.hamming_distance = 10
-        match2.annoy_distance = 20
-        match3.annoy_distance = 25
+        match2.hamming_distance = 20
+        match3.hamming_distance = 25
         matches.append(match1)
         matches.append(match2)
         matches.append(match3)
@@ -58,12 +61,15 @@ class TestCross_post_filter(TestCase):
     def test_annoy_distance_filter__remove_higher_distance(self):
         matches = []
         match1 = ImageMatch()
+        match1.post = Post(id=1)
         match2 = ImageMatch()
+        match2.post = Post(id=2)
         match3 = ImageMatch()
+        match3.post = Post(id=3)
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
-        match1.hamming_distance = 0.100
+        match1.annoy_distance = 0.100
         match2.annoy_distance = 0.200
         match3.annoy_distance = 0.250
         matches.append(match1)

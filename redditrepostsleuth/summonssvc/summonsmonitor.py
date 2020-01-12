@@ -35,7 +35,7 @@ class SummonsMonitor:
                     if comment is None:
                         continue
                     if self.check_for_summons(comment.body, '\?repost'):
-                        if comment.author == 'sneakpeekbot':
+                        if comment.author.name.lower() in ['sneakpeekbot', 'automoderator']:
                             continue
                         self._save_summons(comment)
             except Exception as e:
@@ -72,7 +72,7 @@ class SummonsMonitor:
                         log.debug('Skipping old mention. Created at %s', datetime.fromtimestamp(comment.created_utc))
                         continue
 
-                    if comment.author == 'sneakpeekbot':
+                    if comment.author.name.lower() in ['sneakpeekbot', 'automoderator']:
                         continue
 
                     if comment.id in bad_mentions:

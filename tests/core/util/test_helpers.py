@@ -161,7 +161,7 @@ class TestHelpers(TestCase):
 
         result = build_msg_values_from_search(wrapper)
 
-        self.assertEqual(18, len(result.keys()))
+        self.assertEqual(19, len(result.keys()))
         # TODO - Maybe test return values.  Probably not needed
 
     def test_build_msg_values_from_search_no_match_key_total(self):
@@ -171,7 +171,7 @@ class TestHelpers(TestCase):
         wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper)
 
-        self.assertEqual(8, len(result.keys()))
+        self.assertEqual(9, len(result.keys()))
 
     def test_build_msg_values_from_search_no_match_custom_key_total(self):
         wrapper = ImageRepostWrapper()
@@ -180,7 +180,7 @@ class TestHelpers(TestCase):
         wrapper.total_search_time = 0.111
         result = build_msg_values_from_search(wrapper, test1='test')
 
-        self.assertEqual(9, len(result.keys()))
+        self.assertEqual(10, len(result.keys()))
 
     def test_build_msg_values_from_search_extra_values(self):
         match1 = ImageMatch()
@@ -190,6 +190,7 @@ class TestHelpers(TestCase):
                            post_id='1234',
                            subreddit='somesub')
         wrapper = ImageRepostWrapper()
+        wrapper.matches = []
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
