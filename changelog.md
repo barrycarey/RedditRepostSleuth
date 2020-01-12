@@ -4,6 +4,7 @@
 * [feature] - Send a confirmation PM to modmail when sub is added to dedicated monitoring
 * [bugfix] - First seen and last seen were getting swapped on link posts
 * [bugfix] - Fixed command flags.  I managed to completely break them at some point
+* [bugfix] - Fixed edge case that resulted in repeating comments on monitored sub post if sticky comment was enabled but bot didn't have permissions
 * [backend] - Log processing time for subs with monitoring enabled
 * [backend] - Moved meme detection to search index in increase performance
 * [backend] - Meme detection speed optimized from ~2s to ~3ms
