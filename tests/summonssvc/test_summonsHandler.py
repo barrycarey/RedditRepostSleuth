@@ -24,7 +24,7 @@ class TestSummonsHandler(TestCase):
         config = Config(redis_host='dummy')
         sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
         summons = '?repost'
-        self.assertIsNone(sum_handler._strip_summons_flags(summons))
+        self.assertEqual(sum_handler._strip_summons_flags(summons), '')
 
     def test__strip_summons_flags__junk_input_commandtag(self):
         config = Config(redis_host='dummy')
