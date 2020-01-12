@@ -2,7 +2,9 @@ import time
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment
+from prawcore import Forbidden
 from redlock import RedLockError
+from time import perf_counter
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.config import Config
@@ -11,7 +13,9 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
@@ -30,6 +34,7 @@ class SubMonitor:
             reddit: RedditManager,
             response_builder: ResponseBuilder,
             response_handler: ResponseHandler,
+            event_logger: EventLogging = None,
             config: Config = None
     ):
         self.image_service = image_service
@@ -37,6 +42,7 @@ class SubMonitor:
         self.reddit = reddit
         self.response_builder = response_builder
         self.resposne_handler = response_handler
+        self.event_logger = event_logger
         if config:
             self.config = config
         else:
@@ -83,13 +89,14 @@ class SubMonitor:
 
     def _check_sub(self, monitored_sub: MonitoredSub):
         log.info('Checking sub %s', monitored_sub.name)
+        start_time = perf_counter()
         subreddit = self.reddit.subreddit(monitored_sub.name)
         if not subreddit:
             log.error('Failed to get Subreddit %s', monitored_sub.name)
             return
 
         submissions = subreddit.new(limit=monitored_sub.search_depth)
-
+        checked_posts = 0
         for submission in submissions:
             if not self._should_check_post(submission):
                 continue
@@ -100,7 +107,7 @@ class SubMonitor:
             if post.post_type == 'image' and post.dhash_h is None:
                 log.error('Post %s has no dhash', post.post_id)
                 continue
-
+            checked_posts += 1
             try:
                 if post.post_type == 'image':
                     search_results = self._check_for_repost(post, monitored_sub)
@@ -141,6 +148,9 @@ class SubMonitor:
             if search_results.matches:
                 self._report_submission(monitored_sub, submission)
 
+        process_time = perf_counter() - start_time
+        if self.event_logger:
+            self.log_run(process_time, checked_posts, monitored_sub.name)
 
     def _mark_post_as_comment_left(self, post: Post):
         try:
@@ -186,8 +196,14 @@ class SubMonitor:
 
     def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment):
         if monitored_sub.sticky_comment:
-            comment.mod.distinguish(sticky=True)
-            log.info('Made comment %s sticky', comment.id)
+            try:
+                comment.mod.distinguish(sticky=True)
+                log.info('Made comment %s sticky', comment.id)
+            except Forbidden:
+                log.error('Failed to sticky comment, no permissions')
+            except Exception as e:
+                log.exception('Failed to sticky comment', exc_info=True)
+
 
     def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission):
         if not monitored_sub.report_submission:
@@ -237,3 +253,13 @@ class SubMonitor:
 
         return post
 
+
+    def log_run(self, process_time: float, post_count: int, subreddit: str):
+        self.event_logger.save_event(
+            SubMonitorEvent(
+                event_type='subreddit_monitor',
+                process_time=process_time,
+                post_count=post_count,
+                subreddit=subreddit
+            )
+        )

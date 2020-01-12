@@ -7,7 +7,7 @@ from redditrepostsleuth.core.model.repostmatch import RepostMatch
 class RepostWrapper:
     def __init__(self):
         self.checked_post: Post = None
-        self.matches: List[RepostMatch] = []
+        self.matches = []
         self.total_search_time: int = None
         self.raw_search_time: int = 0
         self.total_searched: int = 0
