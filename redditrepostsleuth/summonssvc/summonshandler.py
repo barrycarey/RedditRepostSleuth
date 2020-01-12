@@ -119,7 +119,7 @@ class SummonsHandler:
         if user_tag > 1:
             # TODO - Possibly return none if len > 100
             return comment_body[user_tag + 15:].strip()
-        elif keyword_tag > 1:
+        elif keyword_tag >= 0:
             return comment_body[keyword_tag + 7:].strip()
         else:
             log.error('Unable to find summons tag in: %s', comment_body)
