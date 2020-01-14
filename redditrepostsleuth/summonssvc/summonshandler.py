@@ -343,8 +343,9 @@ class SummonsHandler:
         try:
             reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons',
                                                            send_pm_on_fail=True)
-        except APIException as e:
+        except (APIException, AssertionError) as e:
             return
+
         if reply:
             response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
         else:

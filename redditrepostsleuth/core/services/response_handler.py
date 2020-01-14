@@ -85,6 +85,9 @@ class ResponseHandler:
                 msg = self.send_private_message(comment.author, msg)
                 comment_reply.body = msg
                 return comment_reply
+        except AssertionError:
+            log.exception('Problem leaving comment', exc_info=True)
+            raise
         except Exception as e:
             log.exception('Unknown exception leaving comment', exc_info=True)
 
