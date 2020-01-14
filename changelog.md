@@ -1,3 +1,7 @@
+### 0.1.4 - 
+
+* [bugfix] - Link reposts checks were not checking for same author or crosspost
+
 ### 0.1.3 - 1/12/2019
 
 * [feature] - Include link to post and sub name in PM response for banned subs
