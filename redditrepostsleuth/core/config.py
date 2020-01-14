@@ -135,7 +135,7 @@ class Config:
             'default_annoy_distance',
             'repost_image_check_on_ingest',
             'repost_link_check_on_ingest',
-            'enable_repost_watch'
+            'enable_repost_watch',
             'image_hash_api',
             'summons_subreddits',
             'hot_post_comment_on_oc',

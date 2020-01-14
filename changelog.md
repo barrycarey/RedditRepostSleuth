@@ -1,4 +1,4 @@
-### 0.1.3 - 
+### 0.1.3 - 1/12/2019
 
 * [feature] - Include link to post and sub name in PM response for banned subs
 * [feature] - Send a confirmation PM to modmail when sub is added to dedicated monitoring
