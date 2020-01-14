@@ -125,6 +125,10 @@ def filter_repost_results(
         if match.post.post_id == checked_post.post_id:
             continue
 
+        if match.post.author == checked_post.author:
+            log.debug('Author Cutoff Reject')
+            continue
+
         if same_sub and match.post.subreddit != checked_post.subreddit:
             log.debug('Same Sub Reject: Orig sub: %s - Match Sub: %s - %s', checked_post.subreddit, match.post.subreddit, f'https://redd.it/{match.post.post_id}')
             continue
@@ -141,6 +145,7 @@ def filter_repost_results(
 
         if exclude_crossposts and match.post.crosspost_parent is not None:
             log.debug('Crosspost Reject: %s', f'https://redd.it/{match.post.post_id}')
+            continue
 
         results.append(match)
 
