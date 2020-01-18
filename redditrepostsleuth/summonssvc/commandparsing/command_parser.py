@@ -18,7 +18,7 @@ class CommandParser:
 
     def parse_repost_image_cmd(self, cmd: str) -> RepostImageCmd:
         parser = ArgumentParserThrow(cmd)
-        parser.add_argument('command', default=None)
+        #parser.add_argument('command', default=None)
         parser.add_argument('-meme', default=self.config.summons_meme_filter, dest='meme_filter', help="Enable the meme filter", action='store_true')
         parser.add_argument('-all', default=self.config.summons_all_matches, dest='all_matches', help="Provide all matches in list format",
                             action='store_true')
@@ -28,22 +28,22 @@ class CommandParser:
         parser.add_argument('-age', type=int, default=self.config.summons_max_age, dest='age',
                             help='High strict should matches be')
         try:
-            args = parser.parse_args(cmd.split(' '))
+            namespace, unknown_args = parser.parse_known_args(cmd.split(' '))
         except InvalidCommandException as e:
             log.exception('Invalid command error: %s', e)
             return self.get_default_repost_image_cmd()
 
         return RepostImageCmd(
-            meme_filter=args.meme_filter,
-            strictness=self._get_hamming_from_strictness(args.strictness),
-            same_sub=args.same_sub,
-            all_matches=args.all_matches,
-            match_age=args.age
+            meme_filter=namespace.meme_filter,
+            strictness=self._get_hamming_from_strictness(namespace.strictness),
+            same_sub=namespace.same_sub,
+            all_matches=namespace.all_matches,
+            match_age=namespace.age
         )
 
     def parse_repost_link_cmd(self, cmd: Text) -> RepostLinkCmd:
         parser = ArgumentParserThrow(cmd)
-        parser.add_argument('command', default=None)
+        #parser.add_argument('command', default=None)
         parser.add_argument('-all', default=self.config.summons_all_matches, dest='all_matches',
                             help="Provide all matches in list format",
                             action='store_true')
@@ -53,34 +53,34 @@ class CommandParser:
         parser.add_argument('-age', type=int, default=self.config.summons_max_age, dest='age',
                             help='High strict should matches be')
         try:
-            args = parser.parse_args(cmd.split(' '))
+            namespace, unknown_args = parser.parse_known_args(cmd.split(' '))
         except InvalidCommandException as e:
             log.exception('Invalid command error: %s', e)
             return self.get_default_repost_link_cmd()
 
         return RepostLinkCmd(
-            same_sub=args.same_sub,
-            all_matches=args.all_matches,
-            match_age=args.age
+            same_sub=namespace.same_sub,
+            all_matches=namespace.all_matches,
+            match_age=namespace.age
         )
 
     def parse_watch_cmd(self, cmd: Text) -> WatchCmd:
         parser = ArgumentParserThrow(cmd)
-        parser.add_argument('command', default=None)
+        #parser.add_argument('command', default=None)
         parser.add_argument('-samesub', default=False, dest='same_sub',
                             help="Only search this sub",
                             action='store_true')
         parser.add_argument('-expire', type=int, default=None, dest='expire',
                             help='Expire watch after X days')
         try:
-            args = parser.parse_args(cmd.split(' '))
+            namespace, unknown_args = parser.parse_known_args(cmd.split(' '))
         except InvalidCommandException as e:
             log.exception('Invalid command error: %s', e)
             return self.get_default_watch_cmd()
 
         return WatchCmd(
-            same_sub=args.same_sub,
-            expire=args.expire
+            same_sub=namespace.same_sub,
+            expire=namespace.expire
         )
 
 
