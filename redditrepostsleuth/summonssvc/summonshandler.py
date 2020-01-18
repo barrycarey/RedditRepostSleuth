@@ -95,11 +95,12 @@ class SummonsHandler:
             else:
                 return self._get_repost_cmd(post_type, cmd_str)
         except InvalidCommandException:
-            log.error('Received command is invalid: %s', cmd_body)
+            log.error('Summons has no base command.  Defaulting to repost')
 
         return self._get_repost_cmd(post_type, cmd_str)
 
     def _get_repost_cmd(self, post_type: Text, cmd_body: Text) -> RepostBaseCmd:
+        cmd_body = cmd_body.strip('repost ')
         if post_type == 'image':
             return self._get_image_repost_cmd(cmd_body)
         elif post_type == 'link':
@@ -128,8 +129,9 @@ class SummonsHandler:
     def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
+        stripped_comment = self._strip_summons_flags(summons.comment_body)
         try:
-            base_command = self.command_parser.parse_root_command(self._strip_summons_flags(summons.comment_body))
+            base_command = self.command_parser.parse_root_command(stripped_comment)
         except InvalidCommandException:
             log.error('Invalid command in summons: %s', summons.comment_body)
             base_command = 'repost'
