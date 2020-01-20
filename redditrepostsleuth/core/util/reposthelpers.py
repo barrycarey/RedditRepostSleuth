@@ -1,4 +1,5 @@
 from datetime import datetime
+import random
 from time import perf_counter
 from typing import List
 
@@ -13,6 +14,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.objectmapping import post_to_repost_match
 
 
@@ -154,7 +156,8 @@ def filter_repost_results(
 def get_first_active_match(matches: List[RepostMatch]) -> RepostMatch:
     for match in matches:
         try:
-            r = requests.head(match.post.url)
+            headers = {'User-Agent': random.choice(USER_AGENTS)}
+            r = requests.head(match.post.url, timeout=3, headers=headers)
             if r.status_code == 200:
                 return match
         except Exception as e:

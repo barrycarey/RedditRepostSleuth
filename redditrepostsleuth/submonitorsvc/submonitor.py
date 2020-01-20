@@ -232,7 +232,7 @@ class SubMonitor:
                 msg_values, search_results.checked_post.post_type
             )
 
-        return self.resposne_handler.reply_to_submission(submission.id, msg, source='submonitor')
+        return self.resposne_handler.reply_to_submission(submission.id, msg)
 
     def save_unknown_post(self, post_id: str) -> Post:
         """
