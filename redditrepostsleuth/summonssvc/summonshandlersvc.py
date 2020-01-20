@@ -25,7 +25,7 @@ if __name__ == '__main__':
     dup = DuplicateImageService(uowm, event_logger, config=config)
     response_builder = ResponseBuilder(uowm)
     reddit_manager = RedditManager(get_reddit_instance(config))
-    summons = SummonsHandler(uowm, dup, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger), event_logger=event_logger, summons_disabled=False)
+    summons = SummonsHandler(uowm, dup, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger, source='summons'), event_logger=event_logger, summons_disabled=False)
 
     while True:
         try:
