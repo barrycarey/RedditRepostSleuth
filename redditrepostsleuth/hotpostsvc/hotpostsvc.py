@@ -30,7 +30,7 @@ if __name__ == '__main__':
             uowm,
             dup,
             response_builder,
-            ResponseHandler(reddit_manager, uowm, event_logger),
+            ResponseHandler(reddit_manager, uowm, event_logger, source='toppost'),
             config=config
         )
         try:
