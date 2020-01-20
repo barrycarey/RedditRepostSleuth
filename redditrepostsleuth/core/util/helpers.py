@@ -142,7 +142,16 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
             'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
             'false_positive_data': json.dumps(
                 {
-                    'post': f'https://redd.it/{search_results.checked_post.post_id}',
+                    'post_id': search_results.checked_post.post_id,
+                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
+                }
+            ),
+        }
+    else:
+        results_values = {
+            'false_negative_data': json.dumps(
+                {
+                    'post_id': search_results.checked_post.post_id,
                     'meme_template': search_results.meme_template.id if search_results.meme_template else None
                 }
             ),
