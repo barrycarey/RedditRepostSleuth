@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Text
 
 import requests
-from requests.exceptions import SSLError
+from requests.exceptions import SSLError, ConnectionError
 
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.imagematch import ImageMatch
