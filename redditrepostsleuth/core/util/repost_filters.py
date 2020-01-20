@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Text
+import random
 
 import requests
 from requests.exceptions import SSLError, ConnectionError
@@ -7,6 +8,7 @@ from requests.exceptions import SSLError, ConnectionError
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
+from redditrepostsleuth.core.util.constants import USER_AGENTS
 
 
 def cross_post_filter(match: RepostMatch) -> bool:
@@ -97,7 +99,8 @@ def filter_no_dhash(match: ImageMatch):
 
 def filter_dead_urls(match: ImageMatch):
     try:
-        r = requests.head(match.post.url)
+        headers = {'User-Agent': random.choice(USER_AGENTS)}
+        r = requests.head(match.post.url, timeout=3, headers=headers)
     except (ConnectionError, SSLError):
         return False
     if r.status_code == 200:

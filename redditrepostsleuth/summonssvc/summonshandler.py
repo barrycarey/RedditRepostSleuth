@@ -62,6 +62,7 @@ class SummonsHandler:
                 with self.uowm.start() as uow:
                     summons = uow.summons.get_unreplied()
                     for s in summons:
+                        log.info('Starting summons %s', s.id)
                         post = uow.posts.get_by_post_id(s.post_id)
                         if not post:
                             post = self.save_unknown_post(s.post_id)
@@ -78,6 +79,7 @@ class SummonsHandler:
                         summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
                                                      s.summons_received_at, s.requestor, event_type='summons')
                         self._send_event(summons_event)
+                        log.info('Finished summons %s', s.id)
                 time.sleep(2)
             except Exception as e:
                 log.exception('Exception in handle summons thread')
@@ -379,7 +381,7 @@ class SummonsHandler:
         submission = self.reddit.submission(post_id)
         try:
             post = pre_process_post(submission_to_post(submission), self.uowm, None)
-        except (InvalidImageUrlException,):
+        except (InvalidImageUrlException):
             return
 
         if not post or post.post_type != 'image':

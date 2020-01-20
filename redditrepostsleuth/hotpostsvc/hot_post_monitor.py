@@ -134,7 +134,7 @@ class TopPostMonitor:
             msg = self.response_builder.build_default_oc_comment(msg_values)
 
         try:
-            self.response_handler.reply_to_submission(post.post_id, msg, source='toppost')
+            self.response_handler.reply_to_submission(post.post_id, msg)
         except Forbidden:
             log.error('Failed to leave comment on %s in %s.  Looks like we are banned', post.post_id, post.subreddit)
 
