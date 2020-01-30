@@ -28,6 +28,9 @@ def ingest_repost_check(post):
     elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
 
+
+
+
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> RepostWrapper:
     r = requests.head(post.url)
