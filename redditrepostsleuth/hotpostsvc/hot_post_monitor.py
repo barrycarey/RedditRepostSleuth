@@ -2,6 +2,7 @@ import time
 from time import perf_counter
 
 from praw import Reddit
+from praw.exceptions import APIException
 from praw.models import Comment
 from prawcore import Forbidden
 from redlock import RedLockError
@@ -135,8 +136,8 @@ class TopPostMonitor:
 
         try:
             self.response_handler.reply_to_submission(post.post_id, msg)
-        except Forbidden:
-            log.error('Failed to leave comment on %s in %s.  Looks like we are banned', post.post_id, post.subreddit)
+        except (Forbidden, APIException):
+            log.error('Failed to leave comment on %s in %s. ', post.post_id, post.subreddit)
 
 
         with self.uowm.start() as uow:
