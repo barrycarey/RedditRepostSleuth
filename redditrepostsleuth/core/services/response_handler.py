@@ -100,6 +100,10 @@ class ResponseHandler:
             log.exception('Unknown exception leaving comment', exc_info=True)
 
     def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> str:
+        if not user:
+            log.error('No user provided to send private message')
+            return
+
         try:
             user.message(subject, message_body)
             log.info('Sent PM to %s. ', user.name)
