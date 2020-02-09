@@ -2,9 +2,10 @@
 import sys
 import time
 
-from redditrepostsleuth.core.celery.response_tasks import handle_summons
+
 
 sys.path.append('./')
+from redditrepostsleuth.core.celery.response_tasks import handle_summons
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -38,7 +39,6 @@ if __name__ == '__main__':
             for r in results:
                 b = r.get()
                 #time.sleep(10)
-
         time.sleep(2)
 
     """

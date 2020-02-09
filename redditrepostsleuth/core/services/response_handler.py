@@ -2,7 +2,7 @@ from typing import Text
 
 from praw.exceptions import APIException
 from praw.models import Comment, Redditor
-from prawcore import Forbidden
+from prawcore import Forbidden, PrawcoreException
 
 from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -88,11 +88,17 @@ class ResponseHandler:
         except Forbidden:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
             if send_pm_on_fail:
-                msg = f'I\'m unable to reply to your comment at https://redd.it/{comment.submission.id}.  I\'m probably banned from r/{comment.submission.subreddit.display_name}.  Here is my response. \n\n *** \n\n'
-                msg = msg + comment_body
-                msg = self.send_private_message(comment.author, msg)
-                comment_reply.body = msg
-                return comment_reply
+                try:
+                    msg = f'I\'m unable to reply to your comment at https://redd.it/{comment.submission.id}.  I\'m probably banned from r/{comment.submission.subreddit.display_name}.  Here is my response. \n\n *** \n\n'
+                    msg = msg + comment_body
+                    msg = self.send_private_message(comment.author, msg)
+                    comment_reply.body = msg
+                    return comment_reply
+                except (PrawcoreException,) as e:
+                    log.error('Failed to send PM', exc_info=True)
+                    comment_reply.body = 'FAILED TO LEAVE COMMENT OR PM'
+                    return comment_reply
+
         except AssertionError:
             log.exception('Problem leaving comment', exc_info=True)
             raise
