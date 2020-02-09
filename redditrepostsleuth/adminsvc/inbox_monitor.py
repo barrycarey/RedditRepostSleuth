@@ -1,4 +1,5 @@
 import json
+import time
 from json import JSONDecodeError
 from typing import Text, Dict, NoReturn
 
@@ -102,4 +103,6 @@ if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     invite = InboxMonitor(uowm, get_reddit_instance(config))
-    invite.check_inbox()
+    while True:
+        invite.check_inbox()
+        time.sleep(20)

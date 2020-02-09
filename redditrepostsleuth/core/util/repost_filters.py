@@ -3,7 +3,7 @@ from typing import Text
 import random
 
 import requests
-from requests.exceptions import SSLError, ConnectionError
+from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.imagematch import ImageMatch
@@ -101,7 +101,7 @@ def filter_dead_urls(match: ImageMatch):
     try:
         headers = {'User-Agent': random.choice(USER_AGENTS)}
         r = requests.head(match.post.url, timeout=3, headers=headers)
-    except (ConnectionError, SSLError):
+    except (ConnectionError, SSLError, ReadTimeout):
         return False
     if r.status_code == 200:
         return True
