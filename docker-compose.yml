@@ -57,6 +57,19 @@ services:
         volumes:
             - /opt/imageindex:/opt/imageindex
 
+    summons_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q summons -c 1
+        volumes:
+            - /opt/imageindex:/opt/imageindex
+
     subreddit_monitor:
         build:
             context: .
@@ -78,6 +91,8 @@ services:
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 1
+        volumes:
+            - /opt/imageindex:/opt/imageindex
 
     ingest_worker:
         build:
