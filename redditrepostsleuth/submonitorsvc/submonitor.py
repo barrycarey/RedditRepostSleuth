@@ -87,6 +87,58 @@ class SubMonitor:
 
         return True
 
+    def check_submission(self, submission: Submission, monitored_sub: MonitoredSub):
+        if not self._should_check_post(submission):
+            return
+
+        with self.uowm.start() as uow:
+            post = uow.posts.get_by_post_id(submission.id)
+
+        if post.post_type == 'image' and post.dhash_h is None:
+            log.error('Post %s has no dhash', post.post_id)
+            return
+
+        try:
+            if post.post_type == 'image':
+                search_results = self._check_for_repost(post, monitored_sub)
+            elif post.post_type == 'link':
+                search_results = self._check_for_link_repost(post)
+        except NoIndexException:
+            log.error('No search index available.  Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
+            return
+        except RedLockError:
+            log.error('New search index is being loaded. Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
+            return
+
+        if not search_results.matches and monitored_sub.repost_only:
+            log.debug('No matches for post %s and comment OC is disabled',
+                     f'https://redd.it/{search_results.checked_post.post_id}')
+            self._create_checked_post(post)
+            return
+
+        try:
+            comment = self._leave_comment(search_results, submission, monitored_sub)
+        except APIException as e:
+            error_type = None
+            if hasattr(e, 'error_type'):
+                error_type = e.error_type
+            log.exception('Praw API Exception.  Error Type: %s', error_type, exc_info=True)
+            return
+        except RateLimitException:
+            time.sleep(10)
+            return
+        except Exception as e:
+            log.exception('Failed to leave comment on %s in %s', submission.id, submission.subreddit.display_name)
+            return
+
+        self._sticky_reply(monitored_sub, comment)
+        self._mark_post_as_comment_left(post)
+        self._create_checked_post(post)
+
+        if search_results.matches:
+            self._report_submission(monitored_sub, submission)
+
+
     def _check_sub(self, monitored_sub: MonitoredSub):
         log.info('Checking sub %s', monitored_sub.name)
         start_time = perf_counter()
