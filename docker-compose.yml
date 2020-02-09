@@ -53,7 +53,20 @@ services:
             dockerfile: redditrepostsleuth/summonssvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonshandlersvc.py
+        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summons_handler_svc_celery.py
+        volumes:
+            - /opt/imageindex:/opt/imageindex
+
+    summons_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q summons -c 1
         volumes:
             - /opt/imageindex:/opt/imageindex
 
@@ -64,7 +77,20 @@ services:
         environment:
             - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
-        entrypoint: python -u /src/redditrepostsleuth/submonitorsvc/submonitorsvc.py
+        entrypoint: python -u /src/redditrepostsleuth/submonitorsvc/sub_monitor_svc_celery.py
+        volumes:
+            - /opt/imageindex:/opt/imageindex
+
+    submonitor_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 1
         volumes:
             - /opt/imageindex:/opt/imageindex
 

@@ -1,3 +1,4 @@
+celery[redis]==4.3.0
 praw
 requests
 sqlalchemy

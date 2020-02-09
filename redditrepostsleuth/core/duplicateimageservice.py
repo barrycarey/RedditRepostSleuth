@@ -213,7 +213,7 @@ class DuplicateImageService:
         return search_results
 
     def _search_index_by_vector(self, vector: bytearray, index: ImageIndex, max_matches=50) -> Tuple[int, float]:
-        r = index.loaded_index.get_nns_by_vector(list(vector), max_matches, search_k=20000, include_distances=True)
+        r = index.loaded_index.get_nns_by_vector(list(vector), max_matches, search_k=4000, include_distances=True)
         return self._zip_annoy_results(r)
 
     def _zip_annoy_results(self, annoy_results: List[tuple]) -> Tuple[int, float]:

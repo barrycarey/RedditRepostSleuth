@@ -3,8 +3,10 @@
 * [bugfix] - Link reposts checks were not checking for same author or crosspost
 * [bugifx] - Fixed issue with command parse the broke the whole thing
 * [backend] - Automated inbox monitoring for user false positive/negative reports
+* [submonitor] - Moved processing of monitored subs to distributed workers to decrease processing time
+* [summons] - Moved summons handling to distributed workers to lower response time and handle summons concurrently 
 
-### 0.1.3 - 1/12/2019
+### 0.1.3 - 1/12/2020
 
 * [feature] - Include link to post and sub name in PM response for banned subs
 * [feature] - Send a confirmation PM to modmail when sub is added to dedicated monitoring
