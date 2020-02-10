@@ -123,6 +123,9 @@ class SubredditConfigUpdater:
             else:
                 self._log_config_value_change('search_depth', monitored_sub.name, monitored_sub.search_depth, new_config['search_depth'])
                 monitored_sub.search_depth = new_config['search_depth']
+        if 'target_days_old' in new_config:
+            self._log_config_value_change('target_days_old', monitored_sub.name, monitored_sub.target_days_old, new_config['target_days_old'])
+            monitored_sub.target_days_old = new_config['target_days_old']
         if 'meme_filter' in new_config:
             self._log_config_value_change('meme_filter', monitored_sub.name, monitored_sub.meme_filter, new_config['meme_filter'])
             monitored_sub.meme_filter = new_config['meme_filter']
