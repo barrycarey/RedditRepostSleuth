@@ -1,4 +1,4 @@
-### 0.1.4 - 
+### 0.1.4 - 2/9/2020
 
 * [bugfix] - Link reposts checks were not checking for same author or crosspost
 * [bugifx] - Fixed issue with command parse the broke the whole thing

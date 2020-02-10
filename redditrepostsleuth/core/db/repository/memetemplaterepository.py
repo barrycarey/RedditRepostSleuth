@@ -16,8 +16,8 @@ class MemeTemplateRepository:
     def get_by_id(self, id: int) -> MemeTemplate:
         return self.db_session.query(MemeTemplate).filter(MemeTemplate.id == id).first()
 
-    def get_all(self) -> List[MemeTemplate]:
-        return self.db_session.query(MemeTemplate).order_by(MemeTemplate.name).all()
+    def get_all(self, limit: int = 100, offset: int = 0) -> List[MemeTemplate]:
+        return self.db_session.query(MemeTemplate).limit(limit).offset(offset).all()
 
     def get_by_name(self, name: str) -> MemeTemplate:
         return self.db_session.query(MemeTemplate).filter(MemeTemplate.name == name).first()
