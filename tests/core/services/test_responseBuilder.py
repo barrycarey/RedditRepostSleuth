@@ -1,3 +1,4 @@
+import json
 from unittest import TestCase, mock
 from unittest.mock import MagicMock
 
@@ -205,8 +206,13 @@ class TestResponseBuilder(TestCase):
         response_builder = ResponseBuilder(uowm)
         expected = 'test 10 image 5\n\n' \
                    '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report ' \
-                   '[ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message=http://redd.it/1234) ]*'
-        result = response_builder.build_sub_oc_comment('test', {'total_searched': 10, 'post_type': 'image', 'search_time': 5, 'post_shortlink': 'http://redd.it/1234'}, 'image' )
+                   '[ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={"post_id": 1111, "meme_template": null}) ]*'
+        result = response_builder.build_sub_oc_comment('test', {'total_searched': 10, 'post_type': 'image', 'search_time': 5, 'post_shortlink': 'http://redd.it/1234', 'false_negative_data': json.dumps(
+                {
+                    'post_id': 1111,
+                    'meme_template': None
+                }
+            )}, 'image' )
         self.assertEqual(expected, result)
 
     @mock.patch('redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager.SqlAlchemyUnitOfWorkManager')
@@ -221,7 +227,12 @@ class TestResponseBuilder(TestCase):
         response_builder = ResponseBuilder(uowm)
         expected = 'There\'s a good chance this is unique! I checked 10 image posts and didn\'t find a close match\n\n' \
                    '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report ' \
-                   '[ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message=http://redd.it/1234) ]*'
+                   '[ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={"post_id": 1111, "meme_template": null}) ]*'
         result = response_builder.build_default_oc_comment(
-            {'total_searched': 10, 'post_type': 'image', 'search_time': 5, 'post_shortlink': 'http://redd.it/1234'}, 'image')
+            {'total_searched': 10, 'post_type': 'image', 'search_time': 5, 'post_shortlink': 'http://redd.it/1234', 'false_negative_data': json.dumps(
+                {
+                    'post_id': 1111,
+                    'meme_template': None
+                }
+            )}, 'image' )
         self.assertEqual(expected, result)

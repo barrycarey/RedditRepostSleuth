@@ -7,7 +7,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COMMENT, \
     DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH, \
     DEFAULT_COMMENT_OC, COMMENT_STATS, IMAGE_REPOST_SIGNATURE, IMAGE_OC_SIGNATURE, DEFAULT_REPOST_LINK_COMMENT, \
-    LINK_SIGNATURE, CLOSEST_MATCH
+    LINK_SIGNATURE, CLOSEST_MATCH, CLOSEST_MATCH_MEME
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 
@@ -108,7 +108,10 @@ class ResponseBuilder:
             msg = self.default_templates['link_oc']
 
         if 'closest_shortlink' in values and values['closest_shortlink'] is not None:
-            msg = msg + CLOSEST_MATCH.format(**values)
+            if values['meme_filter']:
+                msg = msg + CLOSEST_MATCH_MEME.format(**values)
+            else:
+                msg = msg + CLOSEST_MATCH.format(**values)
 
         if signature:
             if post_type == 'image':

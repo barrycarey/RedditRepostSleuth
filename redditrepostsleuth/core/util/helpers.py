@@ -175,7 +175,8 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
         'this_subreddit': search_results.checked_post.subreddit,
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
-        'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}'
+        'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}',
+        'meme_filter': True if search_results.meme_template else False
     }
 
     results_values = {}
