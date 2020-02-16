@@ -133,6 +133,7 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
         'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
         'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
         'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
+        'meme_filter': True if search_results.meme_template else False
     }
     if search_results.matches:
         results_values = {
@@ -176,7 +177,7 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}',
-        'meme_filter': True if search_results.meme_template else False
+
     }
 
     results_values = {}
