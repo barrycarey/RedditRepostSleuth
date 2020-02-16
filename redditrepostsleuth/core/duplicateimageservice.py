@@ -210,6 +210,7 @@ class DuplicateImageService:
             meme_filter,
             source=source
         )
+        log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
     def _search_index_by_vector(self, vector: bytearray, index: ImageIndex, max_matches=50) -> Tuple[int, float]:
