@@ -307,3 +307,15 @@ class ImageSearch(Base):
     meme_template_used = Column(Integer)
     search_time = Column(Float, nullable=False)
     matches_found = Column(Integer, nullable=False)
+
+class UserReport(Base):
+    __tablename__ = 'reddit_user_report'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    reported_by = Column(String(100), nullable=False)
+    post_type = Column(String(15))
+    report_type= Column(String(25), nullable=False)
+    meme_template = Column(Integer)
+    reported_at = Column(DateTime, default=func.utc_timestamp())
+    msg_body = Column(String(1000))
+    message_id = Column(String(20), nullable=False)

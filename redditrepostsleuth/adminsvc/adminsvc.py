@@ -2,6 +2,7 @@ import sys
 import threading
 import time
 sys.path.append('./')
+from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -26,9 +27,11 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
     config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler)
+    inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
     threading.Thread(target=config_updater.update_configs, name='config_update').start()
     threading.Thread(target=activation_monitor.check_for_new_invites, name='activation').start()
     while True:
         comment_monitor.check_comments()
         stats_updater.run_update()
+        inbox_monitor.check_inbox()
         time.sleep(600)

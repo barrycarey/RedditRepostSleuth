@@ -22,7 +22,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
             log.debug('Post %s: Is an image', post.post_id)
             try:
                 post, image_post, image_post_current = process_image_post(post, hash_api)
-            except ImageRemovedException:
+            except (ImageRemovedException, ImageConversioinException):
                 return
             if image_post is None or image_post_current is None:
                 log.error('Post %s: Failed to save image post. One of the post objects is null', post.post_id)

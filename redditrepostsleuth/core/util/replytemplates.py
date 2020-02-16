@@ -18,7 +18,7 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n'
 IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]*'
-IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={post_shortlink}) ]*'
+IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={false_negative_data}) ]*'
 LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
 FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}. Please consider making a crosspost instead of reposting next time \n\n' \
                         '{first_seen}. {last_seen} \n\n' \
@@ -35,6 +35,7 @@ DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {
 DEFAULT_COMMENT_OC = 'There\'s a good chance this is unique! I checked {total_searched} {post_type} posts and didn\'t find a close match\n\n'
 
 CLOSEST_MATCH = 'The closest match [is this post]({closest_shortlink}) at {closest_percent_match}. The target for r/{this_subreddit} is {target_match_percent}\n\n'
+CLOSEST_MATCH_MEME = 'This search triggered my meme filter. This enabled strict matching requirements. The closest match that did not meet the requirements [is this post]({closest_shortlink})\n\n'
 
 IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\n\n**Search Time:** {time}s \n\nHere are all the instances I\'ve seen:\n\n'
 

@@ -62,6 +62,7 @@ class SummonsHandler:
                 with self.uowm.start() as uow:
                     summons = uow.summons.get_unreplied()
                     for s in summons:
+                        log.info('Starting summons %s', s.id)
                         post = uow.posts.get_by_post_id(s.post_id)
                         if not post:
                             post = self.save_unknown_post(s.post_id)
@@ -78,6 +79,7 @@ class SummonsHandler:
                         summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
                                                      s.summons_received_at, s.requestor, event_type='summons')
                         self._send_event(summons_event)
+                        log.info('Finished summons %s', s.id)
                 time.sleep(2)
             except Exception as e:
                 log.exception('Exception in handle summons thread')
@@ -95,11 +97,12 @@ class SummonsHandler:
             else:
                 return self._get_repost_cmd(post_type, cmd_str)
         except InvalidCommandException:
-            log.error('Received command is invalid: %s', cmd_body)
+            log.error('Summons has no base command.  Defaulting to repost')
 
         return self._get_repost_cmd(post_type, cmd_str)
 
     def _get_repost_cmd(self, post_type: Text, cmd_body: Text) -> RepostBaseCmd:
+        cmd_body = cmd_body.strip('repost ')
         if post_type == 'image':
             return self._get_image_repost_cmd(cmd_body)
         elif post_type == 'link':
@@ -128,8 +131,9 @@ class SummonsHandler:
     def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
+        stripped_comment = self._strip_summons_flags(summons.comment_body)
         try:
-            base_command = self.command_parser.parse_root_command(self._strip_summons_flags(summons.comment_body))
+            base_command = self.command_parser.parse_root_command(stripped_comment)
         except InvalidCommandException:
             log.error('Invalid command in summons: %s', summons.comment_body)
             base_command = 'repost'
@@ -341,10 +345,10 @@ class SummonsHandler:
     def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
         log.debug('Sending response to summons comment %s. MESSAGE: %s', comment_id, response.message)
         try:
-            reply = self.response_handler.reply_to_comment(comment_id, response.message, source='summons',
-                                                           send_pm_on_fail=True)
-        except APIException as e:
+            reply = self.response_handler.reply_to_comment(comment_id, response.message, send_pm_on_fail=True)
+        except (APIException, AssertionError) as e:
             return
+
         if reply:
             response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
         else:
@@ -377,7 +381,7 @@ class SummonsHandler:
         submission = self.reddit.submission(post_id)
         try:
             post = pre_process_post(submission_to_post(submission), self.uowm, None)
-        except (InvalidImageUrlException,):
+        except (InvalidImageUrlException):
             return
 
         if not post or post.post_type != 'image':
