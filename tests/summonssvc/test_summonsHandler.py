@@ -3,10 +3,34 @@ from unittest.mock import MagicMock
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.model.commands.repost_image_cmd import RepostImageCmd
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 
 class TestSummonsHandler(TestCase):
+
+    def test__get_summons_cmd_no_params_return_default_repost(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = 'u/repostsleuthbot'
+        cmd = sum_handler._get_summons_cmd(summons, 'image')
+        self.assertEqual(RepostImageCmd, type(cmd))
+
+    def test__get_summons_cmd_no_root_command_with_params_return_default_repost(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = 'u/repostsleuthbot -all'
+        cmd = sum_handler._get_summons_cmd(summons, 'image')
+        self.assertEqual(RepostImageCmd, type(cmd))
+        self.assertTrue(cmd.all_matches)
+
+    def test__get_summons_repost_cmd_with_param_return_configured_cmd(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = 'u/repostsleuthbot repost -all'
+        cmd = sum_handler._get_summons_cmd(summons, 'image')
+        self.assertEqual(RepostImageCmd, type(cmd))
+        self.assertTrue(cmd.all_matches)
 
     def test__strip_summons_flags__clean_input_usertag(self):
         config = Config(redis_host='dummy')
@@ -25,6 +49,12 @@ class TestSummonsHandler(TestCase):
         sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
         summons = '?repost'
         self.assertEqual(sum_handler._strip_summons_flags(summons), '')
+
+    def test__strip_summons_flags__junk_input_commandtag(self):
+        config = Config(redis_host='dummy')
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
+        summons = 'This test ?repost some junk'
+        self.assertEqual(sum_handler._strip_summons_flags(summons), 'some junk')
 
     def test__strip_summons_flags__junk_input_commandtag(self):
         config = Config(redis_host='dummy')

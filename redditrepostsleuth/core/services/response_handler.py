@@ -2,7 +2,7 @@ from typing import Text
 
 from praw.exceptions import APIException
 from praw.models import Comment, Redditor
-from prawcore import Forbidden
+from prawcore import Forbidden, PrawcoreException
 
 from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -16,13 +16,21 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 
 class ResponseHandler:
 
-    def __init__(self, reddit: RedditManager, uowm: UnitOfWorkManager, event_logger: EventLogging, log_response: bool = True):
+    def __init__(
+            self,
+            reddit: RedditManager,
+            uowm: UnitOfWorkManager,
+            event_logger: EventLogging,
+            log_response: bool = True,
+            source='unknown'
+    ):
         self.uowm = uowm
         self.reddit = reddit
         self.log_response = log_response
         self.event_logger = event_logger
+        self.source = source
 
-    def reply_to_submission(self, submission_id: str, comment_body, source: str = None) -> Comment:
+    def reply_to_submission(self, submission_id: str, comment_body) -> Comment:
         submission = self.reddit.submission(submission_id)
         if not submission:
             log.error('Failed to get submission %s', submission_id)
@@ -32,7 +40,7 @@ class ResponseHandler:
             comment = submission.reply(comment_body)
             log.info('Left comment at: https://reddit.com%s', comment.permalink)
             log.debug(comment_body)
-            self._log_response(comment, comment_body, source=source)
+            self._log_response(comment, comment_body)
             return comment
         except APIException as e:
             if e.error_type == 'RATELIMIT':
@@ -46,7 +54,7 @@ class ResponseHandler:
             raise
 
 
-    def reply_to_comment(self, comment_id: str, comment_body: str, source: str = None, send_pm_on_fail: bool = False) -> CommentReply:
+    def reply_to_comment(self, comment_id: str, comment_body: str, send_pm_on_fail: bool = False) -> CommentReply:
         comment = self.reddit.comment(comment_id)
         comment_reply = CommentReply(body=comment_body, comment=None)
         if not comment:
@@ -58,7 +66,7 @@ class ResponseHandler:
             # TODO - Possibly make dataclass to wrap response info
             response = comment.reply(comment_body)
             comment_reply.comment = response
-            self._log_response(comment, comment_body, source=source)
+            self._log_response(comment, comment_body)
             log.info('Left comment at: https://reddit.com%s', response.permalink)
             return comment_reply
         except APIException as e:
@@ -80,15 +88,28 @@ class ResponseHandler:
         except Forbidden:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
             if send_pm_on_fail:
-                msg = f'I\'m unable to reply to your comment at https://redd.it/{comment.submission.id}.  I\'m probably banned from r/{comment.submission.subreddit.display_name}.  Here is my response. \n\n *** \n\n'
-                msg = msg + comment_body
-                msg = self.send_private_message(comment.author, msg)
-                comment_reply.body = msg
-                return comment_reply
+                try:
+                    msg = f'I\'m unable to reply to your comment at https://redd.it/{comment.submission.id}.  I\'m probably banned from r/{comment.submission.subreddit.display_name}.  Here is my response. \n\n *** \n\n'
+                    msg = msg + comment_body
+                    msg = self.send_private_message(comment.author, msg)
+                    comment_reply.body = msg
+                    return comment_reply
+                except (PrawcoreException,) as e:
+                    log.error('Failed to send PM', exc_info=True)
+                    comment_reply.body = 'FAILED TO LEAVE COMMENT OR PM'
+                    return comment_reply
+
+        except AssertionError:
+            log.exception('Problem leaving comment', exc_info=True)
+            raise
         except Exception as e:
             log.exception('Unknown exception leaving comment', exc_info=True)
 
     def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> str:
+        if not user:
+            log.error('No user provided to send private message')
+            return
+
         try:
             user.message(subject, message_body)
             log.info('Sent PM to %s. ', user.name)
@@ -97,20 +118,20 @@ class ResponseHandler:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)
             return 'Failed to send PM'
 
-    def _log_response(self, comment: Comment, comment_body: str, source: str = None):
-        self._log_response_to_db(comment, comment_body, source=source)
-        self._log_response_to_influxdb(comment, source)
+    def _log_response(self, comment: Comment, comment_body: str):
+        self._log_response_to_db(comment, comment_body)
+        self._log_response_to_influxdb(comment)
 
-    def _log_response_to_influxdb(self, comment: Comment, source: str = None):
+    def _log_response_to_influxdb(self, comment: Comment):
         """
         Take a given response and log it to InfluxDB
         :param response:
         """
         self.event_logger.save_event(
-            ResponseEvent(comment.subreddit.display_name, source, event_type='response')
+            ResponseEvent(comment.subreddit.display_name, self.source, event_type='response')
         )
 
-    def _log_response_to_db(self, comment: Comment, comment_body: str, source: str = None):
+    def _log_response_to_db(self, comment: Comment, comment_body: str):
         """
         Take a given response and log it to the database
         :param response:
@@ -118,7 +139,7 @@ class ResponseHandler:
         with self.uowm.start() as uow:
             uow.bot_comment.add(
                 BotComment(
-                    source=source,
+                    source=self.source,
                     comment_id=comment.id,
                     comment_body=comment_body,
                     post_id=comment.submission.id,

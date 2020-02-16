@@ -1,9 +1,11 @@
 # TODO - Mega hackery, figure this out.
 import sys
+import time
 
 
 
 sys.path.append('./')
+from redditrepostsleuth.core.celery.response_tasks import handle_summons
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -28,11 +30,24 @@ if __name__ == '__main__':
     summons = SummonsHandler(uowm, dup, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger, source='summons'), event_logger=event_logger, summons_disabled=False)
 
     while True:
+        with uowm.start() as uow:
+            summons = uow.summons.get_unreplied(limit=10)
+            results = []
+            for s in summons:
+                log.info('Starting summons %s', s.id)
+                results.append(handle_summons.apply_async((s,), queue='summons'))
+            for r in results:
+                b = r.get()
+                #time.sleep(10)
+        time.sleep(2)
+
+    """
+    while True:
         try:
             summons.handle_summons()
         except Exception as e:
             log.exception('Summons handler crashed', exc_info=True)
-
+    """
 
 
 

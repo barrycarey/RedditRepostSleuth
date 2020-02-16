@@ -35,7 +35,7 @@ class ImageIndexLoader:
         )
         self.indexes.append(self._historical_index)
         self._meme_index = ImageIndex(
-            name='historical',
+            name='meme',
             file_path=self.config.index_meme_file,
             max_age=self.config.index_meme_max_age,
             skip_load_seconds=self.config.index_meme_skip_load_age
@@ -96,6 +96,9 @@ class ImageIndexLoader:
     @property
     def historical_index(self) -> ImageIndex:
         self._load_index(self._historical_index)
+        if self._historical_index.loaded_index.get_n_items() < 50000000:
+            log.error('Loaded historical index is too small.  Only loaded %s items', self._historical_index.loaded_index.get_n_items())
+            raise NoIndexException('Loaded historical index is smaller than expected')
         return self._historical_index
 
     @property

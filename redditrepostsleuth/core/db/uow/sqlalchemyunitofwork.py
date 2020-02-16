@@ -18,6 +18,7 @@ from redditrepostsleuth.core.db.repository.monitoredsubrepository import Monitor
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
 from redditrepostsleuth.core.db.repository.repost_watch_repo import RepostWatchRepo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
+from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
 from redditrepostsleuth.core.db.repository.videohashrepository import VideoHashRepository
 
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
@@ -113,3 +114,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def image_search(self) -> ImageSearchRepo:
         return ImageSearchRepo(self.session)
+
+    @property
+    def user_report(self) -> UserReportRepo:
+        return UserReportRepo(self.session)

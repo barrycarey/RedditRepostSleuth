@@ -5,7 +5,7 @@ from typing import NoReturn
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, ReadTimeout
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
@@ -72,7 +72,7 @@ class EventLogging:
             log.debug('Wrote to Influx: %s', event.get_influx_event())
             self._successive_failures = 0
             return True
-        except (InfluxDBClientError, ConnectionError, InfluxDBServerError) as e:
+        except (InfluxDBClientError, ConnectionError, InfluxDBServerError, ReadTimeout) as e:
             if hasattr(e, 'code') and e.code == 404:
                 #log.error('Database %s Does Not Exist.  Attempting To Create', config.influx_database)
                 self._influx_client.create_database(self._config.influx_database)
