@@ -15,6 +15,7 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
@@ -80,3 +81,31 @@ def process_monitored_sub(self, monitored_sub):
     for submission in submissions:
         sub_monitor_check_post.apply_async((submission, monitored_sub), queue='submonitor')
     log.info('All submissions from %s sent to queue', monitored_sub.name)
+
+@celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True)
+def process_summons(self, s):
+    with self.uowm.start() as uow:
+        #summons = uow.summons.get_unreplied(limit=5)
+        log.info('Starting summons %s', s.id)
+        updated_summons = uow.summons.get_by_id(s.id)
+        if updated_summons and updated_summons.summons_replied_at:
+            log.info('Summons %s already replied, skipping', s.id)
+            return
+        with redlock.create_lock(f'summons_{s.id}', ttl=30000):
+            post = uow.posts.get_by_post_id(s.post_id)
+            if not post:
+                post = self.summons_handler.save_unknown_post(s.post_id)
+
+            if not post:
+                response = RepostResponseBase(summons_id=s.id)
+                response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
+                log.info('Failed to ingest post %s.  Sending error response', s.post_id)
+                self.summons_handler._send_response(s.comment_id, response)
+                return
+
+            self.summons_handler.process_summons(s, post)
+            # TODO - This sends completed summons events to influx even if they fail
+            summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
+                                         s.summons_received_at, s.requestor, event_type='summons')
+            self.summons_handler._send_event(summons_event)
+            log.info('Finished summons %s', s.id)
