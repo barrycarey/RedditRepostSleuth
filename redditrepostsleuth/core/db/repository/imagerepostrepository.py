@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Text
 
 from sqlalchemy import func
 from datetime import timedelta, datetime
@@ -19,6 +19,9 @@ class ImageRepostRepository:
 
     def get_dups_by_post_id(self, post_id: str) -> ImageRepost:
         return self.db_session.query(ImageRepost).filter(ImageRepost.post_id == post_id).all()
+
+    def get_by_repost_of(self, post_id: Text) -> List[ImageRepost]:
+        return self.db_session.query(ImageRepost).filter(ImageRepost.repost_of == post_id).all()
 
     def get_count(self):
         r = self.db_session.query(func.count(ImageRepost.id)).first()
