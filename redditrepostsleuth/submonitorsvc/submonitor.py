@@ -256,6 +256,15 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
 
+    def _remove_post(self, monitored_sub: MonitoredSub, post: Post):
+        pass
+
+    def _lock_post(self, monitored_sub: MonitoredSub, post: Post):
+        pass
+
+    def _mark_post_as_oc(self, monitored_sub: MonitoredSub, post: Post):
+        pass
+
 
     def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission):
         if not monitored_sub.report_submission:
