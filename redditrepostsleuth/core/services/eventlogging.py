@@ -82,6 +82,6 @@ class EventLogging:
             self._successive_failures += 1
             if len(self._unsaved_events) < 3000:
                 self._unsaved_events.append(event)
-            log.error('Failed To Write To InfluxDB')
+            log.error('Failed To Write To InfluxDB', exc_info=True)
             log.error(event.get_influx_event())
             return False
