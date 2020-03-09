@@ -44,7 +44,7 @@ class SubMonitorTask(Task):
         self.sub_monitor = SubMonitor(dup_image_svc, uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
 
 @celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle')
-def handle_summons(self, summons):
+def handle_summons2(self, summons):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(summons.post_id)
         if not post:
@@ -105,7 +105,7 @@ def process_summons(self, s):
 
             self.summons_handler.process_summons(s, post)
             # TODO - This sends completed summons events to influx even if they fail
-            summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
+            summons_event = SummonsEvent(float((datetime.utcnow() - s.summons_received_at).seconds),
                                          s.summons_received_at, s.requestor, event_type='summons')
             self.summons_handler._send_event(summons_event)
             log.info('Finished summons %s', s.id)

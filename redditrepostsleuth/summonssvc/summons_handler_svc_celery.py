@@ -7,7 +7,7 @@ from redis.exceptions import ConnectionError
 
 
 sys.path.append('./')
-from redditrepostsleuth.core.celery.response_tasks import handle_summons, process_summons
+from redditrepostsleuth.core.celery.response_tasks import process_summons
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler

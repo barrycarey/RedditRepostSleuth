@@ -42,7 +42,7 @@ class ResponseHandler:
             start_time = perf_counter()
             comment = submission.reply(comment_body)
             self._record_api_event(
-                round(perf_counter() - start_time, 2),
+                float(round(perf_counter() - start_time, 2)),
                 'reply_to_submission',
                 self.reddit.reddit.auth.limits['remaining']
             )
@@ -75,7 +75,7 @@ class ResponseHandler:
             start_time = perf_counter()
             response = comment.reply(comment_body)
             self._record_api_event(
-                round(perf_counter() - start_time, 2),
+                float(round(perf_counter() - start_time, 2)),
                 'reply_to_comment',
                 self.reddit.reddit.auth.limits['remaining']
             )
@@ -128,7 +128,7 @@ class ResponseHandler:
             start_time = perf_counter()
             user.message(subject, message_body)
             self._record_api_event(
-                round(perf_counter() - start_time, 2),
+                float(round(perf_counter() - start_time, 2)),
                 'private_message',
                 self.reddit.reddit.auth.limits['remaining']
             )
@@ -139,7 +139,7 @@ class ResponseHandler:
             return 'Failed to send PM'
 
     def _record_api_event(self, response_time, request_type, remaining_limit):
-        api_event = RedditApiEvent(request_type, response_time, remaining_limit)
+        api_event = RedditApiEvent(request_type, response_time, remaining_limit, event_type='api_response')
         self.event_logger.save_event(api_event)
 
     def _log_response(self, comment: Comment, comment_body: str):
