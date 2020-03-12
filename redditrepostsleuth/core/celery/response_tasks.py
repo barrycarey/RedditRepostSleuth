@@ -1,6 +1,9 @@
+import time
 from datetime import datetime
 
 from celery import Task
+from praw.exceptions import APIException
+from prawcore import ResponseException
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
@@ -72,21 +75,27 @@ def sub_monitor_check_post(self, submission, monitored_sub):
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
 def process_monitored_sub(self, monitored_sub):
-    subreddit = self.reddit.subreddit(monitored_sub.name)
-    if not subreddit:
-        log.error('Failed to get Subreddit %s', monitored_sub.name)
-        return
-    log.info('Loading all submissions from %s', monitored_sub.name)
-    submissions = subreddit.new(limit=monitored_sub.search_depth)
-    for submission in submissions:
-        sub_monitor_check_post.apply_async((submission, monitored_sub), queue='submonitor')
-    log.info('All submissions from %s sent to queue', monitored_sub.name)
+    try:
+        subreddit = self.reddit.subreddit(monitored_sub.name)
+        if not subreddit:
+            log.error('Failed to get Subreddit %s', monitored_sub.name)
+            return
+        log.info('Loading all submissions from %s', monitored_sub.name)
+        submissions = subreddit.new(limit=monitored_sub.search_depth)
+        for submission in submissions:
+            sub_monitor_check_post.apply_async((submission, monitored_sub), queue='submonitor')
+        log.info('All submissions from %s sent to queue', monitored_sub.name)
+    except ResponseException as e:
+        if e.response.status_code == 429:
+            log.error('IP Rate limit hit.  Waiting')
+            time.sleep(60)
+            return
 
-@celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True)
+@celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True, )
 def process_summons(self, s):
     with self.uowm.start() as uow:
         #summons = uow.summons.get_unreplied(limit=5)
-        log.info('Starting summons %s', s.id)
+        log.info('Starting summons %s on sub %s', s.id, s.subreddit)
         updated_summons = uow.summons.get_by_id(s.id)
         if updated_summons and updated_summons.summons_replied_at:
             log.info('Summons %s already replied, skipping', s.id)
@@ -103,7 +112,24 @@ def process_summons(self, s):
                 self.summons_handler._send_response(s.comment_id, response)
                 return
 
-            self.summons_handler.process_summons(s, post)
+            try:
+                self.summons_handler.process_summons(s, post)
+            except ResponseException as e:
+                if e.response.status_code == 429:
+                    log.error('IP Rate limit hit.  Waiting')
+                    time.sleep(60)
+                    return
+            except AssertionError as e:
+                if 'code: 429' in str(e):
+                    log.error('Too many requests from IP.  Waiting')
+                    time.sleep(60)
+                    return
+            except APIException as e:
+                if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
+                    log.error('Hit API rate limit for summons %s on sub %s.', s.id, s.subreddit)
+                    return
+                    #time.sleep(60)
+
             # TODO - This sends completed summons events to influx even if they fail
             summons_event = SummonsEvent(float((datetime.utcnow() - s.summons_received_at).seconds),
                                          s.summons_received_at, s.requestor, event_type='summons')

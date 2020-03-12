@@ -1,9 +1,10 @@
+import time
 from time import perf_counter
 from typing import Text
 
 from praw.exceptions import APIException
 from praw.models import Comment, Redditor
-from prawcore import Forbidden, PrawcoreException
+from prawcore import Forbidden, PrawcoreException, ResponseException
 
 from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -113,11 +114,11 @@ class ResponseHandler:
                     comment_reply.body = 'FAILED TO LEAVE COMMENT OR PM'
                     return comment_reply
 
-        except AssertionError:
+        except AssertionError as e:
             log.exception('Problem leaving comment', exc_info=True)
             raise
-        except Exception as e:
-            log.exception('Unknown exception leaving comment', exc_info=True)
+        except ResponseException as e:
+            raise
 
     def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> str:
         if not user:

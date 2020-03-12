@@ -49,8 +49,14 @@ class PostIngestor:
                 except ResponseException as e:
                     if e.response.status_code == 429:
                         log.error('Too many requests from IP.  Waiting')
-                        time.sleep(240)
+                        time.sleep(60)
                         continue
+                except Exception as e:
+                    if 'code: 429' in str(e):
+                        log.error('Too many requests from IP.  Waiting')
+                        time.sleep(60)
+                        continue
+
                 log.debug('%s posts from API', len(submissions))
                 for submission in submissions:
                     if submission.id in seen_posts:
