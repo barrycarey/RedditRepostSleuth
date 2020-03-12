@@ -152,7 +152,7 @@ class DuplicateImageService:
             raw_results
         ) # Pre-filter results on default annoy value
         historical_results = self._convert_annoy_results(raw_results, post.id)
-        self._set_match_posts(historical_results)
+        historical_results = self._set_match_posts(historical_results)
 
         # TODO - I don't like duplicating this code.  Oh well
         if self.index_loader.current_index.loaded_index:
@@ -162,7 +162,7 @@ class DuplicateImageService:
                 raw_results
             )  # Pre-filter results on default annoy value
             current_results = self._convert_annoy_results(raw_results, post.id)
-            self._set_match_posts(current_results, historical=False)
+            current_results = self._set_match_posts(current_results, historical=False)
             search_results.total_searched = search_results.total_searched + self.index_loader.meme_index.loaded_index.get_n_items()
         else:
             log.error('No current image index loaded.  Only using historical results')
@@ -171,7 +171,7 @@ class DuplicateImageService:
         search_results.index_search_time = round(perf_counter() - start, 5)
 
         if result_filter:
-            search_results.matches = self._set_match_hamming(post, search_results.matches)
+            self._set_match_hamming(post, search_results.matches)
             if meme_filter:
                 meme_start_time = perf_counter()
                 search_results.meme_template = self.meme_detector.detect_meme(post.dhash_h)

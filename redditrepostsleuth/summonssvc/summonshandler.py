@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Tuple, Text, NoReturn
 
 from praw.exceptions import APIException
+from prawcore import ResponseException
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch
@@ -348,6 +349,8 @@ class SummonsHandler:
             reply = self.response_handler.reply_to_comment(comment_id, response.message, send_pm_on_fail=True)
         except (APIException, AssertionError) as e:
             return
+        except ResponseException as e:
+            log.exception('Error responding to comment', exc_info=True)
 
         if reply:
             response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply

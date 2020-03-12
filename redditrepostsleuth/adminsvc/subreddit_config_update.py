@@ -5,7 +5,7 @@ from typing import Text, List, NoReturn
 
 from praw import Reddit
 from praw.models import WikiPage, Subreddit
-from prawcore import NotFound, Forbidden
+from prawcore import NotFound, Forbidden, ResponseException
 from sqlalchemy import func
 
 from redditrepostsleuth.core.config import Config
@@ -52,6 +52,11 @@ class SubredditConfigUpdater:
         except Forbidden:
             log.error('Bot does not have wiki permissions on %s', monitored_sub.name)
             return
+        except ResponseException as e:
+            if e.response.status_code == 429:
+                log.error('IP Rate limit.  Waiting')
+                time.sleep(240)
+                return
 
         if not self._is_config_updated(wiki_page.revision_id):
             self._load_new_config(wiki_page, monitored_sub)
