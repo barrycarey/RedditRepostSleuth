@@ -7,6 +7,7 @@ from datetime import datetime
 import requests
 from praw import Reddit
 from praw.models import Comment
+from prawcore import ResponseException
 from sqlalchemy.exc import DataError
 
 from redditrepostsleuth.core.config import Config
@@ -38,7 +39,16 @@ class SummonsMonitor:
                         if comment.author.name.lower() in ['sneakpeekbot', 'automoderator']:
                             continue
                         self._save_summons(comment)
+            except ResponseException as e:
+                if e.response.status_code == 429:
+                    log.error('IP Rate limit hit.  Waiting')
+                    time.sleep(60)
+                    continue
             except Exception as e:
+                if 'code: 429' in str(e):
+                    log.error('Too many requests from IP.  Waiting')
+                    time.sleep(60)
+                    continue
                 log.exception('Praw summons thread died', exc_info=True)
 
     @staticmethod
@@ -98,6 +108,16 @@ class SummonsMonitor:
                             log.error('SQLAlchemy Data error saving comment')
                             bad_mentions.append(comment.id)
                             continue
+            except ResponseException as e:
+                if e.response.status_code == 429:
+                    log.error('IP Rate limit hit.  Waiting')
+                    time.sleep(60)
+                    continue
+            except AssertionError as e:
+                if 'code: 429' in str(e):
+                    log.error('Too many requests from IP.  Waiting')
+                    time.sleep(60)
+                    return
             except Exception as e:
                 log.exception('Mention monitor failed', exc_info=True)
 

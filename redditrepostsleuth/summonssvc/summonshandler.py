@@ -328,7 +328,9 @@ class SummonsHandler:
 
                 response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
 
+
         self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
+
 
     def _get_target_distances(self, subreddit: str, override_hamming_distance: int = None) -> Tuple[int, float]:
         """
@@ -348,9 +350,7 @@ class SummonsHandler:
         try:
             reply = self.response_handler.reply_to_comment(comment_id, response.message, send_pm_on_fail=True)
         except (APIException, AssertionError) as e:
-            return
-        except ResponseException as e:
-            log.exception('Error responding to comment', exc_info=True)
+            raise
 
         if reply:
             response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply

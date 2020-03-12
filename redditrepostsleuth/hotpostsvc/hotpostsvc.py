@@ -1,7 +1,8 @@
 # TODO - Mega hackery, figure this out.
 import sys
+import time
 
-
+from prawcore import ResponseException
 
 sys.path.append('./')
 from redditrepostsleuth.core.config import Config
@@ -35,5 +36,10 @@ if __name__ == '__main__':
         )
         try:
             top.monitor()
+        except ResponseException as e:
+            if e.response.status_code == 429:
+                log.error('IP Rate limit hit.  Waiting')
+                time.sleep(60)
+                continue
         except Exception as e:
             log.exception('Service crashed', exc_info=True)
