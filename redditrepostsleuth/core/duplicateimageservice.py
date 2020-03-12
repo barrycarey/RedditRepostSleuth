@@ -171,7 +171,7 @@ class DuplicateImageService:
         search_results.index_search_time = round(perf_counter() - start, 5)
 
         if result_filter:
-            self._set_match_hamming(post, search_results.matches)
+            search_results.matches = self._set_match_hamming(post, search_results.matches)
             if meme_filter:
                 meme_start_time = perf_counter()
                 search_results.meme_template = self.meme_detector.detect_meme(post.dhash_h)
@@ -194,7 +194,7 @@ class DuplicateImageService:
                                                                       is_meme=search_results.meme_template or False)
             search_results.total_filter_time = round(perf_counter() - start_time, 5)
         else:
-            self._set_match_posts(search_results.matches)
+            search_results.matches = self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
 
         search_results.total_search_time = round(perf_counter() - start, 5)
@@ -294,6 +294,7 @@ class DuplicateImageService:
         :rtype: List[ImageMatch]
         :param matches: List of matches
         """
+        results = []
         with self.uowm.start() as uow:
             for match in matches:
                 # TODO - Clean this shit up once I fix relationships
@@ -310,7 +311,8 @@ class DuplicateImageService:
                 match_post = uow.posts.get_by_post_id(original_image_post.post_id)
                 match.post = match_post
                 match.match_id = match_post.id
-        return matches
+                results.append(match)
+        return results
 
     def get_meme_template(self, search_results: ImageRepostWrapper) -> ImageRepostWrapper:
         """
