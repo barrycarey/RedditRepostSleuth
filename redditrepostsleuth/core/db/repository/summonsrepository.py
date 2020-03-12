@@ -16,6 +16,9 @@ class SummonsRepository:
     def get_all(self) -> List[Summons]:
         return self.db_session.query(Summons).all()
 
+    def get_by_post_id(self, post_id) -> List[Summons]:
+        return self.db_session.query(Summons).filter(Summons.post_id == post_id).all()
+
     def get_by_id(self, id: int) -> Summons:
         result = self.db_session.query(Summons).filter(Summons.id == id).first()
         return result
@@ -29,3 +32,6 @@ class SummonsRepository:
     def get_count(self):
         r = self.db_session.query(func.count(Summons.id)).first()
         return r[0] if r else None
+
+    def remove(self, item: Summons):
+        self.db_session.delete(item)
