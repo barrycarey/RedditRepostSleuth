@@ -49,7 +49,7 @@ class PostIngestor:
                 for submission in submissions:
                     if submission.id in seen_posts:
                         continue
-                    log.debug('Saving post %s', submission.id)
+                    #log.debug('Saving post %s', submission.id)
                     post = submission_to_post(submission)
                     if not post.post_type:
                         post.post_type = post_type_from_url(post.url)

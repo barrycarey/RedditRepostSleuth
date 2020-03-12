@@ -11,6 +11,9 @@ class BotCommentRepo:
     def get_all(self, limit: int = None) -> List[BotComment]:
         return self.db_session.query(BotComment).limit(limit).all()
 
+    def get_by_post_id(self, post_id) -> BotComment:
+        return self.db_session.query(BotComment).filter(BotComment.post_id == post_id).all()
+
     def get_after_date(self, date: datetime) -> List[BotComment]:
         return self.db_session.query(BotComment).filter(BotComment.comment_left_at > date).all()
 
