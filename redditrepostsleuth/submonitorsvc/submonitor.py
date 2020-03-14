@@ -2,7 +2,7 @@ import time
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment
-from prawcore import Forbidden
+from prawcore import Forbidden, BadRequest
 from redlock import RedLockError
 from time import perf_counter
 from sqlalchemy.exc import IntegrityError
@@ -132,6 +132,9 @@ class SubMonitor:
             return
 
         self._sticky_reply(monitored_sub, comment)
+        self._lock_post(monitored_sub, submission)
+        self._remove_post(monitored_sub, submission)
+        self._mark_post_as_oc(monitored_sub, submission)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
 
@@ -268,11 +271,16 @@ class SubMonitor:
         if monitored_sub.remove_repost:
             try:
                 if monitored_sub.removal_reason_id:
-                    submission.mod.remove(reason_id=monitored_sub.removal_reason_id)
+                    try:
+                        submission.mod.remove(reason_id=monitored_sub.removal_reason_id)
+                    except BadRequest:
+                        log.error('Failed to remove post %s using reason ID %s.  Like a bad reasons ID', submission.id, monitored_sub.removal_reason_id)
+                        submission.mod.remove()
                 else:
                     submission.mod.remove()
             except Forbidden:
                 log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
+
             except Exception as e:
                 log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
