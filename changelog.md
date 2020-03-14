@@ -1,3 +1,7 @@
+### 0.1.5 - 
+
+* [feature] - Registered subs now have the option to lock or remove reposts
+
 ### 0.1.4 - 2/9/2020
 
 * [bugfix] - Link reposts checks were not checking for same author or crosspost
