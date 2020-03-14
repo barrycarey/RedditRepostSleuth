@@ -1,8 +1,17 @@
-### 0.1.5 - 
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [UNRELEASED]
 
 * [feature] - Registered subs now have the option to lock or remove reposts
 
-### 0.1.4 - 2/9/2020
+## [0.1.5] - 
+
+
+
+## [0.1.4] - 2/9/2020
 
 * [bugfix] - Link reposts checks were not checking for same author or crosspost
 * [bugifx] - Fixed issue with command parse the broke the whole thing
@@ -11,7 +20,7 @@
 * [submonitor] - Moved processing of monitored subs to distributed workers to decrease processing time
 * [summons] - Moved summons handling to distributed workers to lower response time and handle summons concurrently 
 
-### 0.1.3 - 1/12/2020
+## [0.1.3] - 1/12/2020
 
 * [feature] - Include link to post and sub name in PM response for banned subs
 * [feature] - Send a confirmation PM to modmail when sub is added to dedicated monitoring
@@ -22,7 +31,7 @@
 * [backend] - Moved meme detection to search index in increase performance
 * [backend] - Meme detection speed optimized from ~2s to ~3ms
 
-### 0.1.2 - 12/01/2019
+## [0.1.2] - 12/01/2019
 
 * Add closest match to OC response
 * [backend] - Log all searches for easier debugging
@@ -33,7 +42,7 @@
 * [bugfix] - Bot was marking crossposts as resposts when summoned
 * [bugfix] - Fix crash when custom message template uses invalid variable
 
-### 0.1.1 - 2019-11-15 
+## [0.1.1] - 2019-11-15 
 
 Note: This will be the last major update until after Thanksgiving.  I'm traveling for the holiday so I want to make sure it's stable before I go.
 
