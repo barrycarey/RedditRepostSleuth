@@ -311,6 +311,7 @@ class ImageSearch(Base):
     meme_template_used = Column(Integer)
     search_time = Column(Float, nullable=False)
     matches_found = Column(Integer, nullable=False)
+    searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
 
 class UserReport(Base):
     __tablename__ = 'reddit_user_report'
