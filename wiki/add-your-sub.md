@@ -28,7 +28,11 @@ To change settings simply update the JSON and save.  The bot will load the new c
   "meme_filter": false,
   "check_post_types": ["image", "link"],
   "oc_response_template": null,
-  "repost_response_template": null
+  "repost_response_template": null,
+  "lock_post": true,
+  "mark_as_oc": false,
+  "remove_repost": false,
+  "removal_reason_id": null 
 }
 ```
 
@@ -54,5 +58,13 @@ target_days_old: Only report matches X days old or newer
 oc_response_template: Comment template when commenting on OC
 
 repost_response_template: Comment template when commenting on reposts
+
+lock_post: Locks a post if it is a repost
+
+mark_as_oc: Flags post as OC if there are no matches
+
+remove_repost: Remove a post if it is a repost
+
+removal_reason_id: ID of the removal reason to use
 
 **Comment Templates:** Must be in markdown format.  You have a number of variables you can use in the template.  [Click here for a list](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [UNRELEASED]
 
 * [feature] - Registered subs now have the option to lock or remove reposts
+* [feature] - Each registered sub will have it's config checked to see if it's missing new options.  If missing options are found they are inserted into the config and a message is sent to modmail
+* [backend] - Deleted image cleanup. A task has been added to remove deleted images from the database to speed up image searching
+* [backend] - Added monitoring for Reddit API response time to alert on possible issues
+* [backend] - Improved handling of reaching API rate limits, including automatic cool off. 
+* [summons] - Reworked summons queue handling to attempt to prevent backlogs
+* [summons] - Add special handling to only send PMs for r/PewdiepieSubmissions. The bot has been unbanned but not modded so it is hitting rate limits commenting due to the large volumn of summons
 
 ## [0.1.5] - 
 
