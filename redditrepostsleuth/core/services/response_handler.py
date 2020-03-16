@@ -104,6 +104,7 @@ class ResponseHandler:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
             if send_pm_on_fail:
                 try:
+                    # TODO - This needs to be moved out of response handler
                     msg = f'I\'m unable to reply to your comment at https://redd.it/{comment.submission.id}.  I\'m probably banned from r/{comment.submission.subreddit.display_name}.  Here is my response. \n\n *** \n\n'
                     msg = msg + comment_body
                     msg = self.send_private_message(comment.author, msg)
