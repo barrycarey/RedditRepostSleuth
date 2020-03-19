@@ -14,5 +14,6 @@
   "lock_post": false,
   "mark_as_oc": false,
   "remove_repost": false,
-  "removal_reason_id": false
+  "removal_reason_id": false,
+  "title_ignore_keywords": []
 }

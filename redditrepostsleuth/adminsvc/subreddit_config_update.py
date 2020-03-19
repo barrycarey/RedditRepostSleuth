@@ -225,6 +225,9 @@ class SubredditConfigUpdater:
         if 'removal_reason_id' in new_config:
             self._log_config_value_change('removal_reason_id', monitored_sub.name, monitored_sub.removal_reason_id, new_config['removal_reason_id'])
             monitored_sub.removal_reason_id = new_config['removal_reason_id']
+        if 'title_ignore_keywords' in new_config:
+            self._log_config_value_change('ignore_title_keywords', monitored_sub.name, monitored_sub.title_ignore_keywords, new_config['title_ignore_keywords'])
+            monitored_sub.title_ignore_keywords = new_config['title_ignore_keywords']
 
         with self.uowm.start() as uow:
             uow.monitored_sub.update(monitored_sub)
