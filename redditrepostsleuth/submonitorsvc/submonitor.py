@@ -1,4 +1,5 @@
 import time
+from typing import List, Text
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment
@@ -63,18 +64,25 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Sub monitor service crashed', exc_info=True)
 
-    def _should_check_post(self, submission: Submission):
+    def has_post_been_checked(self, post_id: Text) -> bool:
+        """
+        Check if a given post ID has been checked already
+        :param post_id: ID of post to check
+        """
         with self.uowm.start() as uow:
-            checked = uow.monitored_sub_checked.get_by_id(submission.id)
+            checked = uow.monitored_sub_checked.get_by_id(post_id)
             if checked:
-                return False
-            post = uow.posts.get_by_post_id(submission.id)
-            if not post:
-                post = self.save_unknown_post(submission.id)
-                if not post:
-                    log.info('Post %s has not been ingested yet.  Skipping')
-                    return False
+                return True
+        return False
 
+    def should_check_post(self, post: Post, title_keyword_filter: List[Text] = None) -> bool:
+        """
+        Check if a given post should be checked
+        :rtype: bool
+        :param post: Post to check
+        :param title_keyword_filter: Optional list of keywords to skip if in title
+        :return: bool
+        """
         if post.left_comment:
             return False
 
@@ -85,14 +93,15 @@ class SubMonitor:
             log.debug('Skipping crosspost')
             return False
 
+        if title_keyword_filter:
+            for kw in title_keyword_filter:
+                if kw in post.title.lower():
+                    log.debug('Skipping post with keyword %s in title %s', kw, post.title)
+                    return False
+
         return True
 
-    def check_submission(self, submission: Submission, monitored_sub: MonitoredSub):
-        if not self._should_check_post(submission):
-            return
-
-        with self.uowm.start() as uow:
-            post = uow.posts.get_by_post_id(submission.id)
+    def check_submission(self, submission: Submission, monitored_sub: MonitoredSub, post: Post):
 
         if post.post_type == 'image' and post.dhash_h is None:
             log.error('Post %s has no dhash', post.post_id)
@@ -153,7 +162,7 @@ class SubMonitor:
         submissions = subreddit.new(limit=monitored_sub.search_depth)
         checked_posts = 0
         for submission in submissions:
-            if not self._should_check_post(submission):
+            if not self.should_check_post(submission):
                 continue
 
             with self.uowm.start() as uow:

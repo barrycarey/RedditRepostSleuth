@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 
+* [feature] - Title keyword filter.  Mods can exclude posts with certain keywords in the title from being checked.
 * [feature] - Registered subs now have the option to lock or remove reposts
 * [feature] - Each registered sub will have it's config checked to see if it's missing new options.  If missing options are found they are inserted into the config and a message is sent to modmail
 * [backend] - Deleted image cleanup. A task has been added to remove deleted images from the database to speed up image searching
