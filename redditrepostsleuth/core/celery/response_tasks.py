@@ -39,12 +39,12 @@ class SubMonitorTask(Task):
     def __init__(self):
         self.config = Config()
         self.reddit = RedditManager(get_reddit_instance(self.config))
-        uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         event_logger = EventLogging(config=self.config)
-        response_handler = ResponseHandler(self.reddit, uowm, event_logger, source='submonitor')
-        dup_image_svc = DuplicateImageService(uowm, event_logger, config=self.config)
-        response_builder = ResponseBuilder(uowm)
-        self.sub_monitor = SubMonitor(dup_image_svc, uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
+        response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor')
+        dup_image_svc = DuplicateImageService(self.uowm, event_logger, config=self.config)
+        response_builder = ResponseBuilder(self.uowm)
+        self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
 
 @celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle')
 def handle_summons2(self, summons):
@@ -69,9 +69,21 @@ def handle_summons2(self, summons):
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
 def sub_monitor_check_post(self, submission, monitored_sub):
-    if not self.sub_monitor._should_check_post(submission):
+    if self.sub_monitor.has_post_been_checked(submission.id):
+        log.debug('Post %s has already been checked', submission.id)
         return
-    self.sub_monitor.check_submission(submission, monitored_sub)
+
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_post_id(submission.id)
+        if not post:
+            post = self.save_unknown_post(submission.id)
+            if not post:
+                log.info('Post %s has not been ingested yet.  Skipping')
+                return
+
+    if not self.sub_monitor.should_check_post(post, title_keyword_filter=monitored_sub.title_ignore_keywords):
+        return
+    self.sub_monitor.check_submission(submission, monitored_sub, post)
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
 def process_monitored_sub(self, monitored_sub):
