@@ -5,7 +5,8 @@ from unittest.mock import patch
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_sub_filter, annoy_distance_filter, \
-    hamming_distance_filter, filter_newer_matches, filter_days_old_matches, filter_same_author, filter_same_post
+    hamming_distance_filter, filter_newer_matches, filter_days_old_matches, filter_same_author, filter_same_post, \
+    filter_title_keywords
 
 
 class TestCross_post_filter(TestCase):
@@ -153,3 +154,39 @@ class TestCross_post_filter(TestCase):
         self.assertEqual(len(r), 2)
         self.assertEqual(1, r[0].match_id)
         self.assertEqual(2, r[1].match_id)
+
+    def test_filter_title_keywords(self):
+        matches = []
+        match1 = ImageMatch()
+        match2 = ImageMatch()
+        match3 = ImageMatch()
+        match1.match_id = 1
+        match2.match_id = 2
+        match3.match_id = 3
+        match1.post = Post(post_id='1111', title='Some repost title')
+        match2.post = Post(post_id='2222', title='This is a repost')
+        match3.post = Post(post_id='3333', title='some normal title')
+        matches.append(match1)
+        matches.append(match2)
+        matches.append(match3)
+        r = list(filter(filter_title_keywords(['repost']), matches))
+        self.assertEqual(len(r), 1)
+        self.assertEqual(3, r[0].match_id)
+
+    def test_filter_title_keywords_uppercase__remove_keyword(self):
+        matches = []
+        match1 = ImageMatch()
+        match2 = ImageMatch()
+        match3 = ImageMatch()
+        match1.match_id = 1
+        match2.match_id = 2
+        match3.match_id = 3
+        match1.post = Post(post_id='1111', title='SOME REPOSTTITLE')
+        match2.post = Post(post_id='2222', title='THIS IS A REPOST')
+        match3.post = Post(post_id='3333', title='NORMAL TITLE')
+        matches.append(match1)
+        matches.append(match2)
+        matches.append(match3)
+        r = list(filter(filter_title_keywords(['repost']), matches))
+        self.assertEqual(len(r), 1)
+        self.assertEqual(3, r[0].match_id)

@@ -201,6 +201,7 @@ class MonitoredSub(Base):
     oc_response_template = Column(String(2000))
     search_depth = Column(Integer, default=100)
     meme_filter = Column(Boolean, default=False)
+    title_ignore_keywords = Column(String(200))
 
     def to_dict(self):
         return {

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Text
+from typing import Text, List
 import random
 
 import requests
@@ -90,6 +90,15 @@ def filter_same_post(post_id: Text):
         return True
     return same_post
 
+def filter_title_keywords(keywords: List[Text]):
+    def filter_title(match: RepostMatch):
+        for kw in keywords:
+            log.info('Title: %s - KW: %s', match.post.title, kw)
+            if kw in match.post.title.lower():
+                log.debug('Title Filter Reject. Title contains %s', kw)
+                return False
+        return True
+    return filter_title
 
 def filter_no_dhash(match: ImageMatch):
     if not match.post.dhash_h:
