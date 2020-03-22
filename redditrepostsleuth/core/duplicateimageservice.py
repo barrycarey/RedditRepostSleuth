@@ -1,6 +1,6 @@
 import webbrowser
 from time import perf_counter
-from typing import List, Tuple, Text
+from typing import List, Tuple
 
 from distance import hamming
 from sqlalchemy import Float
@@ -20,7 +20,7 @@ from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
-    filter_no_dhash, filter_dead_urls, filter_title_keywords
+    filter_no_dhash, filter_dead_urls
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest_image_match
 
 
@@ -50,8 +50,7 @@ class DuplicateImageService:
             date_cutoff: int = None,
             filter_dead_matches: bool = True,
             only_older_matches: bool = True,
-            is_meme: bool = False,
-            ignore_title_keywords: List[Text] = None
+            is_meme: bool = False
     ) -> ImageRepostWrapper:
         """
         Take a list of matches and filter out posts that are not reposts.
@@ -80,7 +79,6 @@ class DuplicateImageService:
         matches = search_results.matches
         matches = list(filter(filter_same_post(search_results.checked_post.post_id), matches))
         matches = list(filter(filter_same_author(search_results.checked_post.author), matches))
-        matches = list(filter(filter_title_keywords(ignore_title_keywords), matches))
         matches = list(filter(cross_post_filter, matches))
         matches = list(filter(filter_no_dhash, matches))
 
@@ -126,8 +124,7 @@ class DuplicateImageService:
                                  filter_dead_matches: bool = True,
                                  only_older_matches=True,
                                  meme_filter=False,
-                                 source='unknown',
-                                 ignore_title_keywords: List[Text] = None) -> ImageRepostWrapper:
+                                 source='unknown') -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -194,8 +191,7 @@ class DuplicateImageService:
                                                                       date_cutoff=date_cutoff,
                                                                       filter_dead_matches=filter_dead_matches,
                                                                       only_older_matches=only_older_matches,
-                                                                      is_meme=search_results.meme_template or False,
-                                                                      ignore_title_keywords=ignore_title_keywords)
+                                                                      is_meme=search_results.meme_template or False)
             search_results.total_filter_time = round(perf_counter() - start_time, 5)
         else:
             search_results.matches = self._set_match_posts(search_results.matches)
