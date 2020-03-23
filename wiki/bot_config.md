@@ -15,5 +15,8 @@
   "mark_as_oc": false,
   "remove_repost": false,
   "removal_reason_id": false,
-  "title_ignore_keywords": []
+  "title_ignore_keywords": [],
+  "disable_summons_after_auto_response": false,
+  "only_allow_one_summons": false,
+  "remove_additional_summons": false
 }

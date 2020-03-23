@@ -26,7 +26,8 @@ from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_
     searched_post_str, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, LINK_ALL, \
-    REPOST_NO_RESULT, IMAGE_REPOST_ALL, WATCH_ENABLED, WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED
+    REPOST_NO_RESULT, IMAGE_REPOST_ALL, WATCH_ENABLED, WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
+    SUMMONS_ALREADY_RESPONDED
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
@@ -132,6 +133,11 @@ class SummonsHandler:
     def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
+
+        with self.uowm.start() as uow:
+            monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
+            comments = uow.bot_comment.get_by_post_id(summons.post_id)
+
         stripped_comment = self._strip_summons_flags(summons.comment_body)
         try:
             base_command = self.command_parser.parse_root_command(stripped_comment)
@@ -156,6 +162,14 @@ class SummonsHandler:
         elif base_command == 'repost':
             self.process_repost_request(summons, post)
             return
+
+    def _send_already_responded_msg(self, summons: Summons, perma_link: Text) -> NoReturn:
+        response = RepostResponseBase(summons_id=summons.id)
+        response.status = 'success'
+        response.message = SUMMONS_ALREADY_RESPONDED.format(perma_link=perma_link)
+        self.response_handler.send_private_message(summons.requestor, response.message)
+        self._save_response(response, CommentReply(body=response.message, comment=None))
+
 
     def _send_unsupported_msg(self, summons: Summons, post_type: Text):
         response = RepostResponseBase(summons_id=summons.id)
@@ -360,7 +374,7 @@ class SummonsHandler:
                                ''
         self._save_response(response, reply)
 
-    def _save_response(self, response: RepostResponseBase, reply: CommentReply, subreddit: str = None):
+    def _save_response(self, response: RepostResponseBase, reply: CommentReply):
         with self.uowm.start() as uow:
             summons = uow.summons.get_by_id(response.summons_id)
             if summons:
