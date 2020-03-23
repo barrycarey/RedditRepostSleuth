@@ -202,6 +202,11 @@ class MonitoredSub(Base):
     search_depth = Column(Integer, default=100)
     meme_filter = Column(Boolean, default=False)
     title_ignore_keywords = Column(String(200))
+    disable_summons_after_auto_response = Column(Boolean, default=False)
+    disable_bot_summons = Column(Boolean, default=False)
+    only_allow_one_summons = Column(Boolean, default=False)
+    remove_additional_summons = Column(Boolean, default=False)
+
 
     def to_dict(self):
         return {
