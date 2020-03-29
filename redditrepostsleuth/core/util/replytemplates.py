@@ -54,4 +54,4 @@ WATCH_ALREADY_ENABLED = 'You already have a watch setup for this submission'
 WATCH_NOTIFY_OF_MATCH = 'It looks like an [image you were watching]({watch_shortlink}) has been reposted. \n\n' \
                         'I found [this post]({repost_shortlink}) which is a {percent_match} match'
 
-SUMMONS_ALREADY_RESPONDED = 'I\'ve already checked this post.  You can see my response here: {perma_link}'
+SUMMONS_ALREADY_RESPONDED = 'I\'ve already checked this post.  \n\nYou can see my response here: {perma_link}'

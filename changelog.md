@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 
-* [feature] - Title keyword filter.  Mods can exclude posts with certain keywords in the title from being checked.
+* [feature] - Title keyword filter.  Mods can exclude posts with certain keywords in the title from being checked.  Example, filter the word Repost. A post with a title of 'This is an old repost but deserves to be seen again' would be ignored by the bot
+* [feature] - Registered subs can choose to allow only one summons per submission.  Additional summons will result in PM sent to user with link to existing response
+* [feature] - Registered subs can choose to automatically delete all additional summons after the first.  Example: User 1 summons the bot, the bot responds.  User 2 summons the bot, the bot sends them a PM with a link to the first response and deletes the user's comment
+* [feature] - Registered subs can block summons after the bot automatically checks and detects a repost on new submissions. Example: A new submission is created.  The bot will automatically check it the next time the subreddit is scanned. Prior to scanning users can summon the bot.  Once the automatic scan takes place that becomes the official response and future summons are linked to that response  
 * [feature] - Registered subs now have the option to lock or remove reposts
 * [feature] - Each registered sub will have it's config checked to see if it's missing new options.  If missing options are found they are inserted into the config and a message is sent to modmail
 * [backend] - Deleted image cleanup. A task has been added to remove deleted images from the database to speed up image searching
