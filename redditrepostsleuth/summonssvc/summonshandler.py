@@ -136,7 +136,25 @@ class SummonsHandler:
 
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
-            comments = uow.bot_comment.get_by_post_id(summons.post_id)
+
+            if monitored_sub:
+                if monitored_sub.disable_summons_after_auto_response:
+                    log.info('Sub %s has summons disabled after auto response', summons.subreddit)
+                    auto_response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'submonitor')
+                    self._send_already_responded_msg(summons, f'https://reddit.com{auto_response.perma_link}')
+                    if monitored_sub.remove_additional_summons:
+                        self._delete_mention(summons.comment_id)
+                    return
+
+                if monitored_sub.only_allow_one_summons:
+                    response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'summons')
+                    if response:
+                        log.info('Sub %s only allows one summons.  Existing response found at %s', summons.subreddit, response.perma_link)
+                        self._send_already_responded_msg(summons, f'https://reddit.com{response.perma_link}')
+                        if monitored_sub.remove_additional_summons:
+                            self._delete_mention(summons.comment_id)
+                        return
+
 
         stripped_comment = self._strip_summons_flags(summons.comment_body)
         try:
@@ -163,11 +181,25 @@ class SummonsHandler:
             self.process_repost_request(summons, post)
             return
 
+    def _delete_mention(self, comment_id: Text) -> NoReturn:
+        log.info('Attempting to delete mention %s', comment_id)
+        comment = self.reddit.comment(comment_id)
+        if not comment:
+            log.error('Failed to load comment %s', comment_id)
+            return
+        try:
+            comment.mod.remove()
+            log.info('Removed mention %s', comment_id)
+        except Exception as e:
+            log.exception('Failed to delete comment %s', comment_id, exc_info=True)
+            return
+
     def _send_already_responded_msg(self, summons: Summons, perma_link: Text) -> NoReturn:
         response = RepostResponseBase(summons_id=summons.id)
         response.status = 'success'
         response.message = SUMMONS_ALREADY_RESPONDED.format(perma_link=perma_link)
-        self.response_handler.send_private_message(summons.requestor, response.message)
+        redditor = self.reddit.redditor(summons.requestor)
+        self.response_handler.send_private_message(redditor, response.message)
         self._save_response(response, CommentReply(body=response.message, comment=None))
 
 
