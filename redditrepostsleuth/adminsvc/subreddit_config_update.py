@@ -79,7 +79,7 @@ class SubredditConfigUpdater:
         wiki_page = subreddit.wiki['repost_sleuth_config'] # Force refresh so we can get latest revision ID
         self._create_revision(wiki_page)
         self._notify_new_options(subreddit, missing_keys)
-        self._mark_config_valid(config.revision_id)
+        self._mark_config_valid(wiki_page.revision_id)
 
     def _update_from_database(self, monitored_sub: MonitoredSub, wiki_page: WikiPage) -> NoReturn:
         """
