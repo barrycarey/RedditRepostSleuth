@@ -26,7 +26,8 @@ from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_
     searched_post_str, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, LINK_ALL, \
-    REPOST_NO_RESULT, IMAGE_REPOST_ALL, WATCH_ENABLED, WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED
+    REPOST_NO_RESULT, IMAGE_REPOST_ALL, WATCH_ENABLED, WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
+    SUMMONS_ALREADY_RESPONDED
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
@@ -132,6 +133,29 @@ class SummonsHandler:
     def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
+
+        with self.uowm.start() as uow:
+            monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
+
+            if monitored_sub:
+                if monitored_sub.disable_summons_after_auto_response:
+                    log.info('Sub %s has summons disabled after auto response', summons.subreddit)
+                    auto_response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'submonitor')
+                    self._send_already_responded_msg(summons, f'https://reddit.com{auto_response.perma_link}')
+                    if monitored_sub.remove_additional_summons:
+                        self._delete_mention(summons.comment_id)
+                    return
+
+                if monitored_sub.only_allow_one_summons:
+                    response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'summons')
+                    if response:
+                        log.info('Sub %s only allows one summons.  Existing response found at %s', summons.subreddit, response.perma_link)
+                        self._send_already_responded_msg(summons, f'https://reddit.com{response.perma_link}')
+                        if monitored_sub.remove_additional_summons:
+                            self._delete_mention(summons.comment_id)
+                        return
+
+
         stripped_comment = self._strip_summons_flags(summons.comment_body)
         try:
             base_command = self.command_parser.parse_root_command(stripped_comment)
@@ -156,6 +180,28 @@ class SummonsHandler:
         elif base_command == 'repost':
             self.process_repost_request(summons, post)
             return
+
+    def _delete_mention(self, comment_id: Text) -> NoReturn:
+        log.info('Attempting to delete mention %s', comment_id)
+        comment = self.reddit.comment(comment_id)
+        if not comment:
+            log.error('Failed to load comment %s', comment_id)
+            return
+        try:
+            comment.mod.remove()
+            log.info('Removed mention %s', comment_id)
+        except Exception as e:
+            log.exception('Failed to delete comment %s', comment_id, exc_info=True)
+            return
+
+    def _send_already_responded_msg(self, summons: Summons, perma_link: Text) -> NoReturn:
+        response = RepostResponseBase(summons_id=summons.id)
+        response.status = 'success'
+        response.message = SUMMONS_ALREADY_RESPONDED.format(perma_link=perma_link)
+        redditor = self.reddit.redditor(summons.requestor)
+        self.response_handler.send_private_message(redditor, response.message)
+        self._save_response(response, CommentReply(body=response.message, comment=None))
+
 
     def _send_unsupported_msg(self, summons: Summons, post_type: Text):
         response = RepostResponseBase(summons_id=summons.id)
@@ -360,7 +406,7 @@ class SummonsHandler:
                                ''
         self._save_response(response, reply)
 
-    def _save_response(self, response: RepostResponseBase, reply: CommentReply, subreddit: str = None):
+    def _save_response(self, response: RepostResponseBase, reply: CommentReply):
         with self.uowm.start() as uow:
             summons = uow.summons.get_by_id(response.summons_id)
             if summons:
