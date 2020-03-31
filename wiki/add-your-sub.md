@@ -67,4 +67,14 @@ remove_repost: Remove a post if it is a repost
 
 removal_reason_id: ID of the removal reason to use
 
+title_ignore_keywords: Skip posts that contain any of these keywords in the title
+
+disable_summons_after_auto_response: Once the bot leaves an automatic comment prevent users from summoning the bot again
+
+disable_bot_summons: Prevent the bot from responding to users that summon it 
+
+only_allow_one_summons: Only allow the bot to be summoned once per post.  Additional summons will PM the user instead of leaving a comment. If remove_additional_summons is set, the bot will delete the comment with the summons
+
+remove_additional_summons: Delete a user's comment summoning the bot if someone else already summoned it
+
 **Comment Templates:** Must be in markdown format.  You have a number of variables you can use in the template.  [Click here for a list](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
