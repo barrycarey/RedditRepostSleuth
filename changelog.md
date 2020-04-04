@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 
+
+## [0.1.5] - 4/4/2020
+
 * [feature] - Title keyword filter.  Mods can exclude posts with certain keywords in the title from being checked.  Example, filter the word Repost. A post with a title of 'This is an old repost but deserves to be seen again' would be ignored by the bot
 * [feature] - Registered subs can choose to allow only one summons per submission.  Additional summons will result in PM sent to user with link to existing response
 * [feature] - Registered subs can choose to automatically delete all additional summons after the first.  Example: User 1 summons the bot, the bot responds.  User 2 summons the bot, the bot sends them a PM with a link to the first response and deletes the user's comment
@@ -17,7 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [summons] - Reworked summons queue handling to attempt to prevent backlogs
 * [summons] - Add special handling to only send PMs for r/PewdiepieSubmissions. The bot has been unbanned but not modded so it is hitting rate limits commenting due to the large volumn of summons
 
-## [0.1.5] - 
 
 ## [0.1.4] - 2/9/2020
 
