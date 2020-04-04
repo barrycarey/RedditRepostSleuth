@@ -36,12 +36,16 @@ class SubredditConfigUpdater:
         self.config = config
 
     def update_configs(self):
+
         while True:
             try:
                 with self.uowm.start() as uow:
                     monitored_subs = uow.monitored_sub.get_all()
                     for sub in monitored_subs:
-                        self.check_for_config_update(sub)
+                        try:
+                            self.check_for_config_update(sub)
+                        except Exception as e:
+                            log.exception('Config failure ')
                     time.sleep(180)
             except Exception as e:
                 log.exception('Config update thread crashed', exc_info=True)
@@ -55,6 +59,8 @@ class SubredditConfigUpdater:
             log.info('%s has no config wiki page', monitored_sub.name)
             try:
                 self._create_wiki_page(subreddit)
+                wiki_page = subreddit.wiki['repost_sleuth_config']
+                wiki_config = wiki_page.content_md
             except Exception:
                 return
         except Forbidden:
@@ -65,11 +71,10 @@ class SubredditConfigUpdater:
                 log.error('IP Rate limit.  Waiting')
                 time.sleep(240)
                 return
+            return
 
         if not self._is_config_updated(wiki_page.revision_id):
             self._load_new_config(wiki_page, monitored_sub)
-        if monitored_sub.name != 'RepostSleuthBot':
-            return
 
         missing_keys = self._get_missing_config_values(wiki_config)
         if not missing_keys:
