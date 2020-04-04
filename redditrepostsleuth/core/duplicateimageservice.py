@@ -152,7 +152,7 @@ class DuplicateImageService:
             raw_results
         ) # Pre-filter results on default annoy value
         historical_results = self._convert_annoy_results(raw_results, post.id)
-        self._set_match_posts(historical_results)
+        historical_results = self._set_match_posts(historical_results)
 
         # TODO - I don't like duplicating this code.  Oh well
         if self.index_loader.current_index.loaded_index:
@@ -162,7 +162,7 @@ class DuplicateImageService:
                 raw_results
             )  # Pre-filter results on default annoy value
             current_results = self._convert_annoy_results(raw_results, post.id)
-            self._set_match_posts(current_results, historical=False)
+            current_results = self._set_match_posts(current_results, historical=False)
             search_results.total_searched = search_results.total_searched + self.index_loader.meme_index.loaded_index.get_n_items()
         else:
             log.error('No current image index loaded.  Only using historical results')
@@ -194,7 +194,7 @@ class DuplicateImageService:
                                                                       is_meme=search_results.meme_template or False)
             search_results.total_filter_time = round(perf_counter() - start_time, 5)
         else:
-            self._set_match_posts(search_results.matches)
+            search_results.matches = self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
 
         search_results.total_search_time = round(perf_counter() - start, 5)
@@ -294,6 +294,7 @@ class DuplicateImageService:
         :rtype: List[ImageMatch]
         :param matches: List of matches
         """
+        results = []
         with self.uowm.start() as uow:
             for match in matches:
                 # TODO - Clean this shit up once I fix relationships
@@ -310,7 +311,8 @@ class DuplicateImageService:
                 match_post = uow.posts.get_by_post_id(original_image_post.post_id)
                 match.post = match_post
                 match.match_id = match_post.id
-        return matches
+                results.append(match)
+        return results
 
     def get_meme_template(self, search_results: ImageRepostWrapper) -> ImageRepostWrapper:
         """

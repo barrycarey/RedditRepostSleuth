@@ -1,8 +1,9 @@
 import time
+from typing import List, Text
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment
-from prawcore import Forbidden
+from prawcore import Forbidden, BadRequest
 from redlock import RedLockError
 from time import perf_counter
 from sqlalchemy.exc import IntegrityError
@@ -63,18 +64,25 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Sub monitor service crashed', exc_info=True)
 
-    def _should_check_post(self, submission: Submission):
+    def has_post_been_checked(self, post_id: Text) -> bool:
+        """
+        Check if a given post ID has been checked already
+        :param post_id: ID of post to check
+        """
         with self.uowm.start() as uow:
-            checked = uow.monitored_sub_checked.get_by_id(submission.id)
+            checked = uow.monitored_sub_checked.get_by_id(post_id)
             if checked:
-                return False
-            post = uow.posts.get_by_post_id(submission.id)
-            if not post:
-                post = self.save_unknown_post(submission.id)
-                if not post:
-                    log.info('Post %s has not been ingested yet.  Skipping')
-                    return False
+                return True
+        return False
 
+    def should_check_post(self, post: Post, title_keyword_filter: List[Text] = None) -> bool:
+        """
+        Check if a given post should be checked
+        :rtype: bool
+        :param post: Post to check
+        :param title_keyword_filter: Optional list of keywords to skip if in title
+        :return: bool
+        """
         if post.left_comment:
             return False
 
@@ -85,14 +93,15 @@ class SubMonitor:
             log.debug('Skipping crosspost')
             return False
 
+        if title_keyword_filter:
+            for kw in title_keyword_filter:
+                if kw in post.title.lower():
+                    log.debug('Skipping post with keyword %s in title %s', kw, post.title)
+                    return False
+
         return True
 
-    def check_submission(self, submission: Submission, monitored_sub: MonitoredSub):
-        if not self._should_check_post(submission):
-            return
-
-        with self.uowm.start() as uow:
-            post = uow.posts.get_by_post_id(submission.id)
+    def check_submission(self, submission: Submission, monitored_sub: MonitoredSub, post: Post):
 
         if post.post_type == 'image' and post.dhash_h is None:
             log.error('Post %s has no dhash', post.post_id)
@@ -132,6 +141,9 @@ class SubMonitor:
             return
 
         self._sticky_reply(monitored_sub, comment)
+        self._lock_post(monitored_sub, submission)
+        self._remove_post(monitored_sub, submission)
+        self._mark_post_as_oc(monitored_sub, submission)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
 
@@ -150,7 +162,7 @@ class SubMonitor:
         submissions = subreddit.new(limit=monitored_sub.search_depth)
         checked_posts = 0
         for submission in submissions:
-            if not self._should_check_post(submission):
+            if not self.should_check_post(submission):
                 continue
 
             with self.uowm.start() as uow:
@@ -194,6 +206,9 @@ class SubMonitor:
                 continue
 
             self._sticky_reply(monitored_sub, comment)
+            self._lock_post(monitored_sub, submission)
+            self._remove_post(monitored_sub, submission)
+            self._mark_post_as_oc(monitored_sub, submission)
             self._mark_post_as_comment_left(post)
             self._create_checked_post(post)
 
@@ -255,6 +270,46 @@ class SubMonitor:
                 log.error('Failed to sticky comment, no permissions')
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
+
+    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission):
+        """
+        Check if given sub wants posts removed.  Remove is enabled
+        @param monitored_sub: Monitored sub
+        @param submission: Submission to remove
+        """
+        if monitored_sub.remove_repost:
+            try:
+                if monitored_sub.removal_reason_id:
+                    try:
+                        submission.mod.remove(reason_id=monitored_sub.removal_reason_id)
+                    except BadRequest:
+                        log.error('Failed to remove post %s using reason ID %s.  Like a bad reasons ID', submission.id, monitored_sub.removal_reason_id)
+                        submission.mod.remove()
+                else:
+                    submission.mod.remove()
+            except Forbidden:
+                log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
+
+            except Exception as e:
+                log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
+
+    def _lock_post(self, monitored_sub: MonitoredSub, submission: Submission):
+        if monitored_sub.lock_post:
+            try:
+                submission.mod.lock()
+            except Forbidden:
+                log.error('Failed to lock post https://redd.it/%s, no permission', submission.id)
+            except Exception as e:
+                log.exception('Failed to lock submission https://redd.it/%s', submission.id, exc_info=True)
+
+    def _mark_post_as_oc(self, monitored_sub: MonitoredSub, submission: Submission):
+        if monitored_sub.mark_as_oc:
+            try:
+                submission.mod.set_original_content()
+            except Forbidden:
+                log.error('Failed to set post OC https://redd.it/%s, no permission', submission.id)
+            except Exception as e:
+                log.exception('Failed to set post OC https://redd.it/%s', submission.id, exc_info=True)
 
 
     def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission):

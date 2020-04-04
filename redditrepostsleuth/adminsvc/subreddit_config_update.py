@@ -1,11 +1,11 @@
 import json
 import time
 from json import JSONDecodeError
-from typing import Text, List, NoReturn
+from typing import Text, List, NoReturn, Dict
 
 from praw import Reddit
 from praw.models import WikiPage, Subreddit
-from prawcore import NotFound, Forbidden
+from prawcore import NotFound, Forbidden, ResponseException
 from sqlalchemy import func
 
 from redditrepostsleuth.core.config import Config
@@ -19,21 +19,33 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
+# Needed to map database column names to friendly config options
+CONFIG_OPTION_MAP = {
+    'only_comment_on_repost': 'repost_only',
+    'report_reposts': 'report_submission',
+    'match_percent_dif': 'target_hamming',
+
+}
 
 class SubredditConfigUpdater:
 
-    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, response_handler: ResponseHandler):
+    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, response_handler: ResponseHandler, config: Config):
         self.uowm = uowm
         self.reddit = reddit
         self.response_handler = response_handler
+        self.config = config
 
     def update_configs(self):
+
         while True:
             try:
                 with self.uowm.start() as uow:
                     monitored_subs = uow.monitored_sub.get_all()
                     for sub in monitored_subs:
-                        self.check_for_config_update(sub)
+                        try:
+                            self.check_for_config_update(sub)
+                        except Exception as e:
+                            log.exception('Config failure ')
                     time.sleep(180)
             except Exception as e:
                 log.exception('Config update thread crashed', exc_info=True)
@@ -47,30 +59,98 @@ class SubredditConfigUpdater:
             log.info('%s has no config wiki page', monitored_sub.name)
             try:
                 self._create_wiki_page(subreddit)
+                wiki_page = subreddit.wiki['repost_sleuth_config']
+                wiki_config = wiki_page.content_md
             except Exception:
                 return
         except Forbidden:
             log.error('Bot does not have wiki permissions on %s', monitored_sub.name)
             return
+        except ResponseException as e:
+            if e.response.status_code == 429:
+                log.error('IP Rate limit.  Waiting')
+                time.sleep(240)
+                return
+            return
 
         if not self._is_config_updated(wiki_page.revision_id):
             self._load_new_config(wiki_page, monitored_sub)
 
-    def _load_new_config(self, wiki_page: WikiPage, monitored_sub: MonitoredSub) -> NoReturn:
-        log.info('Attempting to load new config for %s', monitored_sub.name)
+        missing_keys = self._get_missing_config_values(wiki_config)
+        if not missing_keys:
+            return
+        self._update_from_database(monitored_sub, wiki_page)
+        subreddit = self.reddit.subreddit(monitored_sub.name)
+        wiki_page = subreddit.wiki['repost_sleuth_config'] # Force refresh so we can get latest revision ID
+        self._create_revision(wiki_page)
+        self._notify_new_options(subreddit, missing_keys)
+        self._mark_config_valid(wiki_page.revision_id)
+
+    def _update_from_database(self, monitored_sub: MonitoredSub, wiki_page: WikiPage) -> NoReturn:
+        """
+        Write the current database config to the wiki config.
+
+        Mainly used when we add new exposed config options to the database.  It allows us to backfill the wiki configs
+        :param monitored_sub:
+        """
+        new_config = {}
+        for k in self.config.sub_monitor_exposed_config_options:
+            if k in CONFIG_OPTION_MAP:
+                db_key = CONFIG_OPTION_MAP[k]
+            else:
+                db_key = k
+            if hasattr(monitored_sub, db_key):
+                new_config[k] = getattr(monitored_sub, db_key)
+
+        wiki_page.edit(json.dumps(new_config))
+
+    def _get_missing_config_values(self, config: Dict) -> List[Text]:
+        """
+        Take a config, and check if it's missing any of the exposed keys.
+        Exposed keys are set in the bot's config json
+        :param config: Raw content_md from wiki page
+        :return: List of missing keys
+        """
+        missing_keys = []
+        # Shouldn't need to catch ex since config is already validated
+        config_dict = json.loads(config)
+        for k in self.config.sub_monitor_exposed_config_options:
+            if k in config_dict:
+                continue
+            missing_keys.append(k)
+        return missing_keys
+
+    def _create_revision(self, wiki_page: WikiPage, valid: bool = False, config_loaded_at = None) -> NoReturn:
+        """
+        Take a wiki page and create a revision in the database
+        :param valid: Has this config been validated
+        :param wiki_page: PRAW WikiPage
+        """
         with self.uowm.start() as uow:
             config_revision = MonitoredSubConfigRevision(
                 revision_id=wiki_page.revision_id,
                 revised_by=wiki_page.revision_by.name,
                 config=wiki_page.content_md,
-                subreddit=wiki_page.subreddit.display_name
+                subreddit=wiki_page.subreddit.display_name,
+                is_valid=valid,
+                config_loaded_at=func.utc_timestamp()
             )
             uow.monitored_sub_config_revision.add(config_revision)
             try:
                 uow.commit()
             except Exception as e:
                 log.exception('Failed to save config revision', exc_info=True)
-                return
+                raise
+
+    def _load_new_config(self, wiki_page: WikiPage, monitored_sub: MonitoredSub) -> NoReturn:
+        """
+        Attempt to load the JSON from a wiki config and update our database
+        :param wiki_page: PRAW WikiPage
+        :param monitored_sub: MonitoredSub
+        :return: None
+        """
+        log.info('Attempting to load new config for %s', monitored_sub.name)
+        self._create_revision(wiki_page)
 
         try:
             new_config = json.loads(wiki_page.content_md)
@@ -138,6 +218,21 @@ class SubredditConfigUpdater:
         if 'sticky_comment' in new_config:
             self._log_config_value_change('sticky_comment', monitored_sub.name, monitored_sub.sticky_comment, new_config['sticky_comment'])
             monitored_sub.sticky_comment = new_config['sticky_comment']
+        if 'lock_post' in new_config:
+            self._log_config_value_change('lock_post', monitored_sub.name, monitored_sub.lock_post, new_config['lock_post'])
+            monitored_sub.lock_post = new_config['lock_post']
+        if 'mark_as_oc' in new_config:
+            self._log_config_value_change('mark_as_oc', monitored_sub.name, monitored_sub.mark_as_oc, new_config['mark_as_oc'])
+            monitored_sub.mark_as_oc = new_config['mark_as_oc']
+        if 'remove_repost' in new_config:
+            self._log_config_value_change('remove_repost', monitored_sub.name, monitored_sub.remove_repost, new_config['remove_repost'])
+            monitored_sub.remove_repost = new_config['remove_repost']
+        if 'removal_reason_id' in new_config:
+            self._log_config_value_change('removal_reason_id', monitored_sub.name, monitored_sub.removal_reason_id, new_config['removal_reason_id'])
+            monitored_sub.removal_reason_id = new_config['removal_reason_id']
+        if 'title_ignore_keywords' in new_config:
+            self._log_config_value_change('ignore_title_keywords', monitored_sub.name, monitored_sub.title_ignore_keywords, new_config['title_ignore_keywords'])
+            monitored_sub.title_ignore_keywords = new_config['title_ignore_keywords']
 
         with self.uowm.start() as uow:
             uow.monitored_sub.update(monitored_sub)
@@ -157,6 +252,15 @@ class SubredditConfigUpdater:
     def _notify_successful_load(self, subreddit: Subreddit) -> NoReturn:
         log.info('Sending notification for successful config update to %s', subreddit.display_name)
         subreddit.message('Repost Sleuth Has Loaded Your New Config!', 'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
+
+    def _notify_new_options(self, subreddit: Subreddit, config_keys: List[Text]):
+        log.info('Sending notification for new config keys being added to %s.  %s', config_keys, subreddit.display_name)
+        subreddit.message(
+            'New Repost Sleuth Options Available!',
+            'Your Repost Sleuth config was missing some newly available options.\n\n '
+            f'I\'ve added the following options to your config: {config_keys}\n\n' 
+            'You can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_config_value_explanation'
+        )
 
     def _mark_config_invalid(self, revision_id: Text):
         with self.uowm.start() as uowm:
@@ -188,5 +292,5 @@ if __name__ == '__main__':
     reddit_manager = RedditManager(reddit)
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
-    updater = SubredditConfigUpdater(uowm, reddit, response_handler)
+    updater = SubredditConfigUpdater(uowm, reddit, response_handler, config)
     updater.update_configs()

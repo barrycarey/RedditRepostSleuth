@@ -1,3 +1,5 @@
+from typing import Text
+
 from redditrepostsleuth.core.db.databasemodels import InvestigatePost
 
 
@@ -10,6 +12,9 @@ class InvestigatePostRepo:
 
     def get_by_id(self, id: int):
         return self.db_session.query(InvestigatePost).filter(InvestigatePost.id == id).first()
+
+    def get_by_post_id(self, id: Text) -> InvestigatePost:
+        return self.db_session.query(InvestigatePost).filter(InvestigatePost.post_id == id).first()
 
     def get_all(self):
         return self.db_session.query(InvestigatePost).filter(InvestigatePost.flag_reason == 'High match meme').order_by(InvestigatePost.matches.desc()).limit(100).all()

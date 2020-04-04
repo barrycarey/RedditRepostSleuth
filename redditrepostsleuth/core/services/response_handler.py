@@ -1,14 +1,17 @@
+import time
+from time import perf_counter
 from typing import Text
 
 from praw.exceptions import APIException
 from praw.models import Comment, Redditor
-from prawcore import Forbidden, PrawcoreException
+from prawcore import Forbidden, PrawcoreException, ResponseException
 
 from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import RateLimitException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.comment_reply import CommentReply
+from redditrepostsleuth.core.model.events.reddit_api_event import RedditApiEvent
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -37,7 +40,13 @@ class ResponseHandler:
             return
 
         try:
+            start_time = perf_counter()
             comment = submission.reply(comment_body)
+            self._record_api_event(
+                float(round(perf_counter() - start_time, 2)),
+                'reply_to_submission',
+                self.reddit.reddit.auth.limits['remaining']
+            )
             log.info('Left comment at: https://reddit.com%s', comment.permalink)
             log.debug(comment_body)
             self._log_response(comment, comment_body)
@@ -64,7 +73,13 @@ class ResponseHandler:
 
         try:
             # TODO - Possibly make dataclass to wrap response info
+            start_time = perf_counter()
             response = comment.reply(comment_body)
+            self._record_api_event(
+                float(round(perf_counter() - start_time, 2)),
+                'reply_to_comment',
+                self.reddit.reddit.auth.limits['remaining']
+            )
             comment_reply.comment = response
             self._log_response(comment, comment_body)
             log.info('Left comment at: https://reddit.com%s', response.permalink)
@@ -89,6 +104,7 @@ class ResponseHandler:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
             if send_pm_on_fail:
                 try:
+                    # TODO - This needs to be moved out of response handler
                     msg = f'I\'m unable to reply to your comment at https://redd.it/{comment.submission.id}.  I\'m probably banned from r/{comment.submission.subreddit.display_name}.  Here is my response. \n\n *** \n\n'
                     msg = msg + comment_body
                     msg = self.send_private_message(comment.author, msg)
@@ -99,11 +115,11 @@ class ResponseHandler:
                     comment_reply.body = 'FAILED TO LEAVE COMMENT OR PM'
                     return comment_reply
 
-        except AssertionError:
+        except AssertionError as e:
             log.exception('Problem leaving comment', exc_info=True)
             raise
-        except Exception as e:
-            log.exception('Unknown exception leaving comment', exc_info=True)
+        except ResponseException as e:
+            raise
 
     def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> str:
         if not user:
@@ -111,12 +127,22 @@ class ResponseHandler:
             return
 
         try:
+            start_time = perf_counter()
             user.message(subject, message_body)
+            self._record_api_event(
+                float(round(perf_counter() - start_time, 2)),
+                'private_message',
+                self.reddit.reddit.auth.limits['remaining']
+            )
             log.info('Sent PM to %s. ', user.name)
             return message_body
         except Exception as e:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)
             return 'Failed to send PM'
+
+    def _record_api_event(self, response_time, request_type, remaining_limit):
+        api_event = RedditApiEvent(request_type, response_time, remaining_limit, event_type='api_response')
+        self.event_logger.save_event(api_event)
 
     def _log_response(self, comment: Comment, comment_body: str):
         self._log_response_to_db(comment, comment_body)

@@ -27,7 +27,7 @@ class PostRepository:
         return self.db_session.query(Post).filter(Post.id > id).order_by(Post.id).limit(limit).all()
 
     def get_all(self, limit: int = None, offset: int = None):
-        return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id.desc()).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id).offset(offset).limit(limit).all()
 
     def get_newest_praw(self):
         return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id.desc()).first()

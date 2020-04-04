@@ -18,5 +18,11 @@ class UserReportRepo:
     def get_by_id(self, id: Text) -> UserReport:
         return self.db_session.query(UserReport).filter(UserReport.id == id).first()
 
+    def get_by_post_id(self, post_id: Text) -> List[UserReport]:
+        return self.db_session.query(UserReport).filter(UserReport.post_id == post_id).all()
+
     def get_first_by_message_id(self, id: Text) -> UserReport:
         return self.db_session.query(UserReport).filter(UserReport.message_id == id).first()
+
+    def remove(self, item: UserReport):
+        self.db_session.delete(item)

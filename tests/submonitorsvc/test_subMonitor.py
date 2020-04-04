@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from praw.models import Submission
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSubChecks
+from redditrepostsleuth.core.db.databasemodels import MonitoredSubChecks, Post
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
 
@@ -12,14 +12,25 @@ class TestSubMonitor(TestCase):
 
     def test__should_check_post__already_checked_reject(self):
         sub_monitor = SubMonitor(MagicMock(),MagicMock(),MagicMock(),MagicMock(),MagicMock(), config=Config(redis_host='dummy'))
-        submission = Submission(MagicMock(), id='111')
-        monitored_sub_checked_repo = MagicMock()
-        uow = MagicMock()
-        uowm = MagicMock()
-        monitored_sub_checked_repo.get_by_sub.return_value = MonitoredSubChecks()
-        type(uow).monitored_sub_checked = mock.PropertyMock(return_value=monitored_sub_checked_repo)
-        uow.__enter__.return_value = uow
-        uowm.start.return_value = uow
+        post = Post(left_comment=True)
+        self.assertFalse(sub_monitor.should_check_post(post))
 
-        self.assertFalse(sub_monitor._should_check_post(submission))
+    def test__should_check_post__not_checked_accept(self):
+        sub_monitor = SubMonitor(MagicMock(),MagicMock(),MagicMock(),MagicMock(),MagicMock(), config=Config(redis_host='dummy',supported_post_types=['image']))
+        post = Post(left_comment=False, post_type='image')
+        self.assertTrue(sub_monitor.should_check_post(post))
 
+    def test__should_check_post__reject_crosspost(self):
+        sub_monitor = SubMonitor(MagicMock(),MagicMock(),MagicMock(),MagicMock(),MagicMock(), config=Config(redis_host='dummy',supported_post_types=['image']))
+        post = Post(left_comment=False, post_type='image', crosspost_parent='dkjlsd')
+        self.assertFalse(sub_monitor.should_check_post(post))
+
+    def test__should_check_post__title_filter_accept(self):
+        sub_monitor = SubMonitor(MagicMock(),MagicMock(),MagicMock(),MagicMock(),MagicMock(), config=Config(redis_host='dummy',supported_post_types=['image']))
+        post = Post(left_comment=False, post_type='image', title='some post')
+        self.assertTrue(sub_monitor.should_check_post(post))
+
+    def test__should_check_post__title_filter_reject(self):
+        sub_monitor = SubMonitor(MagicMock(),MagicMock(),MagicMock(),MagicMock(),MagicMock(), config=Config(redis_host='dummy',supported_post_types=['image']))
+        post = Post(left_comment=False, post_type='image', title='some repost')
+        self.assertFalse(sub_monitor.should_check_post(post, title_keyword_filter=['repost']))

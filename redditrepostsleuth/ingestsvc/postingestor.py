@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 from praw import Reddit
-from prawcore import Forbidden
+from prawcore import Forbidden, ResponseException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_pushshift_results
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -44,12 +44,24 @@ class PostIngestor:
             try:
                 if len(seen_posts) > 10000:
                     seen_posts = []
-                submissions = [sub for sub in self.reddit.subreddit('all').new(limit=500)]
+                try:
+                    submissions = [sub for sub in self.reddit.subreddit('all').new(limit=500)]
+                except ResponseException as e:
+                    if e.response.status_code == 429:
+                        log.error('Too many requests from IP.  Waiting')
+                        time.sleep(60)
+                        continue
+                except Exception as e:
+                    if 'code: 429' in str(e):
+                        log.error('Too many requests from IP.  Waiting')
+                        time.sleep(60)
+                        continue
+
                 log.debug('%s posts from API', len(submissions))
                 for submission in submissions:
                     if submission.id in seen_posts:
                         continue
-                    log.debug('Saving post %s', submission.id)
+                    #log.debug('Saving post %s', submission.id)
                     post = submission_to_post(submission)
                     if not post.post_type:
                         post.post_type = post_type_from_url(post.url)
