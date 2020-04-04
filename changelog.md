@@ -19,8 +19,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [0.1.5] - 
 
-
-
 ## [0.1.4] - 2/9/2020
 
 * [bugfix] - Link reposts checks were not checking for same author or crosspost
