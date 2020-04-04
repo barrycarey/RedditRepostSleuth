@@ -20,7 +20,7 @@ COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | 
 IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]*'
 IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={false_negative_data}) ]*'
 LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
-FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}. Please consider making a crosspost instead of reposting next time \n\n' \
+FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}.  \n\n' \
                         '{first_seen}. {last_seen} \n\n' \
 
 DEFAULT_REPOST_IMAGE_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
@@ -53,3 +53,5 @@ WATCH_DISABLED_NOT_FOUND = 'You do not currently have a watch setup for this sub
 WATCH_ALREADY_ENABLED = 'You already have a watch setup for this submission'
 WATCH_NOTIFY_OF_MATCH = 'It looks like an [image you were watching]({watch_shortlink}) has been reposted. \n\n' \
                         'I found [this post]({repost_shortlink}) which is a {percent_match} match'
+
+SUMMONS_ALREADY_RESPONDED = 'I\'ve already checked this post.  \n\nYou can see my response here: {perma_link}'

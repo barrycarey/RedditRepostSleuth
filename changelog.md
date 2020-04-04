@@ -1,4 +1,25 @@
-### 0.1.4 - 2/9/2020
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [UNRELEASED]
+
+* [feature] - Title keyword filter.  Mods can exclude posts with certain keywords in the title from being checked.  Example, filter the word Repost. A post with a title of 'This is an old repost but deserves to be seen again' would be ignored by the bot
+* [feature] - Registered subs can choose to allow only one summons per submission.  Additional summons will result in PM sent to user with link to existing response
+* [feature] - Registered subs can choose to automatically delete all additional summons after the first.  Example: User 1 summons the bot, the bot responds.  User 2 summons the bot, the bot sends them a PM with a link to the first response and deletes the user's comment
+* [feature] - Registered subs can block summons after the bot automatically checks and detects a repost on new submissions. Example: A new submission is created.  The bot will automatically check it the next time the subreddit is scanned. Prior to scanning users can summon the bot.  Once the automatic scan takes place that becomes the official response and future summons are linked to that response  
+* [feature] - Registered subs now have the option to lock or remove reposts
+* [feature] - Each registered sub will have it's config checked to see if it's missing new options.  If missing options are found they are inserted into the config and a message is sent to modmail
+* [backend] - Deleted image cleanup. A task has been added to remove deleted images from the database to speed up image searching
+* [backend] - Added monitoring for Reddit API response time to alert on possible issues
+* [backend] - Improved handling of reaching API rate limits, including automatic cool off. 
+* [summons] - Reworked summons queue handling to attempt to prevent backlogs
+* [summons] - Add special handling to only send PMs for r/PewdiepieSubmissions. The bot has been unbanned but not modded so it is hitting rate limits commenting due to the large volumn of summons
+
+## [0.1.5] - 
+
+## [0.1.4] - 2/9/2020
 
 * [bugfix] - Link reposts checks were not checking for same author or crosspost
 * [bugifx] - Fixed issue with command parse the broke the whole thing
@@ -7,7 +28,7 @@
 * [submonitor] - Moved processing of monitored subs to distributed workers to decrease processing time
 * [summons] - Moved summons handling to distributed workers to lower response time and handle summons concurrently 
 
-### 0.1.3 - 1/12/2020
+## [0.1.3] - 1/12/2020
 
 * [feature] - Include link to post and sub name in PM response for banned subs
 * [feature] - Send a confirmation PM to modmail when sub is added to dedicated monitoring
@@ -18,7 +39,7 @@
 * [backend] - Moved meme detection to search index in increase performance
 * [backend] - Meme detection speed optimized from ~2s to ~3ms
 
-### 0.1.2 - 12/01/2019
+## [0.1.2] - 12/01/2019
 
 * Add closest match to OC response
 * [backend] - Log all searches for easier debugging
@@ -29,7 +50,7 @@
 * [bugfix] - Bot was marking crossposts as resposts when summoned
 * [bugfix] - Fix crash when custom message template uses invalid variable
 
-### 0.1.1 - 2019-11-15 
+## [0.1.1] - 2019-11-15 
 
 Note: This will be the last major update until after Thanksgiving.  I'm traveling for the holiday so I want to make sure it's stable before I go.
 

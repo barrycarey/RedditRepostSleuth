@@ -1,7 +1,11 @@
 import sys
 import threading
 import time
+
+
+
 sys.path.append('./')
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
 from redditrepostsleuth.core.services.eventlogging import EventLogging
@@ -26,12 +30,15 @@ if __name__ == '__main__':
     activation_monitor = NewActivationMonitor(uowm, get_reddit_instance(config))
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
-    config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler)
+    config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler, config)
     inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
     threading.Thread(target=config_updater.update_configs, name='config_update').start()
     threading.Thread(target=activation_monitor.check_for_new_invites, name='activation').start()
     while True:
-        comment_monitor.check_comments()
-        stats_updater.run_update()
-        inbox_monitor.check_inbox()
-        time.sleep(600)
+        try:
+            comment_monitor.check_comments()
+            stats_updater.run_update()
+            inbox_monitor.check_inbox()
+            time.sleep(600)
+        except Exception as e:
+            log.exception('Admin svc died', exc_info=True)

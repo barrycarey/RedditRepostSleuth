@@ -193,10 +193,20 @@ class MonitoredSub(Base):
     same_sub_only = Column(Boolean, default=False)
     notes = Column(String(500))
     sticky_comment = Column(Boolean, default=False)
+    remove_repost = Column(Boolean, default=False)
+    removal_reason_id = Column(String(20))
+    lock_post = Column(Boolean, default=False)
+    mark_as_oc = Column(Boolean, default=False)
     repost_response_template = Column(String(2000))
     oc_response_template = Column(String(2000))
     search_depth = Column(Integer, default=100)
     meme_filter = Column(Boolean, default=False)
+    title_ignore_keywords = Column(String(200))
+    disable_summons_after_auto_response = Column(Boolean, default=False)
+    disable_bot_summons = Column(Boolean, default=False)
+    only_allow_one_summons = Column(Boolean, default=False)
+    remove_additional_summons = Column(Boolean, default=False)
+
 
     def to_dict(self):
         return {
@@ -307,6 +317,7 @@ class ImageSearch(Base):
     meme_template_used = Column(Integer)
     search_time = Column(Float, nullable=False)
     matches_found = Column(Integer, nullable=False)
+    searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
 
 class UserReport(Base):
     __tablename__ = 'reddit_user_report'
