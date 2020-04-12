@@ -146,6 +146,7 @@ class Config:
             'summons_all_matches',
             'summons_same_sub',
             'summons_max_age',
+            'summons_send_pm_subs',
             'bot_comment_karma_flag_threshold',
             'bot_comment_karma_remove_threshold',
             'sub_monitor_exposed_config_options'
