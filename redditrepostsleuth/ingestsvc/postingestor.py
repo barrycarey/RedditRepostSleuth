@@ -85,7 +85,7 @@ class PostIngestor:
                     url = base_url
 
                 try:
-                    r = requests.post('http://sr2.plxbx.com:8888/crosspost', data={'url': url})
+                    r = requests.post('http://sr3.plxbx.com:8888/crosspost', data={'url': url})
                 except Exception as e:
                     log.exception('Exception getting Push Shift result', exc_info=True)
                     time.sleep(10)
