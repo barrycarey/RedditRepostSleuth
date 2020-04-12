@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Tuple, Text, NoReturn
 
 from praw.exceptions import APIException
+from praw.models import Redditor
 from prawcore import ResponseException
 
 from redditrepostsleuth.core.config import Config
@@ -374,8 +375,10 @@ class SummonsHandler:
 
                 response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
 
-
-        self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
+        if summons.subreddit in self.config.summons_send_pm_subs:
+            self._send_private_message(summons, response)
+        else:
+            self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
 
 
     def _get_target_distances(self, subreddit: str, override_hamming_distance: int = None) -> Tuple[int, float]:
@@ -405,6 +408,19 @@ class SummonsHandler:
             response.message = 'FAILED REPLY' \
                                ''
         self._save_response(response, reply)
+
+    def _send_private_message(self, summons: Summons, response: RepostResponseBase) -> NoReturn:
+        redditor = self.reddit.redditor(summons.requestor)
+        log.info('Sending private message to %s for summons in sub %s', summons.requestor, summons.subreddit)
+        msg = f'I\'m unable to reply to your comment at https://redd.it/{summons.post_id}.  I\'m probably banned from r/{summons.subreddit}.  Here is my response. \n\n *** \n\n'
+        msg = msg + response.message
+        try:
+            comment_reply = CommentReply(body=None, comment=None)
+            comment_reply.body = self.response_handler.send_private_message(redditor, msg)
+        except Exception:
+            raise
+        # TODO - Shouldn't need to send response seperately
+        self._save_response(response, comment_reply)
 
     def _save_response(self, response: RepostResponseBase, reply: CommentReply):
         with self.uowm.start() as uow:
