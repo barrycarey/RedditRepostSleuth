@@ -5,7 +5,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 
-
 ## [0.1.5] - 4/4/2020
 
 * [feature] - Title keyword filter.  Mods can exclude posts with certain keywords in the title from being checked.  Example, filter the word Repost. A post with a title of 'This is an old repost but deserves to be seen again' would be ignored by the bot
