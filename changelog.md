@@ -21,7 +21,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [summons] - Reworked summons queue handling to attempt to prevent backlogs
 * [summons] - Add special handling to only send PMs for r/PewdiepieSubmissions. The bot has been unbanned but not modded so it is hitting rate limits commenting due to the large volumn of summons
 
-
 ## [0.1.4] - 2/9/2020
 
 * [bugfix] - Link reposts checks were not checking for same author or crosspost
