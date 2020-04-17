@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 
+* [feature] - Report messages can now include custom variable values.  More info [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
+
 ## [0.1.5] - 4/4/2020
 
 * [feature] - Title keyword filter.  Mods can exclude posts with certain keywords in the title from being checked.  Example, filter the word Repost. A post with a title of 'This is an old repost but deserves to be seen again' would be ignored by the bot
@@ -18,7 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [backend] - Improved handling of reaching API rate limits, including automatic cool off. 
 * [summons] - Reworked summons queue handling to attempt to prevent backlogs
 * [summons] - Add special handling to only send PMs for r/PewdiepieSubmissions. The bot has been unbanned but not modded so it is hitting rate limits commenting due to the large volumn of summons
-
 
 ## [0.1.4] - 2/9/2020
 
