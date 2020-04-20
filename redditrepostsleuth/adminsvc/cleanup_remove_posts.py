@@ -9,9 +9,10 @@ if __name__ == '__main__':
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     with uowm.start() as uow:
         ids = []
-        posts = uow.posts.find_all_for_delete_check(hours=504, limit=1500000)
+        all_posts = []
+        posts = uow.posts.find_all_for_delete_check(hours=800, limit=1000000)
         for post in posts:
-            ids.append(post.post_id)
-        chunks = chunk_list(ids, 1000)
+            all_posts.append({'id': post.post_id, 'url': post.url})
+        chunks = chunk_list(all_posts, 500)
         for chunk in chunks:
             cleanup_removed_posts_batch.apply_async((chunk,), queue='delete')
