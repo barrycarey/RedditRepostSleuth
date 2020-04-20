@@ -1,3 +1,4 @@
+import json
 import random
 from typing import List, Text, NoReturn
 
@@ -18,7 +19,7 @@ def remove_post(uowm: SqlAlchemyUnitOfWorkManager, post):
         investigate_post = uow.investigate_post.get_by_post_id(post.post_id)
         link_repost = uow.link_repost.get_by_repost_of(post.post_id)
         image_reposts = uow.image_repost.get_by_repost_of(post.post_id)
-        comments = uow.bot_comment.get_by_post_id(post.id)
+        comments = uow.bot_comment.get_by_post_id(post.post_id)
         summons = uow.summons.get_by_post_id(post.post_id)
         image_search = uow.image_search.get_by_post_id(post.post_id)
         user_reports = uow.user_report.get_by_post_id(post.post_id)
@@ -58,13 +59,40 @@ def remove_post(uowm: SqlAlchemyUnitOfWorkManager, post):
                 log.debug('Deleting report %s', u.id)
                 uow.user_report.remove(u)
 
-        try:
-            uow.commit()
-        except Exception as e:
-            log.exception('Failed to delete posts', exc_info=True)
+
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
+    try:
+        res = requests.post('http://localhost:8000/maintenance/removed', json=posts)
+    except Exception as e:
+        log.exception('Failed to call delete check api', exc_info=True)
+        return
+    if res.status_code != 200:
+        log.error('Unexpected status code: %s', res.status_code)
+        return
+
+    res_data = json.loads(res.text)
+    with self.uowm.start() as uow:
+        for p in res_data:
+            #log.info('Checking post %s', id)
+            post = uow.posts.get_by_post_id(p['id'])
+            if not post:
+                continue
+
+            if not p['alive']:
+                remove_post(self.uowm, post)
+                print(f'Removing post {post.post_id}')
+                uow.posts.remove(post)
+            else:
+                print(f'Updating post {post.post_id}')
+                post.last_deleted_check = func.utc_timestamp()
+
+        uow.commit()
+
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def cleanup_removed_posts_batch_back(self, posts: List[Text]) -> NoReturn:
     with self.uowm.start() as uow:
         for id in posts:
             #log.info('Checking post %s', id)
