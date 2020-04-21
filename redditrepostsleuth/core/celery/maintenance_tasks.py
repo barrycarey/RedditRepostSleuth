@@ -1,4 +1,5 @@
 import json
+import os
 import random
 from typing import List, Text, NoReturn
 
@@ -63,8 +64,12 @@ def remove_post(uowm: SqlAlchemyUnitOfWorkManager, post):
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
+    util_api = os.getenv('UTIL_API')
+    if not util_api:
+        raise ValueError('Missing util API')
+
     try:
-        res = requests.post('http://localhost:8000/maintenance/removed', json=posts)
+        res = requests.post(f'{util_api}/maintenance/removed', json=posts)
     except Exception as e:
         log.exception('Failed to call delete check api', exc_info=True)
         return
