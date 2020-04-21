@@ -18,5 +18,6 @@
   "title_ignore_keywords": [],
   "disable_summons_after_auto_response": false,
   "only_allow_one_summons": false,
-  "remove_additional_summons": false
+  "remove_additional_summons": false,
+  "check_all_submissions": true
 }
