@@ -233,6 +233,21 @@ class SubredditConfigUpdater:
         if 'title_ignore_keywords' in new_config:
             self._log_config_value_change('ignore_title_keywords', monitored_sub.name, monitored_sub.title_ignore_keywords, new_config['title_ignore_keywords'])
             monitored_sub.title_ignore_keywords = new_config['title_ignore_keywords']
+        if 'disable_summons_after_auto_response' in new_config:
+            self._log_config_value_change('disable_summons_after_auto_response', monitored_sub.name, monitored_sub.disable_summons_after_auto_response, new_config['disable_summons_after_auto_response'])
+            monitored_sub.disable_summons_after_auto_response = new_config['disable_summons_after_auto_response']
+        if 'disable_bot_summons' in new_config:
+            self._log_config_value_change('disable_bot_summons', monitored_sub.name, monitored_sub.disable_bot_summons, new_config['disable_bot_summons'])
+            monitored_sub.disable_bot_summons = new_config['disable_bot_summons']
+        if 'only_allow_one_summons' in new_config:
+            self._log_config_value_change('only_allow_one_summons', monitored_sub.name, monitored_sub.only_allow_one_summons, new_config['only_allow_one_summons'])
+            monitored_sub.only_allow_one_summons = new_config['only_allow_one_summons']
+        if 'title_ignore_keywords' in new_config:
+            self._log_config_value_change('ignore_title_keywords', monitored_sub.name, monitored_sub.title_ignore_keywords, new_config['title_ignore_keywords'])
+            monitored_sub.remove_additional_summons = new_config['remove_additional_summons']
+        if 'check_all_submissions' in new_config:
+            self._log_config_value_change('check_all_submissions', monitored_sub.name, monitored_sub.check_all_submissions, new_config['check_all_submissions'])
+            monitored_sub.check_all_submissions = new_config['check_all_submissions']
 
         with self.uowm.start() as uow:
             uow.monitored_sub.update(monitored_sub)
