@@ -206,6 +206,7 @@ class MonitoredSub(Base):
     disable_bot_summons = Column(Boolean, default=False)
     only_allow_one_summons = Column(Boolean, default=False)
     remove_additional_summons = Column(Boolean, default=False)
+    check_all_submissions = Column(Boolean, default=True)
 
 
     def to_dict(self):
