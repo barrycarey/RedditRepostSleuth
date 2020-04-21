@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [UNRELEASED]
 
 * [feature] - Report messages can now include custom variable values.  More info [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
+* [backend] - Reworked job to cleanup deleted posts.  Will eventually reduce search index size and increase search speed. 
 
 ## [0.1.5] - 4/4/2020
 
