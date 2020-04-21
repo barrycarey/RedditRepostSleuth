@@ -24,15 +24,19 @@ To change settings simply update the JSON and save.  The bot will load the new c
   "same_sub_only": true,
   "sticky_comment": false,
   "search_depth": 100,
-  "target_days_old": null,
+  "target_days_old": 180,
   "meme_filter": false,
-  "check_post_types": ["image", "link"],
   "oc_response_template": null,
   "repost_response_template": null,
-  "lock_post": true,
+  "lock_post": false,
   "mark_as_oc": false,
   "remove_repost": false,
-  "removal_reason_id": null 
+  "removal_reason_id": false,
+  "title_ignore_keywords": [],
+  "disable_summons_after_auto_response": false,
+  "only_allow_one_summons": false,
+  "remove_additional_summons": false,
+  "check_all_submissions": true
 }
 ```
 
