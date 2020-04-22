@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [feature] - Add title similarity checking using Levenshtein distance. Feature can be enabled in config.  Matching % also set in config 
 * [backend] - Reworked job to cleanup deleted posts.  Will eventually reduce search index size and increase search speed. 
 * [bugfix] - Repost check on links ignored custom options set by registered sub.  Example, when sam_sub was enable, link reposts outside of sub were still flagged
+* [bugfix] - New config options not being applied when updated via wiki
 
 ## [0.1.5] - 4/4/2020
 

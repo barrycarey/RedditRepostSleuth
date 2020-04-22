@@ -13,6 +13,6 @@ if __name__ == '__main__':
         posts = uow.posts.find_all_for_delete_check(hours=800, limit=2000000)
         for post in posts:
             all_posts.append({'id': post.post_id, 'url': post.url})
-        chunks = chunk_list(all_posts, 100)
+        chunks = chunk_list(all_posts, 50)
         for chunk in chunks:
             cleanup_removed_posts_batch.apply_async((chunk,), queue='delete')
