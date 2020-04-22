@@ -19,5 +19,7 @@
   "disable_summons_after_auto_response": false,
   "only_allow_one_summons": false,
   "remove_additional_summons": false,
-  "check_all_submissions": true
+  "check_all_submissions": true,
+  "check_title_similarity": false,
+  "target_title_match": 50
 }

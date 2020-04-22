@@ -7,3 +7,4 @@ imagehash
 influxdb
 annoy
 distance
+python-Levenshtein

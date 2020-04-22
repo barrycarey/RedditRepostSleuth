@@ -207,6 +207,8 @@ class MonitoredSub(Base):
     only_allow_one_summons = Column(Boolean, default=False)
     remove_additional_summons = Column(Boolean, default=False)
     check_all_submissions = Column(Boolean, default=True)
+    check_title_similarity = Column(Boolean, default=False)
+    target_title_match = Column(Integer)
 
 
     def to_dict(self):
