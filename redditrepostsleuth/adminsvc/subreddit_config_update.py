@@ -248,6 +248,12 @@ class SubredditConfigUpdater:
         if 'check_all_submissions' in new_config:
             self._log_config_value_change('check_all_submissions', monitored_sub.name, monitored_sub.check_all_submissions, new_config['check_all_submissions'])
             monitored_sub.check_all_submissions = new_config['check_all_submissions']
+        if 'check_title_similarity' in new_config:
+            self._log_config_value_change('check_title_similarity', monitored_sub.name, monitored_sub.check_title_similarity, new_config['check_title_similarity'])
+            monitored_sub.remove_additional_summons = new_config['remove_additional_summons']
+        if 'target_title_match' in new_config:
+            self._log_config_value_change('target_title_match', monitored_sub.name, monitored_sub.target_title_match, new_config['target_title_match'])
+            monitored_sub.target_title_match = new_config['target_title_match']
 
         with self.uowm.start() as uow:
             uow.monitored_sub.update(monitored_sub)
