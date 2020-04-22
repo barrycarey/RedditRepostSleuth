@@ -62,6 +62,13 @@ def filter_newer_matches(cutoff_date: datetime):
         return True
     return date_filter
 
+def filter_title_distance(threshold: int):
+    def title_filter(match: RepostMatch):
+        if match.title_similarity <= threshold:
+            log.debug('Title Similarity Filter Reject: Target: %s Actual: %s', threshold, match.title_similarity)
+            return False
+        return True
+    return title_filter
 
 def filter_days_old_matches(cutoff_days: int):
     def days_filter(match: RepostMatch):

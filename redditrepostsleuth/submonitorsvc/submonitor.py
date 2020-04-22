@@ -112,7 +112,7 @@ class SubMonitor:
             if post.post_type == 'image':
                 search_results = self._check_for_repost(post, monitored_sub)
             elif post.post_type == 'link':
-                search_results = self._check_for_link_repost(post)
+                search_results = self._check_for_link_repost(post, monitored_sub)
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
             return
@@ -251,8 +251,15 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
 
-    def _check_for_link_repost(self, post: Post):
-        return check_link_repost(post, self.uowm, get_total=True)
+    def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub):
+        return check_link_repost(
+            post,
+            self.uowm,
+            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+            same_sub=monitored_sub.same_sub_only,
+            date_cutoff=monitored_sub.target_days_old,
+            get_total=True
+        )
 
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageRepostWrapper:
         """
