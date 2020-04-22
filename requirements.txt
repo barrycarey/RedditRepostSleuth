@@ -23,5 +23,4 @@ scipy
 falcon
 waitress
 falcon-cors
-
-
+python-Levenshtein
