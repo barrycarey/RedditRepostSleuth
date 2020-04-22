@@ -203,3 +203,13 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
 
     return {**base_values, **results_values, **kwargs}
 
+def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
+    """
+    Take an ImageRepostWrapper object and create the json to be stored in the database
+    :rtype: dict
+    :param search_results: ImageRepostWrapper obj
+    """
+    return {
+        'closest_match': search_results.closest_match.to_dict(),
+        'matches': [match.to_dict() for match in search_results.matches],
+    }

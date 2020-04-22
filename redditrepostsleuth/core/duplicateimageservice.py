@@ -16,6 +16,7 @@ from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.image_index_loader import ImageIndexLoader
 from redditrepostsleuth.core.services.meme_detector import MemeDetector
+from redditrepostsleuth.core.util.helpers import create_search_result_json
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
@@ -215,7 +216,8 @@ class DuplicateImageService:
             filter_dead_matches,
             only_older_matches,
             meme_filter,
-            source=source
+            source=source,
+            target_title_match=target_title_match
         )
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
@@ -256,7 +258,8 @@ class DuplicateImageService:
             filter_dead_matches: bool,
             only_older_matches: bool,
             meme_filter: bool,
-            source: str
+            source: str,
+            target_title_match: int
     ):
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
@@ -271,8 +274,12 @@ class DuplicateImageService:
             meme_filter=meme_filter,
             meme_template_used=search_results.meme_template.id if search_results.meme_template else None,
             search_time=search_results.total_search_time,
+            index_search_time=search_results.index_search_time,
+            total_filter_time=search_results.total_filter_time,
+            target_title_match=target_title_match,
             matches_found=len(search_results.matches),
-            source=source
+            source=source,
+            search_results=create_search_result_json(search_results)
         )
 
         with self.uowm.start() as uow:
