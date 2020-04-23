@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [feature] - Report messages can now include custom variable values.  More info [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
 * [feature] - Add check_all_submissions config option.  Allows subs to set rules for the bot without having all new submissions checked. Rules are honored by user summons
 * [feature] - Add title similarity checking using Levenshtein distance. Feature can be enabled in config.  Matching % also set in config 
-* [backend] - Reworked job to cleanup deleted posts.  Will eventually reduce search index size and increase search speed. 
+* [backend] - Reworked job to cleanup deleted posts.  Will eventually reduce search index size and increase search speed.
+* [backend] - Log full search results.  This will allow specific searches to be fully reviewed for better troubleshooting  
 * [bugfix] - Repost check on links ignored custom options set by registered sub.  Example, when sam_sub was enable, link reposts outside of sub were still flagged
 * [bugfix] - New config options not being applied when updated via wiki
 
