@@ -317,10 +317,14 @@ class ImageSearch(Base):
     filter_dead_matches = Column(Boolean, nullable=False)
     only_older_matches = Column(Boolean, nullable=False)
     meme_filter = Column(Boolean, nullable=False)
+    target_title_match = Column(Integer, nullable=True)
     meme_template_used = Column(Integer)
     search_time = Column(Float, nullable=False)
+    index_search_time = Column(Float)
+    total_filter_time = Column(Float)
     matches_found = Column(Integer, nullable=False)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
+    search_results = Column(Text(75000, collation='utf8mb4_general_ci'))
 
 class UserReport(Base):
     __tablename__ = 'reddit_user_report'
