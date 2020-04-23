@@ -79,14 +79,14 @@ class SubredditConfigUpdater:
         missing_keys = self._get_missing_config_values(wiki_config)
         if not missing_keys:
             return
-        self._update_from_database(monitored_sub, wiki_page)
+        self._update_wiki_from_database(monitored_sub, wiki_page)
         subreddit = self.reddit.subreddit(monitored_sub.name)
         wiki_page = subreddit.wiki['repost_sleuth_config'] # Force refresh so we can get latest revision ID
         self._create_revision(wiki_page)
         self._notify_new_options(subreddit, missing_keys)
         self._mark_config_valid(wiki_page.revision_id)
 
-    def _update_from_database(self, monitored_sub: MonitoredSub, wiki_page: WikiPage) -> NoReturn:
+    def _update_wiki_from_database(self, monitored_sub: MonitoredSub, wiki_page: WikiPage) -> NoReturn:
         """
         Write the current database config to the wiki config.
 
