@@ -9,7 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [feature] - Add check_all_submissions config option.  Allows subs to set rules for the bot without having all new submissions checked. Rules are honored by user summons
 * [feature] - Add title similarity checking using Levenshtein distance. Feature can be enabled in config.  Matching % also set in config 
 * [backend] - Reworked job to cleanup deleted posts.  Will eventually reduce search index size and increase search speed.
-* [backend] - Log full search results.  This will allow specific searches to be fully reviewed for better troubleshooting  
+* [backend] - Log full search results.  This will allow specific searches to be fully reviewed for better troubleshooting
+* [backend] - Track registered subreddit subscriber count to better distribute load  
 * [bugfix] - Repost check on links ignored custom options set by registered sub.  Example, when sam_sub was enable, link reposts outside of sub were still flagged
 * [bugfix] - New config options not being applied when updated via wiki
 

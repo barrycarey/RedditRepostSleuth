@@ -209,6 +209,7 @@ class MonitoredSub(Base):
     check_all_submissions = Column(Boolean, default=True)
     check_title_similarity = Column(Boolean, default=False)
     target_title_match = Column(Integer)
+    subscribers = Column(Integer, default=0)
 
 
     def to_dict(self):
