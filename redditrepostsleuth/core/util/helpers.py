@@ -4,8 +4,10 @@ import requests
 from typing import Dict, List, Text
 
 import imagehash
+from praw.models import Subreddit
 
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
@@ -213,3 +215,32 @@ def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
         'closest_match': search_results.closest_match.to_dict(),
         'matches': [match.to_dict() for match in search_results.matches],
     }
+
+def is_moderator(subreddit: Subreddit, user: Text) -> bool:
+    """
+    Check if a given username is a moderator on a given sub
+    :rtype: bool
+    :param subreddit: Praw SubReddit obj
+    :param user: username
+    :return: bool
+    """
+    for mod in subreddit.moderator():
+        if mod.name.lower() == user.lower():
+            return True
+    return False
+
+def bot_has_permission(subreddit: Subreddit, permission_name: Text) -> bool:
+    log.info('Checking if bot has %s permission in %s', permission_name, subreddit.display_name)
+    for mod in subreddit.moderator():
+        if mod.name == 'RepostSleuthBot':
+            if 'all' in mod.mod_permissions:
+                log.info('Bot has All permissions in %s', subreddit.display_name)
+                return True
+            elif permission_name.lower() in mod.mod_permissions:
+                log.info('Bot has %s permission in %s', permission_name, subreddit.display_name)
+                return True
+            else:
+                log.info('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
+                return False
+    return False
+
