@@ -86,6 +86,55 @@ class SubredditConfigUpdater:
         self._notify_new_options(subreddit, missing_keys)
         self._mark_config_valid(wiki_page.revision_id)
 
+    def get_wiki_config(self, sub_name: Text, create_missing_wiki_page: bool = False) -> dict:
+        subreddit = self.reddit.subreddit(sub_name)
+        wiki_page = subreddit.wiki['repost_sleuth_config']
+        try:
+            wiki_content = wiki_page.content_md
+        except NotFound:
+            log.info('%s has no config wiki page', sub_name)
+            if not create_missing_wiki_page:
+                return {}
+            try:
+                self._create_wiki_page(subreddit)
+                wiki_page = subreddit.wiki['repost_sleuth_config']
+                wiki_content = wiki_page.content_md
+            except NotFound:
+                return {}
+        except Forbidden:
+            log.error('Bot does not have wiki permissions on %s', sub_name)
+            return {}
+        except ResponseException as e:
+            if e.response.status_code == 429:
+                log.error('IP Rate limit.  Waiting')
+                time.sleep(240)
+            return {}
+
+        try:
+            wiki_config = json.loads(wiki_content)
+            log.info('Successfully loaded new config from wiki')
+            return wiki_config
+        except JSONDecodeError as e:
+            log.error('Failed to load JSON config for %s.  Error: %s', sub_name, e)
+            return {}
+
+    def sync_config_from_wiki(self, monitored_sub: MonitoredSub) -> NoReturn:
+        """
+        Pull the current config from the wiki page and write it's values to the database
+        :rtype: None
+        :param monitored_sub: MonitoredSub obj
+        """
+        wiki_config = self.get_wiki_config(monitored_sub.name)
+        if not wiki_config:
+            return
+
+        monitored_sub = self._update_database_from_wiki(monitored_sub, wiki_config)
+
+        with self.uowm.start() as uow:
+            uow.monitored_sub.update(monitored_sub)
+            uow.commit()
+
+
     def _update_wiki_from_database(self, monitored_sub: MonitoredSub, wiki_page: WikiPage) -> NoReturn:
         """
         Write the current database config to the wiki config.
@@ -103,6 +152,27 @@ class SubredditConfigUpdater:
                 new_config[k] = getattr(monitored_sub, db_key)
 
         wiki_page.edit(json.dumps(new_config))
+
+    def _update_database_from_wiki(self, monitored_sub: MonitoredSub, wiki_config: Dict) -> MonitoredSub:
+        """
+        Write the current wiki config to the database config.
+
+        Can allow us to resync wiki configs with database in the event of an issue preventing updating
+        :param wiki_page: Praw WikiPage obj
+        :rtype: MonitoredSub
+        :param monitored_sub: MonitoredSub obj
+        """
+
+        for k in self.config.sub_monitor_exposed_config_options:
+            if k in CONFIG_OPTION_MAP:
+                db_key = CONFIG_OPTION_MAP[k]
+            else:
+                db_key = k
+            if hasattr(monitored_sub, db_key) and k in wiki_config:
+                log.debug('Changing %s from %s to %s for %s', db_key, getattr(monitored_sub, db_key), wiki_config[k], monitored_sub.name)
+                setattr(monitored_sub, db_key, wiki_config[k])
+
+        return monitored_sub
 
     def _get_missing_config_values(self, config: Dict) -> List[Text]:
         """
