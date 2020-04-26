@@ -67,7 +67,7 @@ class SubredditConfigUpdater:
             return
 
         if not self._is_config_updated(wiki_page.revision_id):
-            self._load_new_config(wiki_page, monitored_sub)
+            self._load_new_config(wiki_page, monitored_sub, subreddit)
 
         missing_keys = self._get_missing_config_values(wiki_config)
         if not missing_keys:
@@ -113,7 +113,7 @@ class SubredditConfigUpdater:
             log.info('Successfully loaded new config from wiki')
             return wiki_config
         except JSONDecodeError as e:
-            log.error('Failed to load JSON config for %s.  Error: %s', sub_name, e)
+            log.error('Failed to load JSON config for %s.  Error: %s', wiki_page.subreddit.display_name, e)
             raise
 
     def sync_config_from_wiki(self, monitored_sub: MonitoredSub, wiki_page: WikiPage) -> NoReturn:
@@ -192,7 +192,12 @@ class SubredditConfigUpdater:
             missing_keys.append(k)
         return missing_keys
 
-    def _create_revision(self, wiki_page: WikiPage, valid: bool = False, config_loaded_at = None) -> NoReturn:
+    def _create_revision(
+            self,
+            wiki_page: WikiPage,
+            valid: bool = False,
+            config_loaded_at = None
+    ) -> MonitoredSubConfigRevision:
         """
         Take a wiki page and create a revision in the database
         :param valid: Has this config been validated
@@ -210,11 +215,12 @@ class SubredditConfigUpdater:
             uow.monitored_sub_config_revision.add(config_revision)
             try:
                 uow.commit()
+                return config_revision
             except Exception as e:
                 log.exception('Failed to save config revision', exc_info=True)
                 raise
 
-    def _load_new_config(self, wiki_page: WikiPage, monitored_sub: MonitoredSub, new_config: dict) -> dict:
+    def _load_new_config(self, wiki_page: WikiPage, monitored_sub: MonitoredSub, subreddit: Subreddit):
         """
         Attempt to load the JSON from a wiki config and update our database
         :param wiki_page: PRAW WikiPage
@@ -223,8 +229,15 @@ class SubredditConfigUpdater:
         """
         log.info('Attempting to load new config for %s', monitored_sub.name)
         self._create_revision(wiki_page)
+        try:
+            wiki_config = self.get_wiki_config(wiki_page)
+        except JSONDecodeError as e:
+            self._set_config_validity(wiki_page.revision_id, valid=False)
+            if self._notify_failed_load(subreddit):
+                self._mark_config_notified(wiki_page.revision_id)
+            return
 
-        self._update_monitored_sub_from_wiki(monitored_sub, new_config)
+        self._update_monitored_sub_from_wiki(monitored_sub, wiki_config)
 
 
         #self._update_active_config(monitored_sub, new_config)
@@ -240,91 +253,6 @@ class SubredditConfigUpdater:
         except NotFound:
             log.exception('Failed to create wiki page', exc_info=False)
             raise
-
-    def _log_config_value_change(self, value_name: Text, subreddit: Text, old_val, new_val):
-        log.debug('Changing %s from %s to %s for %s', value_name, old_val, new_val, subreddit)
-
-    def _update_active_config(self, monitored_sub: MonitoredSub, new_config: dict) -> NoReturn:
-        log.info('Updating config values for %s', monitored_sub.name)
-        if 'active' in new_config:
-            self._log_config_value_change('active', monitored_sub.name, monitored_sub.active, new_config['active'])
-            monitored_sub.active = new_config['active']
-        if 'only_comment_on_repost' in new_config:
-            self._log_config_value_change('only_comment_on_repost', monitored_sub.name, monitored_sub.repost_only, new_config['only_comment_on_repost'])
-            monitored_sub.repost_only = new_config['only_comment_on_repost']
-        if 'report_reposts' in new_config:
-            self._log_config_value_change('report_reposts', monitored_sub.name, monitored_sub.report_submission, new_config['report_reposts'])
-            monitored_sub.report_submission = new_config['report_reposts']
-        if 'report_msg' in new_config:
-            self._log_config_value_change('report_msg', monitored_sub.name, monitored_sub.report_msg, new_config['report_msg'])
-            monitored_sub.report_msg = new_config['report_msg']
-        if 'match_percent_dif' in new_config:
-            self._log_config_value_change('match_percent_dif', monitored_sub.name, monitored_sub.target_hamming, new_config['match_percent_dif'])
-            monitored_sub.target_hamming = new_config['match_percent_dif']
-        if 'same_sub_only' in new_config:
-            self._log_config_value_change('same_sub_only', monitored_sub.name, monitored_sub.same_sub_only, new_config['same_sub_only'])
-            monitored_sub.same_sub_only = new_config['same_sub_only']
-        if 'search_depth' in new_config:
-            if new_config['search_depth'] > 500:
-                monitored_sub.search_depth = 500
-            else:
-                self._log_config_value_change('search_depth', monitored_sub.name, monitored_sub.search_depth, new_config['search_depth'])
-                monitored_sub.search_depth = new_config['search_depth']
-        if 'target_days_old' in new_config:
-            self._log_config_value_change('target_days_old', monitored_sub.name, monitored_sub.target_days_old, new_config['target_days_old'])
-            monitored_sub.target_days_old = new_config['target_days_old']
-        if 'meme_filter' in new_config:
-            self._log_config_value_change('meme_filter', monitored_sub.name, monitored_sub.meme_filter, new_config['meme_filter'])
-            monitored_sub.meme_filter = new_config['meme_filter']
-        if 'oc_response_template' in new_config:
-            self._log_config_value_change('oc_response_template', monitored_sub.name, monitored_sub.oc_response_template, new_config['oc_response_template'])
-            monitored_sub.oc_response_template = new_config['oc_response_template']
-        if 'repost_response_template' in new_config:
-            self._log_config_value_change('repost_response_template', monitored_sub.name, monitored_sub.repost_response_template, new_config['repost_response_template'])
-            monitored_sub.repost_response_template = new_config['repost_response_template']
-        if 'sticky_comment' in new_config:
-            self._log_config_value_change('sticky_comment', monitored_sub.name, monitored_sub.sticky_comment, new_config['sticky_comment'])
-            monitored_sub.sticky_comment = new_config['sticky_comment']
-        if 'lock_post' in new_config:
-            self._log_config_value_change('lock_post', monitored_sub.name, monitored_sub.lock_post, new_config['lock_post'])
-            monitored_sub.lock_post = new_config['lock_post']
-        if 'mark_as_oc' in new_config:
-            self._log_config_value_change('mark_as_oc', monitored_sub.name, monitored_sub.mark_as_oc, new_config['mark_as_oc'])
-            monitored_sub.mark_as_oc = new_config['mark_as_oc']
-        if 'remove_repost' in new_config:
-            self._log_config_value_change('remove_repost', monitored_sub.name, monitored_sub.remove_repost, new_config['remove_repost'])
-            monitored_sub.remove_repost = new_config['remove_repost']
-        if 'removal_reason_id' in new_config:
-            self._log_config_value_change('removal_reason_id', monitored_sub.name, monitored_sub.removal_reason_id, new_config['removal_reason_id'])
-            monitored_sub.removal_reason_id = new_config['removal_reason_id']
-        if 'title_ignore_keywords' in new_config:
-            self._log_config_value_change('ignore_title_keywords', monitored_sub.name, monitored_sub.title_ignore_keywords, new_config['title_ignore_keywords'])
-            monitored_sub.title_ignore_keywords = new_config['title_ignore_keywords']
-        if 'disable_summons_after_auto_response' in new_config:
-            self._log_config_value_change('disable_summons_after_auto_response', monitored_sub.name, monitored_sub.disable_summons_after_auto_response, new_config['disable_summons_after_auto_response'])
-            monitored_sub.disable_summons_after_auto_response = new_config['disable_summons_after_auto_response']
-        if 'disable_bot_summons' in new_config:
-            self._log_config_value_change('disable_bot_summons', monitored_sub.name, monitored_sub.disable_bot_summons, new_config['disable_bot_summons'])
-            monitored_sub.disable_bot_summons = new_config['disable_bot_summons']
-        if 'only_allow_one_summons' in new_config:
-            self._log_config_value_change('only_allow_one_summons', monitored_sub.name, monitored_sub.only_allow_one_summons, new_config['only_allow_one_summons'])
-            monitored_sub.only_allow_one_summons = new_config['only_allow_one_summons']
-        if 'title_ignore_keywords' in new_config:
-            self._log_config_value_change('ignore_title_keywords', monitored_sub.name, monitored_sub.title_ignore_keywords, new_config['title_ignore_keywords'])
-            monitored_sub.remove_additional_summons = new_config['remove_additional_summons']
-        if 'check_all_submissions' in new_config:
-            self._log_config_value_change('check_all_submissions', monitored_sub.name, monitored_sub.check_all_submissions, new_config['check_all_submissions'])
-            monitored_sub.check_all_submissions = new_config['check_all_submissions']
-        if 'check_title_similarity' in new_config:
-            self._log_config_value_change('check_title_similarity', monitored_sub.name, monitored_sub.check_title_similarity, new_config['check_title_similarity'])
-            monitored_sub.remove_additional_summons = new_config['remove_additional_summons']
-        if 'target_title_match' in new_config:
-            self._log_config_value_change('target_title_match', monitored_sub.name, monitored_sub.target_title_match, new_config['target_title_match'])
-            monitored_sub.target_title_match = new_config['target_title_match']
-
-        with self.uowm.start() as uow:
-            uow.monitored_sub.update(monitored_sub)
-            uow.commit()
 
     def _notify_config_created(self, subreddit: Subreddit) -> bool:
         """
@@ -342,16 +270,17 @@ class SubredditConfigUpdater:
             log.exception('Failed to send config created notification')
             return False
 
-    def _notify_failed_load(self, subreddit: Subreddit, error: Text, revision_id: Text) -> NoReturn:
+    def _notify_failed_load(self, subreddit: Subreddit, error: Text, revision_id: Text) -> bool:
         body = f'I\'m unable to load your new config for r/{subreddit.display_name}. Your recent changes are invalid. \n\n' \
                 f'Error: {error} \n\n' \
                 'Please validate your changes and try again'
 
         try:
             subreddit.message('Repost Sleuth Failed To Load Config', body)
-            self._mark_config_invalid(revision_id)
+            return True
         except Exception as e:
             log.exception('Failed to send PM to %s', subreddit.display_name)
+            return False
 
     def _notify_successful_load(self, subreddit: Subreddit) -> NoReturn:
         log.info('Sending notification for successful config update to %s', subreddit.display_name)
