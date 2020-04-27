@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [backend] - Track registered subreddit subscriber count to better distribute load  
 * [bugfix] - Repost check on links ignored custom options set by registered sub.  Example, when sam_sub was enable, link reposts outside of sub were still flagged
 * [bugfix] - New config options not being applied when updated via wiki
+* [backend] - Completely rewrote registered subreddit config handling and added extensive unit testing. Can now more easily add and remove config options and keep database and wiki pages in sync
 
 ## [0.1.5] - 4/4/2020
 

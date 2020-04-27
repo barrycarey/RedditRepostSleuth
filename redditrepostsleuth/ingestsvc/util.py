@@ -2,6 +2,8 @@ from typing import Tuple
 
 import requests
 from requests.exceptions import ConnectionError
+from sqlalchemy.exc import IntegrityError
+
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException, InvalidImageUrlException, ImageRemovedException
 from redditrepostsleuth.core.logging import log
@@ -45,8 +47,8 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
             uow.posts.add(post)
             uow.commit()
             log.debug('Post %s: Commited post to database', post.post_id)
-        except Exception as e:
-            log.exception('Post %s: Database save failed', post.post_id, exc_info=True)
+        except IntegrityError as e:
+            log.exception('Post %s: Database save failed', post.post_id, exc_info=False)
             return
 
     return post

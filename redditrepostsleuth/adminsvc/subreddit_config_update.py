@@ -37,7 +37,6 @@ class SubredditConfigUpdater:
         self.config = config
 
     def update_configs(self):
-
         while True:
             try:
                 with self.uowm.start() as uow:
@@ -61,39 +60,55 @@ class SubredditConfigUpdater:
         wiki_page = subreddit.wiki[self.config.wiki_config_name]
 
         try:
-            wiki_config = self.get_wiki_config(wiki_page)
+            wiki_page.content_md
         except NotFound:
             self.create_initial_wiki_config(subreddit, wiki_page, monitored_sub)
             return
 
-        if not self._is_config_updated(wiki_page.revision_id):
-            self._load_new_config(wiki_page, monitored_sub, subreddit)
+        try:
+            if not self._is_config_updated(wiki_page.revision_id):
+                wiki_config = self._load_new_config(wiki_page, monitored_sub, subreddit)
+            else:
+                wiki_config = self.get_wiki_config(wiki_page)
+        except JSONDecodeError:
+            return
 
         missing_keys = self._get_missing_config_values(wiki_config)
         if not missing_keys:
             return
-        new_config = self._create_wiki_config_from_database(monitored_sub, wiki_page)
+        new_config = self._create_wiki_config_from_database(monitored_sub)
         if not new_config:
             log.error('Failed to generate new config for %s', monitored_sub.name)
             return
         self._update_wiki_page(wiki_page, new_config)
-        subreddit = self.reddit.subreddit(monitored_sub.name)
         wiki_page = subreddit.wiki['repost_sleuth_config'] # Force refresh so we can get latest revision ID
         self._create_revision(wiki_page)
-        self._notify_new_options(subreddit, missing_keys)
-        self._mark_config_valid(wiki_page.revision_id)
+        self._set_config_validity(wiki_page.revision_id, True)
+        if self._notify_new_options(subreddit, missing_keys):
+            self._set_config_notified(wiki_page.revision_id)
 
 
-    def create_initial_wiki_config(self, subreddit: Subreddit, wiki_page: WikiPage, monitored_sub: MonitoredSub):
+    def create_initial_wiki_config(self, subreddit: Subreddit, wiki_page: WikiPage, monitored_sub: MonitoredSub) -> NoReturn:
+        """
+        Create a new config for a sub that doesn't have one yet
+        :param subreddit: PRAW Subreddit obj
+        :param wiki_page: PRAW Wikipage obj
+        :param monitored_sub: MonitoredSub obj
+        """
         self._create_wiki_page(wiki_page.subreddit)
         self._create_revision(wiki_page)
         self.sync_config_from_wiki(monitored_sub, wiki_page)
         self._set_config_validity(wiki_page.revision_id, True)
         if self._notify_config_created(subreddit):
-            self._mark_config_notified(wiki_page.revision_id)
+            self._set_config_notified(wiki_page.revision_id)
 
     def get_wiki_config(self, wiki_page: WikiPage) -> Dict:
-
+        """
+        Take a config wiki  page and attempt to load and decode the JSON from it
+        :rtype: dict
+        :param wiki_page: PRAW wiki page
+        :return: dict
+        """
         try:
             wiki_content = wiki_page.content_md
         except NotFound:
@@ -110,11 +125,34 @@ class SubredditConfigUpdater:
 
         try:
             wiki_config = json.loads(wiki_content)
-            log.info('Successfully loaded new config from wiki')
+            log.info('Successfully loaded config from %s wiki', wiki_page.subreddit.display_name)
             return wiki_config
         except JSONDecodeError as e:
             log.error('Failed to load JSON config for %s.  Error: %s', wiki_page.subreddit.display_name, e)
             raise
+
+    def sync_all_configs_from_wiki(self) -> NoReturn:
+        """
+        Used to write all wiki configs to the database.  May not be needed in the future but I fucked up and lots of
+        changes made by mods were not sync
+        :return:
+        """
+        with self.uowm.start() as uow:
+            monitored_subs = uow.monitored_sub.get_all()
+            for sub in monitored_subs:
+                subreddit = self.reddit.subreddit(sub.name)
+                wiki_page = subreddit.wiki[self.config.wiki_config_name]
+                try:
+                    wiki_config = self.get_wiki_config(wiki_page)
+                    if not wiki_config:
+                        continue
+                except (JSONDecodeError, NotFound):
+                    continue
+
+                active_config = self._create_wiki_config_from_database(sub)
+                difs = self.compare_configs(active_config, wiki_config)
+                if difs:
+                    self.sync_config_from_wiki(sub, wiki_page)
 
     def sync_config_from_wiki(self, monitored_sub: MonitoredSub, wiki_page: WikiPage) -> NoReturn:
         """
@@ -125,13 +163,35 @@ class SubredditConfigUpdater:
         wiki_config = self.get_wiki_config(wiki_page)
         if not wiki_config:
             return
-
+        # Temp inclusion to fix dumb issue I created
+        if not wiki_config['title_ignore_keywords']:
+            wiki_config['title_ignore_keywords'] = None
         monitored_sub = self._update_monitored_sub_from_wiki(monitored_sub, wiki_config)
-
         with self.uowm.start() as uow:
             uow.monitored_sub.update(monitored_sub)
-            uow.commit()
+            try:
+                uow.commit()
+            except Exception as e:
+                pass
 
+    def compare_configs(self, config_one: Dict, config_two: Dict) -> List[Dict]:
+        results = []
+        for k,v in config_one.items():
+            if k in config_two:
+                if config_two[k] != v:
+                    log.info('Key: %s | Config 1: %s | Config 2: %s', k, v, config_two[k])
+                    results.append({
+                        'key': k,
+                        'config_one': v,
+                        'config_two': config_two[k]
+                    })
+            else:
+                log.error('Config 2 missing key %s', k)
+        if results:
+            log.info('Config Difs: %s', results)
+        else:
+            log.info('Confings match')
+        return results
 
     def _update_wiki_page(self, wiki_page: WikiPage, new_config: Dict) -> NoReturn:
         log.info('Writing new config to %s', wiki_page.subreddit.display_name)
@@ -141,7 +201,7 @@ class SubredditConfigUpdater:
 
     def _create_wiki_config_from_database(self, monitored_sub: MonitoredSub) -> Dict:
         """
-        Write the current database config to the wiki config.
+        Create a new dict config from a Monitored sub object
 
         Mainly used when we add new exposed config options to the database.  It allows us to backfill the wiki configs
         :param monitored_sub:
@@ -173,8 +233,9 @@ class SubredditConfigUpdater:
             else:
                 db_key = k
             if hasattr(monitored_sub, db_key) and k in wiki_config:
-                log.debug('Changing %s from %s to %s for %s', db_key, getattr(monitored_sub, db_key), wiki_config[k], monitored_sub.name)
-                setattr(monitored_sub, db_key, wiki_config[k])
+                if getattr(monitored_sub, db_key) != wiki_config[k]:
+                    log.debug('Changing %s from %s to %s for %s', db_key, getattr(monitored_sub, db_key), wiki_config[k], monitored_sub.name)
+                    setattr(monitored_sub, db_key, wiki_config[k])
 
         return monitored_sub
 
@@ -220,7 +281,7 @@ class SubredditConfigUpdater:
                 log.exception('Failed to save config revision', exc_info=True)
                 raise
 
-    def _load_new_config(self, wiki_page: WikiPage, monitored_sub: MonitoredSub, subreddit: Subreddit):
+    def _load_new_config(self, wiki_page: WikiPage, monitored_sub: MonitoredSub, subreddit: Subreddit) -> dict:
         """
         Attempt to load the JSON from a wiki config and update our database
         :param wiki_page: PRAW WikiPage
@@ -231,18 +292,21 @@ class SubredditConfigUpdater:
         self._create_revision(wiki_page)
         try:
             wiki_config = self.get_wiki_config(wiki_page)
-        except JSONDecodeError as e:
+        except JSONDecodeError:
             self._set_config_validity(wiki_page.revision_id, valid=False)
             if self._notify_failed_load(subreddit):
-                self._mark_config_notified(wiki_page.revision_id)
-            return
+                self._set_config_notified(wiki_page.revision_id)
+            return {}
 
         self._update_monitored_sub_from_wiki(monitored_sub, wiki_config)
+        with self.uowm.start() as uow:
+            uow.monitored_sub.update(monitored_sub)
+            uow.commit()
+        self._set_config_validity(wiki_page.revision_id, True)
+        if self._notify_successful_load(wiki_page.subreddit):
+            self._set_config_notified(wiki_page.revision_id)
 
-
-        #self._update_active_config(monitored_sub, new_config)
-        self._mark_config_valid(wiki_page.revision_id)
-        self._notify_successful_load(wiki_page.subreddit)
+        return wiki_config
 
     def _create_wiki_page(self, subreddit: Subreddit):
         log.info('Creating config wiki page for %s', subreddit.display_name)
@@ -282,18 +346,28 @@ class SubredditConfigUpdater:
             log.exception('Failed to send PM to %s', subreddit.display_name)
             return False
 
-    def _notify_successful_load(self, subreddit: Subreddit) -> NoReturn:
+    def _notify_successful_load(self, subreddit: Subreddit) -> bool:
         log.info('Sending notification for successful config update to %s', subreddit.display_name)
-        subreddit.message('Repost Sleuth Has Loaded Your New Config!', 'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
+        try:
+            subreddit.message('Repost Sleuth Has Loaded Your New Config!', 'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
+            return True
+        except Exception as e:
+            log.exception('Failed to send PM to %s', subreddit.display_name)
+            return False
 
-    def _notify_new_options(self, subreddit: Subreddit, config_keys: List[Text]):
+    def _notify_new_options(self, subreddit: Subreddit, config_keys: List[Text]) -> bool:
         log.info('Sending notification for new config keys being added to %s.  %s', config_keys, subreddit.display_name)
-        subreddit.message(
-            'New Repost Sleuth Options Available!',
-            'Your Repost Sleuth config was missing some newly available options.\n\n '
-            f'I\'ve added the following options to your config: {config_keys}\n\n' 
-            'You can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_config_value_explanation'
-        )
+        try:
+            subreddit.message(
+                'New Repost Sleuth Options Available!',
+                'Your Repost Sleuth config was missing some newly available options.\n\n '
+                f'I\'ve added the following options to your config: {config_keys}\n\n' 
+                'You can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_config_value_explanation'
+            )
+            return True
+        except Exception as e:
+            log.exception('Failed to send PM to %s', subreddit.display_name)
+            return False
 
     def _set_config_validity(self, revision_id: Text, valid: bool) -> NoReturn:
         with self.uowm.start() as uowm:
@@ -301,7 +375,7 @@ class SubredditConfigUpdater:
             revision.is_valid = valid
             uowm.commit()
 
-    def _mark_config_notified(self, revision_id: Text) -> NoReturn:
+    def _set_config_notified(self, revision_id: Text) -> NoReturn:
         with self.uowm.start() as uowm:
             revision = uowm.monitored_sub_config_revision.get_by_revision_id(revision_id)
             revision.notified = True

@@ -323,6 +323,9 @@ class DuplicateImageService:
                     continue
 
                 match_post = uow.posts.get_by_post_id(original_image_post.post_id)
+                if not match_post:
+                    log.error('Failed to find original reddit_post for match')
+                    continue
                 match.post = match_post
                 match.match_id = match_post.id
                 results.append(match)
