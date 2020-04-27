@@ -2,7 +2,7 @@ import time
 from time import perf_counter
 from typing import Text
 
-from praw.exceptions import APIException
+from praw.exceptions import APIException, ClientException
 from praw.models import Comment, Redditor
 from prawcore import Forbidden, PrawcoreException, ResponseException
 
@@ -110,10 +110,12 @@ class ResponseHandler:
                     msg = self.send_private_message(comment.author, msg)
                     comment_reply.body = msg
                     return comment_reply
-                except (PrawcoreException,) as e:
+                except (PrawcoreException,ClientException) as e:
                     log.error('Failed to send PM', exc_info=True)
                     comment_reply.body = 'FAILED TO LEAVE COMMENT OR PM'
                     return comment_reply
+                except Exception as e:
+                    pass
 
         except AssertionError as e:
             log.exception('Problem leaving comment', exc_info=True)
