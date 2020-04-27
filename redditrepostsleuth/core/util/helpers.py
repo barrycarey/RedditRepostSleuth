@@ -211,10 +211,11 @@ def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
     :rtype: dict
     :param search_results: ImageRepostWrapper obj
     """
-    return {
-        'closest_match': search_results.closest_match.to_dict(),
+    search_data = {
+        'closest_match': search_results.closest_match.to_dict() if search_results.closest_match else None,
         'matches': [match.to_dict() for match in search_results.matches],
     }
+    return json.dumps(search_data)
 
 def is_moderator(subreddit: Subreddit, user: Text) -> bool:
     """
@@ -242,5 +243,6 @@ def bot_has_permission(subreddit: Subreddit, permission_name: Text) -> bool:
             else:
                 log.info('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
                 return False
+    log.error('Bot is not mod on %s', subreddit.display_name)
     return False
 

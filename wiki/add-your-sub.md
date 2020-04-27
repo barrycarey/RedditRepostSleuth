@@ -71,7 +71,7 @@ active: Enable / Disable the bot
 
 **removal_reason_id:** ID of the removal reason to use
 
-**title_ignore_keywords:** Skip posts that contain any of these keywords in the title
+**title_ignore_keywords:** Skip posts that contain any of these keywords in the title.  Should be a comma seperate list of words.  word1,word2,word3
 
 **disable_summons_after_auto_response:** Once the bot leaves an automatic comment prevent users from summoning the bot again 
 
@@ -79,4 +79,11 @@ active: Enable / Disable the bot
 
 **remove_additional_summons:** Delete a user's comment summoning the bot if someone else already summoned it
 
-**Comment Templates:** Must be in markdown format.  You have a number of variables you can use in the template.  [Click here for a list](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
+**check_all_submissions:** Should the bot check all new submissions on your sub
+
+**check_title_similarity:** Should the bot also consider title similarity when determining if something is a repost? 
+
+**target_title_match:** How close, in percent, should the title match to be considered a repost.  Only used if check_title_similarity is enabled
+
+### Comment Templates
+Must be in markdown format.  You have a number of variables you can use in the template.  [Click here for a list](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)

@@ -39,6 +39,20 @@ class TestSubredditConfigUpdater(TestCase):
         self.assertTrue(len(r) == 1)
         self.assertTrue('only_comment_on_repost' in r)
 
+    def test__update_monitored_sub_from_wiki_handle_list(self):
+        config = Config(sub_monitor_exposed_config_options=['title_ignore_keywords'])
+        config_updater = self.get_config_updater(config)
+        wiki_config = {'title_ignore_keywords': ['test1']}
+        monitored_sub = MonitoredSub(name='test')
+        config_updater._update_monitored_sub_from_wiki(monitored_sub, wiki_config)
+        self.assertTrue(type(monitored_sub.title_ignore_keywords) == str)
+        self.assertEqual('["test1"]', monitored_sub.title_ignore_keywords)
+
+    def test__create_wiki_config_from_database(self):
+        config = Config(sub_monitor_exposed_config_options=['title_ignore_keywords'])
+        config_updater = self.get_config_updater(config)
+        wiki_config = {'title_ignore_keywords': ['test1']}
+        monitored_sub = MonitoredSub(title_ignore_keywords='["test"]')
 
     def get_config_updater(self, config: Config):
         uowm = MagicMock()
