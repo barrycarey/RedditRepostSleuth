@@ -1,5 +1,7 @@
+import json
 import time
 from datetime import datetime
+from json import JSONDecodeError
 
 from celery import Task
 from praw.exceptions import APIException
@@ -81,7 +83,11 @@ def sub_monitor_check_post(self, submission, monitored_sub):
                 log.info('Post %s has not been ingested yet.  Skipping')
                 return
 
-    if not self.sub_monitor.should_check_post(post, title_keyword_filter=monitored_sub.title_ignore_keywords):
+    title_keywords = []
+    if monitored_sub.title_ignore_keywords:
+        title_keywords = monitored_sub.title_ignore_keywords.split(',')
+
+    if not self.sub_monitor.should_check_post(post, title_keyword_filter=title_keywords):
         return
     self.sub_monitor.check_submission(submission, monitored_sub, post)
 
