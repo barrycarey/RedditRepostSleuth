@@ -1,6 +1,20 @@
-## Want to Help Support Repost Sleuth Bot?
+## Supporting Repost Sleuth
 
-##### TLDR - Repost Sleuth is a passion project that is expensive to run.  I want to add new features like OC theft detection and video searches but this required new hardware.  If you wish to help support the project you now can!
+---
+
+### TLDR
+
+---
+
+Repost Sleuth is a passion project that is expensive to run.  It costs about $40 a month in electricity.  It was just moved to a new $800 server and will soon be getting a $300 RAM upgrade. 
+
+No obligation to donate but I would sincerely appreciate any donations. 
+
+[Click Here To Support Repost Sleuth With a Donation](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=DXTH32CHAK334&source=url)
+
+### What's The Deal?
+
+---
 
 When I started this project I could never imagine how popular it would become.  I put this bot together as a fun side project thinking it might help me land a job someday.  I never thought it would get any traction.  Boy was I wrong.
 
@@ -10,10 +24,10 @@ I am immensely grateful to the Reddit community for the love and support shown t
 
 To put some numbers to it. 
 
-* Average of 1200 summons a day
-* Over 100 subs signed up for monitoring, covering millions of members
-* 130,000 Comments Left
-* Over 20 million image searches performed 
+* Average of 3000 summons a day
+* Over 180 subs signed up for monitoring, covering millions of members
+* 340,000 Comments Left
+* Over 40 million image searches performed 
 * 20 new submissions a second are checked for reposts
 * Over 400 million Reddit submissions indexed
 
@@ -34,7 +48,7 @@ At any given moment there are 20 to 40 containers running to do all of the proce
 
 Most of this runs on a Dell enterprise grade server in my house.  What the server can't handle is currently being picked up by my gaming PC. 
 
-I'd like to add new features like OC theft detection and video repost checking (and get my gaming PC back).  To make this possible I had to buy another service to pick up the slack. 
+I'd like to add new features like OC theft detection and video repost checking (and get my gaming PC back).  To make this possible I had to buy another server to pick up the slack. 
 
 The new server was a cost of $765 out of pocket.  IMO it's money well spent since it will enable the bot to have a much greater capacity.
 
@@ -44,6 +58,4 @@ If you have the means and want to help support Repost Sleuth, you can donate bel
 
 ## Donate
 
-[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=DXTH32CHAK334&source=url)
-
-![donateQR](https://i.imgur.com/9kA5U9Y.png)
+[Click Here To Support Repost Sleuth With a Donation](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=DXTH32CHAK334&source=url)

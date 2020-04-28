@@ -1,89 +1,43 @@
 ### Repost Sleuth Can Check All Your Posts!
-We now allow you to register your sub to have all new submissions checked. 
+---
+You can register your Subreddit to have Repost Sleuth check all new submissions and/or control how the bot handles summons!
 
-The process to active Repost Sleuth is simple. 
+### How To Register
+---
+Make u/RepostSleuthBot a mod with **Wiki and Post** permissions. 
 
-All you have to do is add u/RepostSleuthBot as a mod with Post and Wiki permissions.  That's it. 
+Within 20 minutes the bot will see the moderator invite, accept it and create a wiki page with it's configuration. 
 
-The bot will accept the request, set some sensible default values and start checking posts. 
+Once registration is complete, RepostSleuth will notify you via ModMail. 
 
-## Configuration
+You can then [configure the bot as you please](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth)
 
-Repost Sleuth will create a new wiki page called 'repost_sleuth_config'.  In this wiki page you will find the bot settings in JSON format. 
+### Why Register?
+---
+Registering your sub gives you direct control over a number of the bots features.  You gain the ability to control all these features easily via a config file in your Subreddit's wiki
 
-To change settings simply update the JSON and save.  The bot will load the new config within a few minutes.  Once the new config is loaded you will received a modmail.
+### Moderator Features
+---
+Repost Sleuth can perform a number of Moderation actions to take the load off your Subreddit moderators. 
 
-**Example Config**
-```
-{
-  "active": true,
-  "only_comment_on_repost": true,
-  "report_reposts": false,
-  "report_msg": "RepostSleuthBot-Repost",
-  "match_percent_dif": 5,
-  "same_sub_only": true,
-  "sticky_comment": false,
-  "search_depth": 100,
-  "target_days_old": 180,
-  "meme_filter": false,
-  "oc_response_template": null,
-  "repost_response_template": null,
-  "lock_post": false,
-  "mark_as_oc": false,
-  "remove_repost": false,
-  "removal_reason_id": false,
-  "title_ignore_keywords": [],
-  "disable_summons_after_auto_response": false,
-  "only_allow_one_summons": false,
-  "remove_additional_summons": false,
-  "check_all_submissions": true
-}
-```
+* Report Reposts
+* Lock Reposts
+* Remove Reposts
+* Mark a post as OC
 
-### Config Value Explanation
-active: Enable / Disable the bot
-
-**only_comment_on_repost:** If true the bot only comments on reposts.  If false it will also comment on OC
-
-**report_reposts:** Bot will report any reposts it finds
-
-**report_msg:** The message it will use when reporting
-
-**match_percent_dif:** How strict matching is when determining if an image is a repost. Use values between 0 and 10
-
-**same_sub_only:** Only check for matches within our sub
-
-**sticky_comment:** Comments left by the bot will be stickied
-
-**search_depth:** How many historical posts the bot will check when activated. Max 500
-
-**target_days_old:** Only report matches X days old or newer
-
-**oc_response_template:** Comment template when commenting on OC
-
-**repost_response_template:** Comment template when commenting on reposts
-
-**lock_post:** Locks a post if it is a repost
-
-**mark_as_oc:** Flags post as OC if there are no matches
-
-**remove_repost:** Remove a post if it is a repost
-
-**removal_reason_id:** ID of the removal reason to use
-
-**title_ignore_keywords:** Skip posts that contain any of these keywords in the title.  Should be a comma seperate list of words.  word1,word2,word3
-
-**disable_summons_after_auto_response:** Once the bot leaves an automatic comment prevent users from summoning the bot again 
-
-**only_allow_one_summons:** Only allow the bot to be summoned once per post.  Additional summons will PM the user instead of leaving a comment. If remove_additional_summons is set, the bot will delete the comment with the summons
-
-**remove_additional_summons:** Delete a user's comment summoning the bot if someone else already summoned it
-
-**check_all_submissions:** Should the bot check all new submissions on your sub
-
-**check_title_similarity:** Should the bot also consider title similarity when determining if something is a repost? 
-
-**target_title_match:** How close, in percent, should the title match to be considered a repost.  Only used if check_title_similarity is enabled
-
-### Comment Templates
-Must be in markdown format.  You have a number of variables you can use in the template.  [Click here for a list](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
+# All Features
+---
+* Pick if the bot searches all of Reddit or just your Subreddit
+* Pick custom matching threshold for what is considered a repost
+* Limit how many days back the bot will search for reposts
+* Comment on reposts and sticky the comment
+* Enable the meme filter for better meme matching
+* Mark a post as OC
+* Lock reposts
+* Remove Reposts
+* Report Reposts with custom report message
+* Create custom repost comment templates
+* Limit user tags to 1 per submission
+* Disable user tags of the bot
+* Check title similarity 
+* Check all new submissions
