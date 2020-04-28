@@ -9,3 +9,4 @@ imagehash
 influxdb
 redlock
 dataclasses
+python-Levenshtein

@@ -1,8 +1,9 @@
 from datetime import datetime
 import random
 from time import perf_counter
-from typing import List
+from typing import List, Text
 
+import Levenshtein
 import requests
 from praw import Reddit
 from praw.models import Submission
@@ -16,6 +17,7 @@ from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.objectmapping import post_to_repost_match
+from redditrepostsleuth.core.util.repost_filters import filter_title_distance
 
 
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
@@ -88,7 +90,16 @@ def verify_oc(submission: Submission, repost_service) -> bool:
         return True
 
 
-def check_link_repost(post: Post, uowm: UnitOfWorkManager, get_total: bool = False) -> RepostWrapper:
+def check_link_repost(
+        post: Post,
+        uowm: UnitOfWorkManager,
+        get_total: bool = False,
+        target_title_match: int = None,
+        same_sub: bool = False,
+        date_cutoff: int = None,
+        filter_dead_matches: bool = True,
+        only_older_matches: bool = True
+        ) -> RepostWrapper:
     with uowm.start() as uow:
         start = perf_counter()
         search_results = RepostWrapper()
@@ -96,7 +107,15 @@ def check_link_repost(post: Post, uowm: UnitOfWorkManager, get_total: bool = Fal
         raw_results = uow.posts.find_all_by_url_hash(post.url_hash)
         search_results.total_search_time = round(perf_counter() - start, 3)
         search_results.matches = [post_to_repost_match(match, post.id) for match in raw_results]
-        search_results.matches = filter_repost_results(search_results.matches, post)
+        search_results.matches = filter_repost_results(
+            search_results.matches,
+            post,
+            target_title_match=target_title_match,
+            same_sub=same_sub,
+            date_cutoff=date_cutoff,
+            filter_dead_matches=filter_dead_matches,
+            only_older_matches=only_older_matches
+        )
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')
         #search_results.total_search_time = perf_counter() - start
@@ -115,13 +134,18 @@ def check_link_repost_by_post_id(post_id: str, uowm: UnitOfWorkManager) -> Repos
 def filter_repost_results(
         matches: List[RepostMatch],
         checked_post: Post,
+        target_title_match: int = None,
         same_sub: bool = False,
-        only_older_matches=True,
         date_cutoff: int = None,
+        filter_dead_matches: bool = True,
+        only_older_matches: bool = True,
         exclude_crossposts: bool = True
 
 ) -> List[RepostMatch]:
     results = []
+    if target_title_match:
+        matches = set_all_title_similarity(checked_post.title, matches)
+
     for match in matches:
 
         if match.post.post_id == checked_post.post_id:
@@ -149,9 +173,14 @@ def filter_repost_results(
             log.debug('Crosspost Reject: %s', f'https://redd.it/{match.post.post_id}')
             continue
 
+        if target_title_match and match.title_similarity <= target_title_match:
+            log.debug('Title Similarity Filter Reject: Target: %s Actual: %s', target_title_match, match.title_similarity)
+            continue
+
         results.append(match)
 
     return results
+
 
 def get_first_active_match(matches: List[RepostMatch]) -> RepostMatch:
     for match in matches:
@@ -162,3 +191,21 @@ def get_first_active_match(matches: List[RepostMatch]) -> RepostMatch:
                 return match
         except Exception as e:
             continue
+
+
+def get_title_similarity(title1: Text, title2: Text) -> float:
+    result = Levenshtein.ratio(title1, title2)
+    log.debug('Difference between %s and %s: %s', title1, title2, result)
+    return round(result * 100, 0)
+
+def set_all_title_similarity(title: Text, matches: List[RepostMatch]) -> List[RepostMatch]:
+    """
+    Take a list of repost matches and set the title similarity vs the provided title
+    :param title: Title to measure each match against
+    :param matches: List of matches to check
+    :return: List of RepostMatches
+    """
+    for match in matches:
+        match.title_similarity = get_title_similarity(title, match.post.title)
+    return matches
+

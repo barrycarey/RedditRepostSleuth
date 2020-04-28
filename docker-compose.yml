@@ -66,7 +66,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q summons -c 1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q summons -c 3
         volumes:
             - /opt/imageindex:/opt/imageindex
 
@@ -90,7 +90,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 6
         volumes:
             - /opt/imageindex:/opt/imageindex
 
@@ -103,7 +103,7 @@ services:
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
             #- HASH_API=http://157.230.64.152:8000/hash
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 10
 
     generic_repost_worker:
         build:
@@ -124,9 +124,21 @@ services:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 4
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 2
         volumes:
             - /opt/imageindex:/opt/imageindex
+
+    deleted_post_cleanup_worker:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - C_FORCE_ROOT=True
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
+            - UTIL_API=http://167.99.22.106:8000
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q delete -c 2
+
 
     ingest_pushshift_worker:
         build:
@@ -137,7 +149,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 2
 
     pushshift_archive_intake_worker:
         build:

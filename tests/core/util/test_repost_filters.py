@@ -6,7 +6,7 @@ from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_sub_filter, annoy_distance_filter, \
     hamming_distance_filter, filter_newer_matches, filter_days_old_matches, filter_same_author, filter_same_post, \
-    filter_title_keywords
+    filter_title_keywords, filter_title_distance
 
 
 class TestCross_post_filter(TestCase):
@@ -133,6 +133,27 @@ class TestCross_post_filter(TestCase):
         matches.append(match2)
         matches.append(match3)
         r = list(filter(filter_same_author('barry'), matches))
+        self.assertEqual(len(r), 1)
+        self.assertEqual(3, r[0].match_id)
+
+    def test_filter_title_similarity__remove_lower(self):
+        matches = []
+        match1 = ImageMatch()
+        match2 = ImageMatch()
+        match3 = ImageMatch()
+        match1.match_id = 1
+        match2.match_id = 2
+        match3.match_id = 3
+        match1.post = Post(author='barry')
+        match2.post = Post(author='barry')
+        match3.post = Post(author='steve')
+        match1.title_similarity = .500
+        match2.title_similarity = .75
+        match3.title_similarity = .80
+        matches.append(match1)
+        matches.append(match2)
+        matches.append(match3)
+        r = list(filter(filter_title_distance(.76), matches))
         self.assertEqual(len(r), 1)
         self.assertEqual(3, r[0].match_id)
 

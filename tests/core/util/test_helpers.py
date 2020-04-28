@@ -1,9 +1,11 @@
 import os
+from dataclasses import dataclass
 from unittest import TestCase
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from PIL import Image
+from praw.models import Subreddit
 
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.core.exception import ImageConversioinException
@@ -11,7 +13,8 @@ from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, create_meme_template, \
-    post_type_from_url, build_markdown_list, build_msg_values_from_search, build_image_msg_values_from_search
+    post_type_from_url, build_markdown_list, build_msg_values_from_search, build_image_msg_values_from_search, \
+    is_moderator, bot_has_permission
 
 
 class TestHelpers(TestCase):
@@ -203,3 +206,55 @@ class TestHelpers(TestCase):
         self.assertTrue('item2' in result)
         self.assertEqual(result['item1'], 'value1')
         self.assertEqual(result['item2'], 'value2')
+
+    def test_is_moderator_true(self):
+        @dataclass
+        class Moderator:
+            name: str
+        subreddit = MagicMock()
+        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot')]
+        self.assertTrue(is_moderator(subreddit, 'RepostSleuthBot'))
+
+    def test_is_moderator_false(self):
+        @dataclass
+        class Moderator:
+            name: str
+        subreddit = MagicMock()
+        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot')]
+        self.assertFalse(is_moderator(subreddit, 'Test'))
+
+    def test_bot_has_permission_true(self):
+        @dataclass
+        class Moderator:
+            name: str
+            mod_permissions: list
+        subreddit = MagicMock()
+        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['posts'])]
+        self.assertTrue(bot_has_permission(subreddit, 'posts'))
+
+    def test_bot_has_permission_false(self):
+        @dataclass
+        class Moderator:
+            name: str
+            mod_permissions: list
+        subreddit = MagicMock()
+        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['posts'])]
+        self.assertFalse(bot_has_permission(subreddit, 'wiki'))
+
+    def test_bot_has_permission_weird_capitalization_true(self):
+        @dataclass
+        class Moderator:
+            name: str
+            mod_permissions: list
+        subreddit = MagicMock()
+        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['posts'])]
+        self.assertTrue(bot_has_permission(subreddit, 'pOsTs'))
+
+    def test_bot_has_permission_all_permission_true(self):
+        @dataclass
+        class Moderator:
+            name: str
+            mod_permissions: list
+        subreddit = MagicMock()
+        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['all'])]
+        self.assertTrue(bot_has_permission(subreddit, 'posts'))

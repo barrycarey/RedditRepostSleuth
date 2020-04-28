@@ -1,5 +1,5 @@
 import time
-from typing import List, Text
+from typing import List, Text, NoReturn
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment
@@ -22,6 +22,7 @@ from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
@@ -111,7 +112,7 @@ class SubMonitor:
             if post.post_type == 'image':
                 search_results = self._check_for_repost(post, monitored_sub)
             elif post.post_type == 'link':
-                search_results = self._check_for_link_repost(post)
+                search_results = self._check_for_link_repost(post, monitored_sub)
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
             return
@@ -140,6 +141,13 @@ class SubMonitor:
             log.exception('Failed to leave comment on %s in %s', submission.id, submission.subreddit.display_name)
             return
 
+        msg_values = build_msg_values_from_search(search_results, self.uowm,
+                                                  target_days_old=monitored_sub.target_days_old)
+        if search_results.checked_post.post_type == 'image':
+            msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
+
+        report_msg = self.response_builder.build_report_msg(monitored_sub.name, msg_values)
+
         self._sticky_reply(monitored_sub, comment)
         self._lock_post(monitored_sub, submission)
         self._remove_post(monitored_sub, submission)
@@ -148,7 +156,7 @@ class SubMonitor:
         self._create_checked_post(post)
 
         if search_results.matches:
-            self._report_submission(monitored_sub, submission)
+            self._report_submission(monitored_sub, submission, report_msg)
 
 
     def _check_sub(self, monitored_sub: MonitoredSub):
@@ -205,6 +213,11 @@ class SubMonitor:
                 log.exception('Failed to leave comment on %s in %s', submission.id, submission.subreddit.display_name)
                 continue
 
+            msg_values = build_msg_values_from_search(search_results, self.uowm,
+                                                      target_days_old=monitored_sub.target_days_old)
+            if search_results.checked_post.post_type == 'image':
+                msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
+
             self._sticky_reply(monitored_sub, comment)
             self._lock_post(monitored_sub, submission)
             self._remove_post(monitored_sub, submission)
@@ -238,8 +251,15 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
 
-    def _check_for_link_repost(self, post: Post):
-        return check_link_repost(post, self.uowm, get_total=True)
+    def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub):
+        return check_link_repost(
+            post,
+            self.uowm,
+            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+            same_sub=monitored_sub.same_sub_only,
+            date_cutoff=monitored_sub.target_days_old,
+            get_total=False
+        )
 
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageRepostWrapper:
         """
@@ -312,14 +332,14 @@ class SubMonitor:
                 log.exception('Failed to set post OC https://redd.it/%s', submission.id, exc_info=True)
 
 
-    def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission):
+    def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission, report_msg: Text) -> NoReturn:
         if not monitored_sub.report_submission:
             return
         log.info('Reporting post %s on %s', f'https://redd.it/{submission.id}', monitored_sub.name)
         try:
-            submission.report(monitored_sub.report_msg)
+            submission.report(report_msg)
         except Exception as e:
-            log.exception('Failed to report submissioni', exc_info=True)
+            log.exception('Failed to report submission', exc_info=True)
 
     def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> Comment:
 
@@ -331,7 +351,8 @@ class SubMonitor:
             msg = self.response_builder.build_sub_repost_comment(
                 search_results.checked_post.subreddit,
                 msg_values,
-                search_results.checked_post.post_type
+                search_results.checked_post.post_type,
+                stats=True if search_results.checked_post.post_type == 'image' else False
             )
         else:
             msg = self.response_builder.build_sub_oc_comment(
@@ -370,3 +391,4 @@ class SubMonitor:
                 subreddit=subreddit
             )
         )
+

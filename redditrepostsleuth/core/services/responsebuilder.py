@@ -10,6 +10,7 @@ from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COM
     LINK_SIGNATURE, CLOSEST_MATCH, CLOSEST_MATCH_MEME
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
+DEFAULT_REPORT_MSG = 'RepostSleuthBot-Repost'
 
 class ResponseBuilder:
     # TODO - Logic to add or strip line break if signature is used
@@ -26,7 +27,7 @@ class ResponseBuilder:
             'link_signature': LINK_SIGNATURE
         }
 
-    def build_sub_repost_comment(self, sub: str, values: Dict, post_type: Text, stats: bool = True, signature: bool = True):
+    def build_sub_repost_comment(self, sub: str, values: Dict, post_type: Text, stats: bool = True, signature: bool = True) -> Text:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(sub)
             if not monitored_sub or not monitored_sub.repost_response_template:
@@ -44,7 +45,7 @@ class ResponseBuilder:
                 log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
                 return self.build_default_repost_comment(values, post_type, signature=False, stats=False)
 
-    def build_default_repost_comment(self, values: Dict, post_type: Text,  stats: bool = True, signature: bool = True):
+    def build_default_repost_comment(self, values: Dict, post_type: Text,  stats: bool = True, signature: bool = True) -> Text:
         # TODO - Why am I doing this? There should be matches if calling this method
         total_matches = values.get('match_count', None)
         msg = ''
@@ -82,7 +83,7 @@ class ResponseBuilder:
 
         return msg.format(**values)
 
-    def build_sub_oc_comment(self, sub: str, values: Dict, post_type: Text,  signature: bool = True) -> Text:
+    def build_sub_oc_comment(self, sub: Text, values: Dict, post_type: Text,  signature: bool = True) -> Text:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(sub)
             if not monitored_sub or not monitored_sub.oc_response_template:
@@ -101,7 +102,7 @@ class ResponseBuilder:
                 log.error('Custom oc template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
                 return self.build_default_oc_comment(values, post_type)
 
-    def build_default_oc_comment(self, values: Dict, post_type: Text,  signature: bool = True):
+    def build_default_oc_comment(self, values: Dict, post_type: Text,  signature: bool = True) -> Text:
         if post_type == 'image':
             msg = self.default_templates['image_oc']
         elif post_type == 'link':
@@ -119,6 +120,23 @@ class ResponseBuilder:
             elif post_type == 'link':
                 msg = msg + self.default_templates['link_signature']
         return msg.format(**values)
+
+    def build_report_msg(self, subreddit: Text, values: Dict) -> Text:
+        with self.uowm.start() as uow:
+            monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
+            if not monitored_sub:
+                log.error('Failed to find sub %s when building report message', subreddit)
+                return DEFAULT_REPORT_MSG
+            if not monitored_sub.report_msg:
+                log.debug('Sub %s doesn\'t have a custom report message, returning default', subreddit)
+                return DEFAULT_REPORT_MSG
+            try:
+                msg = monitored_sub.report_msg.format(**values)
+                log.debug('Build custom report message for sub %s: %s', msg, subreddit)
+                return msg
+            except Exception as e:
+                log.exception('Failed to build report msg', exc_info=True)
+                return DEFAULT_REPORT_MSG
 
 if __name__ == '__main__':
     config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
