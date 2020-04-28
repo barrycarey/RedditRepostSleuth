@@ -78,7 +78,7 @@ def sub_monitor_check_post(self, submission, monitored_sub):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(submission.id)
         if not post:
-            post = self.save_unknown_post(submission.id)
+            post = self.sub_monitor.save_unknown_post(submission.id)
             if not post:
                 log.info('Post %s has not been ingested yet.  Skipping')
                 return

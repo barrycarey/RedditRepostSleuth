@@ -107,7 +107,15 @@ def check_link_repost(
         raw_results = uow.posts.find_all_by_url_hash(post.url_hash)
         search_results.total_search_time = round(perf_counter() - start, 3)
         search_results.matches = [post_to_repost_match(match, post.id) for match in raw_results]
-        search_results.matches = filter_repost_results(search_results.matches, post)
+        search_results.matches = filter_repost_results(
+            search_results.matches,
+            post,
+            target_title_match=target_title_match,
+            same_sub=same_sub,
+            date_cutoff=date_cutoff,
+            filter_dead_matches=filter_dead_matches,
+            only_older_matches=only_older_matches
+        )
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')
         #search_results.total_search_time = perf_counter() - start

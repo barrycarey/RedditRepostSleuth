@@ -32,6 +32,7 @@ if __name__ == '__main__':
         with uowm.start() as uow:
             monitored_subs = uow.monitored_sub.get_all()
             for monitored_sub in monitored_subs:
+                log.info('Checking sub %s', monitored_sub.name)
                 subreddit = reddit.subreddit(monitored_sub.name)
                 if subreddit:
                     monitored_sub.subscribers = subreddit.subscribers
@@ -42,7 +43,7 @@ if __name__ == '__main__':
                 if not monitored_sub.active and monitored_sub.check_all_submissions:
                     log.debug('Sub %s is disabled', monitored_sub.name)
                     continue
-                log.info('Checking sub %s', monitored_sub.name)
+
                 process_monitored_sub.apply_async((monitored_sub,), queue='submonitor')
                 continue
 

@@ -142,10 +142,11 @@ class SummonsHandler:
                 if monitored_sub.disable_summons_after_auto_response:
                     log.info('Sub %s has summons disabled after auto response', summons.subreddit)
                     auto_response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'submonitor')
-                    self._send_already_responded_msg(summons, f'https://reddit.com{auto_response.perma_link}')
-                    if monitored_sub.remove_additional_summons:
-                        self._delete_mention(summons.comment_id)
-                    return
+                    if auto_response:
+                        self._send_already_responded_msg(summons, f'https://reddit.com{auto_response.perma_link}')
+                        if monitored_sub.remove_additional_summons:
+                            self._delete_mention(summons.comment_id)
+                        return
 
                 if monitored_sub.only_allow_one_summons:
                     response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'summons')
