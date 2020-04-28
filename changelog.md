@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 
+## [0.1.6] - 4/27/2020
+
+* [feature] - Report messages can now include custom variable values.  More info [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
+* [feature] - Add check_all_submissions config option.  Allows subs to set rules for the bot without having all new submissions checked. Rules are honored by user summons
+* [feature] - Add title similarity checking using Levenshtein distance. Feature can be enabled in config.  Matching % also set in config 
+* [backend] - Reworked job to cleanup deleted posts.  Will eventually reduce search index size and increase search speed.
+* [backend] - Log full search results.  This will allow specific searches to be fully reviewed for better troubleshooting
+* [backend] - Track registered subreddit subscriber count to better distribute load  
+* [backend] - Completely rewrote registered subreddit config handling and added extensive unit testing. Can now more easily add and remove config options and keep database and wiki pages in sync
+* [bugfix] - Repost check on links ignored custom options set by registered sub.  Example, when sam_sub was enable, link reposts outside of sub were still flagged
+* [bugfix] - New config options not being applied when updated via wiki
+* [bugfix] - Fixed bug that caused certain summons responses to crash out and not respond.  This resulted in some people not getting replies
+* [bugfix] - Fixed bug causing submission scanner for registered subs to crash out on posts the bot hadn't ingested yet
 
 ## [0.1.5] - 4/4/2020
 
@@ -19,7 +32,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [backend] - Improved handling of reaching API rate limits, including automatic cool off. 
 * [summons] - Reworked summons queue handling to attempt to prevent backlogs
 * [summons] - Add special handling to only send PMs for r/PewdiepieSubmissions. The bot has been unbanned but not modded so it is hitting rate limits commenting due to the large volumn of summons
-
 
 ## [0.1.4] - 2/9/2020
 
