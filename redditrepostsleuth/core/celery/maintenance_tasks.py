@@ -132,7 +132,7 @@ def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
                     for u in user_reports:
                         log.debug('Deleting report %s', u.id)
                         uow.user_report.remove(u)
-                print(f'Removing post {post.url}')
+                print(f'Removing {post.id} - {post.created_at} - {post.url}')
                 uow.posts.remove(post)
             else:
                 #print(f'Updating post {post.post_id}')

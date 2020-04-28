@@ -6,3 +6,4 @@ influxdb
 imagehash
 distance
 redlock
+python-Levenshtein
