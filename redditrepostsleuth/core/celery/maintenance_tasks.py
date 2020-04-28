@@ -87,6 +87,7 @@ def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
                 continue
 
             if not p['alive']:
+
                 #remove_post(self.uowm, post)
                 image_post = uow.image_post.get_by_post_id(post.post_id)
                 image_post_current = uow.image_post_current.get_by_post_id(post.post_id)
@@ -100,39 +101,39 @@ def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
 
                 # uow.posts.remove(post)
                 if image_post:
-                    log.debug('Deleting image post %s', image_post.id)
+                    log.info('Deleting image post %s', image_post.id)
                     uow.image_post.remove(image_post)
                 if image_post_current:
-                    log.debug('Deleting image post current %s', image_post_current.id)
+                    log.info('Deleting image post current %s', image_post_current.id)
                     uow.image_post_current.remove(image_post_current)
                 if investigate_post:
-                    log.debug('Deleting investigate %s', investigate_post.id)
+                    log.info('Deleting investigate %s', investigate_post.id)
                     uow.investigate_post.remove(investigate_post)
                 if link_repost:
                     for r in link_repost:
-                        log.debug('Deleting link repost %s', r.id)
+                        log.info('Deleting link repost %s', r.id)
                         uow.link_repost.remove(r)
                 if image_reposts:
                     for r in image_reposts:
-                        log.debug('Deleting image repost %s', r.id)
+                        log.info('Deleting image repost %s', r.id)
                         uow.image_repost.remove(r)
                 if comments:
                     for c in comments:
-                        log.debug('Deleting comment %s', c.id)
+                        log.info('Deleting comment %s', c.id)
                         uow.bot_comment.remove(c)
                 if summons:
                     for s in summons:
-                        log.debug('deleting summons %s', s.id)
+                        log.info('deleting summons %s', s.id)
                         uow.summons.remove(s)
                 if image_search:
                     for i in image_search:
-                        log.debug('Deleting image search %s', i.id)
+                        log.info('Deleting image search %s', i.id)
                         uow.image_search.remove(i)
                 if user_reports:
                     for u in user_reports:
-                        log.debug('Deleting report %s', u.id)
+                        log.info('Deleting report %s', u.id)
                         uow.user_report.remove(u)
-                print(f'Removing {post.id} - {post.created_at} - {post.url}')
+                #print(f'Removing {post.id} - {post.created_at} - {post.url}')
                 uow.posts.remove(post)
             else:
                 #print(f'Updating post {post.post_id}')
