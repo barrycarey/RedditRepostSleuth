@@ -90,7 +90,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 4
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 6
         volumes:
             - /opt/imageindex:/opt/imageindex
 

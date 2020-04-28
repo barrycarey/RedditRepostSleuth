@@ -7,3 +7,4 @@ influxdb
 annoy
 distance
 celery[redis]==4.3.0
+python-Levenshtein

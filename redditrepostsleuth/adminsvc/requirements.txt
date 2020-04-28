@@ -2,3 +2,4 @@ pymysql
 praw
 sqlalchemy
 influxdb
+imagehash

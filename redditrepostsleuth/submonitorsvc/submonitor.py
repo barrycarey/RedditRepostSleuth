@@ -258,7 +258,7 @@ class SubMonitor:
             target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
             same_sub=monitored_sub.same_sub_only,
             date_cutoff=monitored_sub.target_days_old,
-            get_total=True
+            get_total=False
         )
 
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageRepostWrapper:
@@ -351,7 +351,8 @@ class SubMonitor:
             msg = self.response_builder.build_sub_repost_comment(
                 search_results.checked_post.subreddit,
                 msg_values,
-                search_results.checked_post.post_type
+                search_results.checked_post.post_type,
+                stats=True if search_results.checked_post.post_type == 'image' else False
             )
         else:
             msg = self.response_builder.build_sub_oc_comment(
