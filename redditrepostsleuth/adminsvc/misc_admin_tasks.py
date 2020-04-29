@@ -26,7 +26,19 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
                 uow.commit()
                 continue
 
+            sub.is_mod = True
             sub.post_permission = bot_has_permission(subreddit, 'post')
             sub.wiki_permission = bot_has_permission(subreddit, 'wiki')
             log.info('%s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
             uow.commit()
+
+
+if __name__ == '__main__':
+    config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    reddit = get_reddit_instance(config)
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    reddit_manager = RedditManager(reddit)
+    event_logger = EventLogging(config=config)
+    response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
+    updater = SubredditConfigUpdater(uowm, reddit, response_handler, config)
+    updater.update_configs()
