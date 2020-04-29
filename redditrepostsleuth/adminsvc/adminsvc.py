@@ -2,7 +2,7 @@ import sys
 import threading
 import time
 
-
+from apscheduler.schedulers.background import BackgroundScheduler
 
 sys.path.append('./')
 from redditrepostsleuth.core.logging import log
@@ -32,6 +32,18 @@ if __name__ == '__main__':
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
     config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler, config)
     inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        func=config_updater.update_configs,
+        trigger='interval',
+
+    )
+
+
+
+
+
     threading.Thread(target=config_updater.update_configs, name='config_update').start()
     threading.Thread(target=activation_monitor.check_for_new_invites, name='activation').start()
     while True:
