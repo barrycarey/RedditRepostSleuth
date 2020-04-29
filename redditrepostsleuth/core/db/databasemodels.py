@@ -210,6 +210,10 @@ class MonitoredSub(Base):
     check_title_similarity = Column(Boolean, default=False)
     target_title_match = Column(Integer)
     subscribers = Column(Integer, default=0)
+    is_mod = Column(Boolean, default=False)
+    post_permission = Column(Boolean, default=False)
+    wiki_permission = Column(Boolean, default=False)
+
 
 
     def to_dict(self):
