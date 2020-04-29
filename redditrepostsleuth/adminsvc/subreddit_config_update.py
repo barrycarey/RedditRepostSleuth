@@ -37,18 +37,17 @@ class SubredditConfigUpdater:
         self.config = config
 
     def update_configs(self):
-        while True:
-            try:
-                with self.uowm.start() as uow:
-                    monitored_subs = uow.monitored_sub.get_all()
-                    for sub in monitored_subs:
-                        try:
-                            self.check_for_config_update(sub)
-                        except Exception as e:
-                            log.exception('Config failure ')
-                    time.sleep(180)
-            except Exception as e:
-                log.exception('Config update thread crashed', exc_info=True)
+        try:
+            with self.uowm.start() as uow:
+                monitored_subs = uow.monitored_sub.get_all()
+                for sub in monitored_subs:
+                    try:
+                        self.check_for_config_update(sub)
+                    except Exception as e:
+                        log.exception('Config failure ')
+                time.sleep(180)
+        except Exception as e:
+            log.exception('Config update thread crashed', exc_info=True)
 
     def check_for_config_update(self, monitored_sub: MonitoredSub):
         # TODO - Possibly pass the subreddit to get_wiki_config

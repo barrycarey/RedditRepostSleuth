@@ -37,20 +37,37 @@ if __name__ == '__main__':
     scheduler.add_job(
         func=config_updater.update_configs,
         trigger='interval',
-
+        minutes=15,
+        name='update_configs',
+        max_instances=3
     )
+    scheduler.add_job(
+        func=activation_monitor.check_for_new_invites,
+        trigger='interval',
+        minutes=1,
+        name='activation_checker',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=stats_updater.run_update,
+        trigger='interval',
+        minutes=15,
+        name='stats_update',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=inbox_monitor.check_inbox,
+        trigger='interval',
+        minutes=5,
+        name='inbox_monitor',
+        max_instances=1
+    )
+    scheduler.start()
 
-
-
-
-
-    threading.Thread(target=config_updater.update_configs, name='config_update').start()
-    threading.Thread(target=activation_monitor.check_for_new_invites, name='activation').start()
-    while True:
-        try:
-            comment_monitor.check_comments()
-            stats_updater.run_update()
-            inbox_monitor.check_inbox()
-            time.sleep(600)
-        except Exception as e:
-            log.exception('Admin svc died', exc_info=True)
+    try:
+        # This is here to simulate application activity (which keeps the main thread alive).
+        while True:
+            time.sleep(2)
+    except (KeyboardInterrupt, SystemExit):
+        # Not strictly necessary if daemonic mode is enabled but should be done if possible
+        scheduler.shutdown()
