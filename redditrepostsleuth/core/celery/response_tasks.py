@@ -6,6 +6,7 @@ from json import JSONDecodeError
 from celery import Task
 from praw.exceptions import APIException
 from prawcore import ResponseException
+from redlock import RedLockError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
@@ -118,38 +119,42 @@ def process_summons(self, s):
         if updated_summons and updated_summons.summons_replied_at:
             log.info('Summons %s already replied, skipping', s.id)
             return
-        with redlock.create_lock(f'summons_{s.id}', ttl=30000):
-            post = uow.posts.get_by_post_id(s.post_id)
-            if not post:
-                post = self.summons_handler.save_unknown_post(s.post_id)
+        try:
+            with redlock.create_lock(f'summons_{s.id}', ttl=120000):
+                post = uow.posts.get_by_post_id(s.post_id)
+                if not post:
+                    post = self.summons_handler.save_unknown_post(s.post_id)
 
-            if not post:
-                response = RepostResponseBase(summons_id=s.id)
-                response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
-                log.info('Failed to ingest post %s.  Sending error response', s.post_id)
-                self.summons_handler._send_response(s.comment_id, response)
-                return
+                if not post:
+                    response = RepostResponseBase(summons_id=s.id)
+                    response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
+                    log.info('Failed to ingest post %s.  Sending error response', s.post_id)
+                    self.summons_handler._send_response(s.comment_id, response)
+                    return
 
-            try:
-                self.summons_handler.process_summons(s, post)
-            except ResponseException as e:
-                if e.response.status_code == 429:
-                    log.error('IP Rate limit hit.  Waiting')
-                    time.sleep(60)
-                    return
-            except AssertionError as e:
-                if 'code: 429' in str(e):
-                    log.error('Too many requests from IP.  Waiting')
-                    time.sleep(60)
-                    return
-            except APIException as e:
-                if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
-                    log.error('Hit API rate limit for summons %s on sub %s.', s.id, s.subreddit)
-                    return
-                    #time.sleep(60)
+                try:
+                    self.summons_handler.process_summons(s, post)
+                except ResponseException as e:
+                    if e.response.status_code == 429:
+                        log.error('IP Rate limit hit.  Waiting')
+                        time.sleep(60)
+                        return
+                except AssertionError as e:
+                    if 'code: 429' in str(e):
+                        log.error('Too many requests from IP.  Waiting')
+                        time.sleep(60)
+                        return
+                except APIException as e:
+                    if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
+                        log.error('Hit API rate limit for summons %s on sub %s.', s.id, s.subreddit)
+                        return
+                        #time.sleep(60)
 
-            # TODO - This sends completed summons events to influx even if they fail
-            summons_event = SummonsEvent(float((datetime.utcnow() - s.summons_received_at).seconds),
-                                         s.summons_received_at, s.requestor, event_type='summons')
-            self.summons_handler._send_event(summons_event)
-            log.info('Finished summons %s', s.id)
+                # TODO - This sends completed summons events to influx even if they fail
+                summons_event = SummonsEvent(float((datetime.utcnow() - s.summons_received_at).seconds),
+                                             s.summons_received_at, s.requestor, event_type='summons')
+                self.summons_handler._send_event(summons_event)
+                log.info('Finished summons %s', s.id)
+        except RedLockError:
+            log.error('Summons %s already in process', s.id)
+            time.sleep(3)
