@@ -19,7 +19,7 @@ services:
                 max_attempts: 3
                 window: 120s
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
 
     hot_post:
         build:
