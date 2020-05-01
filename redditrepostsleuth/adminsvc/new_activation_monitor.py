@@ -23,18 +23,17 @@ class NewActivationMonitor:
         self.reddit = reddit
 
     def check_for_new_invites(self):
-        while True:
-            try:
-                log.info('Checking for new mod invites')
-                for msg in self.reddit.inbox.messages(limit=100):
-                    if 'invitation to moderate' in msg.subject:
-                        if self.is_already_active(msg.subreddit.display_name):
-                            log.info('%s is already a monitored sub', msg.subreddit.display_name)
-                            continue
-                        self.activate_sub(msg)
-                time.sleep(180)
-            except Exception as e:
-                log.exception('Activation thread died', exc_info=True)
+        try:
+            log.info('Checking for new mod invites')
+            for msg in self.reddit.inbox.messages(limit=100):
+                if 'invitation to moderate' in msg.subject:
+                    if self.is_already_active(msg.subreddit.display_name):
+                        log.info('%s is already a monitored sub', msg.subreddit.display_name)
+                        continue
+                    self.activate_sub(msg)
+            time.sleep(180)
+        except Exception as e:
+            log.exception('Activation thread died', exc_info=True)
 
     def accept_invite(self, msg):
         pass
