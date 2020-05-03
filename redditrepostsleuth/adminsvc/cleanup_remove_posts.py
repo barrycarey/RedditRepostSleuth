@@ -43,16 +43,18 @@ def get_certain_sites(uowm):
 
 def get_all_links():
     conn = get_db_conn()
+    batch = []
     with conn.cursor() as cur:
-        query = f"SELECT post_id, url FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 60 DAY LIMIT 4000000"
+        query = f"SELECT post_id, url, post_type FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 60 DAY"
         cur.execute(query)
         log.info('Adding items to index')
-        all_posts = []
         for row in cur:
-            all_posts.append({'id': row['post_id'], 'url': row['url']})
-        chunks = chunk_list(all_posts, 75)
-        for chunk in chunks:
-            cleanup_removed_posts_batch.apply_async((chunk,), queue='delete')
+            if row['post_type'] != 'image':
+                continue
+            batch.append({'id': row['post_id'], 'url': row['url']})
+            if len(batch) >= 15:
+                cleanup_removed_posts_batch.apply_async((batch,), queue='delete')
+                batch = []
 
 def get_all_reddit_links():
     conn = get_db_conn()
@@ -70,14 +72,13 @@ def get_all_reddit_links():
 
 def get_all_links_old(uowm):
     with uowm.start() as uow:
-        ids = []
-        all_posts = []
+        batch = []
         posts = uow.posts.find_all_for_delete_check(hours=1440, limit=2000000)
         for post in posts:
-            all_posts.append({'id': post.post_id, 'url': post.url})
-        chunks = chunk_list(all_posts, 75)
-        for chunk in chunks:
-            cleanup_removed_posts_batch.apply_async((chunk,), queue='delete')
+            batch.append({'id': post.post_id, 'url': post.url})
+            if len(batch) >= 15:
+                cleanup_removed_posts_batch.apply_async((batch,), queue='delete')
+                batch = []
 
 
 if __name__ == '__main__':
@@ -85,7 +86,7 @@ if __name__ == '__main__':
     config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
 
-    get_all_reddit_links()
+    get_all_links()
     sys.exit()
 
 
