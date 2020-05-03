@@ -141,6 +141,7 @@ class ImageRepost(Base):
     post_id = Column(String(100), nullable=False, unique=True)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
+    author = Column(String(100), nullable=False)
 
 class LinkRepost(Base):
 
@@ -149,6 +150,7 @@ class LinkRepost(Base):
     post_id = Column(String(100), nullable=False, unique=True)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
+    author = Column(String(100), nullable=False)
 
 class VideoHash(Base):
     __tablename__ = 'reddit_video_hashes'

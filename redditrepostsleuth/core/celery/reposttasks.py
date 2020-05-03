@@ -83,7 +83,7 @@ def link_repost_check(self, posts, ):
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
             """
             repost_of = repost.matches[0].post
-            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id)
+            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author)
             repost_of.repost_count += 1
             post.checked_repost = True
             uow.posts.update(post)
