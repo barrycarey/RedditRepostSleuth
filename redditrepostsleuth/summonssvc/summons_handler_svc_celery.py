@@ -43,6 +43,7 @@ if __name__ == '__main__':
                     queued_items = redis_client.lrange('summons', 0, 20000)
                     if len(queued_items) == 0:
                         log.info('Summons queue empty.  Starting over')
+                        time.sleep(60)
                         break
                     log.info('Summons queue still has %s tasks', len(queued_items))
                     time.sleep(15)
