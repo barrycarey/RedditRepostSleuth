@@ -91,7 +91,8 @@ def save_image_repost_result(search_results: RepostWrapper, uowm: UnitOfWorkMana
             new_repost = ImageRepost(post_id=search_results.checked_post.post_id,
                                      repost_of=repost_of.post.post_id,
                                      hamming_distance=repost_of.hamming_distance,
-                                     annoy_distance=repost_of.annoy_distance)
+                                     annoy_distance=repost_of.annoy_distance,
+                                     author=search_results.checked_post.author)
             repost_of.post.repost_count += 1
             uow.posts.update(repost_of.post)
             uow.image_repost.add(new_repost)
