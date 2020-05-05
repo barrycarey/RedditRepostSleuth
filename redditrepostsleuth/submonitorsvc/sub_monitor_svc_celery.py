@@ -32,6 +32,8 @@ if __name__ == '__main__':
         with uowm.start() as uow:
             monitored_subs = uow.monitored_sub.get_all()
             for monitored_sub in monitored_subs:
+                if not monitored_sub.active:
+                    continue
                 log.info('Checking sub %s', monitored_sub.name)
                 subreddit = reddit.subreddit(monitored_sub.name)
                 if subreddit:

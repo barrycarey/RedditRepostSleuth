@@ -126,7 +126,7 @@ def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
 
                 # uow.posts.remove(post)
                 if image_post:
-                    log.info('Deleting image post %s', image_post.id)
+                    log.info('Deleting image post %s - %s', image_post.id, post.url)
                     #log.info(post.url)
                     uow.image_post.remove(image_post)
                 if image_post_current:
@@ -205,3 +205,27 @@ def cleanup_removed_posts_batch_back(self, posts: List[Text]) -> NoReturn:
                 continue
             except Exception as e:
                 continue
+
+
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def update_repost_author(self, posts: List[Text]) -> NoReturn:
+    util_api = os.getenv('UTIL_API')
+    if not util_api:
+        raise ValueError('Missing util API')
+    try:
+        res = requests.post(f'{util_api}/maintenance/get_id', json=posts)
+    except Exception as e:
+        log.exception('Failed to call delete check api', exc_info=True)
+        return
+    if res.status_code != 200:
+        log.error('Unexpected status code: %s', res.status_code)
+        return
+
+    res_data = json.loads(res.text)
+    with self.uowm.start() as uow:
+        for p in res_data:
+            repost = uow.image_repost.get_by_id(p['id'])
+            repost.author = p['author']
+        uow.commit()
+        log.info('Saved batch')
