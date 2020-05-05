@@ -11,8 +11,11 @@ class ImageRepostRepository:
     def __init__(self, db_session):
         self.db_session = db_session
 
-    def get_all(self):
-        return self.db_session.query(ImageRepost).all()
+    def get_all(self, limit: int = None, offset: int = None):
+        return self.db_session.query(ImageRepost).order_by(ImageRepost.id.desc()).offset(offset).limit(limit).all()
+
+    def get_all_without_author(self, limit: int = None, offset: int = None):
+        return self.db_session.query(ImageRepost).filter(ImageRepost.author == None).order_by(ImageRepost.id.desc()).offset(offset).limit(limit).all()
 
     def get_by_id(self, id: int) -> ImageRepost:
         return self.db_session.query(ImageRepost).filter(ImageRepost.id == id).first()

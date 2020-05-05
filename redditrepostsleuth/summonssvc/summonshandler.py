@@ -5,6 +5,7 @@ from typing import Tuple, Text, NoReturn
 from praw.exceptions import APIException
 from praw.models import Redditor
 from prawcore import ResponseException
+from sqlalchemy.exc import InternalError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch
@@ -432,8 +433,12 @@ class SummonsHandler:
                 summons.comment_reply = response.message
                 summons.summons_replied_at = datetime.utcnow()
                 summons.comment_reply_id = reply.comment.id if reply.comment else None  # TODO: Hacky
-                uow.commit()
-                log.debug('Committed summons response to database')
+                try:
+                    uow.commit()
+                    log.debug('Committed summons response to database')
+                except InternalError as e:
+                    log.error('Failed to save response to summons')
+
 
     def _save_post(self, post: Post):
         with self.uowm.start() as uow:
