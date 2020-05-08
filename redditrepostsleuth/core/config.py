@@ -2,7 +2,7 @@ import configparser
 import json
 import os
 import sys
-from typing import List, Tuple, Text
+from typing import List, Tuple, Text, NoReturn
 
 from redditrepostsleuth.core.logging import log
 
@@ -25,8 +25,20 @@ class Config:
     CONFIG_NOT_SET = _NotSet()
 
     @classmethod
-    def _load_config(cls, config_file=None):
+    def _load_config(cls, config_file=None) -> NoReturn:
+        """
+        Load the config file.
 
+        Config file can either be passed in, pulled from the ENV, in CWD or in module dir.
+
+        Load priority:
+        1. Passed in config
+        2. ENV
+        3. CWD
+        4 Module Dir
+        :param config_file: path to config file
+        :return: None
+        """
         config_to_load = ()
 
         module_dir = os.path.dirname(sys.modules[__name__].__file__)
