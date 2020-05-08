@@ -52,7 +52,7 @@ def get_all_links():
             if row['post_type'] != 'image':
                 continue
             batch.append({'id': row['post_id'], 'url': row['url']})
-            if len(batch) >= 15:
+            if len(batch) >= 20:
                 cleanup_removed_posts_batch.apply_async((batch,), queue='delete')
                 batch = []
 
@@ -66,7 +66,7 @@ def get_all_reddit_links():
         for row in cur:
             if 'reddit' in row['url']:
                 all_posts.append({'id': row['post_id'], 'url': row['url']})
-        chunks = chunk_list(all_posts, 10)
+        chunks = chunk_list(all_posts, 15)
         for chunk in chunks:
             cleanup_removed_posts_batch.apply_async((chunk,), queue='delete_reddit')
 

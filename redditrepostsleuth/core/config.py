@@ -2,7 +2,7 @@ import configparser
 import json
 import os
 import sys
-from typing import List
+from typing import List, Tuple, Text
 
 from redditrepostsleuth.core.logging import log
 
@@ -21,39 +21,45 @@ class Config:
     This is based on Praw's own config class because I'm an unoriginal bastard"""
 
     CONFIG = {}
+    CONFIG_FILE = None
     CONFIG_NOT_SET = _NotSet()
 
     @classmethod
     def _load_config(cls, config_file=None):
 
-        if config_file:
-            log.info('Checking provided config file: %s', config_file)
-            if not os.path.isfile(config_file):
-                log.error('Provided config does not exist')
-                config_file = None
+        config_to_load = ()
 
         module_dir = os.path.dirname(sys.modules[__name__].__file__)
         log.info('Checking for config in module dir: %s', module_dir)
         if os.path.isfile(os.path.join(module_dir, 'sleuth_config.json')):
             log.info('Found sleuth_config.json in module dir')
-            config_file = os.path.join(module_dir, 'sleuth_config.json')
+            config_to_load = os.path.join(module_dir, 'sleuth_config.json'), 'module'
 
         log.info(f'Checking for config in current dir: %s', os.getcwd())
-        if os.path.isfile('sleuth_config.json'):
+        if not config_to_load and os.path.isfile('sleuth_config.json'):
             log.info('Found sleuth_config.json in current directory')
-            config_file = os.path.join(os.getcwd(), 'sleuth_config.json')
+            config_to_load = os.path.join(os.getcwd(), 'sleuth_config.json'), 'cwd'
 
         print('Checking ENV for config file')
         if os.getenv('bot_config', None):
             if os.path.isfile(os.getenv('bot_config')):
-                config_file = os.getenv('bot_config')
+                config_to_load = os.getenv('bot_config'), 'env'
+                log.info('Loading config provided in ENV: %s', config_to_load)
 
-        if config_file is None:
-            log.error('Failed to locate sleuth_config.json')
+        if config_file:
+            log.info('Checking provided config file: %s', config_file)
+            if os.path.isfile(config_file):
+                config_to_load = config_file, 'passed'
+            else:
+                log.error('Provided config does not exist')
+
+        if not config_to_load:
+            log.error('Failed to locate config file')
             return
 
-        print(f'Loading Config {config_file}')
-        with open(config_file, 'r') as f:
+        log.info('Config Source: %s | Config File: %s', config_to_load[1], config_to_load[0])
+        cls.CONFIG_FILE = config_to_load[0]
+        with open(config_to_load[0], 'r') as f:
             cls.CONFIG = json.loads(f.read())
 
     @staticmethod
