@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [UNRELEASED]
 * [backend] - Check if bot is still a mod on registered subs.  If it's not, remove the sub
 * [backend] - Moved background scheduled tasks to a new scheduler system
+* [backend] - Fixed bug that prevented bot config location from being overridden 
 * [bugfix] - Fixed a timing issue causing the bot to make duplicate replies 
 
 ## [0.1.6] - 4/27/2020
