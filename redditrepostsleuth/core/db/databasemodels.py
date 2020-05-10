@@ -344,3 +344,9 @@ class UserReport(Base):
     reported_at = Column(DateTime, default=func.utc_timestamp())
     msg_body = Column(String(1000))
     message_id = Column(String(20), nullable=False)
+
+class ToBeDeleted(Base):
+    __tablename__ = 'to_be_deleted'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    post_type = Column(String(20))

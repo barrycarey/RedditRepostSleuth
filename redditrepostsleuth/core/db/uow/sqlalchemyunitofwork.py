@@ -18,6 +18,7 @@ from redditrepostsleuth.core.db.repository.monitoredsubrepository import Monitor
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
 from redditrepostsleuth.core.db.repository.repost_watch_repo import RepostWatchRepo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
+from redditrepostsleuth.core.db.repository.to_be_deleted_repo import ToBeDeletedRepo
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
 from redditrepostsleuth.core.db.repository.videohashrepository import VideoHashRepository
 
@@ -118,3 +119,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def user_report(self) -> UserReportRepo:
         return UserReportRepo(self.session)
+
+    @property
+    def to_be_deleted(self) -> ToBeDeletedRepo:
+        return ToBeDeletedRepo(self.session)
+
