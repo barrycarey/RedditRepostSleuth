@@ -8,6 +8,8 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 [Default Config Loaded Into Editor](https://jsoneditoronline.org/#left=cloud.5485ac46f0f349169a40e11f0db6a956)
 
+**Please Note:** Due to how the bot's popularity config updates take some time to be loaded.  Typically within 15 minutes. Once the bot loads your new config you will receive ModMail 
+
 **Example Config**
 
 ```
@@ -27,7 +29,7 @@ To change settings simply update the JSON and save.  The bot will load the new c
   "lock_post": false,
   "mark_as_oc": false,
   "remove_repost": false,
-  "removal_reason_id": false,
+  "removal_reason": null,
   "title_ignore_keywords": null,
   "disable_summons_after_auto_response": false,
   "only_allow_one_summons": false,
@@ -72,7 +74,7 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 **remove_repost:** Remove a post if it is a repost
 
-**removal_reason_id:** ID of the removal reason to use
+**removal_reason:** Title of the removal reason to use.  Must match the title of a removal reason in your sub's mod settings
 
 **title_ignore_keywords:** Skip posts that contain any of these keywords in the title.  Should be a comma seperate list of words.  word1,word2,word3
 

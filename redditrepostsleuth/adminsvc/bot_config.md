@@ -14,7 +14,7 @@
   "lock_post": false,
   "mark_as_oc": false,
   "remove_repost": false,
-  "removal_reason_id": false,
+  "removal_reason": null,
   "title_ignore_keywords": null,
   "disable_summons_after_auto_response": false,
   "only_allow_one_summons": false,
