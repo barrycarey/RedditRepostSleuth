@@ -4,6 +4,8 @@ import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status
+
 sys.path.append('./')
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -62,8 +64,15 @@ if __name__ == '__main__':
         name='inbox_monitor',
         max_instances=1
     )
+    scheduler.add_job(
+        func=update_mod_status,
+        args=(uowm, reddit_manager),
+        trigger='interval',
+        minutes=20,
+        name='check_mod_status',
+        max_instances=1
+    )
     scheduler.start()
-
     try:
         # This is here to simulate application activity (which keeps the main thread alive).
         while True:
