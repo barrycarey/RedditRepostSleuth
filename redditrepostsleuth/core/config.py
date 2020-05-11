@@ -52,7 +52,7 @@ class Config:
             log.info('Found sleuth_config.json in current directory')
             config_to_load = os.path.join(os.getcwd(), 'sleuth_config.json'), 'cwd'
 
-        print('Checking ENV for config file')
+        log.info('Checking ENV for config file')
         if os.getenv('bot_config', None):
             if os.path.isfile(os.getenv('bot_config')):
                 config_to_load = os.getenv('bot_config'), 'env'
