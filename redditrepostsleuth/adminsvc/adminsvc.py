@@ -73,7 +73,6 @@ if __name__ == '__main__':
         max_instances=1
     )
     scheduler.start()
-
     try:
         # This is here to simulate application activity (which keeps the main thread alive).
         while True:
