@@ -196,7 +196,7 @@ class MonitoredSub(Base):
     notes = Column(String(500))
     sticky_comment = Column(Boolean, default=False)
     remove_repost = Column(Boolean, default=False)
-    removal_reason_id = Column(String(20))
+    removal_reason = Column(String(200))
     lock_post = Column(Boolean, default=False)
     mark_as_oc = Column(Boolean, default=False)
     repost_response_template = Column(String(2000))
