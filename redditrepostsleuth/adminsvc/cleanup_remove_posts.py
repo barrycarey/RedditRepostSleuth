@@ -52,7 +52,7 @@ def get_all_links():
             if row['post_type'] != 'image':
                 continue
             batch.append({'id': row['post_id'], 'url': row['url']})
-            if len(batch) >= 20:
+            if len(batch) >= 15:
                 cleanup_removed_posts_batch.apply_async((batch,), queue='delete')
                 batch = []
 
