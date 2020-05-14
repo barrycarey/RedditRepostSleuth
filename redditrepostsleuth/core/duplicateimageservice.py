@@ -117,7 +117,7 @@ class DuplicateImageService:
 
     def check_duplicates_wrapped(self, post: Post,
                                  result_filter: bool = True,
-                                 max_matches: int = 75,  # TODO -
+                                 max_matches: int = 50,  # TODO -
                                  target_hamming_distance: int = None,
                                  target_annoy_distance: float = None,
                                  target_title_match: int = None,
@@ -162,7 +162,9 @@ class DuplicateImageService:
             api_results['matches']
         )  # Pre-filter results on default annoy value
         results = self._convert_annoy_results(raw_results, post.id)
+        start = perf_counter()
         results = self._set_match_posts(results)
+        match_post_time = search_results.total_filter_time = round(perf_counter() - start, 5)
         search_results.matches = self._remove_duplicates(results)
 
         if result_filter:
@@ -191,7 +193,7 @@ class DuplicateImageService:
             search_results.matches = self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
         search_results.total_search_time = round(perf_counter() - start, 5)
-        self._log_search_time(search_results)
+        self._log_search_time(search_results, match_post_time)
         self._log_search(
             search_results,
             same_sub,
@@ -222,7 +224,7 @@ class DuplicateImageService:
             return match['distance'] < target_annoy_distance
         return annoy_distance_filter
 
-    def _log_search_time(self, search_results: ImageRepostWrapper):
+    def _log_search_time(self, search_results: ImageRepostWrapper, match_post_time):
         self.event_logger.save_event(
             AnnoySearchEvent(
                 total_search_time=search_results.total_search_time,
@@ -231,7 +233,8 @@ class DuplicateImageService:
                 event_type='duplicate_image_search',
                 meme_detection_time=search_results.meme_detection_time,
                 meme_filter_time=search_results.meme_filter_time,
-                total_filter_time=search_results.total_filter_time
+                total_filter_time=search_results.total_filter_time,
+                match_post_time=match_post_time
             )
         )
 
