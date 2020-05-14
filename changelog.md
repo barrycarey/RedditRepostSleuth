@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [backend] - Check if bot is still a mod on registered subs.  If it's not, remove the sub
 * [backend] - Moved background scheduled tasks to a new scheduler system
 * [backend] - Fixed bug that prevented bot config location from being overridden 
+* [backend] - Moved image searching into external API in preperation of companion website 
 * [bugfix] - Fixed a timing issue causing the bot to make duplicate replies 
 * [enhancement] - Removed removal_reason_id and replaced with removal_reason. Mods can enter title of the removal reason and bot will lookup the reason ID to send via API
 
