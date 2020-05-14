@@ -49,11 +49,11 @@ def get_all_links():
         cur.execute(query)
         log.info('Adding items to index')
         for row in cur:
-            if row['post_type'] != 'image':
+            if row['post_type'] != 'link':
                 continue
             batch.append({'id': row['post_id'], 'url': row['url']})
             if len(batch) >= 15:
-                cleanup_removed_posts_batch.apply_async((batch,), queue='delete')
+                cleanup_removed_posts_batch.apply_async((batch,), queue='link_check')
                 batch = []
 
 def get_all_reddit_links():
