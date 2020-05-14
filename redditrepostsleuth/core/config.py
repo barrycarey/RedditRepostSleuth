@@ -168,7 +168,8 @@ class Config:
             'bot_comment_karma_flag_threshold',
             'bot_comment_karma_remove_threshold',
             'sub_monitor_exposed_config_options',
-            'wiki_config_name'
+            'wiki_config_name',
+            'index_api'
 
         ]
 

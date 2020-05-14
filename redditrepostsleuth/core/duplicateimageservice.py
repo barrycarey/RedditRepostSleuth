@@ -1,21 +1,23 @@
+import json
 import webbrowser
 from time import perf_counter
-from typing import List, Tuple
+from typing import List, Tuple, Text
 
+import requests
+from requests.exceptions import ConnectionError
 from distance import hamming
 from sqlalchemy import Float
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch
+from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.image_index import ImageIndex
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.services.image_index_loader import ImageIndexLoader
-from redditrepostsleuth.core.services.meme_detector import MemeDetector
 from redditrepostsleuth.core.util.helpers import create_search_result_json
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
@@ -26,20 +28,13 @@ from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest
 
 
 class DuplicateImageService:
-    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, meme_detector: MemeDetector = None, config: Config = None):
-
+    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, config: Config = None):
         self.uowm = uowm
-
         self.event_logger = event_logger
-
         if config:
             self.config = config
         else:
             self.config = Config()
-
-        # TODO - What happens if we don't have config values
-        self.index_loader = ImageIndexLoader(self.config)
-        self.meme_detector = meme_detector or MemeDetector(uowm, config, self.index_loader)
         log.info('Created dup image service')
 
     def _filter_results_for_reposts(
@@ -122,7 +117,7 @@ class DuplicateImageService:
 
     def check_duplicates_wrapped(self, post: Post,
                                  result_filter: bool = True,
-                                 max_matches: int = 75,  # TODO -
+                                 max_matches: int = 50,  # TODO -
                                  target_hamming_distance: int = None,
                                  target_annoy_distance: float = None,
                                  target_title_match: int = None,
@@ -142,50 +137,43 @@ class DuplicateImageService:
         :return: List of matching images
         """
         log.info('Checking %s for duplicates - https://redd.it/%s', post.post_id, post.post_id)
-
+        start = perf_counter()
         search_results = ImageRepostWrapper()
         search_results.checked_post = post
-        start = perf_counter()
-        try:
-            search_array = bytearray(post.dhash_h, encoding='utf-8')
-        # TODO - Figure out what exception we get here and what to do about it
-        except Exception as e:
-            print('')
-        current_results = []
 
-        raw_results = self._search_index_by_vector(search_array, self.index_loader.historical_index, max_matches=max_matches)
+        try:
+            r = requests.get(f'{self.config.index_api}/image', params={'hash': post.dhash_h, 'max_results': max_matches})
+        except ConnectionError:
+            log.error('Failed to connect to Index API')
+            raise NoIndexException('Failed to connect to Index API')
+        except Exception as e:
+            log.exception('Problem with image index api', exc_info=True)
+            raise
+
+        if r.status_code != 200:
+            log.error('Unexpected status from index API: %s', r.status_code)
+            raise NoIndexException('Unexpected status: %s', r.status_code)
+
+        api_results = json.loads(r.text)
+        search_results.index_search_time = api_results['index_search_time']
+        search_results.total_searched = api_results['total_searched']
         raw_results = filter(
             self._annoy_filter(target_annoy_distance or self.config.default_annoy_distance),
-            raw_results
-        ) # Pre-filter results on default annoy value
-        historical_results = self._convert_annoy_results(raw_results, post.id)
-        historical_results = self._set_match_posts(historical_results)
-
-        # TODO - I don't like duplicating this code.  Oh well
-        if self.index_loader.current_index.loaded_index:
-            raw_results = self._search_index_by_vector(search_array, self.index_loader.current_index, max_matches=max_matches)
-            raw_results = filter(
-                self._annoy_filter(target_annoy_distance or self.config.default_annoy_distance),
-                raw_results
-            )  # Pre-filter results on default annoy value
-            current_results = self._convert_annoy_results(raw_results, post.id)
-            current_results = self._set_match_posts(current_results, historical=False)
-            search_results.total_searched = search_results.total_searched + self.index_loader.meme_index.loaded_index.get_n_items()
-        else:
-            log.error('No current image index loaded.  Only using historical results')
-
-        search_results.matches = self._merge_search_results(historical_results, current_results)
-        search_results.index_search_time = round(perf_counter() - start, 5)
+            api_results['matches']
+        )  # Pre-filter results on default annoy value
+        results = self._convert_annoy_results(raw_results, post.id)
+        start = perf_counter()
+        results = self._set_match_posts(results)
+        match_post_time = search_results.total_filter_time = round(perf_counter() - start, 5)
+        search_results.matches = self._remove_duplicates(results)
 
         if result_filter:
             self._set_match_hamming(post, search_results.matches)
             if meme_filter:
                 meme_start_time = perf_counter()
-                search_results.meme_template = self.meme_detector.detect_meme(post.dhash_h)
+                search_results.meme_template = self._get_meme_template(post.dhash_h)
                 search_results.meme_detection_time = round(perf_counter() - meme_start_time, 5)
                 if search_results.meme_template:
-                    #webbrowser.open_new_tab(post.url)
-                    #webbrowser.open_new_tab(search_results.meme_template.example)
                     target_hamming_distance = search_results.meme_template.target_hamming
                     target_annoy_distance = search_results.meme_template.target_annoy
                     log.info('Using meme filter %s', search_results.meme_template.name)
@@ -204,11 +192,8 @@ class DuplicateImageService:
         else:
             search_results.matches = self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
-
         search_results.total_search_time = round(perf_counter() - start, 5)
-        search_results.total_searched = self.index_loader.current_index.loaded_index.get_n_items() if self.index_loader.current_index else 0
-        search_results.total_searched = search_results.total_searched + self.index_loader.historical_index.loaded_index.get_n_items()
-        self._log_search_time(search_results)
+        self._log_search_time(search_results, match_post_time)
         self._log_search(
             search_results,
             same_sub,
@@ -216,8 +201,10 @@ class DuplicateImageService:
             filter_dead_matches,
             only_older_matches,
             meme_filter,
-            source=source,
-            target_title_match=target_title_match
+            source,
+            target_title_match,
+            api_results['used_current_index'],
+            api_results['used_historical_index']
         )
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
@@ -234,10 +221,10 @@ class DuplicateImageService:
 
     def _annoy_filter(self, target_annoy_distance: Float):
         def annoy_distance_filter(match):
-            return match[1] < target_annoy_distance
+            return match['distance'] < target_annoy_distance
         return annoy_distance_filter
 
-    def _log_search_time(self, search_results: ImageRepostWrapper):
+    def _log_search_time(self, search_results: ImageRepostWrapper, match_post_time):
         self.event_logger.save_event(
             AnnoySearchEvent(
                 total_search_time=search_results.total_search_time,
@@ -246,7 +233,8 @@ class DuplicateImageService:
                 event_type='duplicate_image_search',
                 meme_detection_time=search_results.meme_detection_time,
                 meme_filter_time=search_results.meme_filter_time,
-                total_filter_time=search_results.total_filter_time
+                total_filter_time=search_results.total_filter_time,
+                match_post_time=match_post_time
             )
         )
 
@@ -259,12 +247,14 @@ class DuplicateImageService:
             only_older_matches: bool,
             meme_filter: bool,
             source: str,
-            target_title_match: int
+            target_title_match: int,
+            used_current_index: bool,
+            used_historical_index: bool
     ):
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
-            used_historical_index=True if self.index_loader.historical_index else False,
-            used_current_index=True if self.index_loader.current_index else False,
+            used_historical_index=used_historical_index,
+            used_current_index=used_current_index,
             target_hamming_distance=search_results.target_hamming_distance,
             target_annoy_distance=search_results.target_annoy_distance,
             same_sub=same_sub if same_sub else False,
@@ -299,6 +289,15 @@ class DuplicateImageService:
 
         return results
 
+    def _remove_duplicates(self, matches: List[ImageMatch]) -> List[ImageMatch]:
+        results = []
+        for a in matches:
+            match = next((x for x in results if x.match_id == a.match_id), None)
+            if match:
+                continue
+            results.append(a)
+        return results
+
     def _set_match_posts(self, matches: List[ImageMatch], historical: bool = True) -> List[ImageMatch]:
         """
         Attach each matches corresponding database entry.
@@ -331,26 +330,21 @@ class DuplicateImageService:
                 results.append(match)
         return results
 
-    def get_meme_template(self, search_results: ImageRepostWrapper) -> ImageRepostWrapper:
-        """
-        Check if a given post matches a known meme template.  If it is, use that templates distance override
-        :param check_post: Post we're checking
-        :rtype: List[ImageMatch]
-        """
-        start_time = perf_counter()
-        with self.uowm.start() as uow:
-            templates = uow.meme_template.get_all()
+    def _get_meme_template(self, image_hash: Text) -> MemeTemplate:
+        try:
+            r = requests.get(f'{self.config.index_api}/meme', params={'hash': image_hash})
+        except Exception as e:
+            log.exception('Failed to get meme template from api', exc_info=True)
+            return
 
-        for template in templates:
-            h_distance = hamming(search_results.checked_post.dhash_h, template.dhash_h)
-            log.debug('Meme template %s: Hamming %s', template.name, h_distance)
-            if (h_distance <= template.template_detection_hamming):
-                log.info('Post %s matches meme template %s', f'https://redd.it/{search_results.checked_post.post_id}', template.name)
-                search_results.meme_template = template
-                search_results.meme_detection_time = round(perf_counter() - start_time, 5)
-                return search_results
-        search_results.meme_detection_time = round(perf_counter() - start_time, 5)
-        return search_results
+        if r.status_code != 200:
+            log.error('Unexpected Index API status %s', r.status_code)
+            return
+
+        results = json.loads(r.text)
+
+        with self.uowm.start() as uow:
+            return uow.meme_template.get_by_id(results['meme_template_id'])
 
     def _set_match_hamming(self, searched_post: Post, matches: List[ImageMatch]) -> List[ImageMatch]:
         """

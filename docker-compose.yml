@@ -127,6 +127,8 @@ services:
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 10
         volumes:
             - /opt/imageindex:/opt/imageindex
+        networks:
+            - sleuthnet
 
     deleted_post_cleanup_worker:
         build:
@@ -170,3 +172,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_ingest -c 1
+
+networks:
+  sleuthnet:
+    external: true

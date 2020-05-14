@@ -12,8 +12,9 @@ class AnnoySearchEvent(InfluxEvent):
             meme_filter_time,
             meme_detection_time,
             total_filter_time,
+            match_post_time,
             source=None,
-            event_type=None
+            event_type=None,
     ):
         super().__init__(event_type=event_type)
         self.total_search_time = total_search_time
@@ -21,6 +22,7 @@ class AnnoySearchEvent(InfluxEvent):
         self.meme_filter_time = meme_filter_time
         self.meme_detection_time = meme_detection_time
         self.total_filter_time = total_filter_time
+        self.match_post_time = match_post_time
         self.index_size = index_size
         self.source = source
         self.hostname = platform.node()
@@ -32,6 +34,7 @@ class AnnoySearchEvent(InfluxEvent):
         event[0]['fields']['meme_filter_time'] = self.meme_filter_time
         event[0]['fields']['total_filter_time'] = self.total_filter_time
         event[0]['fields']['meme_detection_time'] = self.meme_detection_time
+        event[0]['fields']['match_post_time'] = self.match_post_time
         event[0]['fields']['index_size'] = self.index_size
         event[0]['tags']['hostname'] = self.hostname
         event[0]['tags']['source'] = self.source
