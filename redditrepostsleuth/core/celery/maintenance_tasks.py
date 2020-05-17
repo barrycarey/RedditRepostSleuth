@@ -229,6 +229,42 @@ def image_post_cleanup(self, posts: List[Text]) -> NoReturn:
         uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask)
+def link_post_cleanup(self, posts: List[Text]) -> NoReturn:
+    with self.uowm.start() as uow:
+        for p in posts:
+            post = uow.posts.get_by_post_id(p.post_id)
+            investigate_post = uow.investigate_post.get_by_post_id(p.post_id)
+            link_repost = uow.link_repost.get_by_repost_of(post.post_id)
+            comments = uow.bot_comment.get_by_post_id(p.post_id)
+            summons = uow.summons.get_by_post_id(p.post_id)
+            user_reports = uow.user_report.get_by_post_id(p.post_id)
+
+            if investigate_post:
+                log.info('Deleting investigate %s', investigate_post.id)
+                uow.investigate_post.remove(investigate_post)
+            if link_repost:
+                for r in link_repost:
+                    log.info('Deleting link repost %s', r.id)
+                    uow.link_repost.remove(r)
+            if comments:
+                for c in comments:
+                    log.info('Deleting comment %s', c.id)
+                    uow.bot_comment.remove(c)
+            if summons:
+                for s in summons:
+                    log.info('deleting summons %s', s.id)
+                    uow.summons.remove(s)
+
+            if user_reports:
+                for u in user_reports:
+                    log.info('Deleting report %s', u.id)
+                    uow.user_report.remove(u)
+            if post:
+                uow.posts.remove(post)
+            uow.to_be_deleted.remove(p)
+        uow.commit()
+
+@celery.task(bind=True, base=SqlAlchemyTask)
 def cleanup_orphan_image_post(self, image_posts: List[Text]) -> NoReturn:
     log.info('Checking orphan batch')
     with self.uowm.start() as uow:

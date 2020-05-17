@@ -19,7 +19,7 @@ services:
                 max_attempts: 3
                 window: 120s
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=INFO
 
     hot_post:
         build:
@@ -86,7 +86,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
@@ -114,14 +114,14 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link -c 1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link,watch_notify -c 2
 
     image_repost_worker:
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 10

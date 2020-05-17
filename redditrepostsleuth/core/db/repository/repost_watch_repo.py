@@ -27,3 +27,6 @@ class RepostWatchRepo:
     def remove(self, item: RepostWatch):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
+
+    def update(self, item: RepostWatch):
+        self.db_session.merge(item)

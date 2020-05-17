@@ -4,9 +4,10 @@ import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status
+
 
 sys.path.append('./')
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
@@ -34,6 +35,8 @@ if __name__ == '__main__':
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
     config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler, config)
     inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
+
+    config_updater.update_configs()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(
