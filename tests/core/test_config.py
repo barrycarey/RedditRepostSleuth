@@ -26,12 +26,14 @@ class TestConfig(TestCase):
 
     def test__load_config_file_load_order_prefer_passed_file(self):
         config_file = os.path.join(os.getcwd(), 'sleuth_config.json')
+        Config.CONFIG = {}
         config = Config(config_file)
         self.assertEqual(config_file, config.CONFIG_FILE)
 
     def test__load_config_file_load_order_prefer_env_over_local(self):
         config_file = os.path.join(os.getcwd(), 'sleuth_config_alt.json')
         os.environ['bot_config'] = config_file
+        Config.CONFIG = {}
         config = Config()
         self.assertEqual(config_file, config.CONFIG_FILE)
 
