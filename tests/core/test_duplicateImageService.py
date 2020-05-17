@@ -19,8 +19,8 @@ class TestDuplicateImageService(TestCase):
     def test__convert_annoy_results(self):
         dup = DuplicateImageService(MagicMock(), MagicMock(), config=MagicMock())
         annoy_results = [
-            (1, 0.200),
-            (2, 0.500)
+            {'id': 1, 'distance': 0.200},
+            {'id': 2, 'distance': 0.500}
         ]
         r = dup._convert_annoy_results(annoy_results, 1234)
 
@@ -32,16 +32,16 @@ class TestDuplicateImageService(TestCase):
         dup = DuplicateImageService(MagicMock(), MagicMock(), config=MagicMock())
         target_distance = 0.265
         test_input = [
-            (1, 0.300),
-            (2, 0.200),
-            (3, 0.350),
-            (4, 0.264)
+            {'id': 1, 'distance': 0.300},
+            {'id': 2, 'distance': 0.200},
+            {'id': 3, 'distance': 0.350},
+            {'id': 4, 'distance': 0.264}
         ]
         a_filter = dup._annoy_filter(target_distance)
         r = list(filter(a_filter, test_input))
         self.assertEqual(2, len(r))
-        self.assertEqual(2, r[0][0])
-        self.assertEqual(4, r[1][0])
+        self.assertEqual(2, r[0]['id'])
+        self.assertEqual(4, r[1]['id'])
 
     def test__merge_search_results(self):
         dup = DuplicateImageService(MagicMock(), MagicMock(), config=MagicMock())

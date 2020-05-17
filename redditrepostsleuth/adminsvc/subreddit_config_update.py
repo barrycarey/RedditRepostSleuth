@@ -37,18 +37,17 @@ class SubredditConfigUpdater:
         self.config = config
 
     def update_configs(self):
-        while True:
-            try:
-                with self.uowm.start() as uow:
-                    monitored_subs = uow.monitored_sub.get_all()
-                    for sub in monitored_subs:
-                        try:
-                            self.check_for_config_update(sub)
-                        except Exception as e:
-                            log.exception('Config failure ')
-                    time.sleep(180)
-            except Exception as e:
-                log.exception('Config update thread crashed', exc_info=True)
+        try:
+            with self.uowm.start() as uow:
+                monitored_subs = uow.monitored_sub.get_all()
+                for sub in monitored_subs:
+                    try:
+                        self.check_for_config_update(sub)
+                    except Exception as e:
+                        log.exception('Config failure ')
+                time.sleep(180)
+        except Exception as e:
+            log.exception('Config update thread crashed', exc_info=True)
 
     def check_for_config_update(self, monitored_sub: MonitoredSub):
         # TODO - Possibly pass the subreddit to get_wiki_config
@@ -76,6 +75,7 @@ class SubredditConfigUpdater:
         missing_keys = self._get_missing_config_values(wiki_config)
         if not missing_keys:
             return
+        log.info('Sub %s is missing keys %s', monitored_sub.name, missing_keys)
         new_config = self._create_wiki_config_from_database(monitored_sub)
         if not new_config:
             log.error('Failed to generate new config for %s', monitored_sub.name)
@@ -362,7 +362,7 @@ class SubredditConfigUpdater:
                 'New Repost Sleuth Options Available!',
                 'Your Repost Sleuth config was missing some newly available options.\n\n '
                 f'I\'ve added the following options to your config: {config_keys}\n\n' 
-                'You can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_config_value_explanation'
+                'You can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth#wiki_config_value_explanation'
             )
             return True
         except Exception as e:

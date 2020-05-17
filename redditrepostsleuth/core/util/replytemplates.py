@@ -55,3 +55,11 @@ WATCH_NOTIFY_OF_MATCH = 'It looks like an [image you were watching]({watch_short
                         'I found [this post]({repost_shortlink}) which is a {percent_match} match'
 
 SUMMONS_ALREADY_RESPONDED = 'I\'ve already checked this post.  \n\nYou can see my response here: {perma_link}'
+
+MOD_STATUS_REMOVED = 'Hello, \n\n I\'ve noticed I\'m no longer a mod on r/{subname}. \n\n I\'m sorry to see you go, ' \
+                     'but understand I may not be the best fit for all subreddits. \n\nIf you would like to leave any ' \
+                     'feedback, you can do so on r/RepostSleuthBot\n\n' \
+                     'I have scheduled your configuration to be purged on {removal_time}.  After that time your subreddit\'s ' \
+                     'configuration will be removed from my database\n\n ' \
+                     'If you would like to add me back in the future, simiply make the bot a mod with post and wiki permissions. ' \
+                     'I will automatically add your subreddit back.'
