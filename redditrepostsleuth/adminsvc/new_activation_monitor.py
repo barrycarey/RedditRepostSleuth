@@ -61,7 +61,7 @@ class NewActivationMonitor:
         log.info('Sending sucess PM to %s', subreddit.display_name)
         wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/about/wiki/repost_sleuth_config'
         try:
-            subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_confing=wiki_url))
+            subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_config=wiki_url))
         except Exception as e:
             log.exception('Failed to send activation PM', exc_info=True)
 
