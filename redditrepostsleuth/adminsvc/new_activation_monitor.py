@@ -23,18 +23,16 @@ class NewActivationMonitor:
         self.reddit = reddit
 
     def check_for_new_invites(self):
-        while True:
-            try:
-                log.info('Checking for new mod invites')
-                for msg in self.reddit.inbox.messages(limit=100):
-                    if 'invitation to moderate' in msg.subject:
-                        if self.is_already_active(msg.subreddit.display_name):
-                            log.info('%s is already a monitored sub', msg.subreddit.display_name)
-                            continue
-                        self.activate_sub(msg)
-                time.sleep(180)
-            except Exception as e:
-                log.exception('Activation thread died', exc_info=True)
+        try:
+            log.info('Checking for new mod invites')
+            for msg in self.reddit.inbox.messages(limit=300):
+                if 'invitation to moderate' in msg.subject:
+                    if self.is_already_active(msg.subreddit.display_name):
+                        log.info('%s is already a monitored sub', msg.subreddit.display_name)
+                        continue
+                    self.activate_sub(msg)
+        except Exception as e:
+            log.exception('Activation thread died', exc_info=True)
 
     def accept_invite(self, msg):
         pass
@@ -63,7 +61,7 @@ class NewActivationMonitor:
         log.info('Sending sucess PM to %s', subreddit.display_name)
         wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/about/wiki/repost_sleuth_config'
         try:
-            subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_confing=wiki_url))
+            subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_config=wiki_url))
         except Exception as e:
             log.exception('Failed to send activation PM', exc_info=True)
 
@@ -109,7 +107,7 @@ class NewActivationMonitor:
         return True if existing else False
 
 if __name__ == '__main__':
-    config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
+    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     invite = NewActivationMonitor(uowm, get_reddit_instance(config))
     invite.check_for_new_invites()

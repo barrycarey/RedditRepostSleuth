@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 
+## [0.1.7] - 5/17/2020
+* [feature] - Watch command added.  This allows you to tag a post and be notified if someone else reposts it. Example: u/repostsleuthbot watch
+* [backend] - Check if bot is still a mod on registered subs.  If it's not, remove the sub
+* [backend] - Moved background scheduled tasks to a new scheduler system
+* [backend] - Fixed bug that prevented bot config location from being overridden 
+* [backend] - Moved image searching into external API in preperation of companion website 
+* [bugfix] - Fixed a timing issue causing the bot to make duplicate replies 
+* [enhancement] - Removed removal_reason_id and replaced with removal_reason. Mods can enter title of the removal reason and bot will lookup the reason ID to send via API
+
+
 ## [0.1.6] - 4/27/2020
 
 * [feature] - Report messages can now include custom variable values.  More info [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)

@@ -24,3 +24,4 @@ falcon
 waitress
 falcon-cors
 python-Levenshtein
+apscheduler

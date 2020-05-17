@@ -82,11 +82,11 @@ def hash_tuple_to_hashwrapper(hash_tup):
     wrapper.image_hash = hash_tup[1]
     return wrapper
 
-def annoy_result_to_image_match(result: Tuple[int, float], orig_id: int) -> ImageMatch:
+def annoy_result_to_image_match(result: Dict, orig_id: int) -> ImageMatch:
     match = ImageMatch()
     match.original_id = orig_id
-    match.match_id = result[0]
-    match.annoy_distance = result[1]
+    match.match_id = result['id']
+    match.annoy_distance = result['distance']
     return match
 
 def post_to_repost_match(post: Post, orig_id: int) -> RepostMatch:

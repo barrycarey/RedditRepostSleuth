@@ -2,7 +2,7 @@ import time
 from typing import List, Text, NoReturn
 
 from praw.exceptions import APIException
-from praw.models import Submission, Comment
+from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden, BadRequest
 from redlock import RedLockError
 from time import perf_counter
@@ -299,21 +299,21 @@ class SubMonitor:
         """
         if monitored_sub.remove_repost:
             try:
-                if monitored_sub.removal_reason_id:
-                    try:
-                        submission.mod.remove(reason_id=monitored_sub.removal_reason_id)
-                    except BadRequest:
-                        log.error('Failed to remove post %s using reason ID %s.  Like a bad reasons ID', submission.id, monitored_sub.removal_reason_id)
-                        submission.mod.remove()
-                else:
-                    submission.mod.remove()
+                submission.mod.remove(reason_id=self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit))
+                log.error('[%s][%s] - Failed to remove post using reason ID %s.  Likely a bad reasons ID', monitored_sub.name, submission.id, monitored_sub.removal_reason_id)
+                submission.mod.remove()
             except Forbidden:
                 log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
-
             except Exception as e:
                 log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
-    def _lock_post(self, monitored_sub: MonitoredSub, submission: Submission):
+    def _get_removal_reason_id(self, removal_reason: Text, subreddit: Subreddit) -> Text:
+        for r in subreddit.mod.removal_reasons:
+            if r.title.lower() == removal_reason.lower():
+                return r.id
+        return None
+
+    def _lock_post(self, monitored_sub: MonitoredSub, submission: Submission) -> NoReturn:
         if monitored_sub.lock_post:
             try:
                 submission.mod.lock()

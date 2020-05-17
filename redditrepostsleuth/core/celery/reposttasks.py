@@ -3,6 +3,7 @@ from typing import List, Dict
 
 import requests
 from redlock import RedLockError
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck, IngestHighMatchMeme
@@ -27,8 +28,6 @@ def ingest_repost_check(post):
         check_image_repost_save.apply_async((post,), queue='repost_image')
     elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
-
-
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
@@ -83,7 +82,7 @@ def link_repost_check(self, posts, ):
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
             """
             repost_of = repost.matches[0].post
-            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id)
+            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author)
             repost_of.repost_count += 1
             post.checked_repost = True
             uow.posts.update(post)
@@ -109,3 +108,11 @@ def link_repost_check(self, posts, ):
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
 def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]]):
     repost_watch_notify(watches, self.reddit, self.response_handler)
+    with self.uowm.start() as uow:
+        for w in watches:
+            w['watch'].last_detection = func.utc_timestamp()
+            uow.repostwatch.update(w['watch'])
+            try:
+                uow.commit()
+            except Exception as e:
+                log.exception('Failed to save repost watch %s', w['watch'].id, exc_info=True)
