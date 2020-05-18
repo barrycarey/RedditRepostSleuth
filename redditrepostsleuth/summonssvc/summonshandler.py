@@ -411,6 +411,7 @@ class SummonsHandler:
         log.debug('Sending response to summons comment %s. MESSAGE: %s', response.summons.comment_id, response.message)
         try:
             reply_comment = self.response_handler.reply_to_comment(response.summons.comment_id, response.message)
+            response.comment_reply_id = reply_comment.id
         except APIException as e:
             if e.error_type == 'DELETED_COMMENT':
                 log.debug('Comment %s has been deleted', response.summons.comment_id)
@@ -424,12 +425,10 @@ class SummonsHandler:
             else:
                 log.exception('APIException without error_type', exc_info=True)
                 raise
-            raise
         except Exception:
             log.exception('Problem leaving response', exc_info=True)
             raise
 
-        response.comment_reply_id = reply_comment.id
         return response
 
     def _send_private_message(self, response: SummonsResponse) -> SummonsResponse:

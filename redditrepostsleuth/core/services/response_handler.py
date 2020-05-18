@@ -34,7 +34,7 @@ class ResponseHandler:
         self.event_logger = event_logger
         self.source = source
 
-    def reply_to_submission(self, submission_id: str, comment_body) -> Comment:
+    def reply_to_submission(self, submission_id: str, comment_body) -> Optional[Comment]:
         submission = self.reddit.submission(submission_id)
         if not submission:
             log.error('Failed to get submission %s', submission_id)
@@ -50,7 +50,7 @@ class ResponseHandler:
             )
             log.info('Left comment at: https://reddit.com%s', comment.permalink)
             log.debug(comment_body)
-            self._log_response(comment, comment_body)
+            self._log_response(comment)
             return comment
         except APIException as e:
             if e.error_type == 'RATELIMIT':
@@ -59,7 +59,9 @@ class ResponseHandler:
             else:
                 log.exception('Unknown error type of APIException', exc_info=True)
                 raise
-        except Exception as e:
+        except Forbidden:
+            self._save_banned_sub(submission.subreddit.display_name)
+        except Exception:
             log.exception('Unknown exception leaving comment on post https://redd.it/%s', submission_id, exc_info=True)
             raise
 

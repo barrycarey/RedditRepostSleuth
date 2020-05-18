@@ -135,9 +135,10 @@ class TopPostMonitor:
 
         try:
             self.response_handler.reply_to_submission(post.post_id, msg)
-        except (Forbidden, APIException):
+        except APIException:
             log.error('Failed to leave comment on %s in %s. ', post.post_id, post.subreddit)
-
+        except Exception:
+            pass
 
         with self.uowm.start() as uow:
             post.left_comment = True
