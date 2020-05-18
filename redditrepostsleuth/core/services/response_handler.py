@@ -86,7 +86,7 @@ class ResponseHandler:
                 'reply_to_comment',
                 self.reddit.reddit.auth.limits['remaining']
             )
-            self._log_response(comment)
+            self._log_response(reply_comment)
             log.info('Left comment at: https://reddit.com%s', reply_comment.permalink)
             return reply_comment
         except Forbidden:
