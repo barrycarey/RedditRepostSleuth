@@ -1,5 +1,5 @@
 import time
-from typing import List, Text, NoReturn
+from typing import List, Text, NoReturn, Optional
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
@@ -103,7 +103,7 @@ class SubMonitor:
         return True
 
     def check_submission(self, submission: Submission, monitored_sub: MonitoredSub, post: Post):
-
+        log.info('Checking %s', submission.id)
         if post.post_type == 'image' and post.dhash_h is None:
             log.error('Post %s has no dhash', post.post_id)
             return
@@ -307,7 +307,9 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
-    def _get_removal_reason_id(self, removal_reason: Text, subreddit: Subreddit) -> Text:
+    def _get_removal_reason_id(self, removal_reason: Text, subreddit: Subreddit) -> Optional[Text]:
+        if not removal_reason:
+            return None
         for r in subreddit.mod.removal_reasons:
             if r.title.lower() == removal_reason.lower():
                 return r.id
