@@ -373,10 +373,7 @@ class SummonsHandler:
                     post.post_type
                 )
 
-        if summons.subreddit in self.config.summons_send_pm_subs:
-            self._send_private_message(response)
-        else:
-            self._send_response(response)
+        self._send_response(response)
 
     def _get_target_distances(self, subreddit: str, override_hamming_distance: int = None) -> Tuple[int, float]:
         """
@@ -396,9 +393,10 @@ class SummonsHandler:
         Take a response object and send a response to the summons.  If we're banned on the sub send a PM instead
         :param response: SummonsResponse Object
         """
+
         with self.uowm.start() as uow:
             banned = uow.banned_subreddit.get_by_subreddit(response.summons.subreddit)
-        if banned:
+        if banned or response.summons.subreddit in self.config.summons_send_pm_subs:
             self._send_private_message(response)
         else:
             try:
@@ -420,6 +418,9 @@ class SummonsHandler:
             elif e.error_type == 'THREAD_LOCKED':
                 log.info('Comment %s is in a locked thread', response.summons.comment_id)
                 response.message = 'THREAD LOCKED'
+            elif e.error_type == 'TOO_OLD':
+                log.info('Comment %s is too old to reply to', response.summons.comment_id)
+                response.message = 'TOO OLD'
             elif e.error_type == 'RATELIMIT':
                 log.exception('PRAW Ratelimit exception', exc_info=False)
                 raise
