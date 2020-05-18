@@ -20,6 +20,7 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
@@ -59,10 +60,11 @@ def sub_monitor_check_post(self, submission, monitored_sub):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(submission.id)
         if not post:
-            post = self.sub_monitor.save_unknown_post(submission.id)
-            if not post:
-                log.info('Post %s has not been ingested yet.  Skipping')
-                return
+            log.info('Post %s does exist, sending to ingest queue', submission.id)
+            post = submission_to_post(submission)
+            celery.send_task('redditrepostsleuth.core.celery.ingesttasks.save_new_post', args=[post],
+                             queue='postingest')
+            return
 
     title_keywords = []
     if monitored_sub.title_ignore_keywords:

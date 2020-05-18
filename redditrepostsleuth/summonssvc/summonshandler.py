@@ -404,6 +404,7 @@ class SummonsHandler:
             try:
                 self._reply_to_comment(response)
             except Forbidden:
+                log.info('Banned on %s, sending PM', response.summons.subreddit)
                 self._send_private_message(response)
         self._save_response(response)
 

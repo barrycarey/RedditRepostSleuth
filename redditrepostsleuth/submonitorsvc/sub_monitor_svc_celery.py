@@ -35,17 +35,12 @@ if __name__ == '__main__':
                 if not monitored_sub.active:
                     continue
                 log.info('Checking sub %s', monitored_sub.name)
-                subreddit = reddit.subreddit(monitored_sub.name)
-                if subreddit:
-                    monitored_sub.subscribers = subreddit.subscribers
-                    try:
-                        uow.commit()
-                    except Exception as e:
-                        log.exception('Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
-                if not monitored_sub.active and monitored_sub.check_all_submissions:
+                if not monitored_sub.active:
                     log.debug('Sub %s is disabled', monitored_sub.name)
                     continue
-
+                if not monitored_sub.check_all_submissions:
+                    log.info('Sub %s does not have post checking enabled', monitored_sub.name)
+                    continue
                 process_monitored_sub.apply_async((monitored_sub,), queue='submonitor')
                 continue
 

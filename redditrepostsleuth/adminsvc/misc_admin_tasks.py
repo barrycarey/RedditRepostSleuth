@@ -57,8 +57,22 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
                 uow.banned_subreddit.remove(ban)
             uow.commit()
 
+def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+    with uowm.start() as uow:
+        subs = uow.monitored_sub.get_all()
+        for monitored_sub in subs:
+            subreddit = reddit.subreddit(monitored_sub.name)
+            if subreddit:
+                monitored_sub.subscribers = subreddit.subscribers
+                log.info('%s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
+                try:
+                    uow.commit()
+                except Exception as e:
+                    log.exception('Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
+
+
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_ban_list(uowm, reddit)
+    update_monitored_sub_subscribers(uowm, reddit)
