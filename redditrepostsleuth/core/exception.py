@@ -42,3 +42,8 @@ class InvalidCommandException(RepostSleuthException):
 class IngestHighMatchMeme(RepostSleuthException):
     def __init__(self, message):
         super(IngestHighMatchMeme, self).__init__(message)
+
+class ReplyFailedException(RepostSleuthException):
+    def __init__(self, message, reason):
+        self.reason = reason
+        super(ReplyFailedException, self).__init__(message)

@@ -63,3 +63,5 @@ MOD_STATUS_REMOVED = 'Hello, \n\n I\'ve noticed I\'m no longer a mod on r/{subna
                      'configuration will be removed from my database\n\n ' \
                      'If you would like to add me back in the future, simiply make the bot a mod with post and wiki permissions. ' \
                      'I will automatically add your subreddit back.'
+
+BANNED_SUB_MSG = 'I\'m unable to reply to your comment at https://redd.it/{post_id}.  I\'m probably banned from r/{subreddit}.  Here is my response. \n\n *** \n\n'
