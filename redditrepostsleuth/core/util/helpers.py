@@ -4,7 +4,9 @@ import requests
 from typing import Dict, List, Text
 
 import imagehash
+from praw.exceptions import APIException
 from praw.models import Subreddit
+from prawcore import Forbidden
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
@@ -245,4 +247,26 @@ def bot_has_permission(subreddit: Subreddit, permission_name: Text) -> bool:
                 return False
     log.error('Bot is not mod on %s', subreddit.display_name)
     return False
+
+def is_bot_banned(subreddit: Subreddit) -> bool:
+    """
+    Check if bot is banned on a given sub
+    :rtype: bool
+    :param subreddit: Sub to check
+    :return: bool
+    """
+    banned = False
+    try:
+        sub = subreddit.submit('ban test', selftext='ban test')
+        sub.delete()
+    except Forbidden:
+        banned = True
+    except APIException as e:
+        if e.error_type == 'SUBREDDIT_NOTALLOWED':
+            banned = True
+    if banned:
+        log.info('Bot is banned from %s', subreddit.display_name)
+    else:
+        log.info('Bot is allowed on %s', subreddit.display_name)
+    return banned
 
