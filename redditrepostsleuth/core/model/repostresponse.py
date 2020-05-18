@@ -1,18 +1,10 @@
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, Summons
 
-# TODO - Convert to Py 3.7 dataclasses
+
 @dataclass
-class RepostResponseBase:
-    status: str = None
+class SummonsResponse:
+    summons: Summons
     message: str = None
-    summons_id: int = None
-
-# TODO - Make a generic response instead of repost specific
-@dataclass
-class RepostResponse(RepostResponseBase):
-    occurrences: List[Post] = field(default_factory=lambda: [])
-    posts_checked: int = 0
-
+    comment_reply_id: str = None
