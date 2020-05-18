@@ -15,7 +15,7 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
-from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.core.model.repostresponse import RepostResponse
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -57,7 +57,7 @@ def handle_summons2(self, summons):
             post = self.summons_handler.save_unknown_post(summons.post_id)
 
         if not post:
-            response = RepostResponseBase(summons_id=summons.id)
+            response = RepostResponse(summons_id=summons.id)
             response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
             log.info('Failed to ingest post %s.  Sending error response', summons.post_id)
             self.summons_handler._send_response(summons.comment_id, response)
@@ -126,7 +126,7 @@ def process_summons(self, s):
                     post = self.summons_handler.save_unknown_post(s.post_id)
 
                 if not post:
-                    response = RepostResponseBase(summons_id=s.id)
+                    response = RepostResponse(summons_id=s.id)
                     response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
                     log.info('Failed to ingest post %s.  Sending error response', s.post_id)
                     self.summons_handler._send_response(s.comment_id, response)

@@ -1,10 +1,9 @@
 import time
 from datetime import datetime
-from typing import Tuple, Text, NoReturn
+from typing import Tuple, Text, NoReturn, Optional
 
 from praw.exceptions import APIException
-from praw.models import Redditor
-from prawcore import ResponseException
+from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
 from redditrepostsleuth.core.config import Config
@@ -15,21 +14,19 @@ from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandEx
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.commands.repost_base_cmd import RepostBaseCmd
 from redditrepostsleuth.core.model.commands.repost_image_cmd import RepostImageCmd
-from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
-from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.core.model.repostresponse import SummonsResponse
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen, \
     searched_post_str, build_image_msg_values_from_search
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, LINK_ALL, \
-    REPOST_NO_RESULT, IMAGE_REPOST_ALL, WATCH_ENABLED, WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
-    SUMMONS_ALREADY_RESPONDED
+from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, IMAGE_REPOST_ALL, WATCH_ENABLED, \
+    WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
+    SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
@@ -72,10 +69,10 @@ class SummonsHandler:
                             post = self.save_unknown_post(s.post_id)
 
                         if not post:
-                            response = RepostResponseBase(summons_id=s.id)
+                            response = SummonsResponse(summons=summons)
                             response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
                             log.info('Failed to ingest post %s.  Sending error response', s.post_id)
-                            self._send_response(s.comment_id, response)
+                            self._send_response(response)
                             continue
 
                         self.process_summons(s, post)
@@ -85,8 +82,8 @@ class SummonsHandler:
                         self._send_event(summons_event)
                         log.info('Finished summons %s', s.id)
                 time.sleep(2)
-            except Exception as e:
-                log.exception('Exception in handle summons thread')
+            except Exception:
+                log.exception('Exception in handle summons thread', exc_info=True)
 
     def _get_summons_cmd(self, cmd_body: Text, post_type: Text) -> RepostBaseCmd:
         cmd_str = self._strip_summons_flags(cmd_body)
@@ -118,7 +115,13 @@ class SummonsHandler:
     def _get_link_repost_cmd(self, cmd_body: Text):
         return self.command_parser.parse_repost_link_cmd(cmd_body)
 
-    def _strip_summons_flags(self, comment_body: Text) -> Text:
+    def _strip_summons_flags(self, comment_body: Text) -> Optional[Text]:
+        """
+        Take the body of a comment where the bot is tagged and remove the tag
+        :rtype: Optional[Text]
+        :param comment_body: Body of comment
+        :return: The remainder of comment without the tag
+        """
         log.debug('Attempting to parse summons comment')
         log.debug(comment_body)
         user_tag = comment_body.lower().find('repostsleuthbot')
@@ -152,7 +155,8 @@ class SummonsHandler:
                 if monitored_sub.only_allow_one_summons:
                     response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'summons')
                     if response:
-                        log.info('Sub %s only allows one summons.  Existing response found at %s', summons.subreddit, response.perma_link)
+                        log.info('Sub %s only allows one summons.  Existing response found at %s',
+                                 summons.subreddit, response.perma_link)
                         self._send_already_responded_msg(summons, f'https://reddit.com{response.perma_link}')
                         if monitored_sub.remove_additional_summons:
                             self._delete_mention(summons.comment_id)
@@ -198,41 +202,35 @@ class SummonsHandler:
             return
 
     def _send_already_responded_msg(self, summons: Summons, perma_link: Text) -> NoReturn:
-        response = RepostResponseBase(summons_id=summons.id)
+        response = SummonsResponse(summons=summons)
         response.status = 'success'
         response.message = SUMMONS_ALREADY_RESPONDED.format(perma_link=perma_link)
         redditor = self.reddit.redditor(summons.requestor)
         self.response_handler.send_private_message(redditor, response.message)
-        self._save_response(response, CommentReply(body=response.message, comment=None))
-
+        self._save_response(response)
 
     def _send_unsupported_msg(self, summons: Summons, post_type: Text):
-        response = RepostResponseBase(summons_id=summons.id)
+        response = SummonsResponse(summons=summons)
         response.status = 'error'
         response.message = UNSUPPORTED_POST_TYPE.format(post_type=post_type)
-        self._send_response(summons.comment_id, response)
+        self._send_response(response)
 
     def _send_summons_disable_msg(self, summons: Summons):
-        # TODO - Send PM instead of comment reply
-        response = RepostResponseBase(summons_id=summons.id)
+        response = SummonsResponse(summons=summons)
         log.info('Sending summons disabled message')
-        response.message = 'I\m currently down for maintenance, check back in an hour'
-        self._send_response(summons.comment_id, response)
+        response.message = 'I\'m currently down for maintenance, check back in an hour'
+        self._send_response(response)
         return
 
     def _disable_watch(self, summons: Summons) -> NoReturn:
-        response = RepostResponseBase(summons_id=summons.id)
-
+        response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
             existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
-
             if not existing_watch or (existing_watch and not existing_watch.enabled):
                 response.message = WATCH_DISABLED_NOT_FOUND
                 self._send_response(summons.comment_id, response)
                 return
-
             existing_watch.enabled = False
-
             try:
                 uow.commit()
                 response.message = WATCH_DISABLED
@@ -240,29 +238,25 @@ class SummonsHandler:
             except Exception as e:
                 log.exception('Failed to disable watch %s', existing_watch.id, exc_info=True)
                 response.message = 'An error prevented me from removing your watch on this post.  Please try again'
-
-            self._send_response(summons.comment_id, response)
+            self._send_response(response)
 
     def _enable_watch(self, summons: Summons) -> NoReturn:
 
         cmd = self._get_summons_cmd(summons.comment_body, '')
-
-        response = RepostResponseBase(summons_id=summons.id)
-
+        response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
             existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
-
             if existing_watch:
                 if not existing_watch.enabled:
                     log.info('Found existing watch that is disabled.  Enabling watch %s', existing_watch.id)
                     existing_watch.enabled = True
                     response.message = WATCH_ENABLED
                     uow.commit()
-                    self._send_response(summons.comment_id, response)
+                    self._send_response(response)
                     return
                 else:
                     response.message = WATCH_ALREADY_ENABLED
-                    self._send_response(summons.comment_id, response)
+                    self._send_response(response)
                     return
 
         repost_watch = RepostWatch(
@@ -282,7 +276,7 @@ class SummonsHandler:
                 log.exception('Failed save repost watch', exc_info=True)
                 response.message = 'An error prevented me from creating a watch on this post.  Please try again'
 
-        self._send_response(summons.comment_id, response)
+        self._send_response(response)
 
     def process_repost_request(self, summons: Summons, post: Post):
         if post.post_type == 'image':
@@ -291,8 +285,7 @@ class SummonsHandler:
             self.process_link_repost_request(summons, post)
 
     def process_link_repost_request(self, summons: Summons, post: Post):
-
-        response = RepostResponseBase(summons_id=summons.id)
+        response = SummonsResponse(summons=summons)
         cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
         search_results = check_link_repost(post, self.uowm, get_total=True)
         msg_values = build_msg_values_from_search(search_results, self.uowm)
@@ -314,20 +307,19 @@ class SummonsHandler:
                     log.info('Sending check all results via PM with %s matches', len(search_results.matches))
                     comment = self.reddit.comment(summons.comment_id)
                     self.response_handler.send_private_message(comment.author, response.message)
-                    response.message = f'I found {len(search_results.matches)} matches.  I\'m sending them to you via PM to reduce comment spam'
+                    response.message = f'I found {len(search_results.matches)} matches.  ' \
+                                       f'I\'m sending them to you via PM to reduce comment spam'
 
                 response.message = response.message
             else:
                 response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
 
-        self._send_response(summons.comment_id, response)
+        self._send_response(response)
 
     def process_image_repost_request(self, summons: Summons, post: Post):
 
-        #cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
         cmd = self._get_summons_cmd(summons.comment_body, post.post_type)
-
-        response = RepostResponseBase(summons_id=summons.id)
+        response = SummonsResponse(summons=summons)
 
         target_hamming_distance, target_annoy_distance = self._get_target_distances(
             post.subreddit,
@@ -370,18 +362,21 @@ class SummonsHandler:
                     log.info('Sending check all results via PM with %s matches', len(search_results.matches))
                     comment = self.reddit.comment(summons.comment_id)
                     self.response_handler.send_private_message(comment.author, response.message)
-                    response.message = f'I found {len(search_results.matches)} matches.  I\'m sending them to you via PM to reduce comment spam'
+                    response.message = f'I found {len(search_results.matches)} matches.  ' \
+                                       f'I\'m sending them to you via PM to reduce comment spam'
 
                 response.message = response.message
             else:
 
-                response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
+                response.message = self.response_builder.build_sub_repost_comment(
+                    post.subreddit, msg_values,
+                    post.post_type
+                )
 
         if summons.subreddit in self.config.summons_send_pm_subs:
-            self._send_private_message(summons, response)
+            self._send_private_message(response)
         else:
-            self._send_response(summons.comment_id, response, no_link=post.subreddit in NO_LINK_SUBREDDITS)
-
+            self._send_response(response)
 
     def _get_target_distances(self, subreddit: str, override_hamming_distance: int = None) -> Tuple[int, float]:
         """
@@ -396,65 +391,85 @@ class SummonsHandler:
                 return override_hamming_distance or monitored_sub.target_hamming, monitored_sub.target_annoy
             return override_hamming_distance or self.config.default_hamming_distance, self.config.default_annoy_distance
 
-    def _send_response(self, comment_id: str, response: RepostResponseBase, no_link=False):
-        log.debug('Sending response to summons comment %s. MESSAGE: %s', comment_id, response.message)
-        try:
-            reply = self.response_handler.reply_to_comment(comment_id, response.message, send_pm_on_fail=True)
-        except (APIException, AssertionError) as e:
-            raise
-        except Exception as e:
-            pass
-
-        if reply:
-            response.message = reply.body  # TODO - I don't like this.  Make save_resposne take a CommentReply
-        else:
-            log.error('Failed to get reply from comment %s', comment_id)
-            response.message = 'FAILED REPLY' \
-                               ''
-        self._save_response(response, reply)
-
-    def _send_private_message(self, summons: Summons, response: RepostResponseBase) -> NoReturn:
-        redditor = self.reddit.redditor(summons.requestor)
-        log.info('Sending private message to %s for summons in sub %s', summons.requestor, summons.subreddit)
-        msg = f'I\'m unable to reply to your comment at https://redd.it/{summons.post_id}.  I\'m probably banned from r/{summons.subreddit}.  Here is my response. \n\n *** \n\n'
-        msg = msg + response.message
-        try:
-            comment_reply = CommentReply(body=None, comment=None)
-            comment_reply.body = self.response_handler.send_private_message(redditor, msg)
-        except Exception:
-            raise
-        # TODO - Shouldn't need to send response seperately
-        self._save_response(response, comment_reply)
-
-    def _save_response(self, response: RepostResponseBase, reply: CommentReply):
+    def _send_response(self, response: SummonsResponse) -> NoReturn:
+        """
+        Take a response object and send a response to the summons.  If we're banned on the sub send a PM instead
+        :param response: SummonsResponse Object
+        """
         with self.uowm.start() as uow:
-            summons = uow.summons.get_by_id(response.summons_id)
+            banned = uow.banned_subreddit.get_by_subreddit(response.summons.subreddit)
+        if banned:
+            self._send_private_message(response)
+        else:
+            try:
+                self._reply_to_comment(response)
+            except Forbidden:
+                self._send_private_message(response)
+        self._save_response(response)
+
+    def _reply_to_comment(self, response: SummonsResponse) -> SummonsResponse:
+        log.debug('Sending response to summons comment %s. MESSAGE: %s', response.summons.comment_id, response.message)
+        try:
+            reply_comment = self.response_handler.reply_to_comment(response.summons.comment_id, response.message)
+        except APIException as e:
+            if e.error_type == 'DELETED_COMMENT':
+                log.debug('Comment %s has been deleted', response.summons.comment_id)
+                response.message = 'DELETED COMMENT'
+            elif e.error_type == 'THREAD_LOCKED':
+                log.info('Comment %s is in a locked thread', response.summons.comment_id)
+                response.message = 'THREAD LOCKED'
+            elif e.error_type == 'RATELIMIT':
+                log.exception('PRAW Ratelimit exception', exc_info=False)
+                raise
+            else:
+                log.exception('APIException without error_type', exc_info=True)
+                raise
+            raise
+        except Exception:
+            log.exception('Problem leaving response', exc_info=True)
+            raise
+
+        response.comment_reply_id = reply_comment.id
+        return response
+
+    def _send_private_message(self, response: SummonsResponse) -> SummonsResponse:
+        redditor = self.reddit.redditor(response.summons.requestor)
+        log.info('Sending private message to %s for summons in sub %s', response.summons.requestor, response.summons.subreddit)
+        msg = BANNED_SUB_MSG.format(post_id=response.summons.post_id, subreddit=response.summons.subreddit)
+        msg = msg + response.message
+        self.response_handler.send_private_message(redditor, msg)
+        response.message = msg
+        return response
+
+    def _save_response(self, response: SummonsResponse):
+        with self.uowm.start() as uow:
+            summons = uow.summons.get_by_id(response.summons.id)
             if summons:
                 summons.comment_reply = response.message
                 summons.summons_replied_at = datetime.utcnow()
-                summons.comment_reply_id = reply.comment.id if reply.comment else None  # TODO: Hacky
+                summons.comment_reply_id = response.comment_reply_id
                 try:
                     uow.commit()
                     log.debug('Committed summons response to database')
-                except InternalError as e:
-                    log.error('Failed to save response to summons')
-
+                except InternalError:
+                    log.exception('Failed to save response to summons', exc_info=True)
 
     def _save_post(self, post: Post):
         with self.uowm.start() as uow:
             uow.posts.update(post)
             uow.commit()
 
-    def save_unknown_post(self, post_id: str) -> Post:
+    def save_unknown_post(self, post_id: Text) -> Optional[Post]:
         """
         If we received a request on a post we haven't ingest save it
-        :param submission: Reddit Submission
-        :return:
+        :rtype: Optional[Post]
+        :param post_id: Submission ID
+        :return: Post object
         """
         submission = self.reddit.submission(post_id)
         try:
             post = pre_process_post(submission_to_post(submission), self.uowm, None)
-        except (InvalidImageUrlException):
+        except InvalidImageUrlException:
             return
 
         if not post or post.post_type != 'image':

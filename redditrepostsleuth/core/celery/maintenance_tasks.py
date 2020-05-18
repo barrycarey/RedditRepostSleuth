@@ -77,16 +77,6 @@ def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
     if not util_api:
         raise ValueError('Missing util API')
 
-    non_reddit = 0
-    delete_list = []
-    for p in posts:
-        if 'reddit.com' in p['url'] or 'redd.it' in p['url']:
-            continue
-        else:
-            non_reddit += 1
-
-    log.info('Sending %s non-reddit posts', non_reddit)
-
     try:
         res = requests.post(f'{util_api}/maintenance/removed', json=posts)
     except Exception as e:

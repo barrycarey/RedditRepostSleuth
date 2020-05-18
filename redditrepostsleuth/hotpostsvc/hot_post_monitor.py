@@ -52,18 +52,19 @@ class TopPostMonitor:
             with self.uowm.start() as uow:
                 submissions = [sub for sub in self.reddit.subreddit('all').top('day')]
                 submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
-                #submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
+                submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
                 submissions = submissions + [sub for sub in self.reddit.subreddit('all').hot()]
                 for sub in submissions:
                     post = uow.posts.get_by_post_id(sub.id)
                     if not post:
                         continue
 
-                    if post and post.left_comment:
+                    banned = uow.banned_subreddit.get_by_subreddit(sub.subreddit.display_name)
+                    if banned:
+                        log.info('Skipping post, banned on %s', banned.subreddit)
                         continue
 
-                    if post.subreddit.lower() in BANNED_SUBS:
-                        log.info('Post %s is in a banned sub, %s.', post.post_id, post.subreddit)
+                    if post and post.left_comment:
                         continue
 
                     if post.crosspost_parent:
@@ -77,8 +78,6 @@ class TopPostMonitor:
 
                     self.check_for_repost(post)
                     time.sleep(0.2)
-
-                # TODO - Add checked posts to checked table
 
             log.info('Processed all top posts.  Sleeping')
             time.sleep(3600)

@@ -350,3 +350,10 @@ class ToBeDeleted(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     post_type = Column(String(20))
+
+class BannedSubreddit(Base):
+    __tablename__ = 'banned_subreddit'
+    id = Column(Integer, primary_key=True)
+    subreddit = Column(String(100), nullable=False, unique=True)
+    detected_at = Column(DateTime, default=func.utc_timestamp())
+    last_checked = Column(DateTime, default=func.utc_timestamp())
