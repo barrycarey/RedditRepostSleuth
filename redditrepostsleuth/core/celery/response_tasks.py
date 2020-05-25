@@ -112,7 +112,7 @@ def process_summons(self, s):
                     response = SummonsResponse(summons=s)
                     response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
                     log.info('Failed to ingest post %s.  Sending error response', s.post_id)
-                    self.summons_handler._send_response(s.comment_id, response)
+                    self.summons_handler._send_response(response)
                     return
 
                 try:

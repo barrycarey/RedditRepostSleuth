@@ -108,7 +108,7 @@ def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
                 uow.to_be_deleted.add(
                     ToBeDeleted(
                         post_id=p['id'],
-                        post_type='link'
+                        post_type='image'
                     )
                 )
                 """
