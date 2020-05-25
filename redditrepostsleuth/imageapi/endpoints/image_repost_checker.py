@@ -32,6 +32,7 @@ class ImageRepostChecker:
         only_older = req.get_param_as_bool('only_older', False)
         include_crossposts = req.get_param_as_bool('include_crossposts', False)
         meme_filter = req.get_param_as_bool('meme_filter', False)
+        meme_filter = req.get_param_as_bool('meme_filter', False)
 
         post_id = req.params.get('post_id')
         filter = req.get_param_as_bool('filter')

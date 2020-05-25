@@ -25,3 +25,4 @@ waitress
 falcon-cors
 python-Levenshtein
 apscheduler
+gunicorn

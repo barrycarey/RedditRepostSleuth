@@ -334,6 +334,7 @@ class SummonsHandler:
                 meme_filter=cmd.meme_filter,
                 same_sub=cmd.same_sub,
                 date_cutoff=cmd.match_age,
+                max_matches=125,
                 source='summons'
             )
         except NoIndexException:
