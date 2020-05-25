@@ -45,15 +45,15 @@ def get_all_links():
     conn = get_db_conn()
     batch = []
     with conn.cursor() as cur:
-        query = f"SELECT post_id, url, post_type FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 60 DAY"
+        query = f"SELECT post_id, url, post_type FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 90 DAY"
         cur.execute(query)
         log.info('Adding items to index')
         for row in cur:
-            if row['post_type'] != 'link':
+            if row['post_type'] != 'image':
                 continue
             batch.append({'id': row['post_id'], 'url': row['url']})
-            if len(batch) >= 15:
-                cleanup_removed_posts_batch.apply_async((batch,), queue='link_check')
+            if len(batch) >= 18:
+                cleanup_removed_posts_batch.apply_async((batch,), queue='image_check')
                 batch = []
 
 def get_all_reddit_links():
