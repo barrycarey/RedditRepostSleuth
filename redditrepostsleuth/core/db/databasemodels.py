@@ -357,3 +357,12 @@ class BannedSubreddit(Base):
     subreddit = Column(String(100), nullable=False, unique=True)
     detected_at = Column(DateTime, default=func.utc_timestamp())
     last_checked = Column(DateTime, default=func.utc_timestamp())
+
+class BannedUser(Base):
+    __tablename__ = 'banned_users'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True)
+    reason = Column(String(150), nullable=False)
+    banned_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    expires_at = Column(DateTime)
+    notes = Column(String(500))

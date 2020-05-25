@@ -7,7 +7,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 sys.path.append('./')
-from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers, \
+    remove_expired_bans, update_banned_sub_wiki
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
@@ -27,7 +28,8 @@ from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 if __name__ == '__main__':
     config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    reddit_manager = RedditManager(get_reddit_instance(config))
+    reddit = get_reddit_instance(config)
+    reddit_manager = RedditManager(reddit)
     comment_monitor = BotCommentMonitor(reddit_manager, uowm, config)
     stats_updater = StatsUpdater()
     activation_monitor = NewActivationMonitor(uowm, get_reddit_instance(config))
@@ -80,6 +82,22 @@ if __name__ == '__main__':
         args=(uowm, reddit_manager),
         trigger='interval',
         hours=6,
+        name='update_subscriber_count',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=remove_expired_bans,
+        args=(uowm,),
+        trigger='interval',
+        minutes=5,
+        name='remove_expired_bans',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=update_banned_sub_wiki,
+        args=(uowm, reddit),
+        trigger='interval',
+        hours=1,
         name='update_subscriber_count',
         max_instances=1
     )

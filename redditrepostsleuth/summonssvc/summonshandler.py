@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Tuple, Text, NoReturn, Optional
 
 from praw.exceptions import APIException
@@ -7,7 +7,7 @@ from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch
+from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException, InvalidImageUrlException
@@ -26,7 +26,7 @@ from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, IMAGE_REPOST_ALL, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
-    SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG
+    SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
@@ -138,6 +138,17 @@ class SummonsHandler:
     def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
+
+        if self._is_banned(summons.requestor):
+            log.info('User %s is currently banned', summons.requestor)
+            response = SummonsResponse(summons=summons, message='USER BANNED')
+            self._save_response(response)
+            return
+
+        if self._has_user_exceeded_limit(summons.requestor):
+            self._ban_user(summons.requestor)
+            self._send_ban_notification(summons)
+            return
 
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
@@ -473,6 +484,9 @@ class SummonsHandler:
             post = pre_process_post(submission_to_post(submission), self.uowm, None)
         except InvalidImageUrlException:
             return
+        except Forbidden:
+            log.error('Failed to download post %s, appears we are banned', post_id)
+            return
 
         if not post or post.post_type != 'image':
             log.error('Problem ingesting post.  Either failed to save or it is not an image')
@@ -483,3 +497,46 @@ class SummonsHandler:
     def _send_event(self, event: InfluxEvent):
         if self.event_logger:
             self.event_logger.save_event(event)
+
+    def _send_ban_notification(self, summons: Summons) -> NoReturn:
+        response = SummonsResponse(summons=summons)
+        response.status = 'success'
+        response.message = OVER_LIMIT_BAN.format(ban_expires=datetime.utcnow() + timedelta(hours=1))
+        redditor = self.reddit.redditor(summons.requestor)
+        self.response_handler.send_private_message(redditor, response.message, subject='Temporary RepostSleuth Ban')
+        self._save_response(response)
+
+    def _ban_user(self, requestor: Text) -> NoReturn:
+        ban_expires = datetime.utcnow() + timedelta(hours=1)
+        log.info('Banning user %s until %s', requestor, ban_expires)
+        with self.uowm.start() as uow:
+            uow.banned_user.add(
+                BannedUser(
+                    name=requestor,
+                    reason='Exceeded Summons Count',
+                    expires_at=ban_expires
+                )
+            )
+            uow.commit()
+
+    def _has_user_exceeded_limit(self, requestor: Text) -> bool:
+        with self.uowm.start() as uow:
+            summons_last_hour = uow.summons.get_by_user_interval(requestor, 1)
+            log.debug('Summons Per Hour: User - %s | Summons: %s', requestor, len(summons_last_hour))
+            if len(summons_last_hour) > self.config.summons_max_per_hour:
+                log.info('User %s has submitted %s summons in last hour.  Skipping this summons', requestor,
+                         len(summons_last_hour))
+                return True
+            return False
+
+    def _is_banned(self, requestor: Text) -> bool:
+        """
+        Check if a given requestor is allowed to summon the bot.  First by checking the ban list and then seeing if
+        they have exceeded the summons count
+        :rtype: bool
+        :param requestor: Name of requestor
+        :return: True/False
+        """
+        with self.uowm.start() as uow:
+            banned = uow.banned_user.get_by_user(requestor)
+        return True if banned else False

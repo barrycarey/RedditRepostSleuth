@@ -14,7 +14,7 @@ class BannedSubredditRepo:
         return self.db_session.query(BannedSubreddit).filter(BannedSubreddit.subreddit == name).first()
 
     def get_all(self, limit: int = None, offset: int = None):
-        return self.db_session.query(BannedSubreddit).limit(limit).offset(offset).all()
+        return self.db_session.query(BannedSubreddit).order_by(BannedSubreddit.subreddit).limit(limit).offset(offset).all()
 
     def remove(self, item):
         self.db_session.delete(item)

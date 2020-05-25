@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [UNRELEASED]
 * [backend] - Start tracking which subs the bot is banned on
+* [backend] - Implement ban system to prevent the bot from being spammed.  If a user summons the but more than 50 times per hour it will trigger a 1 hour ban
+* [stats] - Now publishing the list of subs the bot is banned from
 
 ## [0.1.7] - 5/17/2020
 * [feature] - Watch command added.  This allows you to tag a post and be notified if someone else reposts it. Example: u/repostsleuthbot watch
