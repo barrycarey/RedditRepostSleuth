@@ -521,7 +521,8 @@ class SummonsHandler:
 
     def _has_user_exceeded_limit(self, requestor: Text) -> bool:
         with self.uowm.start() as uow:
-            summons_last_hour = uow.banned_user.get_by_user_interval(requestor, 1)
+            summons_last_hour = uow.summons.get_by_user_interval(requestor, 1)
+            log.debug('Summons Per Hour: User - %s | Summons: %s', requestor, len(summons_last_hour))
             if len(summons_last_hour) > self.config.summons_max_per_hour:
                 log.info('User %s has submitted %s summons in last hour.  Skipping this summons', requestor,
                          len(summons_last_hour))
@@ -537,5 +538,5 @@ class SummonsHandler:
         :return: True/False
         """
         with self.uowm.start() as uow:
-            banned = uow.banned_user.get_by_name(requestor)
+            banned = uow.banned_user.get_by_user(requestor)
         return True if banned else False

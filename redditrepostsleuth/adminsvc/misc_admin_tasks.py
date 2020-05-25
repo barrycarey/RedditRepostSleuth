@@ -19,6 +19,7 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     :param uowm: UnitOfWorkManager
     :param reddit: Rreddit
     """
+    log.info('Starting Job: Verify Mod Status')
     with uowm.start() as uow:
         monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
         for sub in monitored_subs:
@@ -45,6 +46,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     :param uowm: UnitOfWorkManager
     :param reddit: Reddit
     """
+    log.info('Starting Job: Update Subreddit Bans')
     with uowm.start() as uow:
         bans = uow.banned_subreddit.get_all()
         for ban in bans:
@@ -58,6 +60,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             uow.commit()
 
 def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+    log.info('Starting Job: Update Monitored Sub Subscribers')
     with uowm.start() as uow:
         subs = uow.monitored_sub.get_all()
         for monitored_sub in subs:
@@ -70,9 +73,17 @@ def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) ->
                 except Exception as e:
                     log.exception('Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
 
+def remove_expired_bans(uowm: UnitOfWorkManager) -> NoReturn:
+    log.info('Starting Job: Remove expired bans')
+    with uowm.start() as uow:
+        bans = uow.banned_user.get_expired_bans()
+        for ban in bans:
+            log.info('Removing %s from ban list', ban.name)
+            uow.banned_user.remove(ban)
+            uow.commit()
 
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_monitored_sub_subscribers(uowm, reddit)
+    remove_expired_bans(uowm)

@@ -7,7 +7,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 sys.path.append('./')
-from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers, \
+    remove_expired_bans
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
@@ -81,6 +82,14 @@ if __name__ == '__main__':
         trigger='interval',
         hours=6,
         name='update_subscriber_count',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=remove_expired_bans,
+        args=(uowm,),
+        trigger='interval',
+        minutes=5,
+        name='remove_expired_bans',
         max_instances=1
     )
     scheduler.start()
