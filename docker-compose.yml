@@ -151,7 +151,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 4
 
     pushshift_archive_intake_worker:
         build:
@@ -172,6 +172,14 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_ingest -c 1
+
+    site_api:
+        build:
+            context: .
+        environment:
+            - LOG_LEVEL=INFO
+        networks:
+            - sleuthnet
 
 networks:
   sleuthnet:
