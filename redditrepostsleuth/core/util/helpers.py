@@ -270,3 +270,30 @@ def is_bot_banned(subreddit: Subreddit) -> bool:
         log.info('Bot is allowed on %s', subreddit.display_name)
     return banned
 
+def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
+    if len(rows[0]) != len(headers):
+        raise ValueError('Header count mismatch')
+
+    table = '|'
+    sep = '|'
+    row_template = '|'
+    for header in headers:
+        table += f' {header} |'
+        sep += ' ----- |'
+        row_template += ' {} |'
+    table += '\n'
+    table += sep + '\n'
+    for row in rows:
+        table += row_template.format(*row) + '\n'
+
+    return table
+
+    """
+    table = f'| {column_one_header}      | {column_two_header} |\n' \
+              '| ----------- | ----------- |\n' \
+
+    for k, v in rows.items():
+        table = table + f'| {k} | {v} |\n'
+
+    return table
+    """
