@@ -26,7 +26,7 @@ class SummonsRepository:
 
     def get_by_user_interval(self, user: Text, interval_hours: int = 1) -> Optional[List[Summons]]:
         since = datetime.now() - timedelta(hours=interval_hours)
-        return self.db_session.query(Summons).filter(Summons.summons_received_at < since).all()
+        return self.db_session.query(Summons).filter(Summons.requestor == user, Summons.summons_received_at > since).all()
 
     def get_by_comment_id(self, id: str) -> Summons:
         return self.db_session.query(Summons).filter(Summons.comment_id == id).first()

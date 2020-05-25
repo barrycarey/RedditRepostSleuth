@@ -66,4 +66,4 @@ MOD_STATUS_REMOVED = 'Hello, \n\n I\'ve noticed I\'m no longer a mod on r/{subna
 
 BANNED_SUB_MSG = 'I\'m unable to reply to your comment at https://redd.it/{post_id}.  I\'m probably banned from r/{subreddit}.  Here is my response. \n\n *** \n\n'
 
-OVER_LIMIT_BAN = 'We have received too many requests from you in the last hour.  You have been blocked for 1 hour.  This will expire at {ban_expire}'
+OVER_LIMIT_BAN = 'We have received too many requests from you in the last hour.  You have been blocked for 1 hour.  This will expire at {ban_expires} UTC'
