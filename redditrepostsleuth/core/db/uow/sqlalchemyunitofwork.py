@@ -3,6 +3,7 @@ from sqlalchemy.orm import scoped_session
 from redditrepostsleuth.core.db.databasemodels import InvestigatePost
 from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
 from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSubredditRepo
+from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
@@ -127,3 +128,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def banned_subreddit(self) -> BannedSubredditRepo:
         return BannedSubredditRepo(self.session)
+
+    @property
+    def banned_user(self) -> BannedUserRepo:
+        return BannedUserRepo(self.session)
