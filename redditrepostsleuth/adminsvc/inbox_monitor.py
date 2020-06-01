@@ -25,7 +25,8 @@ class InboxMonitor:
         self.failed_checks = []
 
     def check_inbox(self):
-        for msg in self.reddit.inbox.messages(limit=30):
+        log.info('[Scheduled Job] Checking Inbox')
+        for msg in self.reddit.inbox.messages(limit=75):
             if msg.author != 'RepostSleuthBot' and msg.subject.lower() in ['false negative', 'false positive']:
                 self._process_user_report(msg)
 

@@ -2,7 +2,9 @@ import json
 import time
 from datetime import datetime
 from json import JSONDecodeError
+from typing import Dict
 
+import requests
 from celery import Task
 from praw.exceptions import APIException
 from prawcore import ResponseException
@@ -10,6 +12,7 @@ from redlock import RedLockError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -21,7 +24,7 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.objectmapping import submission_to_post, pushshift_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
@@ -53,7 +56,30 @@ class SubMonitorTask(Task):
 
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
-def sub_monitor_check_post(self, submission, monitored_sub):
+def sub_monitor_check_post(self, submission: Dict, monitored_sub: MonitoredSub):
+    if self.sub_monitor.has_post_been_checked(submission['id']):
+        log.debug('Post %s has already been checked', submission['id'])
+        return
+
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_post_id(submission['id'])
+        if not post:
+            log.info('Post %s does exist, sending to ingest queue', submission['id'])
+            post = pushshift_to_post(submission, source='reddit_json')
+            celery.send_task('redditrepostsleuth.core.celery.ingesttasks.save_new_post', args=[post],
+                             queue='postingest')
+            return
+
+    title_keywords = []
+    if monitored_sub.title_ignore_keywords:
+        title_keywords = monitored_sub.title_ignore_keywords.split(',')
+
+    if not self.sub_monitor.should_check_post(post, title_keyword_filter=title_keywords):
+        return
+    self.sub_monitor.check_submission(monitored_sub, post)
+
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
+def sub_monitor_check_post_old(self, submission, monitored_sub):
     if self.sub_monitor.has_post_been_checked(submission.id):
         log.debug('Post %s has already been checked', submission.id)
         return
@@ -77,6 +103,27 @@ def sub_monitor_check_post(self, submission, monitored_sub):
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
 def process_monitored_sub(self, monitored_sub):
+    try:
+        log.info('Loading all submissions from %s', monitored_sub.name)
+        r = requests.get(f'{self.config.util_api}/reddit/subreddit', params={'subreddit': monitored_sub.name, 'limit': monitored_sub.search_depth})
+    except Exception as e:
+        log.error('Error getting new posts from util api', exc_info=True)
+        return
+
+    if r.status_code != 200:
+        log.error('Bad status code from Util API %s for %s', r.status_code, monitored_sub.name)
+        return
+
+    response_data = json.loads(r.text)
+
+    for submission in response_data:
+        sub_monitor_check_post.apply_async((submission, monitored_sub), queue='submonitor')
+
+    log.info('All submissions from %s sent to queue', monitored_sub.name)
+
+# TODO - Remove this when we're done
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
+def process_monitored_sub_old(self, monitored_sub):
     try:
         subreddit = self.reddit.subreddit(monitored_sub.name)
         if not subreddit:
