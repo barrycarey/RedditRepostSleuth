@@ -23,6 +23,7 @@ class NewActivationMonitor:
         self.reddit = reddit
 
     def check_for_new_invites(self):
+        log.info('[Scheduled Job] Check For Mod Invites')
         try:
             log.info('Checking for new mod invites')
             for msg in self.reddit.inbox.messages(limit=300):
