@@ -37,6 +37,7 @@ class SubredditConfigUpdater:
         self.config = config
 
     def update_configs(self):
+        log.info('[Scheduled Job] Config Updates')
         try:
             with self.uowm.start() as uow:
                 monitored_subs = uow.monitored_sub.get_all()
@@ -66,8 +67,10 @@ class SubredditConfigUpdater:
 
         try:
             if not self._is_config_updated(wiki_page.revision_id):
+                log.info('Newer config found for %s', monitored_sub.name)
                 wiki_config = self._load_new_config(wiki_page, monitored_sub, subreddit)
             else:
+                log.info('Already have the newest config for %s', monitored_sub.name)
                 wiki_config = self.get_wiki_config(wiki_page)
         except JSONDecodeError:
             return

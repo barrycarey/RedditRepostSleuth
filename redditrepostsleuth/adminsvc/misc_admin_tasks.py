@@ -20,7 +20,12 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     :param uowm: UnitOfWorkManager
     :param reddit: Rreddit
     """
-    log.info('Starting Job: Verify Mod Status')
+    ignore_no_mod = [
+        'CouldYouDeleteThat',
+        'CouldYouDeleteThat',
+
+    ]
+    log.info('[Scheduled Job] Checking Mod Status')
     with uowm.start() as uow:
         monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
         for sub in monitored_subs:
@@ -28,7 +33,7 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             if not subreddit:
                 continue
             if not is_moderator(subreddit, 'RepostSleuthBot'):
-                log.info('Bot is not a mod on %s', sub.name)
+                log.info('[Mod Check] Bot is not a mod on %s', sub.name)
                 sub.is_mod = False
                 uow.commit()
                 continue
@@ -36,7 +41,7 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             sub.is_mod = True
             sub.post_permission = bot_has_permission(subreddit, 'post')
             sub.wiki_permission = bot_has_permission(subreddit, 'wiki')
-            log.info('%s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
+            log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
             uow.commit()
 
 
@@ -53,33 +58,33 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
         for ban in bans:
             subreddit = reddit.subreddit(ban.subreddit)
             if is_bot_banned(subreddit):
-                log.info('Still banned on %s', ban.subreddit)
+                log.info('[Subreddit Ban Check] Still banned on %s', ban.subreddit)
                 ban.last_checked = func.utc_timestamp()
             else:
-                log.info('No longer banned on %s', ban.subreddit)
+                log.info('[Subreddit Ban Check] No longer banned on %s', ban.subreddit)
                 uow.banned_subreddit.remove(ban)
             uow.commit()
 
 def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
-    log.info('Starting Job: Update Monitored Sub Subscribers')
+    log.info('[Scheduled Job] Update Subscribers')
     with uowm.start() as uow:
         subs = uow.monitored_sub.get_all()
         for monitored_sub in subs:
             subreddit = reddit.subreddit(monitored_sub.name)
             if subreddit:
                 monitored_sub.subscribers = subreddit.subscribers
-                log.info('%s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
+                log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
                 try:
                     uow.commit()
                 except Exception as e:
-                    log.exception('Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
+                    log.exception('[Subscriber Update] Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
 
 def remove_expired_bans(uowm: UnitOfWorkManager) -> NoReturn:
-    log.info('Starting Job: Remove expired bans')
+    log.info('[Scheduled Job] Removed Expired Bans')
     with uowm.start() as uow:
         bans = uow.banned_user.get_expired_bans()
         for ban in bans:
-            log.info('Removing %s from ban list', ban.name)
+            log.info('[Ban Remover] Removing %s from ban list', ban.name)
             uow.banned_user.remove(ban)
             uow.commit()
 
@@ -89,6 +94,7 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     :param uowm: UnitOfWorkmanager
     :param reddit: Praw Reddit instance
     """
+    log.info('[Scheduled Job] Update Ban Wiki')
     wiki_template_file = os.path.join(os.getcwd(), 'banned-subs.md')
     if not os.path.isfile(wiki_template_file):
         log.critical('Unable to locate banned sub wiki file at %s', wiki_template_file)
@@ -104,12 +110,13 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     table_data = build_markdown_table(results, ['Subreddit', 'Detected At', 'Last Checked'])
     wiki = reddit.subreddit('RepostSleuthBot').wiki['published-data/banned-subreddits']
     wiki.edit(template.format(banned_subs=table_data, total=len(banned)))
+    log.info('[Banned Sub Wiki Update] Fished update')
 
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_banned_sub_wiki(uowm, reddit)
+    update_mod_status(uowm, reddit)
     wiki = reddit.subreddit('RepostSleuthBot').wiki['published-data/banned-subreddits']
     build_markdown_table([['test1', 'test2', 'test3']], ['header1', 'header2', 'header3'])
 
