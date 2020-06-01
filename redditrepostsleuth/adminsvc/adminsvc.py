@@ -9,7 +9,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 sys.path.append('./')
 from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers, \
     remove_expired_bans, update_banned_sub_wiki
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
 from redditrepostsleuth.core.services.eventlogging import EventLogging
@@ -26,7 +25,7 @@ from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 
 
 if __name__ == '__main__':
-    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config()
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     reddit = get_reddit_instance(config)
     reddit_manager = RedditManager(reddit)
@@ -38,7 +37,7 @@ if __name__ == '__main__':
     config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler, config)
     inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
 
-    config_updater.update_configs()
+    #config_updater.update_configs()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(
