@@ -31,7 +31,7 @@ def check_for_high_match_meme(search_results: ImageRepostWrapper, uowm: UnitOfWo
             except Exception as e:
                 log.exception('Failed to create meme templaet', exc_info=True)
 
-        elif len(search_results.matches) > 10 and 'meme' in search_results.checked_post.subreddit.lower():
+        elif len(search_results.matches) > 5 and 'meme' in search_results.checked_post.subreddit.lower():
             try:
                 meme_template = create_meme_template(search_results.checked_post.url, search_results.checked_post.title)
                 meme_template.approved = False

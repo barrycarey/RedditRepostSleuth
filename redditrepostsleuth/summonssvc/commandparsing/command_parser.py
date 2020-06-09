@@ -111,6 +111,9 @@ class CommandParser:
         pass
 
     def parse_root_command(self, command: str):
+        if not command:
+            log.error('Got empty command.  Returning repost')
+            return 'repost'
         parser = ArgumentParserThrow()
         parser.add_argument('command', default=None, choices=['repost', 'watch', 'unwatch'])
         options, args = parser.parse_known_args(command.split(' '))

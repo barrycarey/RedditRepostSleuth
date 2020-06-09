@@ -44,13 +44,14 @@ def get_certain_sites(uowm):
 def get_all_links():
     conn = get_db_conn()
     batch = []
+    all_posts = []
     with conn.cursor() as cur:
         query = f"SELECT post_id, url, post_type FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 90 DAY AND post_type='image'"
         cur.execute(query)
         log.info('Adding items to index')
         for row in cur:
-            batch.append({'id': row['post_id'], 'url': row['url']})
-            if len(batch) >= 18:
+            all_posts.append({'id': row['post_id'], 'url': row['url']})
+            if len(batch) >= 25:
                 try:
                     cleanup_removed_posts_batch.apply_async((batch,), queue='image_check')
                     batch = []

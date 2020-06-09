@@ -126,6 +126,7 @@ class DuplicateImageService:
                                  filter_dead_matches: bool = True,
                                  only_older_matches=True,
                                  meme_filter=False,
+                                 max_depth=4000,
                                  source='unknown') -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
@@ -142,7 +143,7 @@ class DuplicateImageService:
         search_results.checked_post = post
 
         try:
-            r = requests.get(f'{self.config.index_api}/image', params={'hash': post.dhash_h, 'max_results': max_matches})
+            r = requests.get(f'{self.config.index_api}/image', params={'hash': post.dhash_h, 'max_results': max_matches, 'max_depth': max_depth})
         except ConnectionError:
             log.error('Failed to connect to Index API')
             raise NoIndexException('Failed to connect to Index API')

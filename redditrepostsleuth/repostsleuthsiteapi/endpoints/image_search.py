@@ -40,6 +40,8 @@ class ImageSearch:
                 date_cutoff=date_cutoff,
                 only_older_matches=only_older,
                 filter_dead_matches=filter_dead_matches,
+                max_matches=500,
+                max_depth=-1,
                 source='api'
             )
         except NoIndexException:
