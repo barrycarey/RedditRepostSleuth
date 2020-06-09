@@ -2,6 +2,7 @@ import os
 from typing import NoReturn, List
 
 from praw import Reddit
+from prawcore import Forbidden
 from sqlalchemy import func
 
 from redditrepostsleuth.core.config import Config
@@ -68,11 +69,15 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
 def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     log.info('[Scheduled Job] Update Subscribers')
     with uowm.start() as uow:
-        subs = uow.monitored_sub.get_all()
+        subs = uow.monitored_sub.get_all_active()
         for monitored_sub in subs:
             subreddit = reddit.subreddit(monitored_sub.name)
             if subreddit:
-                monitored_sub.subscribers = subreddit.subscribers
+                try:
+                    monitored_sub.subscribers = subreddit.subscribers
+                except Forbidden:
+                    log.error('[Subscriber Update] %s: Forbidden error', monitored_sub.name)
+                    continue
                 log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
                 try:
                     uow.commit()
@@ -116,7 +121,7 @@ if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_mod_status(uowm, reddit)
+    update_monitored_sub_subscribers(uowm, reddit)
     wiki = reddit.subreddit('RepostSleuthBot').wiki['published-data/banned-subreddits']
     build_markdown_table([['test1', 'test2', 'test3']], ['header1', 'header2', 'header3'])
 

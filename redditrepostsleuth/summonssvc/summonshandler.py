@@ -89,7 +89,7 @@ class SummonsHandler:
         cmd_str = self._strip_summons_flags(cmd_body)
         try:
             base_command = self.command_parser.parse_root_command(cmd_str)
-            if base_command == 'repost':
+            if base_command == 'repost' or base_command is None:
                 return self._get_repost_cmd(post_type, cmd_str)
             elif base_command == 'watch':
                 return self.command_parser.parse_watch_cmd(cmd_str)
@@ -176,7 +176,10 @@ class SummonsHandler:
 
         stripped_comment = self._strip_summons_flags(summons.comment_body)
         try:
-            base_command = self.command_parser.parse_root_command(stripped_comment)
+            if not stripped_comment:
+                base_command = 'repost'
+            else:
+                base_command = self.command_parser.parse_root_command(stripped_comment)
         except InvalidCommandException:
             log.error('Invalid command in summons: %s', summons.comment_body)
             base_command = 'repost'
@@ -345,7 +348,8 @@ class SummonsHandler:
                 meme_filter=cmd.meme_filter,
                 same_sub=cmd.same_sub,
                 date_cutoff=cmd.match_age,
-                max_matches=125,
+                max_matches=250,
+                max_depth=-1,
                 source='summons'
             )
         except NoIndexException:
