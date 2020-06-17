@@ -37,7 +37,7 @@ class SubredditConfigUpdater:
         self.config = config
 
     def update_configs(self):
-        log.info('[Scheduled Job] Config Updates')
+        print('[Scheduled Job] Config Updates Start')
         try:
             with self.uowm.start() as uow:
                 monitored_subs = uow.monitored_sub.get_all()
@@ -49,6 +49,8 @@ class SubredditConfigUpdater:
                 time.sleep(180)
         except Exception as e:
             log.exception('Config update thread crashed', exc_info=True)
+
+        print('[Scheduled Job] Config Updates End')
 
     def check_for_config_update(self, monitored_sub: MonitoredSub):
         # TODO - Possibly pass the subreddit to get_wiki_config

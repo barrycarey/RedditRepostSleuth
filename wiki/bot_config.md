@@ -21,5 +21,7 @@
   "remove_additional_summons": false,
   "check_all_submissions": true,
   "check_title_similarity": false,
-  "target_title_match": 50
+  "target_title_match": 50,
+  "filter_crossposts": True,
+  "filter_same_author": True
 }

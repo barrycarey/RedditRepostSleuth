@@ -36,7 +36,9 @@ To change settings simply update the JSON and save.  The bot will load the new c
   "remove_additional_summons": false,
   "check_all_submissions": true,
   "check_title_similarity": false,
-  "target_title_match": 50
+  "target_title_match": 50,
+  "filter_crossposts": True,
+  "filter_same_author": True
 }
 ```
 
@@ -89,6 +91,10 @@ To change settings simply update the JSON and save.  The bot will load the new c
 **check_title_similarity:** Should the bot also consider title similarity when determining if something is a repost? 
 
 **target_title_match:** How close, in percent, should the title match to be considered a repost.  Only used if check_title_similarity is enabled
+
+**filter_crossposts:** Exclude crossposts from the search results. 
+
+**filter_same_author:** Exclude results from the same author as the post being checked
 
 ### Comment Templates
 ---

@@ -26,7 +26,7 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
         'CouldYouDeleteThat',
 
     ]
-    log.info('[Scheduled Job] Checking Mod Status')
+    print('[Scheduled Job] Checking Mod Status Start')
     with uowm.start() as uow:
         monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
         for sub in monitored_subs:
@@ -44,7 +44,7 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             sub.wiki_permission = bot_has_permission(subreddit, 'wiki')
             log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
             uow.commit()
-
+    print('[Scheduled Job] Checking Mod Status End')
 
 def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     """
@@ -67,7 +67,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             uow.commit()
 
 def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
-    log.info('[Scheduled Job] Update Subscribers')
+    print('[Scheduled Job] Update Subscribers Start')
     with uowm.start() as uow:
         subs = uow.monitored_sub.get_all_active()
         for monitored_sub in subs:
@@ -83,9 +83,10 @@ def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) ->
                     uow.commit()
                 except Exception as e:
                     log.exception('[Subscriber Update] Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
+    print('[Scheduled Job] Update Subscribers End')
 
 def remove_expired_bans(uowm: UnitOfWorkManager) -> NoReturn:
-    log.info('[Scheduled Job] Removed Expired Bans')
+    print('[Scheduled Job] Removed Expired Bans Start')
     with uowm.start() as uow:
         bans = uow.banned_user.get_expired_bans()
         for ban in bans:
@@ -99,7 +100,7 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     :param uowm: UnitOfWorkmanager
     :param reddit: Praw Reddit instance
     """
-    log.info('[Scheduled Job] Update Ban Wiki')
+    print('[Scheduled Job] Update Ban Wiki Start')
     wiki_template_file = os.path.join(os.getcwd(), 'banned-subs.md')
     if not os.path.isfile(wiki_template_file):
         log.critical('Unable to locate banned sub wiki file at %s', wiki_template_file)
@@ -116,15 +117,10 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     wiki = reddit.subreddit('RepostSleuthBot').wiki['published-data/banned-subreddits']
     wiki.edit(template.format(banned_subs=table_data, total=len(banned)))
     log.info('[Banned Sub Wiki Update] Fished update')
+    print('[Scheduled Job] Update Ban Wiki End')
 
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_monitored_sub_subscribers(uowm, reddit)
-    wiki = reddit.subreddit('RepostSleuthBot').wiki['published-data/banned-subreddits']
-    build_markdown_table([['test1', 'test2', 'test3']], ['header1', 'header2', 'header3'])
-
-
-
-    remove_expired_bans(uowm)
+    update_ban_list(uowm, reddit)

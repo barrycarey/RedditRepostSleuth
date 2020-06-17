@@ -227,26 +227,33 @@ def is_moderator(subreddit: Subreddit, user: Text) -> bool:
     :param user: username
     :return: bool
     """
-    for mod in subreddit.moderator():
-        if mod.name.lower() == user.lower():
-            return True
-    return False
+    try:
+        for mod in subreddit.moderator():
+            if mod.name.lower() == user.lower():
+                return True
+        return False
+    except Forbidden:
+        log.error('[Mod Check] Forbidden On Sub %s', subreddit.display_name)
+        return False
 
 def bot_has_permission(subreddit: Subreddit, permission_name: Text) -> bool:
     log.debug('Checking if bot has %s permission in %s', permission_name, subreddit.display_name)
-    for mod in subreddit.moderator():
-        if mod.name == 'RepostSleuthBot':
-            if 'all' in mod.mod_permissions:
-                log.debug('Bot has All permissions in %s', subreddit.display_name)
-                return True
-            elif permission_name.lower() in mod.mod_permissions:
-                log.debug('Bot has %s permission in %s', permission_name, subreddit.display_name)
-                return True
-            else:
-                log.debug('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
-                return False
-    log.error('Bot is not mod on %s', subreddit.display_name)
-    return False
+    try:
+        for mod in subreddit.moderator():
+            if mod.name == 'RepostSleuthBot':
+                if 'all' in mod.mod_permissions:
+                    log.debug('Bot has All permissions in %s', subreddit.display_name)
+                    return True
+                elif permission_name.lower() in mod.mod_permissions:
+                    log.debug('Bot has %s permission in %s', permission_name, subreddit.display_name)
+                    return True
+                else:
+                    log.debug('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
+                    return False
+        log.error('Bot is not mod on %s', subreddit.display_name)
+        return False
+    except Forbidden:
+        return False
 
 def is_bot_banned(subreddit: Subreddit) -> bool:
     """

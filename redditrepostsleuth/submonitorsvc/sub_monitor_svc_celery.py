@@ -3,6 +3,7 @@ import sys
 import time
 
 import redis
+from kombu.exceptions import OperationalError
 
 sys.path.append('./')
 from redditrepostsleuth.core.config import Config
@@ -41,7 +42,10 @@ if __name__ == '__main__':
                 if not monitored_sub.check_all_submissions:
                     log.info('Sub %s does not have post checking enabled', monitored_sub.name)
                     continue
-                process_monitored_sub.apply_async((monitored_sub,), queue='submonitor')
+                try:
+                    process_monitored_sub.apply_async((monitored_sub,), queue='submonitor')
+                except Exception:
+                    log.error('Failed to submit job to Celery')
                 continue
 
             while True:

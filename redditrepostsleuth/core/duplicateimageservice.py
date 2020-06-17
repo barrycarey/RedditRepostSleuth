@@ -47,6 +47,8 @@ class DuplicateImageService:
             date_cutoff: int = None,
             filter_dead_matches: bool = True,
             only_older_matches: bool = True,
+            filter_crossposts=True,
+            filter_author=True,
             is_meme: bool = False
     ) -> ImageRepostWrapper:
         """
@@ -75,8 +77,10 @@ class DuplicateImageService:
         log.debug('Matches pre-filter: %s', len(search_results.matches))
         matches = search_results.matches
         matches = list(filter(filter_same_post(search_results.checked_post.post_id), matches))
-        matches = list(filter(filter_same_author(search_results.checked_post.author), matches))
-        matches = list(filter(cross_post_filter, matches))
+        if filter_author:
+            matches = list(filter(filter_same_author(search_results.checked_post.author), matches))
+        if filter_crossposts:
+            matches = list(filter(cross_post_filter, matches))
         matches = list(filter(filter_no_dhash, matches))
 
         if only_older_matches:
@@ -127,6 +131,8 @@ class DuplicateImageService:
                                  only_older_matches=True,
                                  meme_filter=False,
                                  max_depth=4000,
+                                 filter_crossposts=True,
+                                 filter_author=True,
                                  source='unknown') -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact

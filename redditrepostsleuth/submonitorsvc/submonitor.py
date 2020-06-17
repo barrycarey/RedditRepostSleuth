@@ -154,12 +154,12 @@ class SubMonitor:
 
             report_msg = self.response_builder.build_report_msg(monitored_sub.name, msg_values)
             self._report_submission(monitored_sub, submission, report_msg)
-            self._sticky_reply(monitored_sub, comment)
             self._lock_post(monitored_sub, submission)
             self._remove_post(monitored_sub, submission)
         else:
             self._mark_post_as_oc(monitored_sub, submission)
 
+        self._sticky_reply(monitored_sub, comment)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
 
@@ -282,6 +282,8 @@ class SubMonitor:
             date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter,
+            max_depth=-1,
+            max_matches=300,
             source='sub_monitor'
         )
 
