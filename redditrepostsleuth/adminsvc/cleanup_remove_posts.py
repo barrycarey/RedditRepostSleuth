@@ -14,7 +14,7 @@ def get_db_conn():
                            user=config.db_user,
                            password=config.db_password,
                            db=config.db_name,
-                           cursorclass=pymysql.cursors.SSDictCursor)
+                           cursorclass=pymysql.cursors.DictCursor)
 
 def get_non_reddit_links(uowm):
     with uowm.start() as uow:
@@ -50,7 +50,7 @@ def get_all_links():
         cur.execute(query)
         log.info('Adding items to index')
         for row in cur:
-            all_posts.append({'id': row['post_id'], 'url': row['url']})
+            batch.append({'id': row['post_id'], 'url': row['url']})
             if len(batch) >= 25:
                 try:
                     cleanup_removed_posts_batch.apply_async((batch,), queue='image_check')

@@ -2,6 +2,7 @@ import sys
 import threading
 import time
 
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_SCHEDULER_STARTED, EVENT_JOB_SUBMITTED
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -22,7 +23,8 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 
-
+def event_callback(event):
+    print(event)
 
 if __name__ == '__main__':
     config = Config()
@@ -40,6 +42,7 @@ if __name__ == '__main__':
     #config_updater.update_configs()
 
     scheduler = BackgroundScheduler()
+    scheduler.add_listener(event_callback, EVENT_JOB_ERROR)
     scheduler.add_job(
         func=config_updater.update_configs,
         trigger='interval',
@@ -66,6 +69,13 @@ if __name__ == '__main__':
         trigger='interval',
         minutes=5,
         name='inbox_monitor',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=comment_monitor.check_comments,
+        trigger='interval',
+        minutes=30,
+        name='comment_monitor',
         max_instances=1
     )
     scheduler.add_job(
@@ -97,7 +107,7 @@ if __name__ == '__main__':
         args=(uowm, reddit),
         trigger='interval',
         hours=1,
-        name='update_subscriber_count',
+        name='updated_banned_subs',
         max_instances=1
     )
     scheduler.start()

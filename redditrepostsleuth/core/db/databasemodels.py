@@ -194,6 +194,8 @@ class MonitoredSub(Base):
     target_days_old = Column(Integer)
     same_sub_only = Column(Boolean, default=False)
     notes = Column(String(500))
+    filter_crossposts = Column(Boolean, default=True)
+    filter_same_author = Column(Boolean, default=True)
     sticky_comment = Column(Boolean, default=False)
     remove_repost = Column(Boolean, default=False)
     removal_reason = Column(String(200))

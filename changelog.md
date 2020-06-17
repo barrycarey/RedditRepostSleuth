@@ -6,8 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [UNRELEASED]
 * [backend] - Start tracking which subs the bot is banned on
 * [backend] - Implement ban system to prevent the bot from being spammed.  If a user summons the but more than 50 times per hour it will trigger a 1 hour ban
+* [backend] - Ability to permanently twats
 * [stats] - Now publishing the list of subs the bot is banned from
 * [sub monitoring] - Reworked sub monitoring to speed up processing time
+* [bugfix] - Comments left on monitored subreddit's were no longer being stickied
+* [feature] - 2 new config options for monitored subreddits. filter_crossposts and filter_same_author.  Allows mods to decide if the search results should include crossposts and posts by the same author as post being checked
 
 ## [0.1.7] - 5/17/2020
 * [feature] - Watch command added.  This allows you to tag a post and be notified if someone else reposts it. Example: u/repostsleuthbot watch

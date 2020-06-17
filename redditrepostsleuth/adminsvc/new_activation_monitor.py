@@ -23,7 +23,7 @@ class NewActivationMonitor:
         self.reddit = reddit
 
     def check_for_new_invites(self):
-        log.info('[Scheduled Job] Check For Mod Invites')
+        print('[Scheduled Job] Check For Mod Invites Starting')
         try:
             log.info('Checking for new mod invites')
             for msg in self.reddit.inbox.messages(limit=300):
@@ -34,6 +34,7 @@ class NewActivationMonitor:
                     self.activate_sub(msg)
         except Exception as e:
             log.exception('Activation thread died', exc_info=True)
+
 
     def accept_invite(self, msg):
         pass
