@@ -42,6 +42,8 @@ class SubredditConfigUpdater:
             with self.uowm.start() as uow:
                 monitored_subs = uow.monitored_sub.get_all()
                 for sub in monitored_subs:
+                    if not sub.active:
+                        continue
                     try:
                         self.check_for_config_update(sub)
                     except Exception as e:
