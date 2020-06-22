@@ -144,7 +144,6 @@ class DuplicateImageService:
         :return: List of matching images
         """
         log.info('Checking %s for duplicates - https://redd.it/%s', post.post_id, post.post_id)
-        start = perf_counter()
         search_results = ImageRepostWrapper()
         search_results.checked_post = post
 
@@ -170,6 +169,7 @@ class DuplicateImageService:
         )  # Pre-filter results on default annoy value
         results = self._convert_annoy_results(raw_results, post.id)
         start = perf_counter()
+        log.warn('After Pre Annoy Filter %s', len(results))
         results = self._set_match_posts(results)
         match_post_time = search_results.total_filter_time = round(perf_counter() - start, 5)
         search_results.matches = self._remove_duplicates(results)
@@ -200,7 +200,7 @@ class DuplicateImageService:
             search_results.matches = self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
         search_results.total_search_time = round(perf_counter() - start, 5)
-        self._log_search_time(search_results, match_post_time)
+        self._log_search_time(search_results, match_post_time, source)
         self._log_search(
             search_results,
             same_sub,
@@ -231,7 +231,7 @@ class DuplicateImageService:
             return match['distance'] < target_annoy_distance
         return annoy_distance_filter
 
-    def _log_search_time(self, search_results: ImageRepostWrapper, match_post_time):
+    def _log_search_time(self, search_results: ImageRepostWrapper, match_post_time, source: Text):
         self.event_logger.save_event(
             AnnoySearchEvent(
                 total_search_time=search_results.total_search_time,
@@ -241,7 +241,8 @@ class DuplicateImageService:
                 meme_detection_time=search_results.meme_detection_time,
                 meme_filter_time=search_results.meme_filter_time,
                 total_filter_time=search_results.total_filter_time,
-                match_post_time=match_post_time
+                match_post_time=match_post_time,
+                source=source
             )
         )
 
