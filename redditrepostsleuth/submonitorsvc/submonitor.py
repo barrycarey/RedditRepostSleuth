@@ -283,7 +283,7 @@ class SubMonitor:
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter,
             max_depth=-1,
-            max_matches=300,
+            max_matches=100,
             source='sub_monitor'
         )
 

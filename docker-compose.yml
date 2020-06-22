@@ -21,6 +21,15 @@ services:
         environment:
             - LOG_LEVEL=INFO
 
+    deleted_post_cleanup:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/adminsvc/Dockerfile
+        entrypoint: python -u /src/redditrepostsleuth/adminsvc/deleted_post_cleanup.py
+        environment:
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.maintenance_tasks
+
     hot_post:
         build:
             context: .
@@ -138,8 +147,7 @@ services:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
-            - UTIL_API=http://167.99.22.106:8000
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q delete -c 2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q deleted_post_cleanup -c 6
 
 
     ingest_pushshift_worker:

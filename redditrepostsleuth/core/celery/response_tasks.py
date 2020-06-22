@@ -60,7 +60,7 @@ def sub_monitor_check_post(self, submission: Dict, monitored_sub: MonitoredSub):
     if self.sub_monitor.has_post_been_checked(submission['id']):
         log.debug('Post %s has already been checked', submission['id'])
         return
-
+    start = time.perf_counter()
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(submission['id'])
         if not post:
@@ -76,7 +76,9 @@ def sub_monitor_check_post(self, submission: Dict, monitored_sub: MonitoredSub):
 
     if not self.sub_monitor.should_check_post(post, title_keyword_filter=title_keywords):
         return
+
     self.sub_monitor.check_submission(monitored_sub, post)
+    print(f'Total time: {round(time.perf_counter() - start, 5)}')
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
 def sub_monitor_check_post_old(self, submission, monitored_sub):
