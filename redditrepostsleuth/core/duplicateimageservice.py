@@ -216,13 +216,6 @@ class DuplicateImageService:
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
-    def _search_index_by_vector(self, vector: bytearray, index: ImageIndex, max_matches=50) -> Tuple[int, float]:
-        r = index.loaded_index.get_nns_by_vector(list(vector), max_matches, search_k=4000, include_distances=True)
-        return self._zip_annoy_results(r)
-
-    def _zip_annoy_results(self, annoy_results: List[tuple]) -> Tuple[int, float]:
-        return list(zip(annoy_results[0], annoy_results[1]))
-
     def _convert_annoy_results(self, annoy_results, checked_post_id: int):
         return [annoy_result_to_image_match(match, checked_post_id) for match in annoy_results]
 
