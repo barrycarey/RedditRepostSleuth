@@ -171,7 +171,8 @@ class Config:
             'sub_monitor_exposed_config_options',
             'wiki_config_name',
             'index_api',
-            'util_api'
+            'util_api',
+            'live_responses'
 
         ]
 

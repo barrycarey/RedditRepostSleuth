@@ -25,16 +25,18 @@ class ResponseHandler:
             reddit: RedditManager,
             uowm: UnitOfWorkManager,
             event_logger: EventLogging,
+            live_response: bool = False,
             log_response: bool = True,
             source='unknown'
     ):
+        self.live_response = live_response
         self.uowm = uowm
         self.reddit = reddit
         self.log_response = log_response
         self.event_logger = event_logger
         self.source = source
 
-    def reply_to_submission(self, submission_id: str, comment_body) -> Optional[Comment]:
+    def _reply_to_submission(self, submission_id: str, comment_body) -> Optional[Comment]:
         submission = self.reddit.submission(submission_id)
         if not submission:
             log.error('Failed to get submission %s', submission_id)
@@ -65,8 +67,14 @@ class ResponseHandler:
             log.exception('Unknown exception leaving comment on post https://redd.it/%s', submission_id, exc_info=True)
             raise
 
+    def reply_to_submission(self, submission_id: str, comment_body) -> Optional[Comment]:
+        if self.live_response:
+            return self._reply_to_submission(submission_id, comment_body)
+        log.debug('Live response disabled')
+        return Comment(self.reddit.reddit, id='1111')
 
-    def reply_to_comment(self, comment_id: str, comment_body: str) -> Optional[Comment]:
+
+    def _reply_to_comment(self, comment_id: str, comment_body: str) -> Optional[Comment]:
         """
         Post a given reply to a given comment ID
         :rtype: Optional[Comment]
@@ -97,7 +105,13 @@ class ResponseHandler:
             log.exception('Problem leaving comment', exc_info=True)
             raise
 
-    def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> NoReturn:
+    def reply_to_comment(self, comment_id: str, comment_body: str) -> Optional[Comment]:
+        if self.live_response:
+            return self._reply_to_comment(comment_id, comment_body)
+        log.debug('Live response disabled')
+        return Comment(self.reddit.reddit, id='1111')
+
+    def _send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> NoReturn:
         if not user:
             log.error('No user provided to send private message')
             return
@@ -113,6 +127,11 @@ class ResponseHandler:
         except Exception:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)
             raise
+
+    def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> NoReturn:
+        if self.live_response:
+            self._send_private_message(user, message_body, subject)
+        log.debug('Live resposne disabled')
 
     def _record_api_event(self, response_time, request_type, remaining_limit):
         api_event = RedditApiEvent(request_type, response_time, remaining_limit, event_type='api_response')
