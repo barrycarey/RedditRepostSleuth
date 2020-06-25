@@ -299,9 +299,9 @@ class SubredditConfigUpdater:
         self._create_revision(wiki_page)
         try:
             wiki_config = self.get_wiki_config(wiki_page)
-        except JSONDecodeError:
+        except JSONDecodeError as e:
             self._set_config_validity(wiki_page.revision_id, valid=False)
-            if self._notify_failed_load(subreddit):
+            if self._notify_failed_load(subreddit, str(e), wiki_page.revision_id):
                 self._set_config_notified(wiki_page.revision_id)
             return {}
 
@@ -410,4 +410,7 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config)
-    updater.update_configs()
+    with uowm.start() as uow:
+        sub = uow.monitored_sub.get_by_sub('StrangerThings')
+    updater.check_for_config_update(sub)
+    #updater.update_configs()
