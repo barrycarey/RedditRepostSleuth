@@ -38,7 +38,7 @@ class RedditTask(Task):
         self.reddit = RedditManager(get_reddit_instance(self.config))
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
-        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger)
+        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, live_response=self.config.live_responses)
 
 class RepostLogger(Task):
     def __init__(self):

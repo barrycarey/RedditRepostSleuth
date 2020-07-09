@@ -22,7 +22,7 @@ def get_all_links():
     conn = get_db_conn()
     batch = []
     with conn.cursor() as cur:
-        query = f"SELECT post_id, url, post_type FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 90 DAY AND post_type='image' LIMIT 50000"
+        query = f"SELECT post_id, url, post_type FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 90 DAY AND post_type='image' LIMIT 1000000"
         cur.execute(query)
         log.info('Adding items to index')
         for row in cur:

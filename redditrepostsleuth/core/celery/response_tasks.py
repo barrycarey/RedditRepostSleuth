@@ -37,7 +37,7 @@ class SummonsHandlerTask(Task):
         self.reddit = RedditManager(get_reddit_instance(self.config))
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
-        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, source='summons')
+        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, source='summons', live_response=self.config.live_responses)
         dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit, response_builder,
@@ -49,7 +49,7 @@ class SubMonitorTask(Task):
         self.reddit = RedditManager(get_reddit_instance(self.config))
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         event_logger = EventLogging(config=self.config)
-        response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor')
+        response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor', live_response=self.config.live_responses)
         dup_image_svc = DuplicateImageService(self.uowm, event_logger, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
