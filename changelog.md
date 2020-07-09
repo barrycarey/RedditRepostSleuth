@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [sub monitoring] - Reworked sub monitoring to speed up processing time
 * [bugfix] - Comments left on monitored subreddit's were no longer being stickied
 * [feature] - 2 new config options for monitored subreddits. filter_crossposts and filter_same_author.  Allows mods to decide if the search results should include crossposts and posts by the same author as post being checked
+* [feature] - Add {post_author} message slug to response and report templates
 
 ## [0.1.7] - 5/17/2020
 * [feature] - Watch command added.  This allows you to tag a post and be notified if someone else reposts it. Example: u/repostsleuthbot watch
