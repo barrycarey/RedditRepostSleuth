@@ -181,6 +181,7 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}',
+        'post_author': search_results.checked_post.author
 
     }
 

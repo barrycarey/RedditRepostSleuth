@@ -27,6 +27,7 @@ The bot exposes several variables that can be used in the bot's comments as well
   * Newest Percent Match: {newest_percent_match}
   * Newest Sub: {newest_sub}
   * List of All Matches: {match_list}
+  * Post Author: {post_author}
 
 ## Report Message
 
@@ -46,6 +47,7 @@ The bot exposes several variables that can be used in the bot's comments as well
   * Newest Match Shortlink: {newest_shortlink}
   * Newest Percent Match: {newest_percent_match}
   * Newest Sub: {newest_sub}
+  * Post Author: {post_author}
   
 ## Example
 
