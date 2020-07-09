@@ -27,7 +27,15 @@ if __name__ == '__main__':
     response_builder = ResponseBuilder(uowm)
     dup = DuplicateImageService(uowm, event_logger, config=config)
     reddit = RedditManager(get_reddit_instance(config))
-    monitor = SubMonitor(dup, uowm, reddit, response_builder, ResponseHandler(reddit, uowm, event_logger, source='submonitor'), event_logger=event_logger, config=config)
+    monitor = SubMonitor(
+        dup,
+        uowm,
+        reddit,
+        response_builder,
+        ResponseHandler(reddit, uowm, event_logger, source='submonitor', live_response=config.live_responses),
+        event_logger=event_logger,
+        config=config
+    )
     redis_client = redis.Redis(host=config.redis_host, port=config.redis_port, db=0, password=config.redis_password)
     while True:
         with uowm.start() as uow:

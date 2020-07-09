@@ -21,5 +21,5 @@ if __name__ == '__main__':
     response_builder = ResponseBuilder(uowm)
     dup = DuplicateImageService(uowm, event_logger, config=config)
     reddit_manager = RedditManager(get_reddit_instance(config))
-    monitor = SubMonitor(dup, uowm, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger, source='submonitor'), event_logger=event_logger,config=config)
+    monitor = SubMonitor(dup, uowm, reddit_manager, response_builder, ResponseHandler(reddit_manager, uowm, event_logger, source='submonitor', live_response=config.live_responses), event_logger=event_logger,config=config)
     monitor.run()
