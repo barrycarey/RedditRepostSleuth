@@ -31,7 +31,7 @@ if __name__ == '__main__':
             uowm,
             dup,
             response_builder,
-            ResponseHandler(reddit_manager, uowm, event_logger, source='toppost'),
+            ResponseHandler(reddit_manager, uowm, event_logger, source='toppost', live_response=config.live_responses),
             config=config
         )
         try:
