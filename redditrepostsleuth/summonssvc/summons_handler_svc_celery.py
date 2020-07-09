@@ -34,7 +34,7 @@ if __name__ == '__main__':
         dup,
         reddit_manager,
         response_builder,
-        ResponseHandler(reddit_manager, uowm, event_logger, live_response=False, source='summons'),
+        ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses, source='summons', ),
         event_logger=event_logger,
         summons_disabled=False
     )

@@ -408,7 +408,7 @@ if __name__ == '__main__':
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     reddit_manager = RedditManager(reddit)
     event_logger = EventLogging(config=config)
-    response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
+    response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config)
     with uowm.start() as uow:
         sub = uow.monitored_sub.get_by_sub('StrangerThings')
