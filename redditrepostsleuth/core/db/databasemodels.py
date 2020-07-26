@@ -60,7 +60,9 @@ class Post(Base):
             'title': self.title,
             'dhash_v': self.dhash_v,
             'dhash_h': self.dhash_h,
-            'created_at': self.created_at.timestamp()
+            'created_at': self.created_at.timestamp(),
+            'author': self.author,
+            'subreddit': self.subreddit
         }
 
 class RedditImagePost(Base):

@@ -1,5 +1,5 @@
 {
-  "active": true,
+  "active": false,
   "only_comment_on_repost": true,
   "report_reposts": false,
   "report_msg": "RepostSleuthBot-Repost",
