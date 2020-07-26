@@ -220,7 +220,11 @@ class SummonsHandler:
         response.status = 'success'
         response.message = SUMMONS_ALREADY_RESPONDED.format(perma_link=perma_link)
         redditor = self.reddit.redditor(summons.requestor)
-        self.response_handler.send_private_message(redditor, response.message)
+        try:
+            self.response_handler.send_private_message(redditor, response.message)
+        except APIException as e:
+            if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
+                response.message = 'NOT_WHITELISTED_BY_USER_MESSAGE'
         self._save_response(response)
 
     def _send_unsupported_msg(self, summons: Summons, post_type: Text):
@@ -412,8 +416,12 @@ class SummonsHandler:
 
         with self.uowm.start() as uow:
             banned = uow.banned_subreddit.get_by_subreddit(response.summons.subreddit)
-        if banned or response.summons.subreddit in self.config.summons_send_pm_subs:
-            self._send_private_message(response)
+        if banned or (self.config.summons_send_pm_subs and response.summons.subreddit in self.config.summons_send_pm_subs):
+            try:
+                self._send_private_message(response)
+            except APIException as e:
+                if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
+                    response.message = 'NOT_WHITELISTED_BY_USER_MESSAGE'
         else:
             try:
                 self._reply_to_comment(response)
