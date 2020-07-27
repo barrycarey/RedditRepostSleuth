@@ -7,7 +7,7 @@ from praw.models import Comment, Redditor
 from prawcore import Forbidden, PrawcoreException, ResponseException
 from sqlalchemy import func
 
-from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddit
+from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddit, BotPrivateMessage
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import RateLimitException
 from redditrepostsleuth.core.logging import log
@@ -111,7 +111,16 @@ class ResponseHandler:
         log.debug('Live response disabled')
         return Comment(self.reddit.reddit, id='1111')
 
-    def _send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> NoReturn:
+    def _send_private_message(
+            self,
+            user: Redditor,
+            message_body,
+            subject: Text = 'Repost Check',
+            source: Text = None,
+            post_id: Text = None,
+            comment_id: Text = None
+    ) -> NoReturn:
+
         if not user:
             log.error('No user provided to send private message')
             return
@@ -124,13 +133,40 @@ class ResponseHandler:
                 self.reddit.reddit.auth.limits['remaining']
             )
             log.info('Sent PM to %s. ', user.name)
-        except Exception:
+        except Exception as e:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)
             raise
 
-    def send_private_message(self, user: Redditor, message_body, subject: Text = 'Repost Check') -> NoReturn:
+        try:
+            with self.uowm.start() as uow:
+                uow.bot_private_message.add(
+                    BotPrivateMessage(
+                        subject=subject,
+                        body=message_body,
+                        in_response_to_post=post_id,
+                        in_response_to_comment=comment_id,
+                        triggered_from=source,
+                        recipient=user.name
+                    )
+                )
+                uow.commit()
+        except Exception as e:
+            # TODO - Get specific exc
+            log.exception('Failed to save private message to DB', exc_info=True)
+
+    def send_private_message(
+            self,
+            user: Redditor,
+            message_body,
+            subject: Text = 'Repost Check',
+            source: Text = None,
+            post_id: Text = None,
+            comment_id: Text = None
+    ) -> NoReturn:
+
         if self.live_response:
-            self._send_private_message(user, message_body, subject)
+            self._send_private_message(user, message_body, subject, source=source, post_id=post_id, comment_id=comment_id)
+            return
         log.debug('Live resposne disabled')
 
     def _record_api_event(self, response_time, request_type, remaining_limit):
