@@ -1,5 +1,6 @@
 import time
 from time import perf_counter
+from typing import Text
 
 from praw import Reddit
 from praw.exceptions import APIException
@@ -89,17 +90,9 @@ class TopPostMonitor:
                 log.info('Post %s has no dhash value, skipping', post.post_id)
                 return
             try:
-                target_annoy = None
-                target_hamming = None
-                if post.subreddit in CUSTOM_FILTER_LEVELS:
-                    log.info('Using custom filter values for sub %s', post.subreddit)
-                    target_annoy = CUSTOM_FILTER_LEVELS.get(post.subreddit)['annoy']
-                    target_hamming = CUSTOM_FILTER_LEVELS.get(post.subreddit)['hamming']
 
                 search_results = self.image_service.check_duplicates_wrapped(
                     post,
-                    target_hamming_distance=target_hamming,
-                    target_annoy_distance=target_annoy,
                     same_sub=True,
                     meme_filter=True
                 )
@@ -144,6 +137,15 @@ class TopPostMonitor:
             post.left_comment = True
             uow.posts.update(post)
             uow.commit()
+
+    def _left_comment(self, post_id: Text) -> bool:
+        """
+        Check if we have already comments on a given post
+        :param post_id: Post ID to check
+        """
+        with self.uowm.start() as uow:
+            comment = uow.bot_comment.get_by_post_id_and_type(post_id=post_id, response_type='toppost')
+        return True if comment else False
 
     def _log_comment(self, comment: Comment, post: Post):
         """
