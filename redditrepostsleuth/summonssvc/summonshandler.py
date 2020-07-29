@@ -221,7 +221,13 @@ class SummonsHandler:
         response.message = SUMMONS_ALREADY_RESPONDED.format(perma_link=perma_link)
         redditor = self.reddit.redditor(summons.requestor)
         try:
-            self.response_handler.send_private_message(redditor, response.message)
+            self.response_handler.send_private_message(
+                redditor,
+                response.message,
+                post_id=summons.post_id,
+                comment_id=summons.comment_id,
+                source='summons'
+            )
         except APIException as e:
             if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
                 response.message = 'NOT_WHITELISTED_BY_USER_MESSAGE'
@@ -324,7 +330,13 @@ class SummonsHandler:
                 if len(search_results.matches) > 4:
                     log.info('Sending check all results via PM with %s matches', len(search_results.matches))
                     comment = self.reddit.comment(summons.comment_id)
-                    self.response_handler.send_private_message(comment.author, response.message)
+                    self.response_handler.send_private_message(
+                        comment.author,
+                        response.message,
+                        post_id=summons.post_id,
+                        comment_id=summons.comment_id,
+                        source='summons'
+                    )
                     response.message = f'I found {len(search_results.matches)} matches.  ' \
                                        f'I\'m sending them to you via PM to reduce comment spam'
 
@@ -381,7 +393,13 @@ class SummonsHandler:
                 if len(search_results.matches) > 4:
                     log.info('Sending check all results via PM with %s matches', len(search_results.matches))
                     comment = self.reddit.comment(summons.comment_id)
-                    self.response_handler.send_private_message(comment.author, response.message)
+                    self.response_handler.send_private_message(
+                        comment.author,
+                        response.message,
+                        post_id=summons.post_id,
+                        comment_id=summons.comment_id,
+                        source='summons'
+                    )
                     response.message = f'I found {len(search_results.matches)} matches.  ' \
                                        f'I\'m sending them to you via PM to reduce comment spam'
 
@@ -462,7 +480,13 @@ class SummonsHandler:
         log.info('Sending private message to %s for summons in sub %s', response.summons.requestor, response.summons.subreddit)
         msg = BANNED_SUB_MSG.format(post_id=response.summons.post_id, subreddit=response.summons.subreddit)
         msg = msg + response.message
-        self.response_handler.send_private_message(redditor, msg)
+        self.response_handler.send_private_message(
+            redditor,
+            msg,
+            post_id=response.summons.post_id,
+            comment_id=response.summons.comment_id,
+            source='summons'
+        )
         response.message = msg
         return response
 

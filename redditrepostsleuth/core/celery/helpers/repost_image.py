@@ -133,4 +133,10 @@ def repost_watch_notify(watches: List[Dict[ImageMatch, RepostWatch]], reddit: Re
             percent_match=watch['match'].hamming_match_percent
         )
         log.info('Sending repost watch PM to %s', redditor.name)
-        response_handler.send_private_message(redditor, msg, subject='A post you are watching has been reposted')
+        response_handler.send_private_message(
+            redditor,
+            msg,
+            subject='A post you are watching has been reposted',
+            source='watch',
+            post_id=watch['watch'].post_id
+        )

@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from json import JSONDecodeError
 from typing import Text, Dict, NoReturn
@@ -7,13 +8,14 @@ from praw import Reddit
 from praw.models import Message
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import UserReport
+from redditrepostsleuth.core.db.databasemodels import UserReport, RepostWatch
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_SUBJECT, WATCH_ENABLED
 
 
 class InboxMonitor:
@@ -26,9 +28,42 @@ class InboxMonitor:
 
     def check_inbox(self):
         print('[Scheduled Job] Checking Inbox Start')
-        for msg in self.reddit.inbox.messages(limit=75):
+        for msg in self.reddit.inbox.messages(limit=500):
             if msg.author != 'RepostSleuthBot' and msg.subject.lower() in ['false negative', 'false positive']:
                 self._process_user_report(msg)
+            elif TOP_POST_WATCH_SUBJECT.lower() in msg.subject.lower():
+                self._process_watch_request(msg)
+
+    def _process_watch_request(self, msg: Message) -> NoReturn:
+        """
+        Process someone that wants to active a watch from top posts
+        :param msg: message
+        """
+        if not msg.replies:
+            return
+        if 'yes' in msg.replies[0].body.lower():
+            post_id_search = re.search(r'(?:https://redd.it/)([A-Za-z0-9]{6})', msg.body)
+            if not post_id_search:
+                log.error('Failed to get post ID from watch offer message')
+                return
+            post_id = post_id_search.group(1)
+            with self.uowm.start() as uow:
+                existing_watch = uow.repostwatch.find_existing_watch(msg.dest.name, post_id)
+                if existing_watch:
+                    log.info('Existing watch found for post %s by user %s', post_id, msg.dest.name)
+                    return
+                uow.repostwatch.add(
+                    RepostWatch(
+                        post_id=post_id,
+                        user=msg.dest.name,
+                        source='Top Post'
+                    )
+                )
+                uow.commit()
+                log.info('Created post watch on %s for %s.  Source: Top Post', post_id, msg.author.name)
+                msg.reply(WATCH_ENABLED)
+
+
 
     def _process_user_report(self, msg: Message):
         with self.uowm.start() as uow:
@@ -101,9 +136,9 @@ class InboxMonitor:
             log.error('Failed to load report data using opening and closing brackets')
 
 if __name__ == '__main__':
-    config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config()
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    invite = InboxMonitor(uowm, get_reddit_instance(config))
+    reddit = get_reddit_instance(config)
+    invite = InboxMonitor(uowm, reddit)
     while True:
         invite.check_inbox()
-        time.sleep(20)
