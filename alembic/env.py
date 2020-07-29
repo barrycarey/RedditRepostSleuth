@@ -2,7 +2,8 @@ from __future__ import with_statement
 
 from logging.config import fileConfig
 import sys
-sys.path.append('/home/barry/PycharmProjects/RedditRepostSleuth')
+#sys.path.append('/home/barry/PycharmProjects/RedditRepostSleuth')
+sys.path.append(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth')
 from redditrepostsleuth.core.db.databasemodels import Base
 
 

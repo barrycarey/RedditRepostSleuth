@@ -145,6 +145,7 @@ class RepostWatch(Base):
     same_sub = Column(Boolean, default=False, nullable=False)
     expire_after = Column(Integer)
     enabled = Column(Boolean, default=True)
+    source = Column(String(100))
 
 class ImageRepost(Base):
 

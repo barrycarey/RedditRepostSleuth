@@ -172,7 +172,8 @@ class Config:
             'wiki_config_name',
             'index_api',
             'util_api',
-            'live_responses'
+            'live_responses',
+            'top_post_offer_watch'
 
         ]
 
