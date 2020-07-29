@@ -65,3 +65,9 @@ MOD_STATUS_REMOVED = 'Hello, \n\n I\'ve noticed I\'m no longer a mod on r/{subna
 BANNED_SUB_MSG = 'I\'m unable to reply to your comment at https://redd.it/{post_id}.  I\'m probably banned from r/{subreddit}.  Here is my response. \n\n *** \n\n'
 
 OVER_LIMIT_BAN = 'We have received too many requests from you in the last hour.  You have been blocked for 1 hour.  This will expire at {ban_expires} UTC'
+
+TOP_POST_WATCH_SUBJECT = 'Nice OC!  Want me to protect it?'
+TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someone stole it, right? \n\n Well I can help with that! \n\n Simply reply ' \
+                      '"yes" to this message and I will keep an eye out. If someone uploads your image I\'ll send you a PM.  Simple as that. \n\n' \
+                      '{shortlink}'
+

@@ -1,18 +1,26 @@
 import time
 from time import perf_counter
+from typing import Text, NoReturn, Optional
 
 from praw import Reddit
 from praw.exceptions import APIException
-from praw.models import Comment
+from praw.models import Comment, Submission
 from prawcore import Forbidden
 from redlock import RedLockError
 
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.db_utils import get_db_engine
+from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import CUSTOM_FILTER_LEVELS, BANNED_SUBS, ONLY_COMMENT_REPOST_SUBS, \
     NO_LINK_SUBREDDITS
-from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC, FRONTPAGE_LINK_REPOST
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC, FRONTPAGE_LINK_REPOST, TOP_POST_WATCH_BODY, \
+    TOP_POST_WATCH_SUBJECT
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
@@ -59,11 +67,6 @@ class TopPostMonitor:
                     if not post:
                         continue
 
-                    banned = uow.banned_subreddit.get_by_subreddit(sub.subreddit.display_name)
-                    if banned:
-                        log.info('Skipping post, banned on %s', banned.subreddit)
-                        continue
-
                     if post and post.left_comment:
                         continue
 
@@ -71,36 +74,42 @@ class TopPostMonitor:
                         log.info('Skipping cross post')
                         continue
 
-                    monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
-                    if monitored_sub:
-                        log.info('Skipping monitored sub %s', post.subreddit)
+                    results = self.check_for_repost(post)
+                    if not results:
                         continue
 
-                    self.check_for_repost(post)
+                    self.add_comment(post, results)
+                    if post.post_type == 'image' and len(results.matches) == 0:
+                        self._offer_watch(sub)
+
                     time.sleep(0.2)
 
             log.info('Processed all top posts.  Sleeping')
             time.sleep(3600)
 
-    def check_for_repost(self, post: Post):
+    def _is_banned_sub(self, subreddit: Text) -> bool:
+        with self.uowm.start() as uow:
+            banned = uow.banned_subreddit.get_by_subreddit(subreddit)
+            if banned:
+                return False
+            return True
 
+    def check_for_repost(self, post: Post) -> Optional[RepostWrapper]:
+        """
+        Take a given post and check if it's a repost
+        :rtype: RepostWrapper
+        :param post: Post obj
+        :return: Search results
+        """
         if post.post_type == 'image':
             if not post.dhash_h:
                 log.info('Post %s has no dhash value, skipping', post.post_id)
                 return
             try:
-                target_annoy = None
-                target_hamming = None
-                if post.subreddit in CUSTOM_FILTER_LEVELS:
-                    log.info('Using custom filter values for sub %s', post.subreddit)
-                    target_annoy = CUSTOM_FILTER_LEVELS.get(post.subreddit)['annoy']
-                    target_hamming = CUSTOM_FILTER_LEVELS.get(post.subreddit)['hamming']
 
-                search_results = self.image_service.check_duplicates_wrapped(
+                return self.image_service.check_duplicates_wrapped(
                     post,
-                    target_hamming_distance=target_hamming,
-                    target_annoy_distance=target_annoy,
-                    same_sub=True,
+                    same_sub=False,
                     meme_filter=True
                 )
             except NoIndexException:
@@ -109,15 +118,35 @@ class TopPostMonitor:
             except RedLockError:
                 log.error('Could not get RedLock.  Trying again later')
                 return
-            self.add_comment(post, search_results)
         elif post.post_type == 'link':
-            search_results = check_link_repost(post, self.uowm, get_total=True)
-            self.add_comment(post, search_results)
+            return check_link_repost(post, self.uowm, get_total=True)
         else:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
 
-    def add_comment(self, post: Post, search_results):
+    def add_comment(self, post: Post, search_results: RepostWrapper) -> NoReturn:
+        """
+        Add a comment to the post
+        :rtype: NoReturn
+        :param post: Post to comment on
+        :param search_results: Results
+        :return: NoReturn
+        """
+
+        if self._is_banned_sub(post.subreddit):
+            log.info('Skipping banned sub %s', post.subreddit)
+            return
+
+        if self._left_comment(post.post_id):
+            log.info('Already left comment on %s', post.post_id)
+            return
+
+        with self.uowm.start() as uow:
+            monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
+            if monitored_sub:
+                log.info('Skipping monitored sub %s', post.subreddit)
+                return
+
         msg_values = build_msg_values_from_search(search_results, self.uowm)
         if search_results.checked_post.post_type == 'image':
             msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
@@ -145,6 +174,51 @@ class TopPostMonitor:
             uow.posts.update(post)
             uow.commit()
 
+    def _offer_watch(self, submission: Submission) -> NoReturn:
+        """
+        Offer to add watch to OC post
+        :param search_results:
+        """
+        if not self.config.top_post_offer_watch:
+            log.debug('Top Post Offer Watch Disabled')
+            return
+
+        log.info('Offer watch to %s on post %s', submission.author.name, submission.id)
+
+        with self.uowm.start() as uow:
+            existing_response = uow.bot_private_message.get_by_user_source_and_post(
+                submission.author.name,
+                'toppost',
+                submission.id
+            )
+
+        if existing_response:
+            log.info('Already sent a message to %s', submission.author.name)
+            return
+
+        try:
+            self.response_handler.send_private_message(
+                submission.author,
+                TOP_POST_WATCH_BODY.format(shortlink=f'https://redd.it/{submission.id}'),
+                subject=TOP_POST_WATCH_SUBJECT,
+                source='toppost',
+                post_id=submission.id
+            )
+        except APIException as e:
+            if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
+                log.error('Not whitelisted API error')
+            else:
+                log.error('Unknown error sending PM to %s', submission.author.name)
+
+    def _left_comment(self, post_id: Text) -> bool:
+        """
+        Check if we have already comments on a given post
+        :param post_id: Post ID to check
+        """
+        with self.uowm.start() as uow:
+            comment = uow.bot_comment.get_by_post_id_and_type(post_id=post_id, response_type='toppost')
+        return True if comment else False
+
     def _log_comment(self, comment: Comment, post: Post):
         """
         Log reply comment to database
@@ -164,3 +238,20 @@ class TopPostMonitor:
                 uow.commit()
             except Exception as e:
                 log.exception('Failed to save bot comment', exc_info=True)
+
+if __name__ == '__main__':
+    config = Config()
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    event_logger = EventLogging(config=config)
+    dup = DuplicateImageService(uowm, event_logger, config=config)
+    response_builder = ResponseBuilder(uowm)
+    reddit_manager = RedditManager(get_reddit_instance(config))
+    top = TopPostMonitor(
+        reddit_manager,
+        uowm,
+        dup,
+        response_builder,
+        ResponseHandler(reddit_manager, uowm, event_logger, source='toppost', live_response=config.live_responses),
+        config=config
+    )
+    top.monitor()

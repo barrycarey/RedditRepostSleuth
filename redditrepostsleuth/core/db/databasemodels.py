@@ -113,6 +113,18 @@ class BotComment(Base):
     active = Column(Boolean, default=True)
     needs_review = Column(Boolean, default=False)
 
+class BotPrivateMessage(Base):
+    __tablename__ = 'reddit_bot_private_message'
+
+    id = Column(Integer, primary_key=True)
+    subject = Column(String(200), nullable=False)
+    body = Column(String(1000), nullable=False)
+    in_response_to_comment = Column(String(20))
+    in_response_to_post = Column(String(100))
+    recipient = Column(String(150), nullable=False)
+    triggered_from = Column(String(50), nullable=False)
+    message_sent_at = Column(DateTime, default=func.utc_timestamp())
+
 
 class Comment(Base):
     __tablename__ = 'reddit_comments'
@@ -133,6 +145,7 @@ class RepostWatch(Base):
     same_sub = Column(Boolean, default=False, nullable=False)
     expire_after = Column(Integer)
     enabled = Column(Boolean, default=True)
+    source = Column(String(100))
 
 class ImageRepost(Base):
 
