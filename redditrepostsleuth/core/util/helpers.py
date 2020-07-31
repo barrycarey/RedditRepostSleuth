@@ -10,6 +10,7 @@ from prawcore import Forbidden
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
@@ -165,7 +166,7 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
     return {**results_values, **base_values, **kwargs}
 
 
-def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper

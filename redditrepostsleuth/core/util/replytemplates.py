@@ -71,3 +71,6 @@ TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someon
                       '"yes" to this message and I will keep an eye out. If someone uploads your image I\'ll send you a PM.  Simple as that. \n\n' \
                       '{shortlink}'
 
+TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
+
+
