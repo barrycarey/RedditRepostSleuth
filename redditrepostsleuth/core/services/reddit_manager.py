@@ -45,7 +45,7 @@ class RedditManager:
             self._comments.append(new_comment)
             return new_comment
 
-    def build_provided_comment_templatesubmission(self, submission_id: Text) -> Submission:
+    def submission(self, submission_id: Text) -> Submission:
         return self._return_submission(submission_id)
 
     def _return_submission(self, submission_id: Text) -> Submission:

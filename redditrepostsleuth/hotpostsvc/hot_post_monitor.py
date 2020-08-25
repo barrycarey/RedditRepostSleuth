@@ -83,7 +83,8 @@ class TopPostMonitor:
                         self._offer_watch(sub)
 
                     if len(results.matches) > 0:
-                        self._report_post(results)
+                        #self._report_post(results)
+                        pass
 
                     time.sleep(0.2)
 
@@ -215,7 +216,7 @@ class TopPostMonitor:
             if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
                 log.error('Not whitelisted API error')
             else:
-                log.error('Unknown error sending PM to %s', submission.author.name)
+                log.exception('Unknown error sending PM to %s', submission.author.name, exc_info=True)
 
     def _report_post(self, search_results: RepostWrapper) -> NoReturn:
         """

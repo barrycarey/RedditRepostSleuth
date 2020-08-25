@@ -54,7 +54,7 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
     ))
     watches = check_for_post_watch(result.matches, self.uowm)
     if watches and self.config.enable_repost_watch:
-        notify_watch.apply_async((watches,), queue='watch_notify')
+        notify_watch.apply_async((watches, post), queue='watch_notify')
 
     return result
 
@@ -106,8 +106,8 @@ def link_repost_check(self, posts, ):
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]]):
-    repost_watch_notify(watches, self.reddit, self.response_handler)
+def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]], repost: Post):
+    repost_watch_notify(watches, self.reddit, self.response_handler, repost)
     with self.uowm.start() as uow:
         for w in watches:
             w['watch'].last_detection = func.utc_timestamp()

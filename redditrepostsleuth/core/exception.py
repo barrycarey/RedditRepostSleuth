@@ -47,3 +47,7 @@ class ReplyFailedException(RepostSleuthException):
     def __init__(self, message, reason):
         self.reason = reason
         super(ReplyFailedException, self).__init__(message)
+
+class LoadSubredditException(RepostSleuthException):
+    def __init__(self, message):
+        super(LoadSubredditException, self).__init__(message)

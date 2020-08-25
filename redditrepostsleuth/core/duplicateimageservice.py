@@ -49,7 +49,8 @@ class DuplicateImageService:
             only_older_matches: bool = True,
             filter_crossposts=True,
             filter_author=True,
-            is_meme: bool = False
+            is_meme: bool = False,
+            sort_by='created'
     ) -> ImageRepostWrapper:
         """
         Take a list of matches and filter out posts that are not reposts.
@@ -116,7 +117,7 @@ class DuplicateImageService:
             matches, search_results.meme_filter_time = self._final_meme_filter(search_results.checked_post, matches, target_hamming_distance)
             search_results.target_match_percent = round(100 - (target_hamming_distance / 256) * 100, 2)
 
-        search_results.matches = sort_reposts(matches)
+        search_results.matches = sort_reposts(matches, sort_by=sort_by)
         return search_results
 
     def check_duplicates_wrapped(self, post: Post,
@@ -133,7 +134,8 @@ class DuplicateImageService:
                                  max_depth=4000,
                                  filter_crossposts=True,
                                  filter_author=True,
-                                 source='unknown') -> ImageRepostWrapper:
+                                 source='unknown',
+                                 sort_by='created') -> ImageRepostWrapper:
         """
         Wrapper around check_duplicates to keep existing API intact
         :rtype: ImageRepostWrapper
@@ -194,6 +196,7 @@ class DuplicateImageService:
                                                                       filter_dead_matches=filter_dead_matches,
                                                                       only_older_matches=only_older_matches,
                                                                       target_title_match=target_title_match,
+                                                                      sort_by=sort_by,
                                                                       is_meme=search_results.meme_template or False)
             search_results.total_filter_time = round(perf_counter() - start_time, 5)
         else:

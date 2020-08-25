@@ -147,6 +147,18 @@ class RepostWatch(Base):
     enabled = Column(Boolean, default=True)
     source = Column(String(100))
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'enabled': self.enabled,
+            'post_id': self.post_id,
+            'user': self.user,
+            'created_at': self.created_at.timestamp(),
+            'last_detection': self.last_detection.timestamp() if self.last_detection else None,
+            'expire_after': self.expire_after,
+            'source': self.source
+        }
+
 class ImageRepost(Base):
 
     __tablename__ = 'image_reposts'
@@ -249,6 +261,20 @@ class MonitoredSub(Base):
             'target_annoy': self.target_annoy,
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
+            'filter_crossposts': self.filter_crossposts,
+            'filter_same_author': self.filter_same_author,
+            'remove_repost': self.remove_repost,
+            'removal_reason': self.removal_reason,
+            'lock_post': self.lock_post,
+            'mark_as_oc': self.mark_as_oc,
+            'title_ignore_keywords': self.title_ignore_keywords,
+            'disable_summons_after_auto_response': self.disable_summons_after_auto_response,
+            'disable_bot_summons': self.disable_bot_summons,
+            'only_allow_one_summons': self.only_allow_one_summons,
+            'remove_additional_summons': self.remove_additional_summons,
+            'check_all_submissions': self.check_all_submissions,
+            'check_title_similarity': self.check_title_similarity,
+            'target_title_match': self.target_title_match,
             'notes': self.notes,
             'sticky_comment': self.sticky_comment,
             'repost_response_template': self.repost_response_template,
@@ -264,6 +290,14 @@ class MonitoredSubChecks(Base):
     post_id = Column(String(100), nullable=False)
     checked_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'checked_at': self.checked_at.timestamp(),
+            'subreddit': self.subreddit
+        }
 
 class MonitoredSubConfigRevision(Base):
     __tablename__ = 'reddit_monitored_sub_config_revision'
@@ -349,6 +383,28 @@ class ImageSearch(Base):
     matches_found = Column(Integer, nullable=False)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
     search_results = Column(Text(75000, collation='utf8mb4_general_ci'))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'source': self.source,
+            'target_hamming_distance': self.target_hamming_distance,
+            'used_historical_index': self.used_historical_index,
+            'used_current_index': self.used_current_index,
+            'same_sub': self.same_sub,
+            'max_days_old': self.max_days_old,
+            'filter_dead_matches': self.filter_dead_matches,
+            'only_older_matches': self.only_older_matches,
+            'meme_filter': self.meme_filter,
+            'meme_template_used': self.meme_template_used,
+            'search_time': self.search_time,
+            'index_search_time': self.index_search_time,
+            'total_filter_time': self.total_filter_time,
+            'searched_at': self.searched_at.timestamp(),
+            'matches_found': self.matches_found,
+
+        }
 
 class UserReport(Base):
     __tablename__ = 'reddit_user_report'
