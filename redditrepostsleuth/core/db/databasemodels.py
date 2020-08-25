@@ -439,3 +439,13 @@ class BannedUser(Base):
     banned_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     expires_at = Column(DateTime)
     notes = Column(String(500))
+
+class BotStat(Base):
+    __tablename__ = 'bot_stat'
+    id = Column(Integer, primary_key=True)
+    image_reposts_detected = Column(Integer)
+    link_reposts_detected = Column(Integer)
+    private_messages_sent = Column(Integer)
+    comments = Column(Integer)
+    summons_received = Column(Integer)
+    karma_gained = Column(Integer)
