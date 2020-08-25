@@ -1,5 +1,6 @@
 import falcon
 from falcon_cors import CORS
+from waitress import serve
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -8,7 +9,6 @@ from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.repostsleuthsiteapi.endpoints.dummy import Dummy
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search import ImageSearch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search_history import ImageSearchHistory
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub import MonitoredSub
@@ -27,10 +27,9 @@ api.req_options.auto_parse_form_urlencoded = True
 
 api.add_route('/image', ImageSearch(dup, uowm))
 api.add_route('/watch', PostWatch(uowm))
-api.add_route('/cb', Dummy())
 api.add_route('/history/search', ImageSearchHistory(uowm), suffix='search_history', )
 api.add_route('/history/monitored', ImageSearchHistory(uowm), suffix='monitored_sub_with_history', )
 api.add_route('/monitored-sub', MonitoredSub(uowm))
 
 
-# serve(api, host='localhost', port=8888, threads=15)
+serve(api, host='localhost', port=8888, threads=15)
