@@ -123,13 +123,13 @@ def check_for_post_watch(matches: List[ImageMatch], uowm: UnitOfWorkManager) -> 
                     results.append({'match': match, 'watch': watch})
     return results
 
-def repost_watch_notify(watches: List[Dict[ImageMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler):
+def repost_watch_notify(watches: List[Dict[ImageMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
     for watch in watches:
         # TODO - What happens if we don't get redditor back?
         redditor = reddit.redditor(watch['watch'].user)
         msg = WATCH_NOTIFY_OF_MATCH.format(
             watch_shortlink=f"https://redd.it/{watch['watch'].post_id}",
-            repost_shortlink=watch['match'].post.shortlink,
+            repost_shortlink=f"https://redd.it/{repost.post_id}",
             percent_match=watch['match'].hamming_match_percent
         )
         log.info('Sending repost watch PM to %s', redditor.name)
