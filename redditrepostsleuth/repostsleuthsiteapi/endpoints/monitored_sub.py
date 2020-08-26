@@ -22,4 +22,5 @@ class MonitoredSub:
         pass
 
     def on_put(self, req: Request, resp: Response):
-        pass
+        raw = json.loads(req.bounded_stream)
+        print('')
