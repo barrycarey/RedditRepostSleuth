@@ -29,7 +29,7 @@ api.add_route('/image', ImageSearch(dup, uowm))
 api.add_route('/watch', PostWatch(uowm))
 api.add_route('/history/search', ImageSearchHistory(uowm), suffix='search_history', )
 api.add_route('/history/monitored', ImageSearchHistory(uowm), suffix='monitored_sub_with_history', )
-api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm))
+api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config))
 
 
-serve(api, host='localhost', port=8888, threads=15)
+#serve(api, host='localhost', port=8888, threads=15)
