@@ -69,5 +69,9 @@ OVER_LIMIT_BAN = 'We have received too many requests from you in the last hour. 
 TOP_POST_WATCH_SUBJECT = 'Nice OC!  Want me to protect it?'
 TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someone stole it, right? \n\n Well I can help with that! \n\n Simply reply ' \
                       '"yes" to this message and I will keep an eye out. If someone uploads your image I\'ll send you a PM.  Simple as that. \n\n' \
+                        'If you would like me to protect other posts, simply comment on the post, tagging me like this: u/RepostSleuthBot watch' \
                       '{shortlink}'
+
+TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
+
 

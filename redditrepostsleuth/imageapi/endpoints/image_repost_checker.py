@@ -1,6 +1,6 @@
 import json
 
-from falcon import Request, Response
+from falcon import Request, Response, HTTP_NOT_FOUND
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
@@ -38,10 +38,10 @@ class ImageRepostChecker:
         filter = req.get_param_as_bool('filter')
 
         if not post_id:
-            response['status'] = 'error'
-            response['message'] = 'Please provide a post ID'
-            resp.body = response
-            return
+            raise HTTP_NOT_FOUND(
+                f"Post {post_id} Not Found In Our Database",
+                f"Post {post_id} Not Found In Our Database"
+            )
 
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(post_id)
@@ -58,7 +58,11 @@ class ImageRepostChecker:
                                                                      target_annoy_distance=pre_filter,
                                                                      only_older_matches=only_older,
                                                                      same_sub=same_sub,
-                                                                     meme_filter=meme_filter)
+                                                                     meme_filter=meme_filter,
+                                                                     max_matches=300,
+                                                                     max_depth=-1,
+                                                                     filter_dead_matches=False,
+                                                                     sort_by='percent')
         except Exception as e:
             log.exception('Problem checking duplicates for post %s', post_id)
             response['status'] = 'error'

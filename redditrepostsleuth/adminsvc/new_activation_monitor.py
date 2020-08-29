@@ -26,7 +26,7 @@ class NewActivationMonitor:
         print('[Scheduled Job] Check For Mod Invites Starting')
         try:
             log.info('Checking for new mod invites')
-            for msg in self.reddit.inbox.messages(limit=300):
+            for msg in self.reddit.inbox.messages(limit=750):
                 if 'invitation to moderate' in msg.subject:
                     if self.is_already_active(msg.subreddit.display_name):
                         log.info('%s is already a monitored sub', msg.subreddit.display_name)

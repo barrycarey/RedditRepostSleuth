@@ -43,12 +43,17 @@ def clean_repost_matches(repost: RepostWrapper) -> List[RepostMatch]:
     return matches
 
 
-def sort_reposts(posts: List[RepostMatch], reverse=False) -> List[RepostMatch]:
+def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> List[RepostMatch]:
     """
     Take a list of reposts and sort them by date
     :param posts:
     """
-    return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
+    if sort_by == 'created':
+        return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
+    elif sort_by == 'percent':
+        return sorted(posts, key=lambda x: x.hamming_match_percent, reverse=True)
+    else:
+        return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
 
 
 def get_closest_image_match(posts: List[ImageMatch], reverse=True, check_url=True) -> ImageMatch:
