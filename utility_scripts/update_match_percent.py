@@ -34,4 +34,6 @@ with uowm.start() as uow:
 with uowm.start() as uow:
     monitored_subs = uow.monitored_sub.get_all()
     for sub in monitored_subs:
-        sub.target_image_match = 100 - (sub.target_hamming / 64) * 100
+        #sub.target_image_match = 100 - (sub.target_hamming / 64) * 100
+        sub.target_image_meme_match = 92
+        uow.commit()

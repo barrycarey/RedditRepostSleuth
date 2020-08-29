@@ -115,7 +115,8 @@ class SubMonitor:
                 search_results = self._check_for_repost(post, monitored_sub)
             elif post.post_type == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
-                save_link_repost(post, search_results.matches[0].post, self.uowm, 'sub_monitor')
+                if search_results.matches:
+                    save_link_repost(post, search_results.matches[0].post, self.uowm, 'sub_monitor')
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)
             return

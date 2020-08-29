@@ -165,7 +165,7 @@ class ImageRepost(Base):
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
     annoy_distance = Column(Float)
-    post_id = Column(String(100), nullable=False, unique=True)
+    post_id = Column(String(100), nullable=False)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
     author = Column(String(100))
