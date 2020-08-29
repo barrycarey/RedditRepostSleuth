@@ -21,28 +21,23 @@ class ImageSearchHistory:
         if limit == -1:
             limit = 1000
         with self.uowm.start() as uow:
-            checked = uow.monitored_sub_checked.get_by_subreddit(
+            checked = uow.image_search.get_by_subreddit(
                 req.get_param('subreddit', required=True),
                 limit=limit,
-                offset=req.get_param_as_int('offset', required=False, default=None)
+                offset=req.get_param_as_int('offset', required=False, default=None),
+                only_reposts=req.get_param_as_bool('repost_only', required=False, default=False)
             )
-            for p in checked:
+            for search in checked:
                 r = {
                     'checked_post': None,
-                    'search': None,
+                    'search': search.to_dict(),
                 }
-                post = uow.posts.get_by_post_id(p.post_id)
-                searches = uow.image_search.get_by_post_id(p.post_id)
-                submonitor_search = next((x for x in searches if x.source == 'sub_monitor'), None)
-
-                if not submonitor_search:
-                    log.error('Did not find search history for monitored sub checked post %s', p.post_id)
-                    continue
+                post = uow.posts.get_by_post_id(search.post_id)
 
                 results.append({
                     'checked_post': post.to_dict(),
-                    'search': submonitor_search.to_dict(),
-                    'search_results': json.loads(submonitor_search.search_results)
+                    'search': search.to_dict(),
+                    'search_results': json.loads(search.search_results)
                 })
         resp.body = json.dumps(results)
 

@@ -75,7 +75,12 @@ def sub_monitor_check_post(self, submission: Dict, monitored_sub: MonitoredSub):
     if monitored_sub.title_ignore_keywords:
         title_keywords = monitored_sub.title_ignore_keywords.split(',')
 
-    if not self.sub_monitor.should_check_post(post, title_keyword_filter=title_keywords):
+    if not self.sub_monitor.should_check_post(
+            post,
+            monitored_sub.check_image_posts,
+            monitored_sub.check_link_posts,
+            title_keyword_filter=title_keywords
+    ):
         return
 
     self.sub_monitor.check_submission(monitored_sub, post)

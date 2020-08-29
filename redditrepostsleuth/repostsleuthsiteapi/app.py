@@ -13,6 +13,7 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search import ImageS
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search_history import ImageSearchHistory
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub import MonitoredSub
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatch
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.repost_history import RepostHistoryEndpoint
 
 config = Config()
 event_logger = EventLogging(config=config)
@@ -29,6 +30,7 @@ api.add_route('/image', ImageSearch(dup, uowm))
 api.add_route('/watch', PostWatch(uowm))
 api.add_route('/history/search', ImageSearchHistory(uowm), suffix='search_history', )
 api.add_route('/history/monitored', ImageSearchHistory(uowm), suffix='monitored_sub_with_history', )
+api.add_route('/history/reposts', RepostHistoryEndpoint(uowm), suffix='image_with_search')
 api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config))
 
 

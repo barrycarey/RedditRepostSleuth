@@ -20,6 +20,16 @@ class ImageSearchRepo:
     def get_all(self, limit: int = None):
         return self.db_session.query(ImageSearch).limit(limit).all()
 
+    def get_by_subreddit(self, subreddit: Text, source: Text = 'sub_monitor', only_reposts: bool = False, limit: int = None, offset: int = None) -> List[ImageSearch]:
+        query = self.db_session.query(ImageSearch).filter(ImageSearch.subreddit == subreddit, ImageSearch.source == source)
+        if only_reposts:
+            query = query.filter(ImageSearch.matches_found > 0)
+        return query.order_by(ImageSearch.id.desc()).limit(limit).offset(offset).all()
+
+    def get_all_reposts_by_subreddit(self, subreddit: Text, source: Text = 'sub_monitor', limit: int = None, offset: int = None):
+        return self.db_session.query(ImageSearch).filter(ImageSearch.subreddit == subreddit, ImageSearch.source == source, ImageSearch.matches_found > 0).order_by(
+            ImageSearch.id.desc()).limit(limit).offset(offset).all()
+
     def get_older_with_matches(self, limit: int = None) -> List[ImageSearch]:
         since = datetime.now() - timedelta(days=14)
         return self.db_session.query(ImageSearch).filter(ImageSearch.searched_at < since, ImageSearch.matches_found > 5).limit(limit).all()

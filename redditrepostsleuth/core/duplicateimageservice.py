@@ -221,7 +221,9 @@ class DuplicateImageService:
             source,
             target_title_match,
             api_results['used_current_index'],
-            api_results['used_historical_index']
+            api_results['used_historical_index'],
+            target_match_percent or self.config.target_image_match,
+            target_meme_match_percent or self.config.target_image_meme_match
         )
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
@@ -260,7 +262,9 @@ class DuplicateImageService:
             source: str,
             target_title_match: int,
             used_current_index: bool,
-            used_historical_index: bool
+            used_historical_index: bool,
+            target_image_match: int,
+            target_image_meme_match: int
     ) -> Optional[int]:
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
@@ -281,7 +285,9 @@ class DuplicateImageService:
             matches_found=len(search_results.matches),
             source=source,
             subreddit=search_results.checked_post.subreddit,
-            search_results=create_search_result_json(search_results)
+            search_results=create_search_result_json(search_results),
+            target_image_meme_match=target_image_meme_match,
+            target_image_match=target_image_match
         )
 
         with self.uowm.start() as uow:

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [UNRELEASED]
+
+## [0.1.8] - 8/29/2020
 * [backend] - Start tracking which subs the bot is banned on
 * [backend] - Implement ban system to prevent the bot from being spammed.  If a user summons the but more than 50 times per hour it will trigger a 1 hour ban
 * [backend] - Ability to permanently ban twats
