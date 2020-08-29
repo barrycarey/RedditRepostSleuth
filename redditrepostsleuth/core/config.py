@@ -173,7 +173,9 @@ class Config:
             'index_api',
             'util_api',
             'live_responses',
-            'top_post_offer_watch'
+            'top_post_offer_watch',
+            'target_image_match',
+            'target_image_meme_match'
 
         ]
 

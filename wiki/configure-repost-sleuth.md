@@ -14,14 +14,13 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 ```
 {
-  "active": true,
+  "active": false,
   "only_comment_on_repost": true,
   "report_reposts": false,
   "report_msg": "RepostSleuthBot-Repost",
   "match_percent_dif": 5,
   "same_sub_only": true,
   "sticky_comment": false,
-  "search_depth": 100,
   "target_days_old": 180,
   "meme_filter": false,
   "oc_response_template": null,
@@ -37,8 +36,13 @@ To change settings simply update the JSON and save.  The bot will load the new c
   "check_all_submissions": true,
   "check_title_similarity": false,
   "target_title_match": 50,
-  "filter_crossposts": True,
-  "filter_same_author": True
+  "filter_crossposts": true,
+  "filter_same_author": true,
+  "wiki_managed": true,
+  "check_image_posts": true,
+  "check_link_posts": true,
+  "target_image_match": 92,
+  "target_image_meme_match": 97
 }
 ```
 
@@ -56,13 +60,9 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 **report_msg:** The message it will use when reporting
 
-**match_percent_dif:** How strict matching is when determining if an image is a repost. Use values between 0 and 10
-
 **same_sub_only:** Only check for matches within our sub
 
 **sticky_comment:** Comments left by the bot will be stickied
-
-**search_depth:** How many historical posts the bot will check when activated. Max 500
 
 **target_days_old:** Only report matches X days old or newer
 
@@ -95,6 +95,14 @@ To change settings simply update the JSON and save.  The bot will load the new c
 **filter_crossposts:** Exclude crossposts from the search results. 
 
 **filter_same_author:** Exclude results from the same author as the post being checked
+
+**check_image_posts:** Check image posts
+
+**check_link_posts:** Check link posts
+
+**target_image_match:** The percentage an image must match to be considered a repost.  100% is a perfect match.  Default 92%
+
+**target_image_meme_match:** The percent a meme must match. Lower values increase false positives. 
 
 ### Comment Templates
 ---

@@ -165,10 +165,13 @@ class ImageRepost(Base):
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
     annoy_distance = Column(Float)
-    post_id = Column(String(100), nullable=False, unique=True)
+    post_id = Column(String(100), nullable=False)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
-    author = Column(String(100), nullable=False)
+    author = Column(String(100))
+    subreddit = Column(String(100), nullable=False)
+    source = Column(String(100))
+    search_id = Column(Integer)
 
 class LinkRepost(Base):
 
@@ -177,7 +180,9 @@ class LinkRepost(Base):
     post_id = Column(String(100), nullable=False, unique=True)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
-    author = Column(String(100), nullable=False)
+    author = Column(String(100))
+    subreddit = Column(String(100), nullable=False)
+    source = Column(String(100))
 
 class VideoHash(Base):
     __tablename__ = 'reddit_video_hashes'
@@ -230,7 +235,6 @@ class MonitoredSub(Base):
     mark_as_oc = Column(Boolean, default=False)
     repost_response_template = Column(String(2000))
     oc_response_template = Column(String(2000))
-    search_depth = Column(Integer, default=100)
     meme_filter = Column(Boolean, default=False)
     title_ignore_keywords = Column(String(200))
     disable_summons_after_auto_response = Column(Boolean, default=False)
@@ -244,6 +248,13 @@ class MonitoredSub(Base):
     is_mod = Column(Boolean, default=False)
     post_permission = Column(Boolean, default=False)
     wiki_permission = Column(Boolean, default=False)
+    wiki_managed = Column(Boolean, default=True)
+    check_image_posts = Column(Boolean, default=True)
+    check_link_posts = Column(Boolean, default=False)
+    check_text_posts = Column(Boolean, default=False)
+    check_video_posts = Column(Boolean, default=False)
+    target_image_match = Column(Integer, default=92)
+    target_image_meme_match = Column(Integer, default=97)
 
 
 
@@ -280,7 +291,16 @@ class MonitoredSub(Base):
             'repost_response_template': self.repost_response_template,
             'oc_response_template': self.oc_response_template,
             'search_depth': self.search_depth,
-            'meme_filter': self.meme_filter
+            'meme_filter': self.meme_filter,
+            'wiki_managed': self.wiki_managed,
+            'check_image_posts': self.check_image_posts,
+            'check_link_posts': self.check_link_posts,
+            'check_video_posts': self.check_video_posts,
+            'check_text_posts': self.check_text_posts,
+            'target_image_match': self.target_image_match,
+            'target_image_meme_match': self.target_image_meme_match
+
+
         }
 
 class MonitoredSubChecks(Base):
@@ -383,6 +403,8 @@ class ImageSearch(Base):
     matches_found = Column(Integer, nullable=False)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
     search_results = Column(Text(75000, collation='utf8mb4_general_ci'))
+    subreddit = Column(String(100), nullable=False)
+
 
     def to_dict(self):
         return {

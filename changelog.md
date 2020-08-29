@@ -6,12 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [UNRELEASED]
 * [backend] - Start tracking which subs the bot is banned on
 * [backend] - Implement ban system to prevent the bot from being spammed.  If a user summons the but more than 50 times per hour it will trigger a 1 hour ban
-* [backend] - Ability to permanently twats
+* [backend] - Ability to permanently ban twats
 * [stats] - Now publishing the list of subs the bot is banned from
 * [sub monitoring] - Reworked sub monitoring to speed up processing time
+* [sub monitoring] - Added several new config options for more fine grained control
+* [sub monitoring] - Add Option - check_image_posts - Enabled checking of image posts
+* [sub monitoring] - Add Option - check_link_posts - Enabled checking of link posts
+* [sub monitoring] - Add Option - target_image_match - Replaced match_percent_dif.  What % match is required to flag a repost.  Set between 60 and 100. 100 being a perfect match
+* [sub monitoring] - Add Option - target_image_meme_match - What % match is required to flag a meme as a repost.  Set between 60 and 100. 100 being a perfect match.  This gives you control over how strict the meme filter is.
+* [sub monitoring] - Add Option - wiki_managed - This will be used for the soon coming Repost Sleuth management portal
+* [sub monitoring] - Add Option - filter_same_author - Filter search results by same author as the post being checked
+* [sub monitoring] - Add Option - filter_crossposts - Filter crossposts out of search results
+* [sub monitoring] - Remove Option - search_depth - No longer needed
+* [sub monitoring] - Remove Option - match_percent_dif - This was a confusing option.  Repalced by target_image_match which uses easy to understand percentage.  
 * [bugfix] - Comments left on monitored subreddit's were no longer being stickied
 * [bugfix] - When watch detection is triggered it failed to link to the offending post
-* [feature] - 2 new config options for monitored subreddits. filter_crossposts and filter_same_author.  Allows mods to decide if the search results should include crossposts and posts by the same author as post being checked
 * [feature] - Add {post_author} message slug to response and report templates
 * [feature] - Bot now sends PM to all front page posts giving author the option to enable a watch
 
