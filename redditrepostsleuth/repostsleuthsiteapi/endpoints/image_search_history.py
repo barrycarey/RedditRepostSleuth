@@ -17,10 +17,13 @@ class ImageSearchHistory:
 
     def on_get_monitored_sub_with_history(self, req: Request, resp: Response):
         results = []
+        limit = req.get_param_as_int('limit', required=False, default=20)
+        if limit == -1:
+            limit = 1000
         with self.uowm.start() as uow:
             checked = uow.monitored_sub_checked.get_by_subreddit(
                 req.get_param('subreddit', required=True),
-                limit=req.get_param_as_int('limit', required=False, default=20),
+                limit=limit,
                 offset=req.get_param_as_int('offset', required=False, default=None)
             )
             for p in checked:
