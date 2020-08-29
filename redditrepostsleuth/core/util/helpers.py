@@ -14,7 +14,7 @@ from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, LinkRepost
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
@@ -297,12 +297,23 @@ def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
 
     return table
 
-    """
-    table = f'| {column_one_header}      | {column_two_header} |\n' \
-              '| ----------- | ----------- |\n' \
+def get_hamming_from_percent(match_percent: int, hash_length: int) -> float:
+    return hash_length - (match_percent / 100) * hash_length
 
-    for k, v in rows.items():
-        table = table + f'| {k} | {v} |\n'
+def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
+    with uowm.start() as uow:
+        new_repost = LinkRepost(
+            post_id=post.post_id,
+            repost_of=repost_of.post_id,
+            author=post.author,
+            subreddit=post.subreddit, source
+            =source
+        )
 
-    return table
-    """
+        post.checked_repost = True
+        uow.posts.update(post)
+        uow.link_repost.add(new_repost)
+        try:
+            uow.commit()
+        except Exception as e:
+            log.exception('Failed to save link repost', exc_info=True)

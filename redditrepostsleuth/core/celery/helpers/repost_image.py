@@ -1,4 +1,4 @@
-from typing import List, NoReturn, Dict
+from typing import List, NoReturn, Dict, Text
 
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
@@ -57,7 +57,7 @@ def find_matching_images(post: Post, dup_service: DuplicateImageService) -> Imag
     log.debug('Found %s matching images', len(result.matches))
     return result
 
-def save_image_repost_result(search_results: RepostWrapper, uowm: UnitOfWorkManager) -> None:
+def save_image_repost_result(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager) -> None:
     """
     Take a found repost and save to the database
     :param search_results:
@@ -92,7 +92,9 @@ def save_image_repost_result(search_results: RepostWrapper, uowm: UnitOfWorkMana
                                      repost_of=repost_of.post.post_id,
                                      hamming_distance=repost_of.hamming_distance,
                                      annoy_distance=repost_of.annoy_distance,
-                                     author=search_results.checked_post.author)
+                                     author=search_results.checked_post.author,
+                                     search_id=search_results.search_id,
+                                     subreddit=search_results.checked_post.subreddit)
             repost_of.post.repost_count += 1
             uow.posts.update(repost_of.post)
             uow.image_repost.add(new_repost)
@@ -100,6 +102,53 @@ def save_image_repost_result(search_results: RepostWrapper, uowm: UnitOfWorkMana
 
         uow.posts.update(search_results.checked_post)
         uow.commit()
+
+def save_image_repost_general(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager, source: Text) -> None:
+    """
+    Take a found repost and save to the database
+    :param search_results:
+    :param uowm:
+    :return:
+    """
+    # TODO - This whole function needs to be broken up
+    with uowm.start() as uow:
+
+        search_results.checked_post.checked_repost = True
+        if not search_results.matches:
+            log.debug('Post %s has no matches', search_results.checked_post.post_id)
+            uow.posts.update(search_results.checked_post)
+            uow.commit()
+            return
+
+        if len(search_results.matches) > 0:
+            final_matches = search_results.matches
+            log.debug('Checked Image (%s): %s', search_results.checked_post.created_at, search_results.checked_post.url)
+            for match in final_matches:
+                log.debug('Matching Image: %s (%s) (Hamming: %s - Annoy: %s): %s', match.post.post_id,
+                          match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
+            repost_of = get_oldest_active_match(search_results.matches)
+            if not repost_of:
+                log.info('No active matches, not saving report')
+                return
+
+            log.info('Creating repost. Post %s is a repost of %s', search_results.checked_post.url, repost_of.post.url)
+
+            new_repost = ImageRepost(post_id=search_results.checked_post.post_id,
+                                     repost_of=repost_of.post.post_id,
+                                     hamming_distance=repost_of.hamming_distance,
+                                     annoy_distance=repost_of.annoy_distance,
+                                     author=search_results.checked_post.author,
+                                     search_id=search_results.search_id,
+                                     subreddit=search_results.checked_post.subreddit,
+                                     source=source
+                                     )
+
+            uow.image_repost.add(new_repost)
+            search_results.matches = final_matches
+
+        uow.posts.update(search_results.checked_post)
+        uow.commit()
+
 
 def get_oldest_active_match(matches: List[ImageMatch]) -> ImageMatch:
     """

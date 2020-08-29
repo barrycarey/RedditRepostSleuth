@@ -73,16 +73,9 @@ def link_repost_check(self, posts, ):
 
             log.info('Found %s matching links', len(repost.matches))
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
-            """
 
-
-            log.debug('Checked Link %s (%s): %s', post.post_id, post.created_at, post.url)
-            for match in repost.matches:
-                log.debug('Matching Link: %s (%s)  - %s', match.post.post_id, match.post.created_at, match.post.url)
-            log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
-            """
             repost_of = repost.matches[0].post
-            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author)
+            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author, source='ingest', subreddit=post.subreddit)
             repost_of.repost_count += 1
             post.checked_repost = True
             uow.posts.update(post)

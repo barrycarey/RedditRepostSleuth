@@ -6,6 +6,7 @@ from praw.exceptions import APIException
 from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -22,7 +23,7 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen, \
-    searched_post_str, build_image_msg_values_from_search
+    searched_post_str, build_image_msg_values_from_search, save_link_repost
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, IMAGE_REPOST_ALL, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
@@ -317,6 +318,7 @@ class SummonsHandler:
         if not search_results.matches:
             response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
         else:
+            save_link_repost(post, search_results.matches[0].post, self.uowm, 'summons')
         # TODO - Move this to message builder
             if cmd.all_matches:
                 response.message = IMAGE_REPOST_ALL.format(
@@ -351,7 +353,7 @@ class SummonsHandler:
         cmd = self._get_summons_cmd(summons.comment_body, post.post_type)
         response = SummonsResponse(summons=summons)
 
-        target_hamming_distance, target_annoy_distance = self._get_target_distances(
+        target_image_match, target_annoy_distance = self._get_target_distances(
             post.subreddit,
             override_hamming_distance=cmd.strictness
         )
@@ -360,7 +362,7 @@ class SummonsHandler:
             search_results = self.image_service.check_duplicates_wrapped(
                 post,
                 target_annoy_distance=target_annoy_distance,
-                target_hamming_distance=target_hamming_distance,
+                target_match_percent=target_image_match,
                 meme_filter=cmd.meme_filter,
                 same_sub=cmd.same_sub,
                 date_cutoff=cmd.match_age,
@@ -379,7 +381,7 @@ class SummonsHandler:
         if not search_results.matches:
             response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
         else:
-
+            save_image_repost_general(search_results, self.uowm, 'sub_monitor')
             # TODO - Move this to message builder
             if cmd.all_matches:
                 response.message = IMAGE_REPOST_ALL.format(
@@ -423,8 +425,8 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
             if monitored_sub:
-                return override_hamming_distance or monitored_sub.target_hamming, monitored_sub.target_annoy
-            return override_hamming_distance or self.config.default_hamming_distance, self.config.default_annoy_distance
+                return override_hamming_distance or monitored_sub.target_image_match, monitored_sub.target_annoy
+            return override_hamming_distance or self.config.target_image_match, self.config.default_annoy_distance
 
     def _send_response(self, response: SummonsResponse) -> NoReturn:
         """
