@@ -1,7 +1,7 @@
 import json
 import webbrowser
 from time import perf_counter
-from typing import List, Tuple, Text
+from typing import List, Tuple, Text, Optional
 
 import requests
 from requests.exceptions import ConnectionError
@@ -18,7 +18,7 @@ from redditrepostsleuth.core.model.image_index import ImageIndex
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import create_search_result_json
+from redditrepostsleuth.core.util.helpers import create_search_result_json, get_hamming_from_percent
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
@@ -41,7 +41,8 @@ class DuplicateImageService:
             self,
             search_results: ImageRepostWrapper,
             target_annoy_distance: float = None,
-            target_hamming_distance: int = None,
+            target_match_percent: int = None,
+            target_meme_match_percent: int = None,
             target_title_match: int = None,
             same_sub: bool = False,
             date_cutoff: int = None,
@@ -63,15 +64,19 @@ class DuplicateImageService:
         """
         start_time = perf_counter()
         # TODO - Allow array of filters to be passed
-        # Dumb fix for 0 evaling to False
-        if target_hamming_distance == 0:
-            target_hamming_distance = 0
+
+        if is_meme:
+            target_hamming_distance = get_hamming_from_percent(
+                target_meme_match_percent or self.config.target_image_meme_match, 256)
+            search_results.target_match_percent = target_meme_match_percent or self.config.target_image_meme_match
         else:
-            target_hamming_distance = target_hamming_distance or self.config.default_hamming_distance
+            target_hamming_distance = get_hamming_from_percent(target_match_percent or self.config.target_image_match,
+                                                               len(search_results.checked_post.dhash_h))
+            search_results.target_match_percent = target_match_percent or self.config.target_image_match
+
         target_annoy_distance = target_annoy_distance or self.config.default_annoy_distance
         search_results.target_hamming_distance = target_hamming_distance
         search_results.target_annoy_distance = target_annoy_distance
-        search_results.target_match_percent = round(100 - (target_hamming_distance / len(search_results.checked_post.dhash_h)) * 100, 0)
 
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
         log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
@@ -123,7 +128,8 @@ class DuplicateImageService:
     def check_duplicates_wrapped(self, post: Post,
                                  result_filter: bool = True,
                                  max_matches: int = 50,  # TODO -
-                                 target_hamming_distance: int = None,
+                                 target_match_percent: int = None,
+                                 target_meme_match_percent: int = None,
                                  target_annoy_distance: float = None,
                                  target_title_match: int = None,
                                  same_sub: bool = False,
@@ -190,7 +196,8 @@ class DuplicateImageService:
             start_time = perf_counter()
             search_results = self._filter_results_for_reposts(search_results,
                                                                       target_annoy_distance=target_annoy_distance,
-                                                                      target_hamming_distance=target_hamming_distance,
+                                                                      target_match_percent=target_match_percent,
+                                                                      target_meme_match_percent=target_meme_match_percent,
                                                                       same_sub=same_sub,
                                                                       date_cutoff=date_cutoff,
                                                                       filter_dead_matches=filter_dead_matches,
@@ -204,7 +211,7 @@ class DuplicateImageService:
             self._set_match_hamming(post, search_results.matches)
         search_results.total_search_time = round(perf_counter() - start, 5)
         self._log_search_time(search_results, match_post_time, source)
-        self._log_search(
+        search_results.search_id = self._log_search(
             search_results,
             same_sub,
             date_cutoff,
@@ -254,7 +261,7 @@ class DuplicateImageService:
             target_title_match: int,
             used_current_index: bool,
             used_historical_index: bool
-    ):
+    ) -> Optional[int]:
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
             used_historical_index=used_historical_index,
@@ -273,6 +280,7 @@ class DuplicateImageService:
             target_title_match=target_title_match,
             matches_found=len(search_results.matches),
             source=source,
+            subreddit=search_results.checked_post.subreddit,
             search_results=create_search_result_json(search_results)
         )
 
@@ -280,6 +288,7 @@ class DuplicateImageService:
             uow.image_search.add(image_search)
             try:
                 uow.commit()
+                return image_search.id
             except Exception as e:
                 log.exception('Failed to save image search', exc_info=False)
 
