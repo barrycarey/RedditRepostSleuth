@@ -8,6 +8,7 @@ from redlock import RedLockError
 from time import perf_counter
 from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -20,7 +21,8 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
+    save_link_repost
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
@@ -113,6 +115,7 @@ class SubMonitor:
                 search_results = self._check_for_repost(post, monitored_sub)
             elif post.post_type == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
+                save_link_repost(post, search_results.matches[0].post, self.uowm, 'sub_monitor')
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)
             return
@@ -278,7 +281,8 @@ class SubMonitor:
         search_results = self.image_service.check_duplicates_wrapped(
             post,
             target_annoy_distance=monitored_sub.target_annoy,
-            target_hamming_distance=monitored_sub.target_hamming,
+            target_match_percent=monitored_sub.target_image_match,
+            target_meme_match_percent=monitored_sub.target_image_meme_match,
             date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter,
@@ -286,6 +290,8 @@ class SubMonitor:
             max_matches=100,
             source='sub_monitor'
         )
+        if search_results.matches:
+            save_image_repost_general(search_results ,self.uowm, 'sub_monitor')
 
         log.debug(search_results)
         return search_results

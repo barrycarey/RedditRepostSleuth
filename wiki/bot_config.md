@@ -6,7 +6,6 @@
   "match_percent_dif": 5,
   "same_sub_only": true,
   "sticky_comment": false,
-  "search_depth": 100,
   "target_days_old": 180,
   "meme_filter": false,
   "oc_response_template": null,
@@ -23,5 +22,10 @@
   "check_title_similarity": false,
   "target_title_match": 50,
   "filter_crossposts": true,
-  "filter_same_author": true
+  "filter_same_author": true,
+  "wiki_managed": true,
+  "check_image_posts": true,
+  "check_link_posts": true,
+  "target_image_match": 92,
+  "target_image_meme_match": 97
 }
