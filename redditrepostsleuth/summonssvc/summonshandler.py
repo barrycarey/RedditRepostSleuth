@@ -381,7 +381,7 @@ class SummonsHandler:
         if not search_results.matches:
             response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
         else:
-            save_image_repost_general(search_results, self.uowm, 'sub_monitor')
+            save_image_repost_general(search_results, self.uowm, 'summons')
             # TODO - Move this to message builder
             if cmd.all_matches:
                 response.message = IMAGE_REPOST_ALL.format(

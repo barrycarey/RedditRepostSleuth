@@ -3,7 +3,6 @@
   "only_comment_on_repost": true,
   "report_reposts": false,
   "report_msg": "RepostSleuthBot-Repost",
-  "match_percent_dif": 5,
   "same_sub_only": true,
   "sticky_comment": false,
   "target_days_old": 180,

@@ -108,7 +108,7 @@ def sub_monitor_check_post_old(self, submission, monitored_sub):
 def process_monitored_sub(self, monitored_sub):
     try:
         log.info('Loading all submissions from %s', monitored_sub.name)
-        r = requests.get(f'{self.config.util_api}/reddit/subreddit', params={'subreddit': monitored_sub.name, 'limit': monitored_sub.search_depth})
+        r = requests.get(f'{self.config.util_api}/reddit/subreddit', params={'subreddit': monitored_sub.name, 'limit': 500})
     except Exception as e:
         log.error('Error getting new posts from util api', exc_info=True)
         return
