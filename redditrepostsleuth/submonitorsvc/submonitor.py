@@ -78,7 +78,7 @@ class SubMonitor:
                 return True
         return False
 
-    def should_check_post(self, post: Post, title_keyword_filter: List[Text] = None) -> bool:
+    def should_check_post(self, post: Post, check_image: bool, check_link: bool, title_keyword_filter: List[Text] = None) -> bool:
         """
         Check if a given post should be checked
         :rtype: bool
@@ -90,6 +90,13 @@ class SubMonitor:
             return False
 
         if post.post_type not in self.config.supported_post_types:
+            return False
+
+        if post.post_type == 'image' and not check_image:
+            return False
+
+        if post.post_type == 'link' and not check_link:
+            log.info('Skipping link post')
             return False
 
         if post.crosspost_parent:

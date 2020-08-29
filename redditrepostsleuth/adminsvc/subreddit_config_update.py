@@ -410,7 +410,5 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config)
-    with uowm.start() as uow:
-        sub = uow.monitored_sub.get_by_sub('PewdiepieSubmissions')
-    updater.check_for_config_update(sub)
-    #updater.update_configs()
+
+    updater.update_configs()

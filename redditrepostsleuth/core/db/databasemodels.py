@@ -173,6 +173,19 @@ class ImageRepost(Base):
     source = Column(String(100))
     search_id = Column(Integer)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'hamming_distance': self.hamming_distance,
+            'post_id': self.post_id,
+            'repost_of': self.repost_of,
+            'detected_at': self.detected_at.timestamp() if self.detected_at else None,
+            'author': self.author,
+            'subreddit': self.subreddit,
+            'source': self.source,
+            'search_id': self.search_id
+        }
+
 class LinkRepost(Base):
 
     __tablename__ = 'link_reposts'
@@ -183,6 +196,17 @@ class LinkRepost(Base):
     author = Column(String(100))
     subreddit = Column(String(100), nullable=False)
     source = Column(String(100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'repost_of': self.repost_of,
+            'detected_at': self.detected_at.timestamp() if self.detected_at else None,
+            'author': self.author,
+            'subreddit': self.subreddit,
+            'source': self.source,
+        }
 
 class VideoHash(Base):
     __tablename__ = 'reddit_video_hashes'
@@ -290,7 +314,6 @@ class MonitoredSub(Base):
             'sticky_comment': self.sticky_comment,
             'repost_response_template': self.repost_response_template,
             'oc_response_template': self.oc_response_template,
-            'search_depth': self.search_depth,
             'meme_filter': self.meme_filter,
             'wiki_managed': self.wiki_managed,
             'check_image_posts': self.check_image_posts,
@@ -299,8 +322,6 @@ class MonitoredSub(Base):
             'check_text_posts': self.check_text_posts,
             'target_image_match': self.target_image_match,
             'target_image_meme_match': self.target_image_meme_match
-
-
         }
 
 class MonitoredSubChecks(Base):
@@ -404,6 +425,8 @@ class ImageSearch(Base):
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
     search_results = Column(Text(75000, collation='utf8mb4_general_ci'))
     subreddit = Column(String(100), nullable=False)
+    target_image_match = Column(Integer, default=92)
+    target_image_meme_match = Column(Integer, default=97)
 
 
     def to_dict(self):
@@ -425,7 +448,9 @@ class ImageSearch(Base):
             'total_filter_time': self.total_filter_time,
             'searched_at': self.searched_at.timestamp(),
             'matches_found': self.matches_found,
-
+            'subreddit': self.subreddit,
+            'target_image_match': self.target_image_match,
+            'target_image_meme_match': self.target_image_meme_match
         }
 
 class UserReport(Base):

@@ -16,11 +16,13 @@ class ImageSearch:
 
     def on_get(self, req: Request, resp: Response):
         target_annoy = req.get_param_as_float('pre_filter', None)
-        target_hamming = req.get_param_as_int('post_filter', None)
+        image_match_percent = req.get_param_as_int('post_filter', None)
+        target_meme_match_percent = req.get_param_as_int('target_meme_match_percent', None)
         same_sub = req.get_param_as_bool('same_sub', False)
         only_older = req.get_param_as_bool('only_older', False)
         date_cutoff = req.get_param_as_int('date_cutoff', None)
         meme_filter = req.get_param_as_bool('meme_filter', False)
+        filter_crossposts = req.get_param_as_bool('filter_crossposts', False, default=True)
         post_id = req.get_param('post_id', required=True)
         filter_dead_matches = req.get_param_as_bool('filter_dead_matches', False)
 
@@ -34,12 +36,14 @@ class ImageSearch:
             search_results = self.image_svc.check_duplicates_wrapped(
                 post,
                 target_annoy_distance=target_annoy,
-                target_hamming_distance=target_hamming,
+                target_match_percent=image_match_percent,
+                target_meme_match_percent=target_meme_match_percent,
                 meme_filter=meme_filter,
                 same_sub=same_sub,
                 date_cutoff=date_cutoff,
                 only_older_matches=only_older,
-                filter_dead_matches=False,
+                filter_crossposts=filter_crossposts,
+                filter_dead_matches=filter_dead_matches,
                 max_matches=500,
                 max_depth=-1,
                 source='api'

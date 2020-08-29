@@ -147,7 +147,7 @@ services:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q deleted_post_cleanup -c 4
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q deleted_post_cleanup -c 6
 
 
     ingest_pushshift_worker:
