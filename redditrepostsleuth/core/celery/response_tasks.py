@@ -16,6 +16,7 @@ from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import SummonsResponse
@@ -103,7 +104,7 @@ def sub_monitor_check_post_old(self, submission, monitored_sub):
         return
     self.sub_monitor.check_submission(submission, monitored_sub, post)
 
-@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True, autoretry_for=(LoadSubredditException,), retry_kwards={'max_retries': 3})
 def process_monitored_sub(self, monitored_sub):
     try:
         log.info('Loading all submissions from %s', monitored_sub.name)
@@ -111,6 +112,10 @@ def process_monitored_sub(self, monitored_sub):
     except Exception as e:
         log.error('Error getting new posts from util api', exc_info=True)
         return
+
+    if r.status_code == 403:
+        log.error('Got forbidden for sub %s', monitored_sub.name)
+        raise LoadSubredditException('Failed to load subreddit')
 
     if r.status_code != 200:
         log.error('Bad status code from Util API %s for %s', r.status_code, monitored_sub.name)

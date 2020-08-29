@@ -25,7 +25,7 @@ dup = DuplicateImageService(uowm, event_logger, config=config)
 cors = CORS(allow_origins_list=['http://localhost:8080'], allow_all_methods=True, allow_all_headers=True)
 
 
-api = falcon.API(middleware=[cors.middleware])
+api = falcon.API()
 api.req_options.auto_parse_form_urlencoded = True
 
 api.add_route('/image', ImageRepostChecker(dup, uowm))

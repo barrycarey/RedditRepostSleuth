@@ -26,3 +26,4 @@ falcon-cors
 python-Levenshtein
 apscheduler
 gunicorn
+cryptography

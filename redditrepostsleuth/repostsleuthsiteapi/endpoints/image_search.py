@@ -39,13 +39,13 @@ class ImageSearch:
                 same_sub=same_sub,
                 date_cutoff=date_cutoff,
                 only_older_matches=only_older,
-                filter_dead_matches=filter_dead_matches,
+                filter_dead_matches=False,
                 max_matches=500,
                 max_depth=-1,
                 source='api'
             )
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
-            raise HTTPServiceUnavailable('Search API is not available.' 'The search API is current not available')
+            raise HTTPServiceUnavailable('Search API is not available.', 'The search API is not currently available')
 
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)

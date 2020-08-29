@@ -20,7 +20,7 @@ from redditrepostsleuth.core.util.constants import CUSTOM_FILTER_LEVELS, BANNED_
     NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_COMMENT_OC, FRONTPAGE_LINK_REPOST, TOP_POST_WATCH_BODY, \
-    TOP_POST_WATCH_SUBJECT
+    TOP_POST_WATCH_SUBJECT, TOP_POST_REPORT_MSG
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
@@ -78,9 +78,13 @@ class TopPostMonitor:
                     if not results:
                         continue
 
-                    self.add_comment(post, results)
+                    self._add_comment(post, results)
                     if post.post_type == 'image' and len(results.matches) == 0:
                         self._offer_watch(sub)
+
+                    if len(results.matches) > 0:
+                        #self._report_post(results)
+                        pass
 
                     time.sleep(0.2)
 
@@ -124,7 +128,7 @@ class TopPostMonitor:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
 
-    def add_comment(self, post: Post, search_results: RepostWrapper) -> NoReturn:
+    def _add_comment(self, post: Post, search_results: RepostWrapper) -> NoReturn:
         """
         Add a comment to the post
         :rtype: NoReturn
@@ -135,6 +139,10 @@ class TopPostMonitor:
 
         if self._is_banned_sub(post.subreddit):
             log.info('Skipping banned sub %s', post.subreddit)
+            with self.uowm.start() as uow:
+                post.left_comment = True
+                uow.posts.update(post)
+                uow.commit()
             return
 
         if self._left_comment(post.post_id):
@@ -208,7 +216,35 @@ class TopPostMonitor:
             if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
                 log.error('Not whitelisted API error')
             else:
-                log.error('Unknown error sending PM to %s', submission.author.name)
+                log.exception('Unknown error sending PM to %s', submission.author.name, exc_info=True)
+
+    def _report_post(self, search_results: RepostWrapper) -> NoReturn:
+        """
+        Report a given post
+        :rtype: NoReturn
+        :param post: Post to report
+        """
+        if search_results.checked_post.post_type != 'image':
+            log.info('Post %s is not an image, skipping report', search_results.checked_post.post_id)
+            return
+
+        submission = self.reddit.submission(search_results.checked_post.post_id)
+        msg_values = build_msg_values_from_search(search_results, self.uowm)
+        msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
+        report_msg = self.response_builder.build_provided_comment_template(
+            msg_values,
+            TOP_POST_REPORT_MSG,
+            post_type='image',
+            signature=False,
+            stats=False
+        )
+
+        try:
+            submission.report(report_msg)
+        except Exception as e:
+            # TODO - Specific exception
+            log.exception('Failed to report submission', exc_info=True)
+
 
     def _left_comment(self, post_id: Text) -> bool:
         """
