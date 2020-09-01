@@ -11,16 +11,17 @@ class PostWatch:
 
     def on_get(self, req: Request, res: Response):
         response = {
-            'data': None,
+            'data': [],
             'next_id': None
         }
         limit = req.get_param_as_int('limit', required=False, default=100)
         offset = req.get_param_as_int('offset', required=False)
         with self.uowm.start() as uow:
             watches = uow.repostwatch.get_all(limit=limit, offset=offset)
+            for watch in watches:
+                post = uow.posts.get_by_post_id(watch.post_id)
+                response['data'].append({'watch': watch.to_dict(), 'post': post.to_dict()})
 
-        response['data'] = [watch.to_dict() for watch in watches]
-        response['next_id'] = watches[-1].id + 1
         res.body = json.dumps(response)
 
     def on_get_single(self):

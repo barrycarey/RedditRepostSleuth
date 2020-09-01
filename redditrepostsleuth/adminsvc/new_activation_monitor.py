@@ -90,7 +90,7 @@ class NewActivationMonitor:
                 target_hamming=5,
                 same_sub_only=True,
                 sticky_comment=True,
-                search_depth=100,
+                target_image_match=92,
                 meme_filter=False
             )
             uow.monitored_sub.add(monitored_sub)
@@ -102,6 +102,7 @@ class NewActivationMonitor:
             except Exception as e:
                 log.exception('Unknown exception saving monitored sub', exc_info=True)
                 raise
+
 
     def is_already_active(self, subreddit: Text) -> bool:
         with self.uowm.start() as uow:

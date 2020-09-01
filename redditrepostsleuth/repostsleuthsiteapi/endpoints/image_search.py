@@ -15,16 +15,17 @@ class ImageSearch:
         self.uowm = uowm
 
     def on_get(self, req: Request, resp: Response):
-        target_annoy = req.get_param_as_float('pre_filter', None)
-        image_match_percent = req.get_param_as_int('post_filter', None)
-        target_meme_match_percent = req.get_param_as_int('target_meme_match_percent', None)
-        same_sub = req.get_param_as_bool('same_sub', False)
-        only_older = req.get_param_as_bool('only_older', False)
-        date_cutoff = req.get_param_as_int('date_cutoff', None)
-        meme_filter = req.get_param_as_bool('meme_filter', False)
-        filter_crossposts = req.get_param_as_bool('filter_crossposts', False, default=True)
+        target_annoy = req.get_param_as_float('pre_filter', required=False, default=None)
+        image_match_percent = req.get_param_as_int('post_filter', required=False, default=None)
+        target_meme_match_percent = req.get_param_as_int('target_meme_match_percent', required=False, default=None)
+        same_sub = req.get_param_as_bool('same_sub', required=False, default=False)
+        only_older = req.get_param_as_bool('only_older', required=False, default=False)
+        date_cutoff = req.get_param_as_int('date_cutoff', required=False, default=None)
+        meme_filter = req.get_param_as_bool('meme_filter', required=False, default=False)
+        filter_crossposts = req.get_param_as_bool('filter_crossposts', required=False, default=True)
+        filter_author = req.get_param_as_bool('filter_author', required=False, default=True)
         post_id = req.get_param('post_id', required=True)
-        filter_dead_matches = req.get_param_as_bool('filter_dead_matches', False)
+        filter_dead_matches = req.get_param_as_bool('filter_dead_matches', required=False, default=False)
 
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(post_id)
@@ -44,7 +45,8 @@ class ImageSearch:
                 only_older_matches=only_older,
                 filter_crossposts=filter_crossposts,
                 filter_dead_matches=filter_dead_matches,
-                max_matches=500,
+                filter_author=filter_author,
+                max_matches=250,
                 max_depth=-1,
                 source='api'
             )
@@ -52,4 +54,5 @@ class ImageSearch:
             log.error('No available index for image repost check.  Trying again later')
             raise HTTPServiceUnavailable('Search API is not available.', 'The search API is not currently available')
 
+        print(search_results.search_times.to_dict())
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
