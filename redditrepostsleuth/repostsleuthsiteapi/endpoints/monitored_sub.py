@@ -2,15 +2,21 @@ import json
 from typing import Text
 
 import requests
-from falcon import Response, Request, HTTP_NOT_FOUND, HTTPNotFound, HTTPUnauthorized
+from falcon import Response, Request, HTTP_NOT_FOUND, HTTPNotFound, HTTPUnauthorized, HTTPInternalServerError
+from praw import Reddit
+from praw.exceptions import APIException
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.services.managed_subreddit import create_monitored_sub_in_db
 
-
+import logging
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.DEBUG)
 class MonitoredSub:
-    def __init__(self, uowm: UnitOfWorkManager, config: Config):
+    def __init__(self, uowm: UnitOfWorkManager, config: Config, reddit: Reddit):
+        self.reddit = reddit
         self.config = config
         self.uowm = uowm
 
@@ -22,8 +28,30 @@ class MonitoredSub:
                 return
             resp.body = json.dumps(sub.to_dict())
 
-    def on_post(self, req: Request, resp: Response):
-        pass
+    def on_post(self, req: Request, resp: Response, subreddit: Text):
+        log.info('Attempting to create monitored sub %s', subreddit)
+
+        try:
+            self.reddit.subreddit(subreddit).mod.accept_invite()
+        except APIException as e:
+            if e.error_type == 'NO_INVITE_FOUND':
+                log.error('No open invite to %s', subreddit)
+                raise HTTPInternalServerError(f'No available invite for {subreddit}', f'We were unable to find a pending mod invote for r/{subreddit}')
+            else:
+                log.exception('Problem accepting invite', exc_info=True)
+                raise HTTPInternalServerError(f'Unknown error accepting mod invite for r/{subreddit}', f'Unknown error accepting mod invite for r/{subreddit}.  Please contact us')
+        except Exception as e:
+            log.exception('Failed to accept invite', exc_info=True)
+            raise HTTPInternalServerError(f'Unknown error accepting mod invite for r/{subreddit}', f'Unknown error accepting mod invite for r/{subreddit}.  Please contact us')
+
+        with self.uowm.start() as uow:
+            existing = uow.monitored_sub.get_by_sub(subreddit)
+            if existing:
+                resp.body = json.dumps(existing.to_dict())
+                return
+            monitored_sub = create_monitored_sub_in_db(subreddit, uow)
+            resp.body = json.dumps(monitored_sub.to_dict())
+
 
     def on_patch(self, req: Request, resp: Response, subreddit: Text):
         token = req.get_param('token', required=True)

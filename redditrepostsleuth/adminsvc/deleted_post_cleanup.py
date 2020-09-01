@@ -22,12 +22,12 @@ def get_all_links():
     conn = get_db_conn()
     batch = []
     with conn.cursor() as cur:
-        query = f"SELECT post_id, url, post_type FROM reddit_post WHERE last_deleted_check <= NOW() - INTERVAL 90 DAY LIMIT 1000000"
+        query = f"SELECT post_id, url, post_type FROM reddit_post WHERE post_type='image' AND last_deleted_check <= NOW() - INTERVAL 90 DAY LIMIT 1000000"
         cur.execute(query)
         log.info('Adding items to index')
         for row in cur:
             batch.append({'id': row['post_id'], 'url': row['url']})
-            if len(batch) >= 25:
+            if len(batch) >= 30:
                 try:
                     deleted_post_cleanup.apply_async((batch,), queue='deleted_post_cleanup')
                     batch = []

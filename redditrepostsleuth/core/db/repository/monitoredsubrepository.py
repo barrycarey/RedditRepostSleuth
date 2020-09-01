@@ -27,3 +27,6 @@ class MonitoredSubRepository:
 
     def remove(self, item: MonitoredSub):
         self.db_session.delete(item)
+
+    def refresh(self, item: MonitoredSub):
+        self.db_session.refresh(item)
