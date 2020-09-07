@@ -54,7 +54,7 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
     ))
     watches = check_for_post_watch(result.matches, self.uowm)
     if watches and self.config.enable_repost_watch:
-        notify_watch.apply_async((watches,), queue='watch_notify')
+        notify_watch.apply_async((watches, post), queue='watch_notify')
 
     return result
 
@@ -73,16 +73,9 @@ def link_repost_check(self, posts, ):
 
             log.info('Found %s matching links', len(repost.matches))
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
-            """
 
-
-            log.debug('Checked Link %s (%s): %s', post.post_id, post.created_at, post.url)
-            for match in repost.matches:
-                log.debug('Matching Link: %s (%s)  - %s', match.post.post_id, match.post.created_at, match.post.url)
-            log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
-            """
             repost_of = repost.matches[0].post
-            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author)
+            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author, source='ingest', subreddit=post.subreddit)
             repost_of.repost_count += 1
             post.checked_repost = True
             uow.posts.update(post)
@@ -106,8 +99,8 @@ def link_repost_check(self, posts, ):
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]]):
-    repost_watch_notify(watches, self.reddit, self.response_handler)
+def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]], repost: Post):
+    repost_watch_notify(watches, self.reddit, self.response_handler, repost)
     with self.uowm.start() as uow:
         for w in watches:
             w['watch'].last_detection = func.utc_timestamp()

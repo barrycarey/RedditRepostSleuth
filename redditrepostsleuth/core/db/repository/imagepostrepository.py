@@ -12,6 +12,9 @@ class ImagePostRepository:
     def add(self, item):
         self.db_session.add(item)
 
+    def get_all(self, limit: int = None, offset: int = None) -> List[RedditImagePost]:
+        return self.db_session.query(RedditImagePost).order_by(RedditImagePost.id.desc()).limit(limit).offset(offset).all()
+
     def get_all_without_created_at(self, limit: int = None):
         return self.db_session.query(RedditImagePost).filter(RedditImagePost.created_at > datetime(2019,11,1)).limit(limit).all()
 

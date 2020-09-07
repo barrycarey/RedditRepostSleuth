@@ -4,3 +4,5 @@ sqlalchemy
 influxdb
 imagehash
 apscheduler
+redis
+celery[redis]==4.3.0

@@ -3,6 +3,7 @@ import sys
 import time
 
 import redis
+from kombu.exceptions import OperationalError
 
 sys.path.append('./')
 from redditrepostsleuth.core.config import Config
@@ -26,7 +27,15 @@ if __name__ == '__main__':
     response_builder = ResponseBuilder(uowm)
     dup = DuplicateImageService(uowm, event_logger, config=config)
     reddit = RedditManager(get_reddit_instance(config))
-    monitor = SubMonitor(dup, uowm, reddit, response_builder, ResponseHandler(reddit, uowm, event_logger, source='submonitor'), event_logger=event_logger, config=config)
+    monitor = SubMonitor(
+        dup,
+        uowm,
+        reddit,
+        response_builder,
+        ResponseHandler(reddit, uowm, event_logger, source='submonitor', live_response=config.live_responses),
+        event_logger=event_logger,
+        config=config
+    )
     redis_client = redis.Redis(host=config.redis_host, port=config.redis_port, db=0, password=config.redis_password)
     while True:
         with uowm.start() as uow:
@@ -35,18 +44,16 @@ if __name__ == '__main__':
                 if not monitored_sub.active:
                     continue
                 log.info('Checking sub %s', monitored_sub.name)
-                subreddit = reddit.subreddit(monitored_sub.name)
-                if subreddit:
-                    monitored_sub.subscribers = subreddit.subscribers
-                    try:
-                        uow.commit()
-                    except Exception as e:
-                        log.exception('Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
-                if not monitored_sub.active and monitored_sub.check_all_submissions:
+                if not monitored_sub.active:
                     log.debug('Sub %s is disabled', monitored_sub.name)
                     continue
-
-                process_monitored_sub.apply_async((monitored_sub,), queue='submonitor')
+                if not monitored_sub.check_all_submissions:
+                    log.info('Sub %s does not have post checking enabled', monitored_sub.name)
+                    continue
+                try:
+                    process_monitored_sub.apply_async((monitored_sub,), queue='submonitor')
+                except Exception:
+                    log.error('Failed to submit job to Celery')
                 continue
 
             while True:

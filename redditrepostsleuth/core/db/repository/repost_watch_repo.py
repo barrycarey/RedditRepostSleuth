@@ -1,4 +1,4 @@
-from typing import Text
+from typing import Text, Optional, List
 
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import RepostWatch
@@ -11,6 +11,12 @@ class RepostWatchRepo:
     def add(self, item):
         log.debug('Inserting: %s', item)
         self.db_session.add(item)
+
+    def get_all(self, limit: int = None, offset: int = None) -> Optional[List[RepostWatch]]:
+        return self.db_session.query(RepostWatch).limit(limit).offset(offset).all()
+
+    def get_all_by_user(self, user: Text, limit: int = None, offset: int = None) -> Optional[List[RepostWatch]]:
+        return self.db_session.query(RepostWatch).filter(RepostWatch.user == user).limit(limit).offset(offset).all()
 
     def get_by_id(self, id: Text) -> RepostWatch:
         return self.db_session.query(RepostWatch).filter(RepostWatch.id == id).first()

@@ -11,7 +11,7 @@ class ImageRepostRepository:
     def __init__(self, db_session):
         self.db_session = db_session
 
-    def get_all(self, limit: int = None, offset: int = None):
+    def get_all(self, limit: int = None, offset: int = None) -> List[ImageRepost]:
         return self.db_session.query(ImageRepost).order_by(ImageRepost.id.desc()).offset(offset).limit(limit).all()
 
     def get_all_without_author(self, limit: int = None, offset: int = None):
@@ -25,6 +25,9 @@ class ImageRepostRepository:
 
     def get_by_repost_of(self, post_id: Text) -> List[ImageRepost]:
         return self.db_session.query(ImageRepost).filter(ImageRepost.repost_of == post_id).all()
+
+    def get_all_by_subreddit(self, subreddit: Text, source='sub_monitor', limit: int = None, offset: int = None) -> List[ImageRepost]:
+        return self.db_session.query(ImageRepost).filter(ImageRepost.subreddit == subreddit, ImageRepost.source == source).order_by(ImageRepost.id.desc()).limit(limit).offset(offset).all()
 
     def get_count(self):
         r = self.db_session.query(func.count(ImageRepost.id)).first()

@@ -21,6 +21,15 @@ services:
         environment:
             - LOG_LEVEL=INFO
 
+    deleted_post_cleanup:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/adminsvc/Dockerfile
+        entrypoint: python -u /src/redditrepostsleuth/adminsvc/deleted_post_cleanup.py
+        environment:
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.maintenance_tasks
+
     hot_post:
         build:
             context: .
@@ -103,7 +112,7 @@ services:
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
             #- HASH_API=http://157.230.64.152:8000/hash
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 10
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 14
 
     generic_repost_worker:
         build:
@@ -138,8 +147,7 @@ services:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
-            - UTIL_API=http://167.99.22.106:8000
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q delete -c 2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q deleted_post_cleanup -c 5
 
 
     ingest_pushshift_worker:
@@ -151,7 +159,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 4
 
     pushshift_archive_intake_worker:
         build:
@@ -172,6 +180,14 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_ingest -c 1
+
+    site_api:
+        build:
+            context: .
+        environment:
+            - LOG_LEVEL=INFO
+        networks:
+            - sleuthnet
 
 networks:
   sleuthnet:
