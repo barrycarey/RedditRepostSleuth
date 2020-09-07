@@ -8,6 +8,9 @@ class ImageSearchRepo:
     def __init__(self, db_session):
         self.db_session = db_session
 
+    def get_by_id(self, id: int) -> ImageSearch:
+        return self.db_session.query(ImageSearch).filter(ImageSearch.id == id).first()
+
     def get_by_post_id(self, post_id: Text) -> List[ImageSearch]:
         return self.db_session.query(ImageSearch).filter(ImageSearch.post_id == post_id).all()
 

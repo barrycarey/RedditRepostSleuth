@@ -95,8 +95,8 @@ class TopPostMonitor:
         with self.uowm.start() as uow:
             banned = uow.banned_subreddit.get_by_subreddit(subreddit)
             if banned:
-                return False
-            return True
+                return True
+            return False
 
     def check_for_repost(self, post: Post) -> Optional[RepostWrapper]:
         """

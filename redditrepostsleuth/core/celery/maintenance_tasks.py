@@ -1,6 +1,5 @@
 import json
 import os
-import random
 from typing import List, Text, NoReturn
 from urllib.parse import urlparse
 
@@ -9,10 +8,10 @@ from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent, RedditImagePost, Post, ToBeDeleted
+from redditrepostsleuth.core.db.databasemodels import ToBeDeleted
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.util.constants import USER_AGENTS
+
 
 def remove_post(uowm: SqlAlchemyUnitOfWorkManager, post):
     with uowm.start() as uow:
@@ -348,5 +347,4 @@ def cleanup_orphan_image_post(self, image_posts: List[Text]) -> NoReturn:
                 uow.image_post.remove(image_post)
         uow.commit()
         log.info('Finished Orphan Batch')
-
 

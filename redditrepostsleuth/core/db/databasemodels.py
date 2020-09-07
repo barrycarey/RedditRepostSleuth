@@ -355,30 +355,16 @@ class MonitoredSubConfigRevision(Base):
 class MemeTemplate(Base):
     __tablename__ = 'meme_template'
     id = Column(Integer, primary_key=True)
-    name = Column(String(200))
-    dhash_v = Column(String(64))
     dhash_h = Column(String(64))
-    ahash = Column(String(64))
-    target_hamming = Column(Integer)
-    target_annoy = Column(Float)
-    example = Column(String(500))
-    template_detection_hamming = Column(Integer)
-    created_from_submission = Column(String(100))
-    approved = Column(Boolean, default=False)
+    dhash_256 = Column(String(256))
+    post_id = Column(String(100), nullable=False, unique=True)
 
     def to_dict(self):
         return {
             'id': self.id,
-            'name': self.name,
-            'dhash_v': self.dhash_v,
             'dhash_h': self.dhash_h,
-            'ahash': self.ahash,
-            'target_hamming': self.target_hamming,
-            'target_annoy': self.target_annoy,
-            'example': self.example,
-            'template_detection_hamming': self.template_detection_hamming,
-            'created_from_submission': self.created_from_submission,
-            'approved': self.approved
+            'dhash_256': self.dhash_256,
+            'post_id': self.post_id
         }
 
 class InvestigatePost(Base):
