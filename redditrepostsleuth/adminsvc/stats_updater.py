@@ -139,6 +139,7 @@ class StatsUpdater:
         return template
 
     def run_update(self):
+        print('[Scheduled Job] Stats Update Starting')
         self.get_all_stats()
         output = self.build_template()
         wiki = self.reddit.subreddit('RepostSleuthBot').wiki['stats']
@@ -146,6 +147,7 @@ class StatsUpdater:
             wiki.edit(output)
         except BadRequest:
             log.error('Failed to update wiki page')
+        print('[Scheduled Job] Stats Update Ending')
 
 if __name__ == '__main__':
     config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')

@@ -10,17 +10,11 @@ class MemeTemplateRepository:
     def add(self, item):
         self.db_session.add(item)
 
-    def get_all_unapproved(self) -> List[MemeTemplate]:
-        return self.db_session.query(MemeTemplate).filter(MemeTemplate.approved == False).all()
-
     def get_by_id(self, id: int) -> MemeTemplate:
         return self.db_session.query(MemeTemplate).filter(MemeTemplate.id == id).first()
 
     def get_all(self, limit: int = 100, offset: int = 0) -> List[MemeTemplate]:
         return self.db_session.query(MemeTemplate).limit(limit).offset(offset).all()
-
-    def get_by_name(self, name: str) -> MemeTemplate:
-        return self.db_session.query(MemeTemplate).filter(MemeTemplate.name == name).first()
 
     def update(self, item: MemeTemplate):
         self.db_session.merge(item)

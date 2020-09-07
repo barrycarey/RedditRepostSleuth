@@ -60,7 +60,9 @@ class Post(Base):
             'title': self.title,
             'dhash_v': self.dhash_v,
             'dhash_h': self.dhash_h,
-            'created_at': self.created_at.timestamp()
+            'created_at': self.created_at.timestamp(),
+            'author': self.author,
+            'subreddit': self.subreddit
         }
 
 class RedditImagePost(Base):
@@ -111,6 +113,18 @@ class BotComment(Base):
     active = Column(Boolean, default=True)
     needs_review = Column(Boolean, default=False)
 
+class BotPrivateMessage(Base):
+    __tablename__ = 'reddit_bot_private_message'
+
+    id = Column(Integer, primary_key=True)
+    subject = Column(String(200), nullable=False)
+    body = Column(String(1000), nullable=False)
+    in_response_to_comment = Column(String(20))
+    in_response_to_post = Column(String(100))
+    recipient = Column(String(150), nullable=False)
+    triggered_from = Column(String(50), nullable=False)
+    message_sent_at = Column(DateTime, default=func.utc_timestamp())
+
 
 class Comment(Base):
     __tablename__ = 'reddit_comments'
@@ -131,6 +145,19 @@ class RepostWatch(Base):
     same_sub = Column(Boolean, default=False, nullable=False)
     expire_after = Column(Integer)
     enabled = Column(Boolean, default=True)
+    source = Column(String(100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'enabled': self.enabled,
+            'post_id': self.post_id,
+            'user': self.user,
+            'created_at': self.created_at.timestamp(),
+            'last_detection': self.last_detection.timestamp() if self.last_detection else None,
+            'expire_after': self.expire_after,
+            'source': self.source
+        }
 
 class ImageRepost(Base):
 
@@ -138,10 +165,26 @@ class ImageRepost(Base):
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
     annoy_distance = Column(Float)
-    post_id = Column(String(100), nullable=False, unique=True)
+    post_id = Column(String(100), nullable=False)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
-    author = Column(String(100), nullable=False)
+    author = Column(String(100))
+    subreddit = Column(String(100), nullable=False)
+    source = Column(String(100))
+    search_id = Column(Integer)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'hamming_distance': self.hamming_distance,
+            'post_id': self.post_id,
+            'repost_of': self.repost_of,
+            'detected_at': self.detected_at.timestamp() if self.detected_at else None,
+            'author': self.author,
+            'subreddit': self.subreddit,
+            'source': self.source,
+            'search_id': self.search_id
+        }
 
 class LinkRepost(Base):
 
@@ -150,7 +193,20 @@ class LinkRepost(Base):
     post_id = Column(String(100), nullable=False, unique=True)
     repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
-    author = Column(String(100), nullable=False)
+    author = Column(String(100))
+    subreddit = Column(String(100), nullable=False)
+    source = Column(String(100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'repost_of': self.repost_of,
+            'detected_at': self.detected_at.timestamp() if self.detected_at else None,
+            'author': self.author,
+            'subreddit': self.subreddit,
+            'source': self.source,
+        }
 
 class VideoHash(Base):
     __tablename__ = 'reddit_video_hashes'
@@ -194,6 +250,8 @@ class MonitoredSub(Base):
     target_days_old = Column(Integer)
     same_sub_only = Column(Boolean, default=False)
     notes = Column(String(500))
+    filter_crossposts = Column(Boolean, default=True)
+    filter_same_author = Column(Boolean, default=True)
     sticky_comment = Column(Boolean, default=False)
     remove_repost = Column(Boolean, default=False)
     removal_reason = Column(String(200))
@@ -201,7 +259,6 @@ class MonitoredSub(Base):
     mark_as_oc = Column(Boolean, default=False)
     repost_response_template = Column(String(2000))
     oc_response_template = Column(String(2000))
-    search_depth = Column(Integer, default=100)
     meme_filter = Column(Boolean, default=False)
     title_ignore_keywords = Column(String(200))
     disable_summons_after_auto_response = Column(Boolean, default=False)
@@ -215,6 +272,13 @@ class MonitoredSub(Base):
     is_mod = Column(Boolean, default=False)
     post_permission = Column(Boolean, default=False)
     wiki_permission = Column(Boolean, default=False)
+    wiki_managed = Column(Boolean, default=True)
+    check_image_posts = Column(Boolean, default=True)
+    check_link_posts = Column(Boolean, default=False)
+    check_text_posts = Column(Boolean, default=False)
+    check_video_posts = Column(Boolean, default=False)
+    target_image_match = Column(Integer, default=92)
+    target_image_meme_match = Column(Integer, default=97)
 
 
 
@@ -232,12 +296,32 @@ class MonitoredSub(Base):
             'target_annoy': self.target_annoy,
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
+            'filter_crossposts': self.filter_crossposts,
+            'filter_same_author': self.filter_same_author,
+            'remove_repost': self.remove_repost,
+            'removal_reason': self.removal_reason,
+            'lock_post': self.lock_post,
+            'mark_as_oc': self.mark_as_oc,
+            'title_ignore_keywords': self.title_ignore_keywords,
+            'disable_summons_after_auto_response': self.disable_summons_after_auto_response,
+            'disable_bot_summons': self.disable_bot_summons,
+            'only_allow_one_summons': self.only_allow_one_summons,
+            'remove_additional_summons': self.remove_additional_summons,
+            'check_all_submissions': self.check_all_submissions,
+            'check_title_similarity': self.check_title_similarity,
+            'target_title_match': self.target_title_match,
             'notes': self.notes,
             'sticky_comment': self.sticky_comment,
             'repost_response_template': self.repost_response_template,
             'oc_response_template': self.oc_response_template,
-            'search_depth': self.search_depth,
-            'meme_filter': self.meme_filter
+            'meme_filter': self.meme_filter,
+            'wiki_managed': self.wiki_managed,
+            'check_image_posts': self.check_image_posts,
+            'check_link_posts': self.check_link_posts,
+            'check_video_posts': self.check_video_posts,
+            'check_text_posts': self.check_text_posts,
+            'target_image_match': self.target_image_match,
+            'target_image_meme_match': self.target_image_meme_match
         }
 
 class MonitoredSubChecks(Base):
@@ -247,6 +331,14 @@ class MonitoredSubChecks(Base):
     post_id = Column(String(100), nullable=False)
     checked_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'checked_at': self.checked_at.timestamp(),
+            'subreddit': self.subreddit
+        }
 
 class MonitoredSubConfigRevision(Base):
     __tablename__ = 'reddit_monitored_sub_config_revision'
@@ -263,30 +355,16 @@ class MonitoredSubConfigRevision(Base):
 class MemeTemplate(Base):
     __tablename__ = 'meme_template'
     id = Column(Integer, primary_key=True)
-    name = Column(String(200))
-    dhash_v = Column(String(64))
     dhash_h = Column(String(64))
-    ahash = Column(String(64))
-    target_hamming = Column(Integer)
-    target_annoy = Column(Float)
-    example = Column(String(500))
-    template_detection_hamming = Column(Integer)
-    created_from_submission = Column(String(100))
-    approved = Column(Boolean, default=False)
+    dhash_256 = Column(String(256))
+    post_id = Column(String(100), nullable=False, unique=True)
 
     def to_dict(self):
         return {
             'id': self.id,
-            'name': self.name,
-            'dhash_v': self.dhash_v,
             'dhash_h': self.dhash_h,
-            'ahash': self.ahash,
-            'target_hamming': self.target_hamming,
-            'target_annoy': self.target_annoy,
-            'example': self.example,
-            'template_detection_hamming': self.template_detection_hamming,
-            'created_from_submission': self.created_from_submission,
-            'approved': self.approved
+            'dhash_256': self.dhash_256,
+            'post_id': self.post_id
         }
 
 class InvestigatePost(Base):
@@ -332,6 +410,34 @@ class ImageSearch(Base):
     matches_found = Column(Integer, nullable=False)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
     search_results = Column(Text(75000, collation='utf8mb4_general_ci'))
+    subreddit = Column(String(100), nullable=False)
+    target_image_match = Column(Integer, default=92)
+    target_image_meme_match = Column(Integer, default=97)
+
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'source': self.source,
+            'target_hamming_distance': self.target_hamming_distance,
+            'used_historical_index': self.used_historical_index,
+            'used_current_index': self.used_current_index,
+            'same_sub': self.same_sub,
+            'max_days_old': self.max_days_old,
+            'filter_dead_matches': self.filter_dead_matches,
+            'only_older_matches': self.only_older_matches,
+            'meme_filter': self.meme_filter,
+            'meme_template_used': self.meme_template_used,
+            'search_time': self.search_time,
+            'index_search_time': self.index_search_time,
+            'total_filter_time': self.total_filter_time,
+            'searched_at': self.searched_at.timestamp(),
+            'matches_found': self.matches_found,
+            'subreddit': self.subreddit,
+            'target_image_match': self.target_image_match,
+            'target_image_meme_match': self.target_image_meme_match
+        }
 
 class UserReport(Base):
     __tablename__ = 'reddit_user_report'
@@ -350,3 +456,29 @@ class ToBeDeleted(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     post_type = Column(String(20))
+
+class BannedSubreddit(Base):
+    __tablename__ = 'banned_subreddit'
+    id = Column(Integer, primary_key=True)
+    subreddit = Column(String(100), nullable=False, unique=True)
+    detected_at = Column(DateTime, default=func.utc_timestamp())
+    last_checked = Column(DateTime, default=func.utc_timestamp())
+
+class BannedUser(Base):
+    __tablename__ = 'banned_users'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True)
+    reason = Column(String(150), nullable=False)
+    banned_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    expires_at = Column(DateTime)
+    notes = Column(String(500))
+
+class BotStat(Base):
+    __tablename__ = 'bot_stat'
+    id = Column(Integer, primary_key=True)
+    image_reposts_detected = Column(Integer)
+    link_reposts_detected = Column(Integer)
+    private_messages_sent = Column(Integer)
+    comments = Column(Integer)
+    summons_received = Column(Integer)
+    karma_gained = Column(Integer)

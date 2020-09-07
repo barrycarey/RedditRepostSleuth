@@ -2,6 +2,9 @@ from sqlalchemy.orm import scoped_session
 
 from redditrepostsleuth.core.db.databasemodels import InvestigatePost
 from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
+from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSubredditRepo
+from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
+from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
@@ -42,7 +45,6 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
 
     def rollback(self):
         self.session.rollback()
-
 
     @property
     def posts(self) -> PostRepository:
@@ -105,6 +107,10 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         return BotCommentRepo(self.session)
 
     @property
+    def bot_private_message(self) -> BotPrivateMessageRepo:
+        return BotPrivateMessageRepo(self.session)
+
+    @property
     def investigate_post(self) -> InvestigatePostRepo:
         return InvestigatePostRepo(self.session)
 
@@ -124,3 +130,10 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     def to_be_deleted(self) -> ToBeDeletedRepo:
         return ToBeDeletedRepo(self.session)
 
+    @property
+    def banned_subreddit(self) -> BannedSubredditRepo:
+        return BannedSubredditRepo(self.session)
+
+    @property
+    def banned_user(self) -> BannedUserRepo:
+        return BannedUserRepo(self.session)

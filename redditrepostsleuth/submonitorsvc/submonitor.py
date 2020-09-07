@@ -1,5 +1,5 @@
 import time
-from typing import List, Text, NoReturn
+from typing import List, Text, NoReturn, Optional
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
@@ -8,6 +8,7 @@ from redlock import RedLockError
 from time import perf_counter
 from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -20,7 +21,8 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
+    save_link_repost
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.reposthelpers import check_link_repost
@@ -76,7 +78,7 @@ class SubMonitor:
                 return True
         return False
 
-    def should_check_post(self, post: Post, title_keyword_filter: List[Text] = None) -> bool:
+    def should_check_post(self, post: Post, check_image: bool, check_link: bool, title_keyword_filter: List[Text] = None) -> bool:
         """
         Check if a given post should be checked
         :rtype: bool
@@ -88,6 +90,13 @@ class SubMonitor:
             return False
 
         if post.post_type not in self.config.supported_post_types:
+            return False
+
+        if post.post_type == 'image' and not check_image:
+            return False
+
+        if post.post_type == 'link' and not check_link:
+            log.info('Skipping link post')
             return False
 
         if post.crosspost_parent:
@@ -102,8 +111,8 @@ class SubMonitor:
 
         return True
 
-    def check_submission(self, submission: Submission, monitored_sub: MonitoredSub, post: Post):
-
+    def check_submission(self, monitored_sub: MonitoredSub, post: Post):
+        log.info('Checking %s', post.post_id)
         if post.post_type == 'image' and post.dhash_h is None:
             log.error('Post %s has no dhash', post.post_id)
             return
@@ -113,11 +122,13 @@ class SubMonitor:
                 search_results = self._check_for_repost(post, monitored_sub)
             elif post.post_type == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
+                if search_results.matches:
+                    save_link_repost(post, search_results.matches[0].post, self.uowm, 'sub_monitor')
         except NoIndexException:
-            log.error('No search index available.  Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
+            log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)
             return
         except RedLockError:
-            log.error('New search index is being loaded. Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
+            log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
         if not search_results.matches and monitored_sub.repost_only:
@@ -127,7 +138,7 @@ class SubMonitor:
             return
 
         try:
-            comment = self._leave_comment(search_results, submission, monitored_sub)
+            comment = self._leave_comment(search_results, monitored_sub)
         except APIException as e:
             error_type = None
             if hasattr(e, 'error_type'):
@@ -138,25 +149,32 @@ class SubMonitor:
             time.sleep(10)
             return
         except Exception as e:
-            log.exception('Failed to leave comment on %s in %s', submission.id, submission.subreddit.display_name)
+            log.exception('Failed to leave comment on %s in %s', post.post_id, post.subreddit)
             return
 
-        msg_values = build_msg_values_from_search(search_results, self.uowm,
-                                                  target_days_old=monitored_sub.target_days_old)
-        if search_results.checked_post.post_type == 'image':
-            msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
+        submission = self.reddit.submission(post.post_id)
+        if not submission:
+            log.error('Failed to get submission %s for sub %s.  Cannot perform admin functions', post.post_id, post.subreddit)
+            return
 
-        report_msg = self.response_builder.build_report_msg(monitored_sub.name, msg_values)
+        if search_results.matches:
+            msg_values = build_msg_values_from_search(search_results, self.uowm,
+                                                      target_days_old=monitored_sub.target_days_old)
+            if search_results.checked_post.post_type == 'image':
+                msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
+
+            report_msg = self.response_builder.build_report_msg(monitored_sub.name, msg_values)
+            self._report_submission(monitored_sub, submission, report_msg)
+            self._lock_post(monitored_sub, submission)
+            self._remove_post(monitored_sub, submission)
+        else:
+            self._mark_post_as_oc(monitored_sub, submission)
 
         self._sticky_reply(monitored_sub, comment)
-        self._lock_post(monitored_sub, submission)
-        self._remove_post(monitored_sub, submission)
-        self._mark_post_as_oc(monitored_sub, submission)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
 
-        if search_results.matches:
-            self._report_submission(monitored_sub, submission, report_msg)
+
 
 
     def _check_sub(self, monitored_sub: MonitoredSub):
@@ -271,12 +289,17 @@ class SubMonitor:
         search_results = self.image_service.check_duplicates_wrapped(
             post,
             target_annoy_distance=monitored_sub.target_annoy,
-            target_hamming_distance=monitored_sub.target_hamming,
+            target_match_percent=monitored_sub.target_image_match,
+            target_meme_match_percent=monitored_sub.target_image_meme_match,
             date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter,
+            max_depth=-1,
+            max_matches=100,
             source='sub_monitor'
         )
+        if search_results.matches:
+            save_image_repost_general(search_results ,self.uowm, 'sub_monitor')
 
         log.debug(search_results)
         return search_results
@@ -307,7 +330,9 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
-    def _get_removal_reason_id(self, removal_reason: Text, subreddit: Subreddit) -> Text:
+    def _get_removal_reason_id(self, removal_reason: Text, subreddit: Subreddit) -> Optional[Text]:
+        if not removal_reason:
+            return None
         for r in subreddit.mod.removal_reasons:
             if r.title.lower() == removal_reason.lower():
                 return r.id
@@ -341,7 +366,7 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to report submission', exc_info=True)
 
-    def _leave_comment(self, search_results: ImageRepostWrapper, submission: Submission, monitored_sub: MonitoredSub) -> Comment:
+    def _leave_comment(self, search_results: ImageRepostWrapper, monitored_sub: MonitoredSub) -> Comment:
 
         msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
         if search_results.checked_post.post_type == 'image':
@@ -360,7 +385,7 @@ class SubMonitor:
                 msg_values, search_results.checked_post.post_type
             )
 
-        return self.resposne_handler.reply_to_submission(submission.id, msg)
+        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, msg)
 
     def save_unknown_post(self, post_id: str) -> Post:
         """

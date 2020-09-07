@@ -2,7 +2,9 @@ import json
 import time
 from datetime import datetime
 from json import JSONDecodeError
+from typing import Dict
 
+import requests
 from celery import Task
 from praw.exceptions import APIException
 from prawcore import ResponseException
@@ -10,16 +12,20 @@ from redlock import RedLockError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
-from redditrepostsleuth.core.model.repostresponse import RepostResponseBase
+from redditrepostsleuth.core.model.repostresponse import SummonsResponse
+
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.util.objectmapping import submission_to_post, pushshift_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
@@ -32,7 +38,7 @@ class SummonsHandlerTask(Task):
         self.reddit = RedditManager(get_reddit_instance(self.config))
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
-        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, source='summons')
+        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, source='summons', live_response=self.config.live_responses)
         dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit, response_builder,
@@ -44,34 +50,44 @@ class SubMonitorTask(Task):
         self.reddit = RedditManager(get_reddit_instance(self.config))
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         event_logger = EventLogging(config=self.config)
-        response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor')
+        response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor', live_response=self.config.live_responses)
         dup_image_svc = DuplicateImageService(self.uowm, event_logger, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
 
-@celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle')
-def handle_summons2(self, summons):
-    with self.uowm.start() as uow:
-        post = uow.posts.get_by_post_id(summons.post_id)
-        if not post:
-            post = self.summons_handler.save_unknown_post(summons.post_id)
-
-        if not post:
-            response = RepostResponseBase(summons_id=summons.id)
-            response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
-            log.info('Failed to ingest post %s.  Sending error response', summons.post_id)
-            self.summons_handler._send_response(summons.comment_id, response)
-            return
-
-        self.summons_handler.process_summons(summons, post)
-        # TODO - This sends completed summons events to influx even if they fail
-        summons_event = SummonsEvent((datetime.utcnow() - summons.summons_received_at).seconds,
-                                     summons.summons_received_at, summons.requestor, event_type='summons')
-        self.summons_handler._send_event(summons_event)
-        log.info('Finished summons %s', summons.id)
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
-def sub_monitor_check_post(self, submission, monitored_sub):
+def sub_monitor_check_post(self, submission: Dict, monitored_sub: MonitoredSub):
+    if self.sub_monitor.has_post_been_checked(submission['id']):
+        log.debug('Post %s has already been checked', submission['id'])
+        return
+    start = time.perf_counter()
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_post_id(submission['id'])
+        if not post:
+            log.info('Post %s does exist, sending to ingest queue', submission['id'])
+            post = pushshift_to_post(submission, source='reddit_json')
+            celery.send_task('redditrepostsleuth.core.celery.ingesttasks.save_new_post', args=[post],
+                             queue='postingest')
+            return
+
+    title_keywords = []
+    if monitored_sub.title_ignore_keywords:
+        title_keywords = monitored_sub.title_ignore_keywords.split(',')
+
+    if not self.sub_monitor.should_check_post(
+            post,
+            monitored_sub.check_image_posts,
+            monitored_sub.check_link_posts,
+            title_keyword_filter=title_keywords
+    ):
+        return
+
+    self.sub_monitor.check_submission(monitored_sub, post)
+    print(f'Total time: {round(time.perf_counter() - start, 5)}')
+
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
+def sub_monitor_check_post_old(self, submission, monitored_sub):
     if self.sub_monitor.has_post_been_checked(submission.id):
         log.debug('Post %s has already been checked', submission.id)
         return
@@ -79,10 +95,11 @@ def sub_monitor_check_post(self, submission, monitored_sub):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(submission.id)
         if not post:
-            post = self.sub_monitor.save_unknown_post(submission.id)
-            if not post:
-                log.info('Post %s has not been ingested yet.  Skipping')
-                return
+            log.info('Post %s does exist, sending to ingest queue', submission.id)
+            post = submission_to_post(submission)
+            celery.send_task('redditrepostsleuth.core.celery.ingesttasks.save_new_post', args=[post],
+                             queue='postingest')
+            return
 
     title_keywords = []
     if monitored_sub.title_ignore_keywords:
@@ -92,8 +109,33 @@ def sub_monitor_check_post(self, submission, monitored_sub):
         return
     self.sub_monitor.check_submission(submission, monitored_sub, post)
 
-@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True, autoretry_for=(LoadSubredditException,), retry_kwards={'max_retries': 3})
 def process_monitored_sub(self, monitored_sub):
+    try:
+        log.info('Loading all submissions from %s', monitored_sub.name)
+        r = requests.get(f'{self.config.util_api}/reddit/subreddit', params={'subreddit': monitored_sub.name, 'limit': 500})
+    except Exception as e:
+        log.error('Error getting new posts from util api', exc_info=True)
+        return
+
+    if r.status_code == 403:
+        log.error('Got forbidden for sub %s', monitored_sub.name)
+        raise LoadSubredditException('Failed to load subreddit')
+
+    if r.status_code != 200:
+        log.error('Bad status code from Util API %s for %s', r.status_code, monitored_sub.name)
+        return
+
+    response_data = json.loads(r.text)
+
+    for submission in response_data:
+        sub_monitor_check_post.apply_async((submission, monitored_sub), queue='submonitor')
+
+    log.info('All submissions from %s sent to queue', monitored_sub.name)
+
+# TODO - Remove this when we're done
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
+def process_monitored_sub_old(self, monitored_sub):
     try:
         subreddit = self.reddit.subreddit(monitored_sub.name)
         if not subreddit:
@@ -126,10 +168,10 @@ def process_summons(self, s):
                     post = self.summons_handler.save_unknown_post(s.post_id)
 
                 if not post:
-                    response = RepostResponseBase(summons_id=s.id)
+                    response = SummonsResponse(summons=s)
                     response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
                     log.info('Failed to ingest post %s.  Sending error response', s.post_id)
-                    self.summons_handler._send_response(s.comment_id, response)
+                    self.summons_handler._send_response(response)
                     return
 
                 try:

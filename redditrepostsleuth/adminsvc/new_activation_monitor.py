@@ -23,9 +23,10 @@ class NewActivationMonitor:
         self.reddit = reddit
 
     def check_for_new_invites(self):
+        print('[Scheduled Job] Check For Mod Invites Starting')
         try:
             log.info('Checking for new mod invites')
-            for msg in self.reddit.inbox.messages(limit=300):
+            for msg in self.reddit.inbox.messages(limit=750):
                 if 'invitation to moderate' in msg.subject:
                     if self.is_already_active(msg.subreddit.display_name):
                         log.info('%s is already a monitored sub', msg.subreddit.display_name)
@@ -33,6 +34,7 @@ class NewActivationMonitor:
                     self.activate_sub(msg)
         except Exception as e:
             log.exception('Activation thread died', exc_info=True)
+
 
     def accept_invite(self, msg):
         pass
@@ -88,7 +90,7 @@ class NewActivationMonitor:
                 target_hamming=5,
                 same_sub_only=True,
                 sticky_comment=True,
-                search_depth=100,
+                target_image_match=92,
                 meme_filter=False
             )
             uow.monitored_sub.add(monitored_sub)
@@ -100,6 +102,7 @@ class NewActivationMonitor:
             except Exception as e:
                 log.exception('Unknown exception saving monitored sub', exc_info=True)
                 raise
+
 
     def is_already_active(self, subreddit: Text) -> bool:
         with self.uowm.start() as uow:

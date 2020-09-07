@@ -4,19 +4,22 @@ import requests
 from typing import Dict, List, Text
 
 import imagehash
+from praw.exceptions import APIException
 from praw.models import Subreddit
+from prawcore import Forbidden
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, LinkRepost
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.replytemplates import CLOSEST_MATCH
+
 
 
 def post_type_from_url(url: str) -> str:
@@ -92,34 +95,6 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def create_meme_template(url: str, name: str = None, target_hamming=9, target_annoy=0) -> MemeTemplate:
-    """
-    Take a given URL and create a meme template from it
-    :param url: URL to create template from
-    :param name: Name of template
-    :return: MemeTemplate
-    """
-    try:
-        img = generate_img_by_url(url)
-    except ImageConversioinException as e:
-        raise
-
-    dhash_h = imagehash.dhash(img, hash_size=16)
-    dhash_v = imagehash.dhash_vertical(img, hash_size=16)
-    ahash = imagehash.average_hash(img, hash_size=16)
-
-    return MemeTemplate(
-        dhash_h=str(dhash_h),
-        dhash_v=str(dhash_v),
-        ahash=str(ahash),
-        name=name,
-        example=url,
-        template_detection_hamming=10,
-        target_annoy=target_annoy,
-        target_hamming=target_hamming
-    )
-
-
 def build_markdown_list(matches: List[ImageMatch]) -> str:
     result = ''
     for match in matches:
@@ -163,7 +138,7 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
     return {**results_values, **base_values, **kwargs}
 
 
-def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -179,6 +154,7 @@ def build_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitO
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}',
+        'post_author': search_results.checked_post.author
 
     }
 
@@ -225,24 +201,91 @@ def is_moderator(subreddit: Subreddit, user: Text) -> bool:
     :param user: username
     :return: bool
     """
-    for mod in subreddit.moderator():
-        if mod.name.lower() == user.lower():
-            return True
-    return False
+    try:
+        for mod in subreddit.moderator():
+            if mod.name.lower() == user.lower():
+                return True
+        return False
+    except Forbidden:
+        log.error('[Mod Check] Forbidden On Sub %s', subreddit.display_name)
+        return False
 
 def bot_has_permission(subreddit: Subreddit, permission_name: Text) -> bool:
     log.debug('Checking if bot has %s permission in %s', permission_name, subreddit.display_name)
-    for mod in subreddit.moderator():
-        if mod.name == 'RepostSleuthBot':
-            if 'all' in mod.mod_permissions:
-                log.debug('Bot has All permissions in %s', subreddit.display_name)
-                return True
-            elif permission_name.lower() in mod.mod_permissions:
-                log.debug('Bot has %s permission in %s', permission_name, subreddit.display_name)
-                return True
-            else:
-                log.debug('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
-                return False
-    log.error('Bot is not mod on %s', subreddit.display_name)
-    return False
+    try:
+        for mod in subreddit.moderator():
+            if mod.name == 'RepostSleuthBot':
+                if 'all' in mod.mod_permissions:
+                    log.debug('Bot has All permissions in %s', subreddit.display_name)
+                    return True
+                elif permission_name.lower() in mod.mod_permissions:
+                    log.debug('Bot has %s permission in %s', permission_name, subreddit.display_name)
+                    return True
+                else:
+                    log.debug('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
+                    return False
+        log.error('Bot is not mod on %s', subreddit.display_name)
+        return False
+    except Forbidden:
+        return False
 
+def is_bot_banned(subreddit: Subreddit) -> bool:
+    """
+    Check if bot is banned on a given sub
+    :rtype: bool
+    :param subreddit: Sub to check
+    :return: bool
+    """
+    banned = False
+    try:
+        sub = subreddit.submit('ban test', selftext='ban test')
+        sub.delete()
+    except Forbidden:
+        banned = True
+    except APIException as e:
+        if e.error_type == 'SUBREDDIT_NOTALLOWED':
+            banned = True
+    if banned:
+        log.info('Bot is banned from %s', subreddit.display_name)
+    else:
+        log.info('Bot is allowed on %s', subreddit.display_name)
+    return banned
+
+def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
+    if len(rows[0]) != len(headers):
+        raise ValueError('Header count mismatch')
+
+    table = '|'
+    sep = '|'
+    row_template = '|'
+    for header in headers:
+        table += f' {header} |'
+        sep += ' ----- |'
+        row_template += ' {} |'
+    table += '\n'
+    table += sep + '\n'
+    for row in rows:
+        table += row_template.format(*row) + '\n'
+
+    return table
+
+def get_hamming_from_percent(match_percent: int, hash_length: int) -> float:
+    return hash_length - (match_percent / 100) * hash_length
+
+def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
+    with uowm.start() as uow:
+        new_repost = LinkRepost(
+            post_id=post.post_id,
+            repost_of=repost_of.post_id,
+            author=post.author,
+            subreddit=post.subreddit, source
+            =source
+        )
+
+        post.checked_repost = True
+        uow.posts.update(post)
+        uow.link_repost.add(new_repost)
+        try:
+            uow.commit()
+        except Exception as e:
+            log.exception('Failed to save link repost', exc_info=True)

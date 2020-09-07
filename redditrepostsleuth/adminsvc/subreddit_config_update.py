@@ -37,10 +37,13 @@ class SubredditConfigUpdater:
         self.config = config
 
     def update_configs(self):
+        print('[Scheduled Job] Config Updates Start')
         try:
             with self.uowm.start() as uow:
                 monitored_subs = uow.monitored_sub.get_all()
                 for sub in monitored_subs:
+                    if not sub.active:
+                        continue
                     try:
                         self.check_for_config_update(sub)
                     except Exception as e:
@@ -48,6 +51,8 @@ class SubredditConfigUpdater:
                 time.sleep(180)
         except Exception as e:
             log.exception('Config update thread crashed', exc_info=True)
+
+        print('[Scheduled Job] Config Updates End')
 
     def check_for_config_update(self, monitored_sub: MonitoredSub):
         # TODO - Possibly pass the subreddit to get_wiki_config
@@ -66,8 +71,10 @@ class SubredditConfigUpdater:
 
         try:
             if not self._is_config_updated(wiki_page.revision_id):
+                log.info('Newer config found for %s', monitored_sub.name)
                 wiki_config = self._load_new_config(wiki_page, monitored_sub, subreddit)
             else:
+                log.info('Already have the newest config for %s', monitored_sub.name)
                 wiki_config = self.get_wiki_config(wiki_page)
         except JSONDecodeError:
             return
@@ -292,9 +299,9 @@ class SubredditConfigUpdater:
         self._create_revision(wiki_page)
         try:
             wiki_config = self.get_wiki_config(wiki_page)
-        except JSONDecodeError:
+        except JSONDecodeError as e:
             self._set_config_validity(wiki_page.revision_id, valid=False)
-            if self._notify_failed_load(subreddit):
+            if self._notify_failed_load(subreddit, str(e), wiki_page.revision_id):
                 self._set_config_notified(wiki_page.revision_id)
             return {}
 
@@ -401,6 +408,7 @@ if __name__ == '__main__':
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     reddit_manager = RedditManager(reddit)
     event_logger = EventLogging(config=config)
-    response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
+    response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config)
+
     updater.update_configs()
