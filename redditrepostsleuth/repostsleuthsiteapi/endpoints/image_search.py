@@ -56,3 +56,8 @@ class ImageSearch:
 
         print(search_results.search_times.to_dict())
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
+
+    def on_get_compare(self, req: Request, resp: Response):
+        with self.uowm.start() as uow:
+            post_one = uow.posts.get_by_post_id(req.get_param('post_one', required=True))
+            post_two = uow.posts.get_by_post_id(req.get_param('post_two', required=True))

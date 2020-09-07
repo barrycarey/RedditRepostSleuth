@@ -1,7 +1,6 @@
 import json
-import webbrowser
 from time import perf_counter
-from typing import List, Tuple, Text, Optional
+from typing import List, Text, Optional
 
 import requests
 from requests.exceptions import ConnectionError
@@ -14,7 +13,6 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
-from redditrepostsleuth.core.model.image_index import ImageIndex
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
@@ -206,7 +204,7 @@ class DuplicateImageService:
                 search_results.meme_template = self._get_meme_template(post.dhash_h)
                 search_times.stop_timer('meme_detection_time')
                 if search_results.meme_template:
-                    log.info('Using meme filter %s', search_results.meme_template.name)
+                    log.info('Using meme filter %s', search_results.meme_template.id)
 
             search_times.start_timer('total_filter_time')
             search_results = self._filter_results_for_reposts(search_results,
@@ -368,7 +366,7 @@ class DuplicateImageService:
                 results.append(match)
         return results
 
-    def _get_meme_template(self, image_hash: Text) -> MemeTemplate:
+    def _get_meme_template(self, image_hash: Text) -> Optional[MemeTemplate]:
         try:
             r = requests.get(f'{self.config.index_api}/meme', params={'hash': image_hash})
         except Exception as e:
@@ -380,6 +378,9 @@ class DuplicateImageService:
             return
 
         results = json.loads(r.text)
+
+        if not results['meme_template_id']:
+            return
 
         with self.uowm.start() as uow:
             return uow.meme_template.get_by_id(results['meme_template_id'])

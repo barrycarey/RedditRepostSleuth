@@ -24,7 +24,7 @@ reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
 dup = DuplicateImageService(uowm, event_logger, config=config)
 
-cors = CORS(allow_origins_list=['http://localhost:8080'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
+cors = CORS(allow_origins_list=['http://localhost:8080'], allow_all_methods=True, allow_all_headers=True, log_level='INFO')
 
 api = application = falcon.API(middleware=[cors.middleware])
 api.req_options.auto_parse_form_urlencoded = True
@@ -33,9 +33,11 @@ api.add_route('/image', ImageSearch(dup, uowm))
 api.add_route('/watch', PostWatch(uowm))
 api.add_route('/post', PostsEndpoint(uowm, reddit_manager))
 api.add_route('/post/reddit', PostsEndpoint(uowm, reddit_manager), suffix='reddit')
+api.add_route('/post/all', PostsEndpoint(uowm, reddit_manager), suffix='all')
 api.add_route('/history/search', ImageSearchHistory(uowm), suffix='search_history', )
 api.add_route('/history/monitored', ImageSearchHistory(uowm), suffix='monitored_sub_with_history', )
 api.add_route('/history/reposts', RepostHistoryEndpoint(uowm), suffix='image_with_search')
+api.add_route('/history/reposts/all', RepostHistoryEndpoint(uowm), suffix='repost_image_feed')
 api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit))
 api.add_route('/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
 

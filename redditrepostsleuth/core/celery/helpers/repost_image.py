@@ -1,17 +1,15 @@
 from typing import List, NoReturn, Dict, Text
 
+from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, RepostWatch, MemeTemplate
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, InvestigatePost, RepostWatch
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
-
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
-from redditrepostsleuth.core.util.helpers import create_meme_template
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
 from redditrepostsleuth.core.util.repost_filters import filter_dead_urls
 
@@ -22,26 +20,27 @@ def check_for_high_match_meme(search_results: ImageRepostWrapper, uowm: UnitOfWo
 
     with uowm.start() as uow:
         meme_template = None
-        if len(search_results.matches) > 5 and search_results.checked_post.subreddit.lower() == 'memes':
+        if len(search_results.matches) > 5 and 'meme' in search_results.checked_post.subreddit.lower():
             try:
-                meme_template = create_meme_template(search_results.checked_post.url, search_results.checked_post.title)
-                meme_template.approved = False
-                meme_template.created_from_submission = f'https://redd.it/{search_results.checked_post.post_id}'
-                uow.meme_template.add(meme_template)
+                meme_hashes = get_image_hashes(search_results.checked_post, hash_size=32)
             except Exception as e:
-                log.exception('Failed to create meme templaet', exc_info=True)
+                log.error('Failed to get meme hash for %s', search_results.checked_post.post_id)
+                return
 
-        elif len(search_results.matches) > 5 and 'meme' in search_results.checked_post.subreddit.lower():
             try:
-                meme_template = create_meme_template(search_results.checked_post.url, search_results.checked_post.title)
-                meme_template.approved = False
-                meme_template.created_from_submission = f'https://redd.it/{search_results.checked_post.post_id}'
+                meme_template = MemeTemplate(
+                    dhash_h=search_results.checked_post.dhash_h,
+                    dhash_256=meme_hashes['dhash_h'],
+                    post_id=search_results.checked_post.post_id
+                )
+
                 uow.meme_template.add(meme_template)
+                uow.commit()
             except Exception as e:
                 log.exception('Failed to create meme template', exc_info=True)
+                meme_template = None
 
         if meme_template:
-            uow.commit()
             log.info('Saved new meme template for post %s in %s', search_results.checked_post.post_id, search_results.checked_post.subreddit)
             # Raise exception so celery will retry the task and use the new meme template
             raise IngestHighMatchMeme('Created meme template.  Post needs to be rechecked')

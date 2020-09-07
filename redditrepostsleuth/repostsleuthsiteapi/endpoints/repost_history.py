@@ -42,3 +42,22 @@ class RepostHistoryEndpoint:
                 results.append({'checked_post': post.to_dict(), 'search': search.to_dict()})
 
         resp.body = json.dumps(results)
+
+    def on_get_repost_image_feed(self, res: Request, resp: Response):
+        results = []
+        limit = res.get_param_as_int('limit', required=False, default=20)
+        offset = res.get_param_as_int('offset', required=False)
+        with self.uowm.start() as uow:
+            reposts = uow.image_repost.get_all(limit=limit, offset=offset)
+            for rp in reposts:
+                post = uow.posts.get_by_post_id(rp.post_id)
+                repost_of = uow.posts.get_by_post_id(rp.repost_of)
+                search_data = uow.image_search.get_by_id(rp.search_id)
+                if not post or not repost_of:
+                    continue
+                results.append({
+                    'repost_data': rp.to_dict(),
+                    'post': post.to_dict(),
+                    'repost_of': repost_of.to_dict(),
+                    'search_data': search_data.to_dict()})
+        resp.body = json.dumps(results)

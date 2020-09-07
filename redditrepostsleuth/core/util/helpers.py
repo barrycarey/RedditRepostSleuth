@@ -95,34 +95,6 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def create_meme_template(url: str, name: str = None, target_hamming=9, target_annoy=0) -> MemeTemplate:
-    """
-    Take a given URL and create a meme template from it
-    :param url: URL to create template from
-    :param name: Name of template
-    :return: MemeTemplate
-    """
-    try:
-        img = generate_img_by_url(url)
-    except ImageConversioinException as e:
-        raise
-
-    dhash_h = imagehash.dhash(img, hash_size=16)
-    dhash_v = imagehash.dhash_vertical(img, hash_size=16)
-    ahash = imagehash.average_hash(img, hash_size=16)
-
-    return MemeTemplate(
-        dhash_h=str(dhash_h),
-        dhash_v=str(dhash_v),
-        ahash=str(ahash),
-        name=name,
-        example=url,
-        template_detection_hamming=10,
-        target_annoy=target_annoy,
-        target_hamming=target_hamming
-    )
-
-
 def build_markdown_list(matches: List[ImageMatch]) -> str:
     result = ''
     for match in matches:
