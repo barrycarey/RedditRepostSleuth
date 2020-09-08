@@ -10,7 +10,6 @@ dataclasses
 flower
 eventlet
 ImageHash
-annoy
 RedLock
 influxdb
 gensim
@@ -27,3 +26,4 @@ python-Levenshtein
 apscheduler
 gunicorn
 cryptography
+google-cloud-vision

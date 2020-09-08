@@ -30,6 +30,7 @@ api = application = falcon.API(middleware=[cors.middleware])
 api.req_options.auto_parse_form_urlencoded = True
 
 api.add_route('/image', ImageSearch(dup, uowm))
+api.add_route('/image/ocr', ImageSearch(dup, uowm), suffix='compare_image_text')
 api.add_route('/watch', PostWatch(uowm))
 api.add_route('/post', PostsEndpoint(uowm, reddit_manager))
 api.add_route('/post/reddit', PostsEndpoint(uowm, reddit_manager), suffix='reddit')
