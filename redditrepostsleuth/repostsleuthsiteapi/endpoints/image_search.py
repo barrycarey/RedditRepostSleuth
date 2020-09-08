@@ -7,6 +7,8 @@ from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.ocr import get_image_text, get_image_text_tesseract
+from redditrepostsleuth.core.util.reposthelpers import get_title_similarity
 
 
 class ImageSearch:
@@ -61,3 +63,19 @@ class ImageSearch:
         with self.uowm.start() as uow:
             post_one = uow.posts.get_by_post_id(req.get_param('post_one', required=True))
             post_two = uow.posts.get_by_post_id(req.get_param('post_two', required=True))
+
+    def on_get_compare_image_text(self, req: Request, resp: Response):
+        result = {
+            'google': {
+                'image_one_text': get_image_text(req.get_param('image_one', required=True)),
+                'image_two_text': get_image_text(req.get_param('image_two', required=True))
+            },
+            'tesseract': {
+                'image_one_text': get_image_text_tesseract(req.get_param('image_one', required=True)),
+                'image_two_text': get_image_text_tesseract(req.get_param('image_two', required=True))
+            }
+        }
+        result['google']['similarity'] = get_title_similarity(result['google']['image_one_text'], result['google']['image_two_text'])
+        result['tesseract']['similarity'] = get_title_similarity(result['tesseract']['image_one_text'],
+                                                              result['tesseract']['image_two_text'])
+        resp.body = json.dumps(result)

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -23,6 +23,12 @@ class Post(Base):
     # TODO - Move to_dict methods into JSON encoders
 
     __tablename__ = 'reddit_post'
+    __table_args__ = (
+        Index('ingest_source', 'created_at', 'ingested_from'),
+        Index('ingest_graph', 'ingested_at', 'post_type', unique=False),
+        Index('image_repost_check', 'post_type', 'checked_repost', 'crosspost_parent', 'dhash_h', unique=False),
+        Index('image_hash', 'post_type', 'dhash_h', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
@@ -67,6 +73,9 @@ class Post(Base):
 
 class RedditImagePost(Base):
     __tablename__ = 'reddit_image_post'
+    __table_args__ = (
+        Index('create_at_index', 'created_at', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime)
@@ -86,6 +95,9 @@ class RedditImagePostCurrent(Base):
 
 class Summons(Base):
     __tablename__ = 'reddit_bot_summons'
+    __table_args__ = (
+        Index('user_summons_check', 'requestor', 'summons_received_at', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
@@ -162,6 +174,9 @@ class RepostWatch(Base):
 class ImageRepost(Base):
 
     __tablename__ = 'image_reposts'
+    __table_args__ = (
+        Index('Index 3', 'repost_of', unique=False),
+    )
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
     annoy_distance = Column(Float)
@@ -189,6 +204,10 @@ class ImageRepost(Base):
 class LinkRepost(Base):
 
     __tablename__ = 'link_reposts'
+    __table_args__ = (
+        Index('Index 3', 'repost_of', unique=False),
+    )
+
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
     repost_of = Column(String(100), nullable=False)
@@ -279,8 +298,8 @@ class MonitoredSub(Base):
     check_video_posts = Column(Boolean, default=False)
     target_image_match = Column(Integer, default=92)
     target_image_meme_match = Column(Integer, default=97)
-
-
+    meme_filter_check_text = Column(Boolean, default=False)
+    meme_filter_text_target_match = Column(Integer, default=90)
 
     def to_dict(self):
         return {
@@ -321,8 +340,12 @@ class MonitoredSub(Base):
             'check_video_posts': self.check_video_posts,
             'check_text_posts': self.check_text_posts,
             'target_image_match': self.target_image_match,
-            'target_image_meme_match': self.target_image_meme_match
+            'target_image_meme_match': self.target_image_meme_match,
+            'meme_filter_check_text': self.meme_filter_check_text,
+            'meme_filter_text_target_match': self.meme_filter_text_target_match
         }
+
+
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'reddit_monitored_sub_checked'
@@ -390,6 +413,10 @@ class InvestigatePost(Base):
 
 class ImageSearch(Base):
     __tablename__ = 'reddit_image_search'
+    __table_args__ = (
+        Index('subsearched', 'subreddit', 'source', 'matches_found', unique=False),
+        Index('Index 2', 'post_id', unique=False),
+    )
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     source = Column(String(50), nullable=False)
