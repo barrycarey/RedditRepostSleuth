@@ -2,6 +2,7 @@ import json
 from time import perf_counter
 from typing import List, Text, Optional
 
+import Levenshtein
 import requests
 from requests.exceptions import ConnectionError
 from distance import hamming
@@ -49,7 +50,6 @@ class DuplicateImageService:
             only_older_matches: bool = True,
             filter_crossposts=True,
             filter_author=True,
-            is_meme: bool = False,
             sort_by='created'
     ) -> ImageRepostWrapper:
         """
@@ -64,7 +64,7 @@ class DuplicateImageService:
         start_time = perf_counter()
         # TODO - Allow array of filters to be passed
 
-        if is_meme:
+        if search_results.meme_template:
             target_hamming_distance = get_hamming_from_percent(
                 target_meme_match_percent or self.config.target_image_meme_match, 256)
             search_results.target_match_percent = target_meme_match_percent or self.config.target_image_meme_match
@@ -78,7 +78,7 @@ class DuplicateImageService:
         search_results.target_annoy_distance = target_annoy_distance
 
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
-        log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
+        log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', search_results.meme_template is None, only_older_matches, date_cutoff, same_sub)
         log.debug('Matches pre-filter: %s', len(search_results.matches))
         matches = search_results.matches
         matches = list(filter(filter_same_post(search_results.checked_post.post_id), matches))
@@ -107,7 +107,7 @@ class DuplicateImageService:
 
 
         matches = list(filter(annoy_distance_filter(target_annoy_distance), matches))
-        matches = list(filter(hamming_distance_filter(target_hamming_distance if not is_meme else 0), matches))
+        matches = list(filter(hamming_distance_filter(target_hamming_distance if not search_results.meme_template else 0), matches))
 
         if filter_dead_matches:
             matches = list(filter(filter_dead_urls, matches))
@@ -117,7 +117,7 @@ class DuplicateImageService:
                       round(match.annoy_distance, 5), match.hamming_distance)
 
         log.info('Matches post-filter: %s', len(matches))
-        if is_meme:
+        if search_results.meme_template:
             search_results.search_times.start_timer('meme_filter_time')
             matches = self._final_meme_filter(search_results.checked_post, matches, target_hamming_distance)
             search_results.search_times.stop_timer('meme_filter_time')
@@ -217,7 +217,6 @@ class DuplicateImageService:
                                                                       only_older_matches=only_older_matches,
                                                                       target_title_match=target_title_match,
                                                                       sort_by=sort_by,
-                                                                      is_meme=search_results.meme_template or False,
                                                                       filter_crossposts=filter_crossposts,
                                                                       filter_author=filter_author
                                                                       )

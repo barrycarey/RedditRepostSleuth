@@ -12,8 +12,10 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.managed_subreddit import create_monitored_sub_in_db
 
 import logging
-logging.basicConfig()
-logging.getLogger('sqlalchemy.engine').setLevel(logging.DEBUG)
+
+from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
+
+
 class MonitoredSub:
     def __init__(self, uowm: UnitOfWorkManager, config: Config, reddit: Reddit):
         self.reddit = reddit
@@ -27,6 +29,9 @@ class MonitoredSub:
                 resp.body = {}
                 return
             resp.body = json.dumps(sub.to_dict())
+
+    def on_get_default_config(self, req: Request, resp: Response):
+        resp.body = json.dumps(DEFAULT_CONFIG_VALUES)
 
     def on_post(self, req: Request, resp: Response, subreddit: Text):
         log.info('Attempting to create monitored sub %s', subreddit)

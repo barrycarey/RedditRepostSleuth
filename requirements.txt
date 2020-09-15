@@ -27,3 +27,5 @@ apscheduler
 gunicorn
 cryptography
 google-cloud-vision
+opencv-python
+imutils
