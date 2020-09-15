@@ -1,3 +1,5 @@
+import logging
+
 import falcon
 from falcon_cors import CORS
 from waitress import serve
@@ -17,6 +19,7 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatc
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.posts import PostsEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.repost_history import RepostHistoryEndpoint
 
+
 config = Config()
 event_logger = EventLogging(config=config)
 uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
@@ -29,8 +32,8 @@ cors = CORS(allow_origins_list=['http://localhost:8080'], allow_all_methods=True
 api = application = falcon.API(middleware=[cors.middleware])
 api.req_options.auto_parse_form_urlencoded = True
 
-api.add_route('/image', ImageSearch(dup, uowm))
-api.add_route('/image/ocr', ImageSearch(dup, uowm), suffix='compare_image_text')
+api.add_route('/image', ImageSearch(dup, uowm, config))
+api.add_route('/image/ocr', ImageSearch(dup, uowm, config), suffix='compare_image_text')
 api.add_route('/watch', PostWatch(uowm))
 api.add_route('/post', PostsEndpoint(uowm, reddit_manager))
 api.add_route('/post/reddit', PostsEndpoint(uowm, reddit_manager), suffix='reddit')
@@ -39,6 +42,7 @@ api.add_route('/history/search', ImageSearchHistory(uowm), suffix='search_histor
 api.add_route('/history/monitored', ImageSearchHistory(uowm), suffix='monitored_sub_with_history', )
 api.add_route('/history/reposts', RepostHistoryEndpoint(uowm), suffix='image_with_search')
 api.add_route('/history/reposts/all', RepostHistoryEndpoint(uowm), suffix='repost_image_feed')
+api.add_route('/monitored-sub/default-config', MonitoredSub(uowm, config, reddit), suffix='default_config')
 api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit))
 api.add_route('/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
 

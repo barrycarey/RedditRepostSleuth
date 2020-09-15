@@ -121,7 +121,7 @@ class PostIngestor:
                 try:
                     save_pushshift_results.apply_async((data['data'],), queue='pushshift')
                 except Exception as e:
-                    log.exception('Failed to send to pushshift')
+                    log.exception('Failed to send to pushshift', exc_info=False)
                     time.sleep(5)
                     try:
                         save_pushshift_results.apply_async((data['data'],), queue='pushshift')

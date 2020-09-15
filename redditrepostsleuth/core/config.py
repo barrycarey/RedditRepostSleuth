@@ -175,7 +175,12 @@ class Config:
             'live_responses',
             'top_post_offer_watch',
             'target_image_match',
-            'target_image_meme_match'
+            'target_image_meme_match',
+            'ocr_east_model',
+            'ocr_min_confidence',
+            'ocr_bounding_padding',
+            'ocr_image_width',
+            'ocr_image_height'
 
         ]
 

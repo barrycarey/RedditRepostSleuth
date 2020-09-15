@@ -154,7 +154,7 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
 
-            if monitored_sub:
+            if monitored_sub and summons.requestor != 'barrycarey':
                 if monitored_sub.disable_summons_after_auto_response:
                     log.info('Sub %s has summons disabled after auto response', summons.subreddit)
                     auto_response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'submonitor')
@@ -353,9 +353,9 @@ class SummonsHandler:
         cmd = self._get_summons_cmd(summons.comment_body, post.post_type)
         response = SummonsResponse(summons=summons)
 
-        target_image_match, target_annoy_distance = self._get_target_distances(
+        target_image_match, target_meme_match, target_annoy_distance = self._get_target_distances(
             post.subreddit,
-            override_hamming_distance=cmd.strictness
+            override_target_match_percent=cmd.strictness
         )
 
         try:
@@ -363,6 +363,7 @@ class SummonsHandler:
                 post,
                 target_annoy_distance=target_annoy_distance,
                 target_match_percent=target_image_match,
+                target_meme_match_percent=target_meme_match,
                 meme_filter=cmd.meme_filter,
                 same_sub=cmd.same_sub,
                 date_cutoff=cmd.match_age,
@@ -415,18 +416,24 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def _get_target_distances(self, subreddit: str, override_hamming_distance: int = None) -> Tuple[int, float]:
+    def _get_target_distances(self, subreddit: str, override_target_match_percent: int = None) -> Tuple[int, int, float]:
         """
         Check if the post we were summoned on is in a monitored sub.  If it is get the target distances for that sub
         :rtype: Tuple[int,float]
         :param subreddit: Subreddit name
         :return: Tuple with target hamming and annoy
         """
+        target_match_percent = None
+        target_meme_match_percent = None
+        target_annoy_distance = None
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
             if monitored_sub:
-                return override_hamming_distance or monitored_sub.target_image_match, monitored_sub.target_annoy
-            return override_hamming_distance or self.config.target_image_match, self.config.default_annoy_distance
+                target_match_percent = override_target_match_percent or monitored_sub.target_image_match
+                target_meme_match_percent = monitored_sub.target_image_meme_match
+                target_annoy_distance = monitored_sub.target_annoy
+                return target_match_percent, target_meme_match_percent, target_annoy_distance
+            return override_target_match_percent or self.config.target_image_match, self.config.target_image_meme_match, self.config.default_annoy_distance
 
     def _send_response(self, response: SummonsResponse) -> NoReturn:
         """

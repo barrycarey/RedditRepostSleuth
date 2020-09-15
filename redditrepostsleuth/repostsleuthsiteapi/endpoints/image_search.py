@@ -2,6 +2,7 @@ import json
 
 from falcon import Response, Request, HTTPBadRequest, HTTPServiceUnavailable
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException
@@ -12,13 +13,14 @@ from redditrepostsleuth.core.util.reposthelpers import get_title_similarity
 
 
 class ImageSearch:
-    def __init__(self, image_svc: DuplicateImageService, uowm: UnitOfWorkManager):
+    def __init__(self, image_svc: DuplicateImageService, uowm: UnitOfWorkManager, config: Config):
+        self.config = config
         self.image_svc = image_svc
         self.uowm = uowm
 
     def on_get(self, req: Request, resp: Response):
         target_annoy = req.get_param_as_float('pre_filter', required=False, default=None)
-        image_match_percent = req.get_param_as_int('post_filter', required=False, default=None)
+        image_match_percent = req.get_param_as_int('image_match_percent', required=False, default=None)
         target_meme_match_percent = req.get_param_as_int('target_meme_match_percent', required=False, default=None)
         same_sub = req.get_param_as_bool('same_sub', required=False, default=False)
         only_older = req.get_param_as_bool('only_older', required=False, default=False)
@@ -65,17 +67,19 @@ class ImageSearch:
             post_two = uow.posts.get_by_post_id(req.get_param('post_two', required=True))
 
     def on_get_compare_image_text(self, req: Request, resp: Response):
+        image_one_text, _ = get_image_text_tesseract(req.get_param('image_one', required=True), self.config.ocr_east_model)
+        image_two_text, _ = get_image_text_tesseract(req.get_param('image_two', required=True), self.config.ocr_east_model)
         result = {
             'google': {
-                'image_one_text': get_image_text(req.get_param('image_one', required=True)),
-                'image_two_text': get_image_text(req.get_param('image_two', required=True))
+                'image_one_text': None,
+                'image_two_text': None
             },
             'tesseract': {
-                'image_one_text': get_image_text_tesseract(req.get_param('image_one', required=True)),
-                'image_two_text': get_image_text_tesseract(req.get_param('image_two', required=True))
+                'image_one_text': image_one_text,
+                'image_two_text': image_two_text
             }
         }
-        result['google']['similarity'] = get_title_similarity(result['google']['image_one_text'], result['google']['image_two_text'])
+        #result['google']['similarity'] = get_title_similarity(result['google']['image_one_text'], result['google']['image_two_text'])
         result['tesseract']['similarity'] = get_title_similarity(result['tesseract']['image_one_text'],
                                                               result['tesseract']['image_two_text'])
         resp.body = json.dumps(result)
