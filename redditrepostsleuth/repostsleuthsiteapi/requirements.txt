@@ -10,3 +10,4 @@ influxdb
 imagehash
 praw
 opencv-python
+imutils
