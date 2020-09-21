@@ -1,2 +1,12 @@
 falcon
 gunicorn
+requests
+falcon_cors
+sqlalchemy
+pymysql
+python-Levenshtein
+distance
+influxdb
+imagehash
+praw
+opencv-python
