@@ -1,8 +1,5 @@
-import logging
-
 import falcon
 from falcon_cors import CORS
-from waitress import serve
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -18,7 +15,6 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub import Monit
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.posts import PostsEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.repost_history import RepostHistoryEndpoint
-
 
 config = Config()
 event_logger = EventLogging(config=config)
