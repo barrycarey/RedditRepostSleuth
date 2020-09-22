@@ -1,4 +1,5 @@
 import json
+from typing import Text
 
 from falcon import Request, Response, HTTPNotFound, HTTPUnauthorized
 
@@ -28,6 +29,26 @@ class PostWatch:
 
         res.body = json.dumps(response)
 
+    def on_get_user(self, req: Request, resp: Response, user: Text):
+        results = []
+        token = req.get_param('token', required=True)
+        user_data = get_user_data(token)
+        if user.lower() != user_data['name'].lower():
+            if not is_sleuth_admin(token, user_data):
+                raise HTTPUnauthorized(title='You are not authorized to views these watches',
+                                       description=f'You are not authorized to view watches for {user}')
+        with self.uowm.start() as uow:
+            watches = uow.repostwatch.get_all_by_user(user_data['name'])
+            for watch in watches:
+                post = uow.posts.get_by_post_id(watch.post_id)
+                if not post:
+                    continue
+                results.append({
+                    'watch': watch.to_dict(),
+                    'post': post.to_dict()
+                })
+        resp.body = json.dumps(results)
+
     def on_patch(self, req: Request, resp: Response):
         token = req.get_param('token', required=True)
         user_data = get_user_data(token)
@@ -51,7 +72,7 @@ class PostWatch:
         with self.uowm.start() as uow:
             watch = uow.repostwatch.get_by_id(watch_id)
             if not watch:
-                raise HTTPNotFound(title='No watch found', description=f'Failed to find watch with ID {data["id"]}')
+                raise HTTPNotFound(title='No watch found', description=f'Failed to find watch with ID {watch_id}')
             if watch.user.lower() != user_data['name'].lower():
                 if not is_sleuth_admin(token, user_data):
                     raise HTTPUnauthorized(title='You are not authorized to delete this watch',
