@@ -11,3 +11,5 @@ imagehash
 praw
 opencv-python
 imutils
+matplotlib
+pytesseract
