@@ -31,6 +31,7 @@ api.req_options.auto_parse_form_urlencoded = True
 api.add_route('/image', ImageSearch(dup, uowm, config))
 api.add_route('/image/ocr', ImageSearch(dup, uowm, config), suffix='compare_image_text')
 api.add_route('/watch', PostWatch(uowm))
+api.add_route('/watch/{user}', PostWatch(uowm), suffix='user')
 api.add_route('/post', PostsEndpoint(uowm, reddit_manager))
 api.add_route('/post/reddit', PostsEndpoint(uowm, reddit_manager), suffix='reddit')
 api.add_route('/post/all', PostsEndpoint(uowm, reddit_manager), suffix='all')
