@@ -1,4 +1,4 @@
-celery[redis]==4.3.0
+celery[redis]
 praw
 redlock
 sqlalchemy

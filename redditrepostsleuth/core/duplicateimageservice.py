@@ -179,16 +179,23 @@ class DuplicateImageService:
         search_results.total_searched = api_results['total_searched']
 
         search_times.start_timer('pre_annoy_filter_time')
-        raw_results = filter(
+        historical_raw_results = filter(
             self._annoy_filter(target_annoy_distance or self.config.default_annoy_distance),
-            api_results['matches']
+            api_results['historical_matches']
         )  # Pre-filter results on default annoy value
-        results = self._convert_annoy_results(raw_results, post.id)
-        log.warn('After Pre Annoy Filter %s', len(results))
+        current_raw_results = filter(
+            self._annoy_filter(target_annoy_distance or self.config.default_annoy_distance),
+            api_results['current_matches']
+        )
+        historical_results = self._convert_annoy_results(historical_raw_results, post.id)
+        current_results = self._convert_annoy_results(current_raw_results, post.id)
+        log.warn('After Pre Annoy Filter %s', len(historical_results) + len(current_results))
         search_times.stop_timer('pre_annoy_filter_time')
 
         search_times.start_timer('set_match_post_time')
-        results = self._set_match_posts(results)
+        historical_results = self._set_match_posts(historical_results)
+        current_results = self._set_match_posts(current_results, historical=False)
+        results = historical_results + current_results
         search_times.stop_timer('set_match_post_time')
 
         search_times.start_timer('remove_duplicate_time')

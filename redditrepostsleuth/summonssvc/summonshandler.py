@@ -253,7 +253,7 @@ class SummonsHandler:
             existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
             if not existing_watch or (existing_watch and not existing_watch.enabled):
                 response.message = WATCH_DISABLED_NOT_FOUND
-                self._send_response(summons.comment_id, response)
+                self._send_response(response)
                 return
             existing_watch.enabled = False
             try:
