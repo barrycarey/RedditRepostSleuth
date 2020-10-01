@@ -6,11 +6,11 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 from datetime import datetime
 
 from redditrepostsleuth.core.util.helpers import chunk_list
-config = Config('/sleuth_config.json')
+config = Config('../sleuth_config.json')
 uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config=config))
 
 with uowm.start() as uow:
-    posts = uow.image_post.get_after_date(datetime(2020,8,31))
+    posts = uow.image_post.get_after_date(datetime(2020,9,29))
     batch = []
     chunks = chunk_list(posts, 500)
     for chunk in chunks:

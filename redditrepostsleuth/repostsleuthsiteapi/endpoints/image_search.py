@@ -50,7 +50,7 @@ class ImageSearch:
                 filter_crossposts=filter_crossposts,
                 filter_dead_matches=filter_dead_matches,
                 filter_author=filter_author,
-                max_matches=250,
+                max_matches=500,
                 max_depth=-1,
                 source='api'
             )

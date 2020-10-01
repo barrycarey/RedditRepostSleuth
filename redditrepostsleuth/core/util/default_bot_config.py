@@ -1,9 +1,9 @@
 DEFAULT_CONFIG_VALUES = {
-              "active": False,
+              "active": True,
               "repost_only": True,
               "report_submission": False,
               "report_msg": "RepostSleuthBot-Repost",
-              "same_sub_only": True,
+              "same_sub_only": False,
               "sticky_comment": False,
               "target_days_old": None,
               "meme_filter": False,

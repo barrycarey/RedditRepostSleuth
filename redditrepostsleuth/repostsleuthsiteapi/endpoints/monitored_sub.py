@@ -31,6 +31,17 @@ class MonitoredSub:
                 return
             resp.body = json.dumps(sub.to_dict())
 
+    def on_get_popular(self, req: Request, resp: Response):
+        results = []
+        with self.uowm.start() as uow:
+            subs = uow.monitored_sub.get_all_active(limit=10)
+            for sub in subs:
+                results.append({
+                    'name': sub.name,
+                    'subscribers': sub.subscribers
+                })
+            resp.body = json.dumps(results)
+
     def on_get_default_config(self, req: Request, resp: Response):
         resp.body = json.dumps(DEFAULT_CONFIG_VALUES)
 

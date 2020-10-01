@@ -11,6 +11,7 @@ from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_repost_endpoint import ImageRepostEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search import ImageSearch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search_history import ImageSearchHistory
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.meme_template import MemeTemplateEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub import MonitoredSub
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.posts import PostsEndpoint
@@ -41,7 +42,9 @@ api.add_route('/history/reposts', RepostHistoryEndpoint(uowm), suffix='image_wit
 api.add_route('/history/reposts/all', RepostHistoryEndpoint(uowm), suffix='repost_image_feed')
 api.add_route('/monitored-sub/default-config', MonitoredSub(uowm, config, reddit), suffix='default_config')
 api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit))
+api.add_route('/monitored-sub/popular', MonitoredSub(uowm, config, reddit), suffix='popular')
 api.add_route('/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
+api.add_route('/meme-template/', MemeTemplateEndpoint(uowm))
 
 
 #serve(api, host='localhost', port=8888, threads=15)
