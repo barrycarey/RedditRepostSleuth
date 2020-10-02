@@ -22,7 +22,7 @@ event_logger = EventLogging(config=config)
 uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
 reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
-dup = DuplicateImageService(uowm, event_logger, config=config)
+dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
 
 cors = CORS(allow_origins_list=['http://localhost:8080'], allow_all_methods=True, allow_all_headers=True, log_level='INFO')
 
