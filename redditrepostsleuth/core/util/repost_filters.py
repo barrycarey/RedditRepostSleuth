@@ -3,6 +3,7 @@ from typing import Text, List
 import random
 
 import requests
+from praw import Reddit
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
 from redditrepostsleuth.core.logging import log
@@ -124,3 +125,14 @@ def filter_dead_urls(match: ImageMatch):
     else:
         log.debug('Active URL Reject:  https://redd.it/%s', match.post.post_id)
         return False
+
+def filter_removed_posts(reddit: Reddit, matches: List[RepostMatch]):
+    if not matches:
+        return matches
+    post_ids = [f't3_{match.post.post_id}' for match in matches]
+    submissions = reddit.info(post_ids)
+    for sub in submissions:
+        if sub.__dict__.get('removed', None):
+            log.debug('Removed Post Filter Reject - %s', sub.id)
+            del matches[next(i for i, x in enumerate(matches) if x.post.post_id == sub.id)]
+    return matches

@@ -4,6 +4,7 @@ from typing import List, Text, Optional
 
 import Levenshtein
 import requests
+from praw import Reddit
 from requests.exceptions import ConnectionError
 from distance import hamming
 from sqlalchemy import Float
@@ -23,12 +24,13 @@ from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
-    filter_no_dhash, filter_dead_urls, filter_title_distance
+    filter_no_dhash, filter_dead_urls, filter_title_distance, filter_removed_posts
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest_image_match, set_all_title_similarity
 
 
 class DuplicateImageService:
-    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, config: Config = None):
+    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, reddit: Reddit, config: Config = None):
+        self.reddit = reddit
         self.uowm = uowm
         self.event_logger = event_logger
         if config:
@@ -47,6 +49,7 @@ class DuplicateImageService:
             same_sub: bool = False,
             date_cutoff: int = None,
             filter_dead_matches: bool = True,
+            filter_removed_matches: bool = True,
             only_older_matches: bool = True,
             filter_crossposts=True,
             filter_author=True,
@@ -111,6 +114,7 @@ class DuplicateImageService:
 
         if filter_dead_matches:
             matches = list(filter(filter_dead_urls, matches))
+            matches = filter_removed_posts(self.reddit, matches)
 
         for match in matches:
             log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}',
@@ -136,6 +140,7 @@ class DuplicateImageService:
                                  same_sub: bool = False,
                                  date_cutoff: int = None,
                                  filter_dead_matches: bool = True,
+                                 filter_removed_matches: bool = True,
                                  only_older_matches=True,
                                  meme_filter=False,
                                  max_depth=4000,
