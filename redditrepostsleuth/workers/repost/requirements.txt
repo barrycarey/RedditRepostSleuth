@@ -6,5 +6,5 @@ imagehash
 influxdb
 annoy
 distance
-celery[redis]
+celery[redis]==4.4.7
 python-Levenshtein

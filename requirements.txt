@@ -5,7 +5,7 @@ pymysql
 pillow
 requests
 distance
-celery[redis]
+celery[redis]==4.4.7
 dataclasses
 flower
 eventlet
