@@ -237,6 +237,7 @@ class DuplicateImageService:
             search_results.matches = self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
         search_times.stop_timer('total_search_time')
+        search_results.total_search_time = search_results.search_times.total_search_time # TODO - Properly fix this.
         self._log_search_time(search_results, source)
         search_results.search_id = self._log_search(
             search_results,
