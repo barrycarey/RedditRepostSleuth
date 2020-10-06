@@ -27,7 +27,7 @@ class MonitoredSub:
         with self.uowm.start() as uow:
             sub = uow.monitored_sub.get_by_sub(subreddit)
             if not sub:
-                resp.body = {}
+                resp.body = json.dumps({})
                 return
             resp.body = json.dumps(sub.to_dict())
 
@@ -47,7 +47,6 @@ class MonitoredSub:
 
     def on_post(self, req: Request, resp: Response, subreddit: Text):
         log.info('Attempting to create monitored sub %s', subreddit)
-
         try:
             self.reddit.subreddit(subreddit).mod.accept_invite()
         except APIException as e:

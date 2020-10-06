@@ -349,6 +349,9 @@ class MonitoredSub(Base):
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'reddit_monitored_sub_checked'
+    __table_args__ = (
+        Index('post_id', 'post_id'),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
