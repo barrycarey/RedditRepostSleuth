@@ -1,0 +1,12 @@
+version: "3.7"
+services:
+    api:
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
+        environment:
+            LOG_LEVEL: INFO
+        restart: always
+        entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:7777 --workers 10
+        ports:
+            - 7777:7777

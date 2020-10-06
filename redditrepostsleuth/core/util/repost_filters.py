@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Text, List
 import random
@@ -129,10 +130,33 @@ def filter_dead_urls(match: ImageMatch):
 def filter_removed_posts(reddit: Reddit, matches: List[RepostMatch]):
     if not matches:
         return matches
+    if len(matches) > 100:
+        log.info('Skipping removed post check due to > 100 matches (%s)', len(matches))
+        return matches
     post_ids = [f't3_{match.post.post_id}' for match in matches]
     submissions = reddit.info(post_ids)
     for sub in submissions:
         if sub.__dict__.get('removed', None):
             log.debug('Removed Post Filter Reject - %s', sub.id)
             del matches[next(i for i, x in enumerate(matches) if x.post.post_id == sub.id)]
+    return matches
+
+def filter_dead_urls_remote(util_api: Text, reddit: Reddit, matches: List[RepostMatch]):
+    match_urls = [{'id': match.post.post_id, 'url': match.post.url} for match in matches]
+    try:
+        res = requests.post(util_api, json=match_urls)
+    except ConnectionError:
+        log.error('Problem reaching retail API, doing local check')
+        return filter_removed_posts(reddit, matches)
+    except Exception as e:
+        log.exception('Problem reaching retail API, doing local check', exc_info=True)
+        return filter_removed_posts(reddit, matches)
+
+    if res.status_code != 200:
+        log.error('Non 200 status from util api (%s), doing local dead URL check', res.status_code)
+        return filter_removed_posts(reddit, matches)
+    res_data = json.loads(res.text)
+    removed_matches = [match['id'] for match in res_data if match['action'] == 'remove']
+    for removed_id in removed_matches:
+        del matches[next(i for i, x in enumerate(matches) if x.post.post_id == removed_id)]
     return matches
