@@ -69,7 +69,7 @@ services:
     summons_worker:
         build:
             context: .
-            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
+            dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
         environment:
             - LOG_LEVEL=INFO
             - SLEUTHCONFIG=testconfig.ini
@@ -93,7 +93,7 @@ services:
     submonitor_worker:
         build:
             context: .
-            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
+            dockerfile: redditrepostsleuth/workers/SubMonitorWorkerDockerFile
         environment:
             - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
