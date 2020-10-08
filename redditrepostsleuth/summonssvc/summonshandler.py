@@ -104,7 +104,8 @@ class SummonsHandler:
         return self._get_repost_cmd(post_type, cmd_str)
 
     def _get_repost_cmd(self, post_type: Text, cmd_body: Text) -> RepostBaseCmd:
-        cmd_body = cmd_body.strip('repost ')
+        if cmd_body:
+            cmd_body = cmd_body.strip('repost ')
         if post_type == 'image':
             return self._get_image_repost_cmd(cmd_body)
         elif post_type == 'link':
@@ -154,7 +155,7 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
 
-            if monitored_sub and summons.requestor != 'barrycarey':
+            if monitored_sub:
                 if monitored_sub.disable_summons_after_auto_response:
                     log.info('Sub %s has summons disabled after auto response', summons.subreddit)
                     auto_response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'submonitor')
@@ -164,7 +165,7 @@ class SummonsHandler:
                             self._delete_mention(summons.comment_id)
                         return
 
-                if monitored_sub.only_allow_one_summons:
+                if monitored_sub.only_allow_one_summons and summons.requestor != 'barrycarey':
                     response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'summons')
                     if response:
                         log.info('Sub %s only allows one summons.  Existing response found at %s',
@@ -350,6 +351,10 @@ class SummonsHandler:
 
     def process_image_repost_request(self, summons: Summons, post: Post):
 
+        with self.uowm.start() as uow:
+            monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
+
+
         cmd = self._get_summons_cmd(summons.comment_body, post.post_type)
         response = SummonsResponse(summons=summons)
 
@@ -364,9 +369,9 @@ class SummonsHandler:
                 target_annoy_distance=target_annoy_distance,
                 target_match_percent=target_image_match,
                 target_meme_match_percent=target_meme_match,
-                meme_filter=cmd.meme_filter,
-                same_sub=cmd.same_sub,
-                date_cutoff=cmd.match_age,
+                meme_filter=monitored_sub.meme_filter if monitored_sub else cmd.meme_filter,
+                same_sub=monitored_sub.same_sub_only if monitored_sub else cmd.same_sub,
+                date_cutoff=monitored_sub.target_days_old if monitored_sub else cmd.match_age,
                 max_matches=250,
                 max_depth=-1,
                 source='summons'
