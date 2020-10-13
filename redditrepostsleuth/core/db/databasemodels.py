@@ -176,6 +176,8 @@ class ImageRepost(Base):
     __tablename__ = 'image_reposts'
     __table_args__ = (
         Index('Index 3', 'repost_of', unique=False),
+        Index('idx_author', 'author', unique=False),
+        Index('idx_detected_at', 'detected_at', unique=False),
     )
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
@@ -206,6 +208,8 @@ class LinkRepost(Base):
     __tablename__ = 'link_reposts'
     __table_args__ = (
         Index('Index 3', 'repost_of', unique=False),
+        Index('idx_author', 'author', unique=False),
+        Index('idx_detected_at', 'detected_at', unique=False),
     )
 
     id = Column(Integer, primary_key=True)
@@ -419,6 +423,7 @@ class ImageSearch(Base):
     __table_args__ = (
         Index('subsearched', 'subreddit', 'source', 'matches_found', unique=False),
         Index('Index 2', 'post_id', unique=False),
+        Index('idx_source', 'source', unique=False),
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
@@ -509,6 +514,19 @@ class BotStat(Base):
     image_reposts_detected = Column(Integer)
     link_reposts_detected = Column(Integer)
     private_messages_sent = Column(Integer)
-    comments = Column(Integer)
+    comments_left = Column(Integer)
     summons_received = Column(Integer)
     karma_gained = Column(Integer)
+
+class MonitoredSubConfigChange(Base):
+    __tablename__ = 'reddit_monitored_sub_config_change'
+    __table_args__ = (
+        Index('idx_subreddit', 'subreddit', 'updated_at', unique=False),
+    )
+    id = Column(Integer, primary_key=True)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    updated_by = Column(String(100), nullable=False)
+    source = Column(String(10))
+    subreddit = Column(String(200), nullable=False)
+    old_value = Column(String(2000))
+    new_value = Column(String(2000))

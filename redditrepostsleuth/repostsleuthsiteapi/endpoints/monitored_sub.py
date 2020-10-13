@@ -7,6 +7,7 @@ from praw import Reddit
 from praw.exceptions import APIException
 
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import MonitoredSubConfigChange
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.managed_subreddit import create_monitored_sub_in_db
@@ -14,7 +15,7 @@ from redditrepostsleuth.core.services.managed_subreddit import create_monitored_
 import logging
 
 from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
-from redditrepostsleuth.core.util.reddithelpers import is_sub_mod
+from redditrepostsleuth.core.util.reddithelpers import is_sub_mod, get_user_data
 
 
 class MonitoredSub:
@@ -71,7 +72,7 @@ class MonitoredSub:
 
     def on_patch(self, req: Request, resp: Response, subreddit: Text):
         token = req.get_param('token', required=True)
-        #if not self.is_sleuth_admin(token):
+        user_data = get_user_data(token)
         if not is_sub_mod(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}', f'You\'re not a moderator on {subreddit}')
         with self.uowm.start() as uow:
@@ -85,6 +86,15 @@ class MonitoredSub:
                 if hasattr(sub, k):
                     if getattr(sub, k) != v:
                         log.debug('Update %s config | %s: %s => %s', subreddit, k, getattr(sub, k), v)
+                        uow.monitored_sub_config_change.add(
+                            MonitoredSubConfigChange(
+                                source='site',
+                                subreddit=subreddit,
+                                old_value=str(getattr(sub, k)),
+                                new_value=str(v),
+                                updated_by=user_data['name']
+                            )
+                        )
                         setattr(sub, k, v)
-            #uow.commit()
+            uow.commit()
 

@@ -43,7 +43,7 @@ def is_sleuth_admin(token, user_data = None, user_agent: Text = 'windows.reposts
 
     return False
 
-def is_sub_mod(self, token, subreddit, user_agent: Text = 'windows.repostsleuthbot:v0.0.1 (by /u/barrycarey)'):
+def is_sub_mod(token, subreddit, user_agent: Text = 'windows.repostsleuthbot:v0.0.1 (by /u/barrycarey)'):
     headers = {'Authorization': f'Bearer {token}', 'User-Agent': user_agent}
     after = None
     while True:
@@ -51,7 +51,9 @@ def is_sub_mod(self, token, subreddit, user_agent: Text = 'windows.repostsleuthb
         if after:
             url += f'&after={after}'
         r = requests.get(url, headers=headers)
-
+        if r.status_code != 200:
+            log.error('Received %s status code from Reddit API', r.status_code)
+            return False
         data = json.loads(r.text)
         subs = data['data']['children']
         if not subs:

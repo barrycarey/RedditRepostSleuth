@@ -8,6 +8,7 @@ from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.bot_stats import BotStats
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_repost_endpoint import ImageRepostEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search import ImageSearch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search_history import ImageSearchHistory
@@ -24,7 +25,7 @@ reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
 dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
 
-cors = CORS(allow_origins_list=['http://localhost:8080'], allow_all_methods=True, allow_all_headers=True, log_level='INFO')
+cors = CORS(allow_origins_list=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='INFO')
 
 api = application = falcon.API(middleware=[cors.middleware])
 api.req_options.auto_parse_form_urlencoded = True
@@ -45,6 +46,8 @@ api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit))
 api.add_route('/monitored-sub/popular', MonitoredSub(uowm, config, reddit), suffix='popular')
 api.add_route('/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
 api.add_route('/meme-template/', MemeTemplateEndpoint(uowm))
-
+api.add_route('/stats', BotStats(uowm))
+api.add_route('/stats/top-reposters', BotStats(uowm), suffix='reposters')
+api.add_route('/stats/banned-subreddits', BotStats(uowm), suffix='banned_subs')
 
 #serve(api, host='localhost', port=8888, threads=15)

@@ -15,6 +15,7 @@ from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import Inde
 from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
 from redditrepostsleuth.core.db.repository.link_repost_repo import LinkPostRepo
 from redditrepostsleuth.core.db.repository.memetemplaterepository import MemeTemplateRepository
+from redditrepostsleuth.core.db.repository.monitored_sub_config_change_repo import MonitoredSubConfigChangeRepo
 from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo import MonitoredSubConfigRevisionRepo
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
@@ -137,3 +138,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def banned_user(self) -> BannedUserRepo:
         return BannedUserRepo(self.session)
+
+    @property
+    def monitored_sub_config_change(self) -> MonitoredSubConfigChangeRepo:
+        return MonitoredSubConfigChangeRepo(self.session)
