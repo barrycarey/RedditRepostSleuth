@@ -24,12 +24,12 @@ class ImageSearch:
         target_meme_match_percent = req.get_param_as_int('target_meme_match_percent', required=False, default=None)
         same_sub = req.get_param_as_bool('same_sub', required=False, default=False)
         only_older = req.get_param_as_bool('only_older', required=False, default=False)
-        date_cutoff = req.get_param_as_int('date_cutoff', required=False, default=None)
         meme_filter = req.get_param_as_bool('meme_filter', required=False, default=False)
         filter_crossposts = req.get_param_as_bool('filter_crossposts', required=False, default=True)
         filter_author = req.get_param_as_bool('filter_author', required=False, default=True)
         post_id = req.get_param('post_id', required=True)
         filter_dead_matches = req.get_param_as_bool('filter_dead_matches', required=False, default=False)
+        target_days_old = req.get_param_as_int('target_days_old', required=False, default=0)
 
         with self.uowm.start() as uow:
             post = uow.posts.get_by_post_id(post_id)
@@ -45,7 +45,7 @@ class ImageSearch:
                 target_meme_match_percent=target_meme_match_percent,
                 meme_filter=meme_filter,
                 same_sub=same_sub,
-                date_cutoff=date_cutoff,
+                date_cutoff=target_days_old,
                 only_older_matches=only_older,
                 filter_crossposts=filter_crossposts,
                 filter_dead_matches=filter_dead_matches,

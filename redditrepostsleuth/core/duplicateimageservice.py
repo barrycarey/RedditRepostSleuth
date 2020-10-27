@@ -248,7 +248,7 @@ class DuplicateImageService:
         search_times.stop_timer('total_search_time')
         search_results.total_search_time = search_results.search_times.total_search_time # TODO - Properly fix this.
         self._log_search_time(search_results, source)
-        search_results.search_id = self._log_search(
+        search_results.logged_search = self._log_search(
             search_results,
             same_sub,
             date_cutoff,
@@ -262,6 +262,8 @@ class DuplicateImageService:
             target_match_percent or self.config.target_image_match,
             target_meme_match_percent or self.config.target_image_meme_match
         )
+        if search_results.logged_search:
+            search_results.search_id = search_results.logged_search.id
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
@@ -302,7 +304,7 @@ class DuplicateImageService:
             used_historical_index: bool,
             target_image_match: int,
             target_image_meme_match: int
-    ) -> Optional[int]:
+    ) -> Optional[ImageRepostWrapper]:
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
             used_historical_index=used_historical_index,
@@ -331,7 +333,7 @@ class DuplicateImageService:
             uow.image_search.add(image_search)
             try:
                 uow.commit()
-                return image_search.id
+                return image_search
             except Exception as e:
                 log.exception('Failed to save image search', exc_info=False)
 
@@ -432,6 +434,9 @@ class DuplicateImageService:
             target_hamming
     ) -> List[ImageMatch]:
         results = []
+        log.debug('MEME FILTER - Filtering %s matches', len(matches))
+        if len(matches) == 0:
+            return matches
 
         try:
             target_hashes = get_image_hashes(searched_post, hash_size=32)
@@ -440,6 +445,7 @@ class DuplicateImageService:
             return matches
 
         for match in matches:
+            start = perf_counter()
             try:
                 match_hashes = get_image_hashes(match.post, hash_size=32)
             except Exception as e:
@@ -452,7 +458,6 @@ class DuplicateImageService:
                 log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
                           h_distance, f'https://redd.it/{match.post.post_id}')
                 continue
-
             log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                        h_distance)
             match.hamming_distance = h_distance
