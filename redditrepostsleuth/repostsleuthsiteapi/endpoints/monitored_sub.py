@@ -90,6 +90,7 @@ class MonitoredSub:
                             MonitoredSubConfigChange(
                                 source='site',
                                 subreddit=subreddit,
+                                config_key=k,
                                 old_value=str(getattr(sub, k)),
                                 new_value=str(v),
                                 updated_by=user_data['name']

@@ -178,6 +178,7 @@ class ImageRepost(Base):
         Index('Index 3', 'repost_of', unique=False),
         Index('idx_author', 'author', unique=False),
         Index('idx_detected_at', 'detected_at', unique=False),
+        Index('idx_repost_of_date', 'detected_at', 'author', unique=False)
     )
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
@@ -210,6 +211,7 @@ class LinkRepost(Base):
         Index('Index 3', 'repost_of', unique=False),
         Index('idx_author', 'author', unique=False),
         Index('idx_detected_at', 'detected_at', unique=False),
+        Index('idx_repost_of_date', 'detected_at', 'author', unique=False)
     )
 
     id = Column(Integer, primary_key=True)
@@ -508,8 +510,8 @@ class BannedUser(Base):
     expires_at = Column(DateTime)
     notes = Column(String(500))
 
-class BotStat(Base):
-    __tablename__ = 'bot_stat'
+class StatsGeneral(Base):
+    __tablename__ = 'stats_general'
     id = Column(Integer, primary_key=True)
     image_reposts_detected = Column(Integer)
     link_reposts_detected = Column(Integer)
@@ -517,6 +519,15 @@ class BotStat(Base):
     comments_left = Column(Integer)
     summons_received = Column(Integer)
     karma_gained = Column(Integer)
+
+class StatsTopImageRepost(Base):
+    __tablename__ = 'stats_top_image_repost'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    repost_count = Column(Integer, nullable=False)
+    days = Column(Integer, nullable=False)
+    nsfw = Column(Boolean, nullable=False)
+
 
 class MonitoredSubConfigChange(Base):
     __tablename__ = 'reddit_monitored_sub_config_change'
@@ -528,5 +539,59 @@ class MonitoredSubConfigChange(Base):
     updated_by = Column(String(100), nullable=False)
     source = Column(String(10))
     subreddit = Column(String(200), nullable=False)
+    config_key = Column(String(100), nullable=False)
     old_value = Column(String(2000))
     new_value = Column(String(2000))
+
+class ConfigMessageTemplate(Base):
+    __tablename__ = 'config_message_templates'
+    id = Column(Integer, primary_key=True)
+    template_name = Column(String(100), nullable=False, unique=True)
+    template_slug = Column(String(100), nullable=False, unique=True)
+    template = Column(String(2000), nullable=False)
+    created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'template_name': self.template_name,
+            'template': self.template,
+            'template_slug': self.template_slug,
+            'created_at': self.created_at.timestamp() if self.created_at else None,
+            'updated_at': self.updated_at.timestamp() if self.created_at else None
+        }
+
+class ConfigSettings(Base):
+    __tablename__ = 'config_settings'
+    id = Column(Integer, primary_key=True)
+    comment_karma_flag_threshold = Column(Integer)
+    comment_karma_remove_threshold = Column(Integer)
+    index_api = Column(String(150))
+    util_api = Column(String(150))
+    top_post_offer_watch = Column(Boolean, default=False)
+    repost_watch_enabled = Column(Boolean)
+    ingest_repost_check_image = Column(Boolean)
+    ingest_repost_check_link = Column(Boolean)
+    ingest_repost_check_text = Column(Boolean)
+    ingest_repost_check_video = Column(Boolean)
+    image_repost_target_image_match = Column(Integer)
+    image_repost_target_image_meme_match = Column(Integer)
+    image_repost_target_annoy_distance = Column(Float)
+
+class SiteAdmin(Base):
+    __tablename__ = 'site_admin'
+    id = Column(Integer, primary_key=True)
+    user = Column(String(100), nullable=False, unique=True)
+    super_user = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user': self.user,
+            'super_user': self.super_user,
+            'created_at': self.created_at.timestamp() if self.created_at else None,
+            'updated_at': self.updated_at.timestamp() if self.created_at else None
+        }

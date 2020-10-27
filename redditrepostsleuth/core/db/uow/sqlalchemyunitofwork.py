@@ -5,6 +5,9 @@ from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFing
 from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSubredditRepo
 from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
 from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
+from redditrepostsleuth.core.db.repository.config_message_template_repo import ConfigMessageTemplateRepo
+from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
+from redditrepostsleuth.core.db.repository.stats_top_image_repost_repo import StatsTopImageRepostRepo
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
@@ -142,3 +145,15 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def monitored_sub_config_change(self) -> MonitoredSubConfigChangeRepo:
         return MonitoredSubConfigChangeRepo(self.session)
+
+    @property
+    def stats_top_image_repost(self) -> StatsTopImageRepostRepo:
+        return StatsTopImageRepostRepo(self.session)
+
+    @property
+    def config_message_template(self) -> ConfigMessageTemplateRepo:
+        return ConfigMessageTemplateRepo(self.session)
+
+    @property
+    def site_admin(self) -> SiteAdminRepo:
+        return SiteAdminRepo(self.session)

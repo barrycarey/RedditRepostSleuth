@@ -8,6 +8,8 @@ from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.general_admin import GeneralAdmin
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.message_template import MessageTemplate
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.bot_stats import BotStats
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_repost_endpoint import ImageRepostEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search import ImageSearch
@@ -46,8 +48,13 @@ api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit))
 api.add_route('/monitored-sub/popular', MonitoredSub(uowm, config, reddit), suffix='popular')
 api.add_route('/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
 api.add_route('/meme-template/', MemeTemplateEndpoint(uowm))
-api.add_route('/stats', BotStats(uowm))
-api.add_route('/stats/top-reposters', BotStats(uowm), suffix='reposters')
-api.add_route('/stats/banned-subreddits', BotStats(uowm), suffix='banned_subs')
+api.add_route('/stats', BotStats(uowm, reddit))
+api.add_route('/stats/top-reposters', BotStats(uowm, reddit), suffix='reposters')
+api.add_route('/stats/banned-subreddits', BotStats(uowm, reddit), suffix='banned_subs')
+api.add_route('/stats/top-image-reposts', BotStats(uowm, reddit), suffix='top_image_reposts')
+api.add_route('/admin/message-templates', MessageTemplate(uowm))
+api.add_route('/admin/message-templates/{id:int}', MessageTemplate(uowm))
+api.add_route('/admin/message-templates/all', MessageTemplate(uowm), suffix='all')
+api.add_route('/admin/users', GeneralAdmin(uowm))
 
 #serve(api, host='localhost', port=8888, threads=15)

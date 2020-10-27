@@ -6,12 +6,13 @@ from prawcore import Forbidden, NotFound
 from sqlalchemy import func
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.util.helpers import is_moderator, bot_has_permission, is_bot_banned, build_markdown_table
+from redditrepostsleuth.core.util.helpers import is_moderator, bot_has_permission, is_bot_banned, build_markdown_table, \
+    chunk_list
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -121,8 +122,38 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     log.info('[Banned Sub Wiki Update] Fished update')
     print('[Scheduled Job] Update Ban Wiki End')
 
+def update_top_image_reposts(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+    days = [1,7,30,365]
+    with uowm.start() as uow:
+        uow.session.execute('TRUNCATE `stats_top_image_repost`')
+        for day in days:
+            result = uow.session.execute(
+                'SELECT repost_of, COUNT(*) c FROM image_reposts WHERE detected_at > NOW() - INTERVAL :days DAY GROUP BY repost_of HAVING c > 1 ORDER BY c DESC LIMIT 2000',
+                {'days': day})
+            for chunk in chunk_list(result.fetchall(), 100):
+                reddit_ids_to_lookup = []
+                for post in chunk:
+                    existing = uow.stats_top_image_repost.get_by_post_id_and_days(post[0], day)
+                    if existing:
+                        existing.repost_count = post[1]
+                        continue
+                    reddit_ids_to_lookup.append(f't3_{post[0]}')
+                for submission in reddit.info(reddit_ids_to_lookup):
+                    count_data = next((x for x in chunk if x[0] == submission.id))
+                    if not count_data:
+                        continue
+                    uow.jashpu.add(
+                        StatsTopImageRepost(
+                            post_id=count_data[0],
+                            repost_count=count_data[1],
+                            days=day,
+                            nsfw=submission.over_18
+                        )
+                    )
+            uow.commit()
+
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_monitored_sub_subscribers(uowm, reddit)
+    update_top_image_reposts(uowm, reddit)

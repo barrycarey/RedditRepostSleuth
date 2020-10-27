@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [bugfix] - Summons on a monitored subreddit were ignoring subs custom settings
 * [backend] - Added API to support repostsleuth.com
 * [feature] - Bot now checks if a post is removed from Reddit, in addition to checking if the image has been removed
+* [feature] - Added search_url message slug to open search on repostsleuth.com
 
 
 ## [0.1.8] - 8/29/2020
