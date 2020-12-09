@@ -61,7 +61,7 @@ class NewActivationMonitor:
 
     def _notify_added(self, subreddit: Subreddit) -> NoReturn:
         log.info('Sending sucess PM to %s', subreddit.display_name)
-        wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/about/wiki/repost_sleuth_config'
+        wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/wiki/repost_sleuth_config'
         try:
             subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_config=wiki_url))
         except Exception as e:

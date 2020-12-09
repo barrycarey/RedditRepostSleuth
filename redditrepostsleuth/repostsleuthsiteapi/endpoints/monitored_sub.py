@@ -15,7 +15,9 @@ from redditrepostsleuth.core.services.managed_subreddit import create_monitored_
 import logging
 
 from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
-from redditrepostsleuth.core.util.reddithelpers import is_sub_mod, get_user_data
+from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_token, get_user_data, get_subscribers, \
+    is_sub_mod_praw, bot_has_permission, get_bot_permissions
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin
 
 
 class MonitoredSub:
@@ -32,6 +34,11 @@ class MonitoredSub:
                 return
             resp.body = json.dumps(sub.to_dict())
 
+    def on_get_all(self, req: Request, resp: Response):
+        with self.uowm.start() as uow:
+            subs = uow.monitored_sub.get_all()
+        resp.body = json.dumps([sub.to_dict() for sub in subs])
+
     def on_get_popular(self, req: Request, resp: Response):
         results = []
         with self.uowm.start() as uow:
@@ -46,6 +53,21 @@ class MonitoredSub:
     def on_get_default_config(self, req: Request, resp: Response):
         resp.body = json.dumps(DEFAULT_CONFIG_VALUES)
 
+    def on_post_refresh(self, req: Request, resp: Response, subreddit: Text):
+        log.info('Refreshing %s', subreddit)
+        with self.uowm.start() as uow:
+            sub = uow.monitored_sub.get_by_sub(subreddit)
+            if not sub:
+                raise HTTPNotFound(title=f'Subreddit {subreddit} Not Found',
+                                   description=f'Subreddit {subreddit} Not Found')
+            sub.subscribers = get_subscribers(sub.name, self.reddit)
+            sub.is_mod = is_sub_mod_praw(sub.name, 'repostsleuthbot', self.reddit)
+            perms = get_bot_permissions(sub.name, self.reddit) if sub.is_mod else []
+            sub.post_permission = True if 'all' in perms or 'posts' in perms else None
+            sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
+            uow.commit()
+        resp.body = json.dumps(sub.to_dict())
+
     def on_post(self, req: Request, resp: Response, subreddit: Text):
         log.info('Attempting to create monitored sub %s', subreddit)
         try:
@@ -53,7 +75,8 @@ class MonitoredSub:
         except APIException as e:
             if e.error_type == 'NO_INVITE_FOUND':
                 log.error('No open invite to %s', subreddit)
-                raise HTTPInternalServerError(f'No available invite for {subreddit}', f'We were unable to find a pending mod invote for r/{subreddit}')
+                raise HTTPInternalServerError(f'No available invite for {subreddit}', f'We were unable to find a '
+                                                                                      f'pending mod invote for r/{subreddit}')
             else:
                 log.exception('Problem accepting invite', exc_info=True)
                 raise HTTPInternalServerError(f'Unknown error accepting mod invite for r/{subreddit}', f'Unknown error accepting mod invite for r/{subreddit}.  Please contact us')
@@ -73,7 +96,7 @@ class MonitoredSub:
     def on_patch(self, req: Request, resp: Response, subreddit: Text):
         token = req.get_param('token', required=True)
         user_data = get_user_data(token)
-        if not is_sub_mod(token, subreddit, self.config.reddit_useragent):
+        if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}', f'You\'re not a moderator on {subreddit}')
         with self.uowm.start() as uow:
             sub = uow.monitored_sub.get_by_sub(subreddit)
@@ -99,3 +122,17 @@ class MonitoredSub:
                         setattr(sub, k, v)
             uow.commit()
 
+
+    def on_delete(self, req: Request, resp: Response, subreddit: Text):
+        token = req.get_param('token', required=True)
+        user_data = get_user_data(token)
+        if not is_site_admin(user_data, self.uowm):
+            raise HTTPUnauthorized(f'Not authorized to make this request',
+                                   f'You are not authorized to make this request')
+        with self.uowm.start() as uow:
+            sub = uow.monitored_sub.get_by_sub(subreddit)
+            if not sub:
+                raise HTTPNotFound(title=f'Subreddit {subreddit} Not Found',
+                                   description=f'Subreddit {subreddit} Not Found')
+            uow.monitored_sub.remove(sub)
+            uow.commit()
