@@ -6,15 +6,21 @@ from datetime import datetime
 
 from praw import Reddit
 from prawcore import Forbidden, ResponseException
+
+from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.db_utils import get_db_engine
+from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_pushshift_results
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.util.helpers import post_type_from_url
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
 class PostIngestor:
-    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager) -> None:
+    def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager, config: Config) -> None:
+        self.config = config
         self.existing_posts = []
         self.reddit = reddit
         self.uowm = uowm
@@ -76,16 +82,13 @@ class PostIngestor:
         while True:
             oldest_id = None
             start_time = None
-            base_url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
+#            base_url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
+            url = 'https://beta.pushshift.io/search/reddit/submissions?size=1000&sort_type=created_utc&sort=desc'
             while True:
 
-                if oldest_id:
-                    url = base_url + '&before=' + str(oldest_id)
-                else:
-                    url = base_url
 
                 try:
-                    r = requests.post('http://sr3.plxbx.com:8888/crosspost', data={'url': url})
+                    r = requests.get(f'{self.config.util_api}/pushshift', params={'url': url})
                 except Exception as e:
                     log.exception('Exception getting Push Shift result', exc_info=True)
                     time.sleep(10)
@@ -111,9 +114,10 @@ class PostIngestor:
                         continue
                     continue
 
-                data = json.loads(response['payload'])
-                oldest_id = data['data'][-1]['created_utc']
-                log.debug('Oldest: %s', datetime.utcfromtimestamp(oldest_id))
+                data = response['payload']
+                oldest_id = data['data'][-1]['sid']
+                oldest_created_time = data['data'][-1]['created_utc']
+                log.debug('Oldest: %s | Newest: %s', datetime.utcfromtimestamp(data['data'][-1]['created_utc']), datetime.utcfromtimestamp(data['data'][0]['created_utc']))
 
                 if not start_time:
                     start_time = data['data'][0]['created_utc']
@@ -128,10 +132,12 @@ class PostIngestor:
                     except Exception:
                         pass
 
-
-                start_end_dif = start_time - oldest_id
-                if start_end_dif > 3600:
-                    log.debug('Reached end of 1 hour window, starting over')
-                    break
+                time.sleep(5)
 
 
+if __name__ == '__main__':
+    config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    reddit = get_reddit_instance(config)
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    ingestor = PostIngestor(reddit, uowm, config)
+    ingestor.ingest_pushshift()

@@ -27,7 +27,7 @@ reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
 dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
 
-cors = CORS(allow_origins_list=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='INFO')
+cors = CORS(allow_origins_list=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
 
 api = application = falcon.API(middleware=[cors.middleware])
 api.req_options.auto_parse_form_urlencoded = True
@@ -45,9 +45,13 @@ api.add_route('/history/reposts', RepostHistoryEndpoint(uowm), suffix='image_wit
 api.add_route('/history/reposts/all', RepostHistoryEndpoint(uowm), suffix='repost_image_feed')
 api.add_route('/monitored-sub/default-config', MonitoredSub(uowm, config, reddit), suffix='default_config')
 api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit))
+api.add_route('/monitored-sub/{subreddit}/refresh', MonitoredSub(uowm, config, reddit), suffix='refresh')
 api.add_route('/monitored-sub/popular', MonitoredSub(uowm, config, reddit), suffix='popular')
+api.add_route('/monitored-sub/all', MonitoredSub(uowm, config, reddit), suffix='all')
 api.add_route('/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
 api.add_route('/meme-template/', MemeTemplateEndpoint(uowm))
+api.add_route('/meme-template/potential', MemeTemplateEndpoint(uowm), suffix='potential')
+api.add_route('/meme-template/potential/{id:int}', MemeTemplateEndpoint(uowm), suffix='potential')
 api.add_route('/stats', BotStats(uowm, reddit))
 api.add_route('/stats/top-reposters', BotStats(uowm, reddit), suffix='reposters')
 api.add_route('/stats/banned-subreddits', BotStats(uowm, reddit), suffix='banned_subs')

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -348,7 +349,11 @@ class MonitoredSub(Base):
             'target_image_match': self.target_image_match,
             'target_image_meme_match': self.target_image_meme_match,
             'meme_filter_check_text': self.meme_filter_check_text,
-            'meme_filter_text_target_match': self.meme_filter_text_target_match
+            'meme_filter_text_target_match': self.meme_filter_text_target_match,
+            'subscribers': self.subscribers,
+            'is_mod': self.is_mod,
+            'wiki_permission': self.wiki_permission,
+            'post_permission': self.post_permission
         }
 
 
@@ -487,6 +492,7 @@ class UserReport(Base):
     reported_at = Column(DateTime, default=func.utc_timestamp())
     msg_body = Column(String(1000))
     message_id = Column(String(20), nullable=False)
+    sent_for_voting = Column(Boolean, default=False)
 
 class ToBeDeleted(Base):
     __tablename__ = 'to_be_deleted'
@@ -594,4 +600,46 @@ class SiteAdmin(Base):
             'super_user': self.super_user,
             'created_at': self.created_at.timestamp() if self.created_at else None,
             'updated_at': self.updated_at.timestamp() if self.created_at else None
+        }
+
+
+class MemeTemplatePotential(Base):
+    __tablename__ = 'meme_template_potential'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    submitted_by = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    vote_total = Column(Integer, nullable=False, default=0)
+
+    votes = relationship('MemeTemplatePotentialVote', back_populates='potential_template', cascade="all, delete")
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'submitted_by': self.submitted_by,
+            'vote_total': self.vote_total,
+            'created_at': self.created_at.timestamp() if self.created_at else None,
+            'votes': [vote.to_dict() for vote in self.votes]
+        }
+
+class MemeTemplatePotentialVote(Base):
+    __tablename__ = 'meme_template_potential_votes'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=False)
+    meme_template_potential_id = Column(Integer, ForeignKey('meme_template_potential.id'))
+    user = Column(String(100), nullable=False)
+    vote = Column(Integer, nullable=False)
+    voted_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+
+    potential_template = relationship("MemeTemplatePotential", back_populates='votes')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'user': self.user,
+            'vote': self.vote,
+            'voted_at': self.voted_at.timestamp() if self.voted_at else None,
         }

@@ -87,7 +87,8 @@ class InboxMonitor:
             report_type=msg.subject,
             meme_template=report_data['meme_template'],
             msg_body=msg.body,
-            message_id=msg.id
+            message_id=msg.id,
+            sent_for_voting=False
         )
 
         with self.uowm.start() as uow:

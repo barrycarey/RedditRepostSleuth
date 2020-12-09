@@ -1,19 +1,24 @@
 import os
 from typing import NoReturn, List
 
+import requests
 from praw import Reddit
 from prawcore import Forbidden, NotFound
 from sqlalchemy import func
 
+from redditrepostsleuth.core.celery.maintenance_tasks import update_monitored_sub_stats
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost, MemeTemplatePotential, \
+    MemeTemplate
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.util.helpers import is_moderator, bot_has_permission, is_bot_banned, build_markdown_table, \
+from redditrepostsleuth.core.util.helpers import build_markdown_table, \
     chunk_list
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, is_sub_mod_praw, is_bot_banned, \
+    bot_has_permission
 
 
 def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
@@ -31,18 +36,15 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     with uowm.start() as uow:
         monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
         for sub in monitored_subs:
-            subreddit = reddit.subreddit(sub.name)
-            if not subreddit:
-                continue
-            if not is_moderator(subreddit, 'RepostSleuthBot'):
+            if not is_sub_mod_praw(sub.name, 'RepostSleuthBot', reddit):
                 log.info('[Mod Check] Bot is not a mod on %s', sub.name)
                 sub.is_mod = False
                 uow.commit()
                 continue
 
             sub.is_mod = True
-            sub.post_permission = bot_has_permission(subreddit, 'post')
-            sub.wiki_permission = bot_has_permission(subreddit, 'wiki')
+            sub.post_permission = bot_has_permission(sub.name, 'posts', reddit)
+            sub.wiki_permission = bot_has_permission(sub.name, 'wiki', reddit)
             log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
             uow.commit()
     print('[Scheduled Job] Checking Mod Status End')
@@ -58,8 +60,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     with uowm.start() as uow:
         bans = uow.banned_subreddit.get_all()
         for ban in bans:
-            subreddit = reddit.subreddit(ban.subreddit)
-            if is_bot_banned(subreddit):
+            if is_bot_banned(ban.subreddit, reddit):
                 log.info('[Subreddit Ban Check] Still banned on %s', ban.subreddit)
                 ban.last_checked = func.utc_timestamp()
             else:
@@ -67,6 +68,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
                 uow.banned_subreddit.remove(ban)
             uow.commit()
 
+# TODO - Can be removed
 def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     print('[Scheduled Job] Update Subscribers Start')
     with uowm.start() as uow:
@@ -87,6 +89,13 @@ def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) ->
                 except Exception as e:
                     log.exception('[Subscriber Update] Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
     print('[Scheduled Job] Update Subscribers End')
+
+def update_monitored_sub_data(uowm: UnitOfWorkManager) -> NoReturn:
+    print('[Scheduled Job] Update Monitored Sub Data')
+    with uowm.start() as uow:
+        subs = uow.monitored_sub.get_all_active()
+        for sub in subs:
+            update_monitored_sub_stats.apply_async((sub.name,))
 
 def remove_expired_bans(uowm: UnitOfWorkManager) -> NoReturn:
     print('[Scheduled Job] Removed Expired Bans Start')
@@ -142,7 +151,7 @@ def update_top_image_reposts(uowm: UnitOfWorkManager, reddit: Reddit) -> NoRetur
                     count_data = next((x for x in chunk if x[0] == submission.id))
                     if not count_data:
                         continue
-                    uow.jashpu.add(
+                    uow.stats_top_image_repost.add(
                         StatsTopImageRepost(
                             post_id=count_data[0],
                             repost_count=count_data[1],
@@ -152,8 +161,69 @@ def update_top_image_reposts(uowm: UnitOfWorkManager, reddit: Reddit) -> NoRetur
                     )
             uow.commit()
 
+def send_reports_to_meme_voting(uowm: UnitOfWorkManager) -> NoReturn:
+    with uowm.start() as uow:
+        reports = uow.user_report.get_reports_for_voting(7)
+        for report in reports:
+            if uow.meme_template.get_by_post_id(report.post_id):
+                continue
+            if uow.meme_template_potential.get_by_post_id(report.post_id):
+                continue
+
+            post = uow.posts.get_by_post_id(report.post_id)
+            if not post:
+                continue
+            try:
+                if not requests.head(post.url).status_code == 200:
+                    continue
+            except Exception:
+                continue
+
+            potential_template = MemeTemplatePotential(
+                post_id=report.post_id,
+                submitted_by='background',
+                vote_total=0
+            )
+            uow.meme_template_potential.add(potential_template)
+            report.sent_for_voting = True
+            uow.commit()
+
+def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
+    with uowm.start() as uow:
+        potential_templates = uow.meme_template_potential.get_all()
+        for potential_template in potential_templates:
+            if potential_template.vote_total >= 10:
+                existing_template = uow.meme_template.get_by_post_id(potential_template.post_id)
+                if existing_template:
+                    log.info('Meme template already exists for %s. Removing', potential_template.post_id)
+                    uow.meme_template_potential.remove(potential_template)
+                    uow.commit()
+                    return
+
+                log.info('Post %s received %s votes.  Creating meme template', potential_template.post_id, potential_template.vote_total)
+                post = uow.posts.get_by_post_id(potential_template.post_id)
+                try:
+                    meme_hashes = get_image_hashes(post, hash_size=32)
+                except Exception as e:
+                    log.error('Failed to get meme hash for %s', post.post_id)
+                    return
+
+                meme_template = MemeTemplate(
+                    dhash_h=post.dhash_h,
+                    dhash_256=meme_hashes['dhash_h'],
+                    post_id=post.post_id
+                )
+                uow.meme_template.add(meme_template)
+                uow.meme_template_potential.remove(potential_template)
+            elif potential_template.vote_total <= -10:
+                log.info('Removing potential template with at least 10 negative votes')
+                uow.meme_template_potential.remove(potential_template)
+            else:
+                continue
+            uow.commit()
+
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_top_image_reposts(uowm, reddit)
+    update_monitored_sub_data(uowm)

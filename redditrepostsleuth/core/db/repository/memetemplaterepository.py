@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Text
 
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate
 
@@ -12,6 +12,9 @@ class MemeTemplateRepository:
 
     def get_by_id(self, id: int) -> MemeTemplate:
         return self.db_session.query(MemeTemplate).filter(MemeTemplate.id == id).first()
+
+    def get_by_post_id(self, id: Text) -> MemeTemplate:
+        return self.db_session.query(MemeTemplate).filter(MemeTemplate.post_id == id).first()
 
     def get_all(self, limit: int = 100, offset: int = 0) -> List[MemeTemplate]:
         return self.db_session.query(MemeTemplate).limit(limit).offset(offset).all()
