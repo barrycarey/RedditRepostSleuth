@@ -18,7 +18,7 @@ if __name__ == '__main__':
     print('Starting post ingestor')
     config = Config()
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    ingestor = PostIngestor(get_reddit_instance(config), uowm)
+    ingestor = PostIngestor(get_reddit_instance(config), uowm, config)
     threading.Thread(target=ingestor.ingest_without_stream, name='praw_ingest').start()
     threading.Thread(target=ingestor.ingest_pushshift, name='pushshift_ingest').start()
 

@@ -17,8 +17,8 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
-from redditrepostsleuth.core.util.helpers import bot_has_permission
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, bot_has_permission
 
 # Needed to map database column names to friendly config options
 CONFIG_OPTION_MAP = {
@@ -58,7 +58,7 @@ class SubredditConfigUpdater:
         # TODO - Possibly pass the subreddit to get_wiki_config
         subreddit = self.reddit.subreddit(monitored_sub.name)
 
-        if not bot_has_permission(subreddit, 'wiki'):
+        if not bot_has_permission(monitored_sub.name, 'wiki', self.reddit):
             return
 
         wiki_page = subreddit.wiki[self.config.wiki_config_name]

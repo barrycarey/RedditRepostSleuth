@@ -104,7 +104,8 @@ class SummonsHandler:
         return self._get_repost_cmd(post_type, cmd_str)
 
     def _get_repost_cmd(self, post_type: Text, cmd_body: Text) -> RepostBaseCmd:
-        cmd_body = cmd_body.strip('repost ')
+        if cmd_body:
+            cmd_body = cmd_body.strip('repost ')
         if post_type == 'image':
             return self._get_image_repost_cmd(cmd_body)
         elif post_type == 'link':
@@ -164,7 +165,7 @@ class SummonsHandler:
                             self._delete_mention(summons.comment_id)
                         return
 
-                if monitored_sub.only_allow_one_summons:
+                if monitored_sub.only_allow_one_summons and summons.requestor != 'barrycarey':
                     response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'summons')
                     if response:
                         log.info('Sub %s only allows one summons.  Existing response found at %s',
@@ -253,7 +254,7 @@ class SummonsHandler:
             existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
             if not existing_watch or (existing_watch and not existing_watch.enabled):
                 response.message = WATCH_DISABLED_NOT_FOUND
-                self._send_response(summons.comment_id, response)
+                self._send_response(response)
                 return
             existing_watch.enabled = False
             try:
@@ -350,12 +351,16 @@ class SummonsHandler:
 
     def process_image_repost_request(self, summons: Summons, post: Post):
 
+        with self.uowm.start() as uow:
+            monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
+
+
         cmd = self._get_summons_cmd(summons.comment_body, post.post_type)
         response = SummonsResponse(summons=summons)
 
-        target_image_match, target_annoy_distance = self._get_target_distances(
+        target_image_match, target_meme_match, target_annoy_distance = self._get_target_distances(
             post.subreddit,
-            override_hamming_distance=cmd.strictness
+            override_target_match_percent=cmd.strictness
         )
 
         try:
@@ -363,9 +368,10 @@ class SummonsHandler:
                 post,
                 target_annoy_distance=target_annoy_distance,
                 target_match_percent=target_image_match,
-                meme_filter=cmd.meme_filter,
-                same_sub=cmd.same_sub,
-                date_cutoff=cmd.match_age,
+                target_meme_match_percent=target_meme_match,
+                meme_filter=monitored_sub.meme_filter if monitored_sub else cmd.meme_filter,
+                same_sub=monitored_sub.same_sub_only if monitored_sub else cmd.same_sub,
+                date_cutoff=monitored_sub.target_days_old if monitored_sub else cmd.match_age,
                 max_matches=250,
                 max_depth=-1,
                 source='summons'
@@ -415,18 +421,24 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def _get_target_distances(self, subreddit: str, override_hamming_distance: int = None) -> Tuple[int, float]:
+    def _get_target_distances(self, subreddit: str, override_target_match_percent: int = None) -> Tuple[int, int, float]:
         """
         Check if the post we were summoned on is in a monitored sub.  If it is get the target distances for that sub
         :rtype: Tuple[int,float]
         :param subreddit: Subreddit name
         :return: Tuple with target hamming and annoy
         """
+        target_match_percent = None
+        target_meme_match_percent = None
+        target_annoy_distance = None
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
             if monitored_sub:
-                return override_hamming_distance or monitored_sub.target_image_match, monitored_sub.target_annoy
-            return override_hamming_distance or self.config.target_image_match, self.config.default_annoy_distance
+                target_match_percent = override_target_match_percent or monitored_sub.target_image_match
+                target_meme_match_percent = monitored_sub.target_image_meme_match
+                target_annoy_distance = monitored_sub.target_annoy
+                return target_match_percent, target_meme_match_percent, target_annoy_distance
+            return override_target_match_percent or self.config.target_image_match, self.config.target_image_meme_match, self.config.default_annoy_distance
 
     def _send_response(self, response: SummonsResponse) -> NoReturn:
         """

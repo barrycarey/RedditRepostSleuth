@@ -4,13 +4,15 @@ from typing import List, Text, NoReturn
 from urllib.parse import urlparse
 
 import requests
+from prawcore import Forbidden, NotFound
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
+from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask, RedditTask
 from redditrepostsleuth.core.db.databasemodels import ToBeDeleted
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_praw, get_bot_permissions, get_subscribers
 
 
 def remove_post(uowm: SqlAlchemyUnitOfWorkManager, post):
@@ -348,3 +350,20 @@ def cleanup_orphan_image_post(self, image_posts: List[Text]) -> NoReturn:
         uow.commit()
         log.info('Finished Orphan Batch')
 
+@celery.task(bind=True, base=RedditTask)
+def update_monitored_sub_stats(self, sub_name: Text) -> NoReturn:
+    with self.uowm.start() as uow:
+        sub = uow.monitored_sub.get_by_sub(sub_name)
+        if not sub:
+            log.error('Failed to find subreddit %s', sub_name)
+            return
+
+        sub.subscribers = get_subscribers(sub.name, self.reddit.reddit)
+
+        log.info('[Subscriber Update] %s: %s subscribers', sub.name, sub.subscribers)
+        sub.is_mod = is_sub_mod_praw(sub.name, 'repostsleuthbot', self.reddit.reddit)
+        perms = get_bot_permissions(sub.name, self.reddit) if sub.is_mod else []
+        sub.post_permission = True if 'all' in perms or 'posts' in perms else None
+        sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
+        log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
+        uow.commit()

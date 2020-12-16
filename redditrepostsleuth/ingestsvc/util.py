@@ -1,3 +1,4 @@
+import os
 from typing import Tuple
 
 import requests
@@ -70,7 +71,7 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, Redd
                 log.debug('Bad status code from image URL %s', r.status_code)
                 raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')
 
-    log.info('Post %s: Hashing with URL: %s', post.post_id, post.url)
+    log.info('%s - Post %s: Hashing with URL: %s', os.getpid(), post.post_id, post.url)
 
     if hash_api:
         log.debug('Post %s: Using hash API: %s', post.post_id, hash_api)

@@ -26,7 +26,7 @@ class NewActivationMonitor:
         print('[Scheduled Job] Check For Mod Invites Starting')
         try:
             log.info('Checking for new mod invites')
-            for msg in self.reddit.inbox.messages(limit=750):
+            for msg in self.reddit.inbox.messages(limit=1000):
                 if 'invitation to moderate' in msg.subject:
                     if self.is_already_active(msg.subreddit.display_name):
                         log.info('%s is already a monitored sub', msg.subreddit.display_name)
@@ -61,7 +61,7 @@ class NewActivationMonitor:
 
     def _notify_added(self, subreddit: Subreddit) -> NoReturn:
         log.info('Sending sucess PM to %s', subreddit.display_name)
-        wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/about/wiki/repost_sleuth_config'
+        wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/wiki/repost_sleuth_config'
         try:
             subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_config=wiki_url))
         except Exception as e:

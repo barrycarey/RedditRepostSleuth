@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Dict
 
 import requests
@@ -59,7 +60,7 @@ def generate_img_by_file(path: str) -> Image:
     return img if img else None
 
 def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
-    log.debug('Hashing image post %s', post.post_id)
+    log.debug('%s - Hashing image post %s', os.getpid(), post.post_id)
     try:
         img = generate_img_by_url(post.url)
     except ImageConversioinException as e:

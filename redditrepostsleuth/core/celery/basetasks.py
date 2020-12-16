@@ -30,7 +30,8 @@ class AnnoyTask(Task):
         from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging()
-        self.dup_service = DuplicateImageService(self.uowm, self.event_logger)
+        self.reddit = get_reddit_instance(self.config)
+        self.dup_service = DuplicateImageService(self.uowm, self.event_logger, self.reddit)
 
 class RedditTask(Task):
     def __init__(self):
