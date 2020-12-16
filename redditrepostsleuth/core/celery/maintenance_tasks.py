@@ -358,10 +358,10 @@ def update_monitored_sub_stats(self, sub_name: Text) -> NoReturn:
             log.error('Failed to find subreddit %s', sub_name)
             return
 
-        sub.subscribers = get_subscribers(sub.name, self.reddit)
+        sub.subscribers = get_subscribers(sub.name, self.reddit.reddit)
 
         log.info('[Subscriber Update] %s: %s subscribers', sub.name, sub.subscribers)
-        sub.is_mod = is_sub_mod_praw(sub.name, 'repostsleuthbot', self.reddit)
+        sub.is_mod = is_sub_mod_praw(sub.name, 'repostsleuthbot', self.reddit.reddit)
         perms = get_bot_permissions(sub.name, self.reddit) if sub.is_mod else []
         sub.post_permission = True if 'all' in perms or 'posts' in perms else None
         sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
