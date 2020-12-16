@@ -9,7 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 sys.path.append('./')
 from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers, \
-    remove_expired_bans, update_banned_sub_wiki
+    remove_expired_bans, update_banned_sub_wiki, send_reports_to_meme_voting, update_top_image_reposts, \
+    update_monitored_sub_data, check_meme_template_potential_votes
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
 from redditrepostsleuth.core.services.eventlogging import EventLogging
@@ -79,19 +80,11 @@ if __name__ == '__main__':
         max_instances=1
     )
     scheduler.add_job(
-        func=update_mod_status,
-        args=(uowm, reddit_manager),
+        func=update_monitored_sub_data,
+        args=(uowm,),
         trigger='interval',
-        minutes=20,
-        name='check_mod_status',
-        max_instances=1
-    )
-    scheduler.add_job(
-        func=update_monitored_sub_subscribers,
-        args=(uowm, reddit_manager),
-        trigger='interval',
-        hours=6,
-        name='update_subscriber_count',
+        hours=2,
+        name='updated_monitored_sub_data',
         max_instances=1
     )
     scheduler.add_job(
@@ -108,6 +101,30 @@ if __name__ == '__main__':
         trigger='interval',
         hours=1,
         name='updated_banned_subs',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=send_reports_to_meme_voting,
+        args=(uowm,),
+        trigger='interval',
+        hours=1,
+        name='send_reports_for_voting',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=update_top_image_reposts,
+        args=(uowm,reddit),
+        trigger='interval',
+        days=1,
+        name='update_image_reposts',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=check_meme_template_potential_votes,
+        args=(uowm,),
+        trigger='interval',
+        minutes=30,
+        name='check_meme_template_votes',
         max_instances=1
     )
     scheduler.start()

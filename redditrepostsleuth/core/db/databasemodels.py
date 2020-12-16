@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -23,6 +24,12 @@ class Post(Base):
     # TODO - Move to_dict methods into JSON encoders
 
     __tablename__ = 'reddit_post'
+    __table_args__ = (
+        Index('ingest_source', 'created_at', 'ingested_from'),
+        Index('ingest_graph', 'ingested_at', 'post_type', unique=False),
+        Index('image_repost_check', 'post_type', 'checked_repost', 'crosspost_parent', 'dhash_h', unique=False),
+        Index('image_hash', 'post_type', 'dhash_h', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
@@ -67,6 +74,9 @@ class Post(Base):
 
 class RedditImagePost(Base):
     __tablename__ = 'reddit_image_post'
+    __table_args__ = (
+        Index('create_at_index', 'created_at', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime)
@@ -86,6 +96,9 @@ class RedditImagePostCurrent(Base):
 
 class Summons(Base):
     __tablename__ = 'reddit_bot_summons'
+    __table_args__ = (
+        Index('user_summons_check', 'requestor', 'summons_received_at', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
@@ -162,6 +175,12 @@ class RepostWatch(Base):
 class ImageRepost(Base):
 
     __tablename__ = 'image_reposts'
+    __table_args__ = (
+        Index('Index 3', 'repost_of', unique=False),
+        Index('idx_author', 'author', unique=False),
+        Index('idx_detected_at', 'detected_at', unique=False),
+        Index('idx_repost_of_date', 'detected_at', 'author', unique=False)
+    )
     id = Column(Integer, primary_key=True)
     hamming_distance = Column(Integer)
     annoy_distance = Column(Float)
@@ -189,6 +208,13 @@ class ImageRepost(Base):
 class LinkRepost(Base):
 
     __tablename__ = 'link_reposts'
+    __table_args__ = (
+        Index('Index 3', 'repost_of', unique=False),
+        Index('idx_author', 'author', unique=False),
+        Index('idx_detected_at', 'detected_at', unique=False),
+        Index('idx_repost_of_date', 'detected_at', 'author', unique=False)
+    )
+
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False, unique=True)
     repost_of = Column(String(100), nullable=False)
@@ -279,8 +305,8 @@ class MonitoredSub(Base):
     check_video_posts = Column(Boolean, default=False)
     target_image_match = Column(Integer, default=92)
     target_image_meme_match = Column(Integer, default=97)
-
-
+    meme_filter_check_text = Column(Boolean, default=False)
+    meme_filter_text_target_match = Column(Integer, default=90)
 
     def to_dict(self):
         return {
@@ -321,11 +347,22 @@ class MonitoredSub(Base):
             'check_video_posts': self.check_video_posts,
             'check_text_posts': self.check_text_posts,
             'target_image_match': self.target_image_match,
-            'target_image_meme_match': self.target_image_meme_match
+            'target_image_meme_match': self.target_image_meme_match,
+            'meme_filter_check_text': self.meme_filter_check_text,
+            'meme_filter_text_target_match': self.meme_filter_text_target_match,
+            'subscribers': self.subscribers,
+            'is_mod': self.is_mod,
+            'wiki_permission': self.wiki_permission,
+            'post_permission': self.post_permission
         }
+
+
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'reddit_monitored_sub_checked'
+    __table_args__ = (
+        Index('post_id', 'post_id'),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
@@ -390,6 +427,11 @@ class InvestigatePost(Base):
 
 class ImageSearch(Base):
     __tablename__ = 'reddit_image_search'
+    __table_args__ = (
+        Index('subsearched', 'subreddit', 'source', 'matches_found', unique=False),
+        Index('Index 2', 'post_id', unique=False),
+        Index('idx_source', 'source', unique=False),
+    )
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     source = Column(String(50), nullable=False)
@@ -450,6 +492,7 @@ class UserReport(Base):
     reported_at = Column(DateTime, default=func.utc_timestamp())
     msg_body = Column(String(1000))
     message_id = Column(String(20), nullable=False)
+    sent_for_voting = Column(Boolean, default=False)
 
 class ToBeDeleted(Base):
     __tablename__ = 'to_be_deleted'
@@ -473,12 +516,130 @@ class BannedUser(Base):
     expires_at = Column(DateTime)
     notes = Column(String(500))
 
-class BotStat(Base):
-    __tablename__ = 'bot_stat'
+class StatsGeneral(Base):
+    __tablename__ = 'stats_general'
     id = Column(Integer, primary_key=True)
     image_reposts_detected = Column(Integer)
     link_reposts_detected = Column(Integer)
     private_messages_sent = Column(Integer)
-    comments = Column(Integer)
+    comments_left = Column(Integer)
     summons_received = Column(Integer)
     karma_gained = Column(Integer)
+
+class StatsTopImageRepost(Base):
+    __tablename__ = 'stats_top_image_repost'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    repost_count = Column(Integer, nullable=False)
+    days = Column(Integer, nullable=False)
+    nsfw = Column(Boolean, nullable=False)
+
+
+class MonitoredSubConfigChange(Base):
+    __tablename__ = 'reddit_monitored_sub_config_change'
+    __table_args__ = (
+        Index('idx_subreddit', 'subreddit', 'updated_at', unique=False),
+    )
+    id = Column(Integer, primary_key=True)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    updated_by = Column(String(100), nullable=False)
+    source = Column(String(10))
+    subreddit = Column(String(200), nullable=False)
+    config_key = Column(String(100), nullable=False)
+    old_value = Column(String(2000))
+    new_value = Column(String(2000))
+
+class ConfigMessageTemplate(Base):
+    __tablename__ = 'config_message_templates'
+    id = Column(Integer, primary_key=True)
+    template_name = Column(String(100), nullable=False, unique=True)
+    template_slug = Column(String(100), nullable=False, unique=True)
+    template = Column(String(2000), nullable=False)
+    created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'template_name': self.template_name,
+            'template': self.template,
+            'template_slug': self.template_slug,
+            'created_at': self.created_at.timestamp() if self.created_at else None,
+            'updated_at': self.updated_at.timestamp() if self.created_at else None
+        }
+
+class ConfigSettings(Base):
+    __tablename__ = 'config_settings'
+    id = Column(Integer, primary_key=True)
+    comment_karma_flag_threshold = Column(Integer)
+    comment_karma_remove_threshold = Column(Integer)
+    index_api = Column(String(150))
+    util_api = Column(String(150))
+    top_post_offer_watch = Column(Boolean, default=False)
+    repost_watch_enabled = Column(Boolean)
+    ingest_repost_check_image = Column(Boolean)
+    ingest_repost_check_link = Column(Boolean)
+    ingest_repost_check_text = Column(Boolean)
+    ingest_repost_check_video = Column(Boolean)
+    image_repost_target_image_match = Column(Integer)
+    image_repost_target_image_meme_match = Column(Integer)
+    image_repost_target_annoy_distance = Column(Float)
+
+class SiteAdmin(Base):
+    __tablename__ = 'site_admin'
+    id = Column(Integer, primary_key=True)
+    user = Column(String(100), nullable=False, unique=True)
+    super_user = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user': self.user,
+            'super_user': self.super_user,
+            'created_at': self.created_at.timestamp() if self.created_at else None,
+            'updated_at': self.updated_at.timestamp() if self.created_at else None
+        }
+
+
+class MemeTemplatePotential(Base):
+    __tablename__ = 'meme_template_potential'
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    submitted_by = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    vote_total = Column(Integer, nullable=False, default=0)
+
+    votes = relationship('MemeTemplatePotentialVote', back_populates='potential_template', cascade="all, delete")
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'submitted_by': self.submitted_by,
+            'vote_total': self.vote_total,
+            'created_at': self.created_at.timestamp() if self.created_at else None,
+            'votes': [vote.to_dict() for vote in self.votes]
+        }
+
+class MemeTemplatePotentialVote(Base):
+    __tablename__ = 'meme_template_potential_votes'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=False)
+    meme_template_potential_id = Column(Integer, ForeignKey('meme_template_potential.id'))
+    user = Column(String(100), nullable=False)
+    vote = Column(Integer, nullable=False)
+    voted_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+
+    potential_template = relationship("MemeTemplatePotential", back_populates='votes')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'user': self.user,
+            'vote': self.vote,
+            'voted_at': self.voted_at.timestamp() if self.voted_at else None,
+        }

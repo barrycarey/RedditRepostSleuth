@@ -2,7 +2,9 @@ import json
 from time import perf_counter
 from typing import List, Text, Optional
 
+import Levenshtein
 import requests
+from praw import Reddit
 from requests.exceptions import ConnectionError
 from distance import hamming
 from sqlalchemy import Float
@@ -22,12 +24,13 @@ from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import annoy_result_to_image_match
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
-    filter_no_dhash, filter_dead_urls, filter_title_distance
+    filter_no_dhash, filter_dead_urls, filter_title_distance, filter_removed_posts, filter_dead_urls_remote
 from redditrepostsleuth.core.util.reposthelpers import sort_reposts, get_closest_image_match, set_all_title_similarity
 
 
 class DuplicateImageService:
-    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, config: Config = None):
+    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, reddit: Reddit, config: Config = None):
+        self.reddit = reddit
         self.uowm = uowm
         self.event_logger = event_logger
         if config:
@@ -46,10 +49,10 @@ class DuplicateImageService:
             same_sub: bool = False,
             date_cutoff: int = None,
             filter_dead_matches: bool = True,
+            filter_removed_matches: bool = True,
             only_older_matches: bool = True,
             filter_crossposts=True,
             filter_author=True,
-            is_meme: bool = False,
             sort_by='created'
     ) -> ImageRepostWrapper:
         """
@@ -64,7 +67,7 @@ class DuplicateImageService:
         start_time = perf_counter()
         # TODO - Allow array of filters to be passed
 
-        if is_meme:
+        if search_results.meme_template:
             target_hamming_distance = get_hamming_from_percent(
                 target_meme_match_percent or self.config.target_image_meme_match, 256)
             search_results.target_match_percent = target_meme_match_percent or self.config.target_image_meme_match
@@ -78,7 +81,7 @@ class DuplicateImageService:
         search_results.target_annoy_distance = target_annoy_distance
 
         log.info('Target Annoy Dist: %s - Target Hamming Dist: %s', target_annoy_distance, target_hamming_distance)
-        log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', is_meme, only_older_matches, date_cutoff, same_sub)
+        log.info('Meme Filter: %s - Only Older: %s - Day Cutoff: %s - Same Sub: %s', search_results.meme_template is None, only_older_matches, date_cutoff, same_sub)
         log.debug('Matches pre-filter: %s', len(search_results.matches))
         matches = search_results.matches
         matches = list(filter(filter_same_post(search_results.checked_post.post_id), matches))
@@ -107,17 +110,23 @@ class DuplicateImageService:
 
 
         matches = list(filter(annoy_distance_filter(target_annoy_distance), matches))
-        matches = list(filter(hamming_distance_filter(target_hamming_distance if not is_meme else 0), matches))
+        # TODO - Don't like setting a hard zero hamming distance when meme is detected
+        matches = list(filter(hamming_distance_filter(target_hamming_distance if not search_results.meme_template else 0), matches))
 
         if filter_dead_matches:
-            matches = list(filter(filter_dead_urls, matches))
+            matches = filter_dead_urls_remote(
+                f'{self.config.util_api}/maintenance/removed',
+                self.reddit,
+                matches
+            )
+            matches = filter_removed_posts(self.reddit, matches)
 
         for match in matches:
             log.debug('Match found: %s - A:%s H:%s', f'https://redd.it/{match.post.post_id}',
                       round(match.annoy_distance, 5), match.hamming_distance)
 
         log.info('Matches post-filter: %s', len(matches))
-        if is_meme:
+        if search_results.meme_template:
             search_results.search_times.start_timer('meme_filter_time')
             matches = self._final_meme_filter(search_results.checked_post, matches, target_hamming_distance)
             search_results.search_times.stop_timer('meme_filter_time')
@@ -136,6 +145,7 @@ class DuplicateImageService:
                                  same_sub: bool = False,
                                  date_cutoff: int = None,
                                  filter_dead_matches: bool = True,
+                                 filter_removed_matches: bool = True,
                                  only_older_matches=True,
                                  meme_filter=False,
                                  max_depth=4000,
@@ -159,9 +169,29 @@ class DuplicateImageService:
         search_times.start_timer('total_search_time')
         search_results.checked_post = post
 
+        if meme_filter and result_filter:
+            search_times.start_timer('meme_detection_time')
+            search_results.meme_template = self._get_meme_template(post.dhash_h)
+            search_times.stop_timer('meme_detection_time')
+            if search_results.meme_template:
+                log.info('Using meme filter %s', search_results.meme_template.id)
+
+        if search_results.meme_template:
+            target_hamming_distance = 0
+        else:
+            target_hamming_distance = get_hamming_from_percent(target_match_percent or self.config.target_image_match,
+                                                                len(search_results.checked_post.dhash_h))
+
         try:
             search_times.start_timer('image_search_api_time')
-            r = requests.get(f'{self.config.index_api}/image', params={'hash': post.dhash_h, 'max_results': max_matches, 'max_depth': max_depth})
+            params = {
+                'hash': post.dhash_h,
+                'max_results': max_matches,
+                'max_depth': max_depth,
+                'a_filter': target_annoy_distance or self.config.default_annoy_distance,
+                'h_filter': target_hamming_distance
+            }
+            r = requests.get(f'{self.config.index_api}/image', params=params)
             search_times.stop_timer('image_search_api_time')
         except ConnectionError:
             log.error('Failed to connect to Index API')
@@ -172,23 +202,20 @@ class DuplicateImageService:
 
         if r.status_code != 200:
             log.error('Unexpected status from index API: %s', r.status_code)
-            raise NoIndexException('Unexpected status: %s', r.status_code)
+            raise NoIndexException(f'Unexpected status: {r.status_code}')
 
         api_results = json.loads(r.text)
         search_times.index_search_time = api_results['index_search_time']
         search_results.total_searched = api_results['total_searched']
 
-        search_times.start_timer('pre_annoy_filter_time')
-        raw_results = filter(
-            self._annoy_filter(target_annoy_distance or self.config.default_annoy_distance),
-            api_results['matches']
-        )  # Pre-filter results on default annoy value
-        results = self._convert_annoy_results(raw_results, post.id)
-        log.warn('After Pre Annoy Filter %s', len(results))
-        search_times.stop_timer('pre_annoy_filter_time')
+        historical_results = self._convert_annoy_results(api_results['historical_matches'], post.id)
+        current_results = self._convert_annoy_results(api_results['current_matches'], post.id)
+        log.warn('After Pre Annoy Filter %s', len(historical_results) + len(current_results))
 
         search_times.start_timer('set_match_post_time')
-        results = self._set_match_posts(results)
+        historical_results = self._set_match_posts(historical_results)
+        current_results = self._set_match_posts(current_results, historical=False)
+        results = historical_results + current_results
         search_times.stop_timer('set_match_post_time')
 
         search_times.start_timer('remove_duplicate_time')
@@ -199,12 +226,6 @@ class DuplicateImageService:
             search_times.start_timer('set_match_hamming')
             self._set_match_hamming(post, search_results.matches)
             search_times.stop_timer('set_match_hamming')
-            if meme_filter:
-                search_times.start_timer('meme_detection_time')
-                search_results.meme_template = self._get_meme_template(post.dhash_h)
-                search_times.stop_timer('meme_detection_time')
-                if search_results.meme_template:
-                    log.info('Using meme filter %s', search_results.meme_template.id)
 
             search_times.start_timer('total_filter_time')
             search_results = self._filter_results_for_reposts(search_results,
@@ -217,7 +238,6 @@ class DuplicateImageService:
                                                                       only_older_matches=only_older_matches,
                                                                       target_title_match=target_title_match,
                                                                       sort_by=sort_by,
-                                                                      is_meme=search_results.meme_template or False,
                                                                       filter_crossposts=filter_crossposts,
                                                                       filter_author=filter_author
                                                                       )
@@ -226,8 +246,9 @@ class DuplicateImageService:
             search_results.matches = self._set_match_posts(search_results.matches)
             self._set_match_hamming(post, search_results.matches)
         search_times.stop_timer('total_search_time')
+        search_results.total_search_time = search_results.search_times.total_search_time # TODO - Properly fix this.
         self._log_search_time(search_results, source)
-        search_results.search_id = self._log_search(
+        search_results.logged_search = self._log_search(
             search_results,
             same_sub,
             date_cutoff,
@@ -241,6 +262,8 @@ class DuplicateImageService:
             target_match_percent or self.config.target_image_match,
             target_meme_match_percent or self.config.target_image_meme_match
         )
+        if search_results.logged_search:
+            search_results.search_id = search_results.logged_search.id
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
@@ -281,7 +304,7 @@ class DuplicateImageService:
             used_historical_index: bool,
             target_image_match: int,
             target_image_meme_match: int
-    ) -> Optional[int]:
+    ) -> Optional[ImageRepostWrapper]:
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id,
             used_historical_index=used_historical_index,
@@ -310,7 +333,7 @@ class DuplicateImageService:
             uow.image_search.add(image_search)
             try:
                 uow.commit()
-                return image_search.id
+                return image_search
             except Exception as e:
                 log.exception('Failed to save image search', exc_info=False)
 
@@ -411,6 +434,9 @@ class DuplicateImageService:
             target_hamming
     ) -> List[ImageMatch]:
         results = []
+        log.debug('MEME FILTER - Filtering %s matches', len(matches))
+        if len(matches) == 0:
+            return matches
 
         try:
             target_hashes = get_image_hashes(searched_post, hash_size=32)
@@ -419,6 +445,7 @@ class DuplicateImageService:
             return matches
 
         for match in matches:
+            start = perf_counter()
             try:
                 match_hashes = get_image_hashes(match.post, hash_size=32)
             except Exception as e:
@@ -431,7 +458,6 @@ class DuplicateImageService:
                 log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
                           h_distance, f'https://redd.it/{match.post.post_id}')
                 continue
-
             log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                        h_distance)
             match.hamming_distance = h_distance

@@ -1,6 +1,6 @@
 from typing import List
 
-from redditrepostsleuth.core.db.databasemodels import MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
@@ -19,6 +19,7 @@ class ImageRepostWrapper(RepostWrapper):
         self.target_annoy_distance: float = None
         self.search_id: int = None
         self.search_times: ImageSearchTimes
+        self.logged_search: ImageSearch
 
     def to_dict(self):
         r = {

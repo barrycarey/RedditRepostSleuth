@@ -14,7 +14,7 @@ from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, LinkRepost
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, LinkRepost, ImageSearch
 from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
 from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
@@ -101,6 +101,17 @@ def build_markdown_list(matches: List[ImageMatch]) -> str:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
     return result
 
+def build_site_search_url(image_search: ImageSearch) -> Text:
+    url = f'https://www.repostsleuth.com?postId={image_search.post_id}&'
+    url += f'sameSub={str(image_search.same_sub).lower()}&'
+    url += f'filterOnlyOlder={str(image_search.only_older_matches).lower()}&'
+    url += f'memeFilter={str(image_search.meme_filter).lower()}&'
+    url += f'filterDeadMatches={str(image_search.filter_dead_matches).lower()}&'
+    url += f'targetImageMatch={str(image_search.target_image_match)}&'
+    url += f'targetImageMemeMatch={str(image_search.target_image_meme_match)}'
+    return url
+
+
 def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     results_values = {}
     base_values = {
@@ -110,7 +121,8 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
         'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
         'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
         'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
-        'meme_filter': True if search_results.meme_template else False
+        'meme_filter': True if search_results.meme_template else False,
+        'search_url': build_site_search_url(search_results.logged_search)
     }
     if search_results.matches:
         results_values = {
@@ -193,63 +205,9 @@ def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
     }
     return json.dumps(search_data)
 
-def is_moderator(subreddit: Subreddit, user: Text) -> bool:
-    """
-    Check if a given username is a moderator on a given sub
-    :rtype: bool
-    :param subreddit: Praw SubReddit obj
-    :param user: username
-    :return: bool
-    """
-    try:
-        for mod in subreddit.moderator():
-            if mod.name.lower() == user.lower():
-                return True
-        return False
-    except Forbidden:
-        log.error('[Mod Check] Forbidden On Sub %s', subreddit.display_name)
-        return False
 
-def bot_has_permission(subreddit: Subreddit, permission_name: Text) -> bool:
-    log.debug('Checking if bot has %s permission in %s', permission_name, subreddit.display_name)
-    try:
-        for mod in subreddit.moderator():
-            if mod.name == 'RepostSleuthBot':
-                if 'all' in mod.mod_permissions:
-                    log.debug('Bot has All permissions in %s', subreddit.display_name)
-                    return True
-                elif permission_name.lower() in mod.mod_permissions:
-                    log.debug('Bot has %s permission in %s', permission_name, subreddit.display_name)
-                    return True
-                else:
-                    log.debug('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
-                    return False
-        log.error('Bot is not mod on %s', subreddit.display_name)
-        return False
-    except Forbidden:
-        return False
 
-def is_bot_banned(subreddit: Subreddit) -> bool:
-    """
-    Check if bot is banned on a given sub
-    :rtype: bool
-    :param subreddit: Sub to check
-    :return: bool
-    """
-    banned = False
-    try:
-        sub = subreddit.submit('ban test', selftext='ban test')
-        sub.delete()
-    except Forbidden:
-        banned = True
-    except APIException as e:
-        if e.error_type == 'SUBREDDIT_NOTALLOWED':
-            banned = True
-    if banned:
-        log.info('Bot is banned from %s', subreddit.display_name)
-    else:
-        log.info('Bot is allowed on %s', subreddit.display_name)
-    return banned
+
 
 def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
     if len(rows[0]) != len(headers):

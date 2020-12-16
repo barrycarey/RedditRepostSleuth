@@ -8,7 +8,7 @@ import requests
 from praw import Reddit
 from praw.models import Submission
 
-
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.logging import log
@@ -17,7 +17,7 @@ from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.objectmapping import post_to_repost_match
-from redditrepostsleuth.core.util.repost_filters import filter_title_distance
+
 
 
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
@@ -213,4 +213,5 @@ def set_all_title_similarity(title: Text, matches: List[RepostMatch]) -> List[Re
     for match in matches:
         match.title_similarity = get_title_similarity(title, match.post.title)
     return matches
+
 

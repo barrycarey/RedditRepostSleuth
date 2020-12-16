@@ -15,8 +15,10 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 
 COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n'
-IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]*'
-IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={false_negative_data}) ]*'
+IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]* \n\n' \
+                        '[View Search On repostsleuth.com]({search_url})'
+IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={false_negative_data}) ]* \n\n' \
+                        '[View Search On repostsleuth.com]({search_url})'
 LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
 FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}.  \n\n' \
                         '{first_seen}. {last_seen} \n\n' \
@@ -70,7 +72,7 @@ TOP_POST_WATCH_SUBJECT = 'Nice OC!  Want me to protect it?'
 TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someone stole it, right? \n\n Well I can help with that! \n\n Simply reply ' \
                       '"yes" to this message and I will keep an eye out. If someone uploads your image I\'ll send you a PM.  Simple as that. \n\n' \
                         'If you would like me to protect other posts, simply comment on the post, tagging me like this: u/RepostSleuthBot watch' \
-                      '{shortlink}'
+                      '\n\n{shortlink}'
 
 TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
 
