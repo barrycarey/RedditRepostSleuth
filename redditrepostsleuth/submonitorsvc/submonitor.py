@@ -131,7 +131,7 @@ class SubMonitor:
             log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
-        if not search_results.matches and monitored_sub.repost_only:
+        if not search_results.matches and monitored_sub.only_comment_on_repost:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
@@ -210,7 +210,7 @@ class SubMonitor:
                 log.error('New search index is being loaded. Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
                 continue
 
-            if not search_results.matches and monitored_sub.repost_only:
+            if not search_results.matches and monitored_sub.only_comment_on_repost:
                 log.debug('No matches for post %s and comment OC is disabled',
                          f'https://redd.it/{search_results.checked_post.post_id}')
                 self._create_checked_post(post)
@@ -358,7 +358,7 @@ class SubMonitor:
 
 
     def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission, report_msg: Text) -> NoReturn:
-        if not monitored_sub.report_submission:
+        if not monitored_sub.report_reposts:
             return
         log.info('Reporting post %s on %s', f'https://redd.it/{submission.id}', monitored_sub.name)
         try:
