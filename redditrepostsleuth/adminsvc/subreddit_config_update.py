@@ -54,7 +54,7 @@ class SubredditConfigUpdater:
 
         print('[Scheduled Job] Config Updates End')
 
-    def check_for_config_update(self, monitored_sub: MonitoredSub):
+    def check_for_config_update(self, monitored_sub: MonitoredSub, notify_missing_keys=True):
         # TODO - Possibly pass the subreddit to get_wiki_config
         subreddit = self.reddit.subreddit(monitored_sub.name)
 
@@ -91,8 +91,9 @@ class SubredditConfigUpdater:
         wiki_page = subreddit.wiki['repost_sleuth_config'] # Force refresh so we can get latest revision ID
         self._create_revision(wiki_page)
         self._set_config_validity(wiki_page.revision_id, True)
-        if self._notify_new_options(subreddit, missing_keys):
-            self._set_config_notified(wiki_page.revision_id)
+        if notify_missing_keys:
+            if self._notify_new_options(subreddit, missing_keys):
+                self._set_config_notified(wiki_page.revision_id)
 
 
     def create_initial_wiki_config(self, subreddit: Subreddit, wiki_page: WikiPage, monitored_sub: MonitoredSub) -> NoReturn:
