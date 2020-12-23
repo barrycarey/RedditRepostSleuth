@@ -20,14 +20,6 @@ from redditrepostsleuth.core.services.response_handler import ResponseHandler
 
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, bot_has_permission
 
-# Needed to map database column names to friendly config options
-CONFIG_OPTION_MAP = {
-    'only_comment_on_repost': 'repost_only',
-    'report_reposts': 'report_submission',
-    'match_percent_dif': 'target_hamming',
-
-}
-
 class SubredditConfigUpdater:
 
     def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, response_handler: ResponseHandler, config: Config):
@@ -67,6 +59,8 @@ class SubredditConfigUpdater:
             wiki_page.content_md
         except NotFound:
             self.create_initial_wiki_config(subreddit, wiki_page, monitored_sub)
+            return
+        except Forbidden:
             return
 
         try:
@@ -216,12 +210,8 @@ class SubredditConfigUpdater:
         """
         new_config = {}
         for k in self.config.sub_monitor_exposed_config_options:
-            if k in CONFIG_OPTION_MAP:
-                db_key = CONFIG_OPTION_MAP[k]
-            else:
-                db_key = k
-            if hasattr(monitored_sub, db_key):
-                new_config[k] = getattr(monitored_sub, db_key)
+            if hasattr(monitored_sub, k):
+                new_config[k] = getattr(monitored_sub, k)
 
         return new_config
 
@@ -236,14 +226,10 @@ class SubredditConfigUpdater:
         """
 
         for k in self.config.sub_monitor_exposed_config_options:
-            if k in CONFIG_OPTION_MAP:
-                db_key = CONFIG_OPTION_MAP[k]
-            else:
-                db_key = k
-            if hasattr(monitored_sub, db_key) and k in wiki_config:
-                if getattr(monitored_sub, db_key) != wiki_config[k]:
-                    log.debug('Changing %s from %s to %s for %s', db_key, getattr(monitored_sub, db_key), wiki_config[k], monitored_sub.name)
-                    setattr(monitored_sub, db_key, wiki_config[k])
+            if hasattr(monitored_sub, k) and k in wiki_config:
+                if getattr(monitored_sub, k) != wiki_config[k]:
+                    log.debug('Changing %s from %s to %s for %s', k, getattr(monitored_sub, k), wiki_config[k], monitored_sub.name)
+                    setattr(monitored_sub, k, wiki_config[k])
 
         return monitored_sub
 
