@@ -3,9 +3,8 @@ import time
 from typing import Text, NoReturn
 
 from praw import Reddit
-from praw.exceptions import APIException
+from praw.exceptions import APIException, RedditAPIException
 from praw.models import Subreddit, Message
-from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
@@ -40,7 +39,6 @@ class NewActivationMonitor:
             monitored_sub = self._create_monitored_sub_in_db(msg)
         except Exception as e:
             return
-
         subreddit = self.reddit.subreddit(msg.subreddit.display_name)
         try:
             subreddit.mod.accept_invite()
@@ -56,6 +54,8 @@ class NewActivationMonitor:
         self._create_wiki_page(subreddit)
         log.info('%s has been added as a monitored sub', subreddit.display_name)
 
+
+
     def _notify_added(self, subreddit: Subreddit) -> NoReturn:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit.display_name)
@@ -64,7 +64,7 @@ class NewActivationMonitor:
             try:
                 subreddit.message('Repost Sleuth Activated', MONITORED_SUB_ADDED.format(wiki_config=wiki_url))
                 monitored_sub.activation_notification_sent = True
-            except Exception as e:
+            except RedditAPIException as e:
                 log.exception('Failed to send activation PM', exc_info=True)
             uow.commit()
 
@@ -73,7 +73,7 @@ class NewActivationMonitor:
         template = json.dumps(DEFAULT_CONFIG_VALUES)
         try:
             subreddit.wiki.create('Repost Sleuth Config', template)
-        except Exception as e:
+        except RedditAPIException:
             log.exception('Failed to create wiki page', exc_info=True)
 
     def _create_monitored_sub_in_db(self, msg: Message) -> MonitoredSub:
