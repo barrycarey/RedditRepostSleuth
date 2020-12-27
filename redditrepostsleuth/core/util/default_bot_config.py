@@ -1,7 +1,5 @@
 DEFAULT_CONFIG_VALUES = {
               "active": True,
-              "repost_only": True,
-              "report_submission": False,
               "report_msg": "RepostSleuthBot-Repost",
               "same_sub_only": False,
               "sticky_comment": False,
@@ -26,5 +24,7 @@ DEFAULT_CONFIG_VALUES = {
               "check_image_posts": True,
               "check_link_posts": True,
               "target_image_match": 92,
-              "target_image_meme_match": 97
+              "target_image_meme_match": 97,
+              "only_comment_on_repost": True,
+              "report_reposts": False
 }

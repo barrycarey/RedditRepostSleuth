@@ -6,13 +6,6 @@ from sqlalchemy.orm import relationship
 Base = declarative_base()
 
 
-
-#op.create_index('ingest_source', 'reddit_post', ['created_at', 'ingested_from'], unique=False)
-#op.create_index('ingest_graph', 'reddit_post', ['ingested_at', 'post_type'], unique=False)
-#op.create_index('image_repost_check', 'reddit_post', ['post_type', 'checked_repost', 'crosspost_parent', 'dhash_h'], unique=False)
-#op.create_index('image_hash', 'reddit_post', ['post_type', 'dhash_h'], unique=False)
-#op.create_index('create_at_index', 'reddit_image_post', ['created_at'], unique=False)
-
 class Post(Base):
 
     def __lt__(self, other):
@@ -307,6 +300,10 @@ class MonitoredSub(Base):
     target_image_meme_match = Column(Integer, default=97)
     meme_filter_check_text = Column(Boolean, default=False)
     meme_filter_text_target_match = Column(Integer, default=90)
+    only_comment_on_repost = Column(Boolean, default=True)
+    report_reposts = Column(Boolean, default=False)
+    failed_admin_check_count = Column(Integer, default=0)
+    activation_notification_sent = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -353,7 +350,11 @@ class MonitoredSub(Base):
             'subscribers': self.subscribers,
             'is_mod': self.is_mod,
             'wiki_permission': self.wiki_permission,
-            'post_permission': self.post_permission
+            'post_permission': self.post_permission,
+            'only_comment_on_repost': self.only_comment_on_repost,
+            'report_reposts': self.report_reposts,
+            'failed_admin_check_count': self.failed_admin_check_count
+
         }
 
 
