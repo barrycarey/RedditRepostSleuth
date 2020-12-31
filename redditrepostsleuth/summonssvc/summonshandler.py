@@ -28,7 +28,7 @@ from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, IMAGE_REPOST_ALL, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
-from redditrepostsleuth.core.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 

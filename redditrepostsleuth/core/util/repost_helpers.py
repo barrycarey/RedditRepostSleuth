@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 import random
 from time import perf_counter
@@ -8,15 +9,15 @@ import requests
 from praw import Reddit
 from praw.models import Submission
 
-from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.imagematch import ImageMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
 from redditrepostsleuth.core.util.constants import USER_AGENTS
-from redditrepostsleuth.core.util.objectmapping import post_to_repost_match
+from redditrepostsleuth.core.util.objectmapping import post_to_link_post_search_match
 
 
 
@@ -56,12 +57,12 @@ def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> 
         return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
 
 
-def get_closest_image_match(posts: List[ImageMatch], reverse=True, check_url=True) -> ImageMatch:
+def get_closest_image_match(posts: List[ImageSearchMatch], reverse=True, check_url=True) -> ImageSearchMatch:
     if not posts:
         return None
     if not check_url:
-        return sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)[0]
-    sorted_matches = sorted(posts, key=lambda  x: x.hamming_match_percent, reverse=reverse)
+        return sorted(posts, key=lambda x: x.hamming_match_percent, reverse=reverse)[0]
+    sorted_matches = sorted(posts, key=lambda x: x.hamming_match_percent, reverse=reverse)
     return get_first_active_match(sorted_matches)
 
 
@@ -111,7 +112,7 @@ def check_link_repost(
         search_results.checked_post = post
         raw_results = uow.posts.find_all_by_url_hash(post.url_hash)
         search_results.total_search_time = round(perf_counter() - start, 3)
-        search_results.matches = [post_to_repost_match(match, post.id) for match in raw_results]
+        search_results.matches = [post_to_link_post_search_match(match, post.id) for match in raw_results]
         search_results.matches = filter_repost_results(
             search_results.matches,
             post,
@@ -187,7 +188,7 @@ def filter_repost_results(
     return results
 
 
-def get_first_active_match(matches: List[RepostMatch]) -> RepostMatch:
+def get_first_active_match(matches: List[SearchMatch]) -> SearchMatch:
     for match in matches:
         try:
             headers = {'User-Agent': random.choice(USER_AGENTS)}
@@ -203,7 +204,7 @@ def get_title_similarity(title1: Text, title2: Text) -> float:
     log.debug('Difference between %s and %s: %s', title1, title2, result)
     return round(result * 100, 0)
 
-def set_all_title_similarity(title: Text, matches: List[RepostMatch]) -> List[RepostMatch]:
+def set_all_title_similarity(title: Text, matches: List[SearchMatch]) -> List[SearchMatch]:
     """
     Take a list of repost matches and set the title similarity vs the provided title
     :param title: Title to measure each match against
@@ -213,5 +214,4 @@ def set_all_title_similarity(title: Text, matches: List[RepostMatch]) -> List[Re
     for match in matches:
         match.title_similarity = get_title_similarity(title, match.post.title)
     return matches
-
 

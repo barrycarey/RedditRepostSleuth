@@ -1,4 +1,3 @@
-from time import perf_counter
 from typing import List, Dict
 
 import requests
@@ -8,13 +7,11 @@ from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck, IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
-from redditrepostsleuth.core.model.imagematch import ImageMatch
+from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
-from redditrepostsleuth.core.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask
 from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result, \
@@ -99,7 +96,7 @@ def link_repost_check(self, posts, ):
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]], repost: Post):
+def notify_watch(self, watches: List[Dict[ImagePostSearchMatch, RepostWatch]], repost: Post):
     repost_watch_notify(watches, self.reddit, self.response_handler, repost)
     with self.uowm.start() as uow:
         for w in watches:

@@ -9,7 +9,7 @@ from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.ocr import get_image_text, get_image_text_tesseract
-from redditrepostsleuth.core.util.reposthelpers import get_title_similarity
+from redditrepostsleuth.core.util.repost_helpers import get_title_similarity
 
 
 class ImageSearch:

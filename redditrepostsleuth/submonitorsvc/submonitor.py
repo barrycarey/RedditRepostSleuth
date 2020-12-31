@@ -16,7 +16,7 @@ from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -25,7 +25,7 @@ from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, b
     save_link_repost
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -279,7 +279,7 @@ class SubMonitor:
             get_total=False
         )
 
-    def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageRepostWrapper:
+    def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageSearchResults:
         """
         Check if provided post is a repost
         :param post: DB Post obj
@@ -366,7 +366,7 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to report submission', exc_info=True)
 
-    def _leave_comment(self, search_results: ImageRepostWrapper, monitored_sub: MonitoredSub) -> Comment:
+    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
 
         msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
         if search_results.checked_post.post_type == 'image':

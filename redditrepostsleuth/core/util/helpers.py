@@ -1,23 +1,18 @@
+
+
 import json
+from typing import Dict, List, Text, TYPE_CHECKING
 
-import requests
-from typing import Dict, List, Text
-
-import imagehash
-from praw.exceptions import APIException
-from praw.models import Subreddit
-from prawcore import Forbidden
+if TYPE_CHECKING:
+    from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
+    from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, LinkRepost, ImageSearch
-from redditrepostsleuth.core.model.imagematch import ImageMatch
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -95,7 +90,7 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def build_markdown_list(matches: List[ImageMatch]) -> str:
+def build_markdown_list(matches: List['ImagePostSearchMatch']) -> str:
     result = ''
     for match in matches:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
@@ -112,7 +107,7 @@ def build_site_search_url(image_search: ImageSearch) -> Text:
     return url
 
 
-def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     results_values = {}
     base_values = {
         'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
@@ -175,11 +170,11 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
     if search_results.matches:
         results_values = {
             'oldest_created_at': search_results.matches[0].post.created_at,
-            'oldest_url': search_results.matches[0].post.url,
+            'oldest_url': search_results.matches[0].post.searched_url,
             'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
             'oldest_sub': search_results.matches[0].post.subreddit,
             'newest_created_at': search_results.matches[-1].post.created_at,
-            'newest_url': search_results.matches[-1].post.url,
+            'newest_url': search_results.matches[-1].post.searched_url,
             'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
             'newest_sub': search_results.matches[-1].post.subreddit,
             'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
@@ -193,7 +188,7 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
 
     return {**base_values, **results_values, **kwargs}
 
-def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
+def create_search_result_json(search_results: 'ImageSearchResults') -> dict:
     """
     Take an ImageRepostWrapper object and create the json to be stored in the database
     :rtype: dict
@@ -227,7 +222,7 @@ def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
 
     return table
 
-def get_hamming_from_percent(match_percent: int, hash_length: int) -> float:
+def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
 def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
