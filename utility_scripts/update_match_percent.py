@@ -28,7 +28,7 @@ sub_monitor = SubMonitor(dup_image_svc, uowm, reddit_manager, response_builder, 
 
 with uowm.start() as uow:
     post = uow.posts.get_by_post_id('iirpkm')
-    target_hashes = get_image_hashes(post, hash_size=32)
+    target_hashes = get_image_hashes(post.searched_url, hash_size=32)
 
 
 with uowm.start() as uow:

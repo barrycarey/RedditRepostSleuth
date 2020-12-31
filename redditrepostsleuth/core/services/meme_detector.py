@@ -3,7 +3,7 @@ from typing import Text
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.image_index_loader import ImageIndexLoader
 from redditrepostsleuth.core.util.repost_filters import raw_annoy_filter
 

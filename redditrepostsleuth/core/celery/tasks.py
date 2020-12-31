@@ -127,9 +127,9 @@ def fingerprint_audio_dl(self, post):
             return
 
     try:
-        file = download_file(post.url)
+        file = download_file(post.searched_url)
     except Exception as e:
-        log.error('Failed to download file from %s', post.url)
+        log.error('Failed to download file from %s', post.searched_url)
         return
 
     try:
