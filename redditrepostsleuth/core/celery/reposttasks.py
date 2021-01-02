@@ -9,6 +9,7 @@ from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostC
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
+from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.repost_helpers import check_link_repost
@@ -28,7 +29,7 @@ def ingest_repost_check(post):
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
-def check_image_repost_save(self, post: Post) -> RepostWrapper:
+def check_image_repost_save(self, post: Post) -> ImageSearchResults:
     r = requests.head(post.url)
     if r.status_code != 200:
         log.info('Skipping image that is deleted %s', post.url)

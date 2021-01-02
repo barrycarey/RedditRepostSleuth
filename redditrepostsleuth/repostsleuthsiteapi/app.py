@@ -4,7 +4,7 @@ from falcon_cors import CORS
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance

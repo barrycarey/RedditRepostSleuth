@@ -2,7 +2,6 @@ from typing import List, NoReturn, Dict, Text
 
 from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, RepostWatch, MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
