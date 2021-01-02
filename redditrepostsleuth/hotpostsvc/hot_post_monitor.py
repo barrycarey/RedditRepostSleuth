@@ -111,8 +111,9 @@ class TopPostMonitor:
                 return
             try:
 
-                return self.image_service.check_duplicates_wrapped(
-                    post,
+                return self.image_service.check_image(
+                    post.url,
+                    post=post,
                     same_sub=False,
                     meme_filter=True
                 )

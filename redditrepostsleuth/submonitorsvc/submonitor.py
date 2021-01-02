@@ -286,14 +286,16 @@ class SubMonitor:
         :return: None
         """
 
-        search_results = self.image_service.check_duplicates_wrapped(
-            post,
+        search_results = self.image_service.check_image(
+            post.url,
+            post=post,
             target_annoy_distance=monitored_sub.target_annoy,
             target_match_percent=monitored_sub.target_image_match,
             target_meme_match_percent=monitored_sub.target_image_meme_match,
             date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter,
+            filter_removed_matches=True,
             max_depth=-1,
             max_matches=100,
             source='sub_monitor'

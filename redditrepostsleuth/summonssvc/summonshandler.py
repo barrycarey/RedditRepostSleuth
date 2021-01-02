@@ -364,8 +364,9 @@ class SummonsHandler:
         )
 
         try:
-            search_results = self.image_service.check_duplicates_wrapped(
-                post,
+            search_results = self.image_service.check_image(
+                post.url,
+                post=post,
                 target_annoy_distance=target_annoy_distance,
                 target_match_percent=target_image_match,
                 target_meme_match_percent=target_meme_match,

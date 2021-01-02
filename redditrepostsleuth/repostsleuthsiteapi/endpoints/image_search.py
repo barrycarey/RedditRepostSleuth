@@ -38,9 +38,10 @@ class ImageSearch:
             raise HTTPBadRequest("No Post Found", "We were unable to find a post with the provided ID")
 
         try:
-            search_results = self.image_svc.check_duplicates_wrapped(
-                post,
+            search_results = self.image_svc.check_image(
+                post.url,
                 target_annoy_distance=target_annoy,
+                post=post,
                 target_match_percent=image_match_percent,
                 target_meme_match_percent=target_meme_match_percent,
                 meme_filter=meme_filter,
