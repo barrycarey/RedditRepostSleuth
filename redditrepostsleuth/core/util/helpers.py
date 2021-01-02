@@ -145,7 +145,7 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
     return {**results_values, **base_values, **kwargs}
 
 
-def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: ImageSearchResults, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -153,7 +153,6 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
     """
     base_values = {
         'total_searched': f'{search_results.total_searched:,}',
-        'search_time': search_results.total_search_time,
         'total_posts': 0,
         'match_count': len(search_results.matches),
         'post_type': search_results.checked_post.post_type,
@@ -164,6 +163,8 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
         'post_author': search_results.checked_post.author
 
     }
+    if search_results.search_times:
+        base_values['search_time'] = search_results.search_times.total_search_time
 
     results_values = {}
 

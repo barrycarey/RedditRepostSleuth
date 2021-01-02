@@ -140,7 +140,7 @@ class DuplicateImageService:
             sort_by='created',
             max_depth=4000,
 
-    ):
+    ) -> ImageSearchResults:
         log.info('Checking URL for matches: %s', url)
         search_results = ImageSearchResults(
             url,

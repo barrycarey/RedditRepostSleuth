@@ -6,7 +6,6 @@ from datetime import datetime
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.db.databasemodels import Post, RedditImagePost, RedditImagePostCurrent
-from redditrepostsleuth.core.model.hashwrapper import HashWrapper
 from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.search_results.link_post_search_match import LinkPostSearchMatch
@@ -69,19 +68,6 @@ def pushshift_to_post(submission: Dict, source: str = 'pushshift') -> Post:
 
     return post
 
-
-def post_to_hashwrapper(post: Post):
-    wrapper = HashWrapper()
-    wrapper.post_id = post.post_id
-    wrapper.image_hash = post.image_hash
-    wrapper.created_at = post.created_at
-    return wrapper
-
-def hash_tuple_to_hashwrapper(hash_tup):
-    wrapper = HashWrapper()
-    wrapper.post_id = hash_tup[0]
-    wrapper.image_hash = hash_tup[1]
-    return wrapper
 
 def annoy_result_to_image_search_match(result: Dict, orig_id: int) -> ImagePostSearchMatch:
     match = ImagePostSearchMatch()
