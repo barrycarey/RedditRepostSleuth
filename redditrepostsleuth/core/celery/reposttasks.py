@@ -38,7 +38,12 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
-    result = find_matching_images(post, self.dup_service)
+    result = self.dup_service.check_image(
+        post.url,
+        meme_filter=True,
+        filter_dead_matches=False,
+        filter_removed_matches=False
+    )
 
     save_image_repost_result(result, self.uowm)
 

@@ -45,16 +45,6 @@ def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWo
             # Raise exception so celery will retry the task and use the new meme template
             raise IngestHighMatchMeme('Created meme template.  Post needs to be rechecked')
 
-def find_matching_images(post: Post, dup_service: DuplicateImageService) -> ImageSearchResults:
-    """
-    Take a given post and dup image service and return all matches
-    :param post: Reddit Post
-    :param dup_service: Dup Image Service
-    :return: RepostWrapper
-    """
-    result = dup_service.check_duplicates_wrapped(post, filter_dead_matches=False, meme_filter=True, source='ingest_repost')
-    log.debug('Found %s matching images', len(result.matches))
-    return result
 
 def save_image_repost_result(search_results: ImageSearchResults, uowm: UnitOfWorkManager) -> None:
     """
