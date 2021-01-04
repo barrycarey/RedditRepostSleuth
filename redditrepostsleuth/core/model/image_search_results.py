@@ -14,8 +14,10 @@ class ImageSearchResults:
             checked_url: Text,
             search_settings: ImageSearchSettings,
             checked_post: Post = None,
+            search_times: ImageSearchTimes = None
 
     ):
+        self.search_times = search_times
         self.search_settings = search_settings
         self.checked_url = checked_url
         self.checked_post = checked_post

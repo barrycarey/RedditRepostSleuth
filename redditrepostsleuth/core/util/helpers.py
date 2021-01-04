@@ -6,7 +6,6 @@ from typing import Dict, List, Text, TYPE_CHECKING
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 
 if TYPE_CHECKING:
-    from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
     from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 
 from redditrepostsleuth.core.config import Config
@@ -91,20 +90,16 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def build_markdown_list(matches: List['ImagePostSearchMatch']) -> str:
-    result = ''
-    for match in matches:
-        result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
-    return result
-
-def build_site_search_url(image_search: ImageSearch) -> Text:
-    url = f'https://www.repostsleuth.com?postId={image_search.post_id}&'
-    url += f'sameSub={str(image_search.same_sub).lower()}&'
-    url += f'filterOnlyOlder={str(image_search.only_older_matches).lower()}&'
-    url += f'memeFilter={str(image_search.meme_filter).lower()}&'
-    url += f'filterDeadMatches={str(image_search.filter_dead_matches).lower()}&'
-    url += f'targetImageMatch={str(image_search.target_image_match)}&'
-    url += f'targetImageMemeMatch={str(image_search.target_image_meme_match)}'
+def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -> Text:
+    if not search_settings:
+        return None
+    url = f'https://www.repostsleuth.com?postId={post_id}&'
+    url += f'sameSub={str(search_settings.same_sub).lower()}&'
+    url += f'filterOnlyOlder={str(search_settings.only_older_matches).lower()}&'
+    url += f'memeFilter={str(search_settings.meme_filter).lower()}&'
+    url += f'filterDeadMatches={str(search_settings.filter_dead_matches).lower()}&'
+    url += f'targetImageMatch={str(search_settings.target_match_percent)}&'
+    url += f'targetImageMemeMatch={str(search_settings.target_meme_match_percent)}'
     return url
 
 
@@ -118,13 +113,12 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
         'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
         'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
         'meme_filter': True if search_results.meme_template else False,
-        'search_url': build_site_search_url(search_results.logged_search)
+        'search_url': build_site_search_url(search_results.checked_post.post_id, search_results.search_settings)
     }
     if search_results.matches:
         results_values = {
             'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent}%',
             'oldest_percent_match': f'{search_results.matches[0].hamming_match_percent}%',
-            'match_list': build_markdown_list(search_results.matches),
             'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
             'false_positive_data': json.dumps(
                 {
@@ -256,9 +250,10 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 
     )
 
-def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
+def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, target_annoy_distance: float = 170.0) -> ImageSearchSettings:
     return ImageSearchSettings(
         monitored_sub.target_image_match,
+        target_annoy_distance,
         target_meme_match_percent=monitored_sub.target_image_meme_match,
         meme_filter=monitored_sub.meme_filter,
         target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,

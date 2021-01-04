@@ -10,8 +10,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
-from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
 from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask
@@ -106,7 +105,7 @@ def link_repost_check(self, posts, ):
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def notify_watch(self, watches: List[Dict[ImagePostSearchMatch, RepostWatch]], repost: Post):
+def notify_watch(self, watches: List[Dict[SearchMatch, RepostWatch]], repost: Post):
     repost_watch_notify(watches, self.reddit, self.response_handler, repost)
     with self.uowm.start() as uow:
         for w in watches:

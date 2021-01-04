@@ -40,3 +40,8 @@ class SearchSettings:
         self.max_matches = max_matches
         self.target_title_match = target_title_match
 
+    def __repr__(self):
+        r = ''
+        for k, v in self.__dict__.items():
+            r += f'{k}: {v} | '
+        return r
