@@ -1,6 +1,7 @@
 from typing import List, Text
 
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch, Post
+from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.util.helpers import get_hamming_from_percent
@@ -11,17 +12,13 @@ class ImageSearchResults:
     def __init__(
             self,
             checked_url: Text,
-            target_match_percent: float,
-            target_annoy_distance: float,
-            target_meme_match_percent: float = None,
+            search_settings: ImageSearchSettings,
             checked_post: Post = None,
 
     ):
-        self.target_match_percent = target_match_percent
-        self.target_meme_match_percent = target_meme_match_percent
+        self.search_settings = search_settings
         self.checked_url = checked_url
         self.checked_post = checked_post
-        self.target_annoy_distance = target_annoy_distance
         self._target_hash = None
         self.total_searched: int = 0
         self.meme_template: MemeTemplate = None
@@ -46,11 +43,11 @@ class ImageSearchResults:
 
     @property
     def target_hamming_distance(self):
-        return get_hamming_from_percent(self.target_match_percent, len(self.target_hash))
+        return get_hamming_from_percent(self.search_settings.target_match_percent, len(self.target_hash))
 
     @property
     def target_meme_hamming_distance(self):
-        return get_hamming_from_percent(self.target_meme_match_percent, len(self.meme_hash))
+        return get_hamming_from_percent(self.search_settings.target_meme_match_percent, len(self.meme_hash))
 
     def to_dict(self):
         return {
