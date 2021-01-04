@@ -17,7 +17,7 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 
@@ -26,9 +26,11 @@ if __name__ == '__main__':
     config = Config()
     event_logger = EventLogging(config=config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    dup = DuplicateImageService(uowm, event_logger, config=config)
+
     response_builder = ResponseBuilder(uowm)
-    reddit_manager = RedditManager(get_reddit_instance(config))
+    reddit = get_reddit_instance(config)
+    reddit_manager = RedditManager(reddit)
+    dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
     summons = SummonsHandler(
         uowm,
         dup,

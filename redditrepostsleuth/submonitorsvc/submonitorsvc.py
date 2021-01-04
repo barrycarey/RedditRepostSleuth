@@ -11,7 +11,7 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
 if __name__ == '__main__':

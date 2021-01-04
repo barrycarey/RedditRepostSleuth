@@ -1,7 +1,6 @@
 import json
 import time
 from datetime import datetime
-from json import JSONDecodeError
 from typing import Dict
 
 import requests
@@ -15,7 +14,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
@@ -35,25 +34,27 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 class SummonsHandlerTask(Task):
     def __init__(self):
         self.config = Config()
-        self.reddit = RedditManager(get_reddit_instance(self.config))
+        self.reddit = get_reddit_instance(self.config)
+        self.reddit_manager = RedditManager(self.reddit)
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
-        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, source='summons', live_response=self.config.live_responses)
-        dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, config=self.config)
+        self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons', live_response=self.config.live_responses)
+        dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
-        self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit, response_builder,
-                                 self.response_handler, event_logger=self.event_logger, summons_disabled=False)
+        self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit_manager, response_builder,
+                                              self.response_handler, event_logger=self.event_logger, summons_disabled=False)
 
 class SubMonitorTask(Task):
     def __init__(self):
         self.config = Config()
-        self.reddit = RedditManager(get_reddit_instance(self.config))
+        self.reddit = get_reddit_instance(self.config)
+        self.reddit_manager = RedditManager(self.reddit)
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         event_logger = EventLogging(config=self.config)
-        response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor', live_response=self.config.live_responses)
-        dup_image_svc = DuplicateImageService(self.uowm, event_logger, config=self.config)
+        response_handler = ResponseHandler(self.reddit_manager, self.uowm, event_logger, source='submonitor', live_response=self.config.live_responses)
+        dup_image_svc = DuplicateImageService(self.uowm, event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
-        self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
+        self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit_manager, response_builder, response_handler, event_logger=event_logger, config=self.config)
 
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle')

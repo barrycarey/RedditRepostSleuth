@@ -1,16 +1,12 @@
-import os
 from dataclasses import dataclass
 from unittest import TestCase
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
-from PIL import Image
-from praw.models import Subreddit
-
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.model.imagematch import ImageMatch
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
+from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, create_meme_template, \
     post_type_from_url, build_markdown_list, build_msg_values_from_search, build_image_msg_values_from_search, \
@@ -87,7 +83,7 @@ class TestHelpers(TestCase):
         self.assertEqual('image', post_type_from_url('www.example.com/test.Jpg'))
 
     def test_build_markdown_list_valid(self):
-        match = ImageMatch()
+        match = ImagePostSearchMatch()
         match.post = Post(created_at=datetime.fromtimestamp(1572799193),
                                 shortlink='http://redd.it',
                                 subreddit='somesub',
@@ -97,13 +93,13 @@ class TestHelpers(TestCase):
         self.assertEqual(expected, build_markdown_list([match]))
 
     def build_image_msg_values_from_search_include_meme_template(self):
-        match1 = ImageMatch()
+        match1 = ImagePostSearchMatch()
         match1.hamming_distance = 5
         match1.post = Post(url='www.example.com',
                            created_at=datetime.fromtimestamp(1572799193),
                            post_id='1234',
                            subreddit='somesub')
-        wrapper = ImageRepostWrapper()
+        wrapper = ImageSearchResults()
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
@@ -115,13 +111,13 @@ class TestHelpers(TestCase):
         self.assertEqual(10, result['meme_template_id'])
 
     def build_image_msg_values_from_search_include_false_positive_data(self):
-        match1 = ImageMatch()
+        match1 = ImagePostSearchMatch()
         match1.hamming_distance = 5
         match1.post = Post(url='www.example.com',
                            created_at=datetime.fromtimestamp(1572799193),
                            post_id='1234',
                            subreddit='somesub')
-        wrapper = ImageRepostWrapper()
+        wrapper = ImageSearchResults()
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(post_id=1234)
         wrapper.total_searched = 100
@@ -132,14 +128,14 @@ class TestHelpers(TestCase):
         self.assertEqual(result['false_positive_data'], '{"post": "https://redd.it/1234", "meme_template": 10}')
 
     def build_image_msg_values_from_search_correct_match_percent(self):
-        match1 = ImageMatch()
+        match1 = ImagePostSearchMatch()
         match1.hamming_distance = 5
         match1.hamming_match_percent = 96.78
         match1.post = Post(url='www.example.com',
                            created_at=datetime.fromtimestamp(1572799193),
                            post_id='1234',
                            subreddit='somesub')
-        wrapper = ImageRepostWrapper()
+        wrapper = ImageSearchResults()
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(post_id=1234)
         wrapper.total_searched = 100
@@ -149,13 +145,13 @@ class TestHelpers(TestCase):
         self.assertEqual('96.78%', result['newest_percent_match'])
 
     def test_build_msg_values_from_search_key_total(self):
-        match1 = ImageMatch()
+        match1 = ImagePostSearchMatch()
         match1.hamming_distance = 5
         match1.post = Post(url='www.example.com',
                            created_at=datetime.fromtimestamp(1572799193),
                            post_id='1234',
                            subreddit='somesub')
-        wrapper = ImageRepostWrapper()
+        wrapper = ImageSearchResults()
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)
         wrapper.checked_post = Post(subreddit='sub2')
@@ -168,7 +164,7 @@ class TestHelpers(TestCase):
         # TODO - Maybe test return values.  Probably not needed
 
     def test_build_msg_values_from_search_no_match_key_total(self):
-        wrapper = ImageRepostWrapper()
+        wrapper = ImageSearchResults()
         wrapper.checked_post = Post(subreddit='sub2')
         wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
@@ -177,7 +173,7 @@ class TestHelpers(TestCase):
         self.assertEqual(9, len(result.keys()))
 
     def test_build_msg_values_from_search_no_match_custom_key_total(self):
-        wrapper = ImageRepostWrapper()
+        wrapper = ImageSearchResults()
         wrapper.checked_post = Post(subreddit='sub2')
         wrapper.total_searched = 100
         wrapper.total_search_time = 0.111
@@ -186,13 +182,13 @@ class TestHelpers(TestCase):
         self.assertEqual(10, len(result.keys()))
 
     def test_build_msg_values_from_search_extra_values(self):
-        match1 = ImageMatch()
+        match1 = ImagePostSearchMatch()
         match1.hamming_distance = 5
         match1.post = Post(url='www.example.com',
                            created_at=datetime.fromtimestamp(1572799193),
                            post_id='1234',
                            subreddit='somesub')
-        wrapper = ImageRepostWrapper()
+        wrapper = ImageSearchResults()
         wrapper.matches = []
         wrapper.matches.append(match1)
         wrapper.matches.append(match1)

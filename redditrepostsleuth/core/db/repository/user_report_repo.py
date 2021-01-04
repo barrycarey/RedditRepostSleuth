@@ -1,3 +1,4 @@
+from datetime import timedelta, datetime
 from typing import Text, List
 
 from redditrepostsleuth.core.db.databasemodels import UserReport
@@ -11,6 +12,13 @@ class UserReportRepo:
     def add(self, item):
         log.debug('Inserting: %s', item)
         self.db_session.add(item)
+
+    def get_reports_for_voting(self, days: int) -> List[UserReport]:
+        since = datetime.now() - timedelta(days=days)
+        return self.db_session.query(UserReport).filter(UserReport.reported_at > since,
+                                                        UserReport.report_type == 'False Positive',
+                                                        UserReport.sent_for_voting == False).order_by(
+            UserReport.reported_at.desc()).all()
 
     def get_all(self, limit: int = None, offset: int = None) -> List[UserReport]:
         return self.db_session.query(UserReport).offset(offset).limit(limit).all()

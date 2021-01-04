@@ -16,7 +16,8 @@ task_routes = {
     'redditrepostsleuth.core.celery.reposttasks.check_image_repost_save': {'queue': 'repost_image'},
     'redditrepostsleuth.core.celery.reposttasks.process_repost_annoy': {'queue': 'process_repost'},
     'redditrepostsleuth.core.celery.tasks.link_repost_check': {'queue': 'repost_link'},
-'redditrepostsleuth.core.celery.tasks.log_repost': {'queue': 'logrepost'},
+    'redditrepostsleuth.core.celery.tasks.log_repost': {'queue': 'logrepost'},
+    'redditrepostsleuth.core.celery.maintenance_tasks.update_monitored_sub_stats': {'queue': 'monitored_sub_update'}
 
 }
 

@@ -17,6 +17,8 @@ class CommandParser:
             self.config = Config()
 
     def parse_repost_image_cmd(self, cmd: str) -> RepostImageCmd:
+        if not cmd:
+            return self.get_default_repost_image_cmd()
         parser = ArgumentParserThrow(cmd)
         #parser.add_argument('command', default=None)
         parser.add_argument('-meme', default=self.config.summons_meme_filter, dest='meme_filter', help="Enable the meme filter", action='store_true')
@@ -42,6 +44,8 @@ class CommandParser:
         )
 
     def parse_repost_link_cmd(self, cmd: Text) -> RepostLinkCmd:
+        if not cmd:
+            return self.get_default_repost_link_cmd()
         parser = ArgumentParserThrow(cmd)
         #parser.add_argument('command', default=None)
         parser.add_argument('-all', default=self.config.summons_all_matches, dest='all_matches',

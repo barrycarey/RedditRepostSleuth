@@ -2,11 +2,10 @@ from typing import List, NoReturn, Dict, Text
 
 from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, RepostWatch, MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.imagematch import ImageMatch
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
+from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
@@ -14,7 +13,7 @@ from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
 from redditrepostsleuth.core.util.repost_filters import filter_dead_urls
 
 
-def check_for_high_match_meme(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager) -> NoReturn:
+def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWorkManager) -> NoReturn:
     if search_results.meme_template is not None:
         return
 
@@ -22,7 +21,7 @@ def check_for_high_match_meme(search_results: ImageRepostWrapper, uowm: UnitOfWo
         meme_template = None
         if len(search_results.matches) > 5 and 'meme' in search_results.checked_post.subreddit.lower():
             try:
-                meme_hashes = get_image_hashes(search_results.checked_post, hash_size=32)
+                meme_hashes = get_image_hashes(search_results.checked_post.url, hash_size=32)
             except Exception as e:
                 log.error('Failed to get meme hash for %s', search_results.checked_post.post_id)
                 return
@@ -45,18 +44,8 @@ def check_for_high_match_meme(search_results: ImageRepostWrapper, uowm: UnitOfWo
             # Raise exception so celery will retry the task and use the new meme template
             raise IngestHighMatchMeme('Created meme template.  Post needs to be rechecked')
 
-def find_matching_images(post: Post, dup_service: DuplicateImageService) -> ImageRepostWrapper:
-    """
-    Take a given post and dup image service and return all matches
-    :param post: Reddit Post
-    :param dup_service: Dup Image Service
-    :return: RepostWrapper
-    """
-    result = dup_service.check_duplicates_wrapped(post, filter_dead_matches=False, meme_filter=True, source='ingest_repost')
-    log.debug('Found %s matching images', len(result.matches))
-    return result
 
-def save_image_repost_result(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager) -> None:
+def save_image_repost_result(search_results: ImageSearchResults, uowm: UnitOfWorkManager) -> None:
     """
     Take a found repost and save to the database
     :param search_results:
@@ -102,7 +91,7 @@ def save_image_repost_result(search_results: ImageRepostWrapper, uowm: UnitOfWor
         uow.posts.update(search_results.checked_post)
         uow.commit()
 
-def save_image_repost_general(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager, source: Text) -> None:
+def save_image_repost_general(search_results: ImageSearchResults, uowm: UnitOfWorkManager, source: Text) -> None:
     """
     Take a found repost and save to the database
     :param search_results:
@@ -149,10 +138,10 @@ def save_image_repost_general(search_results: ImageRepostWrapper, uowm: UnitOfWo
         uow.commit()
 
 
-def get_oldest_active_match(matches: List[ImageMatch]) -> ImageMatch:
+def get_oldest_active_match(matches: List[ImagePostSearchMatch]) -> ImagePostSearchMatch:
     """
     Take a list of ImageMatches and return the oldest match that is still alive
-    :rtype: ImageMatch
+    :rtype: ImagePostSearchMatch
     :param matches: List of matches
     :return: ImageMatch
     """
@@ -160,7 +149,7 @@ def get_oldest_active_match(matches: List[ImageMatch]) -> ImageMatch:
         if filter_dead_urls(match):
             return match
 
-def check_for_post_watch(matches: List[ImageMatch], uowm: UnitOfWorkManager) -> List[Dict[ImageMatch, RepostWatch]]:
+def check_for_post_watch(matches: List[ImagePostSearchMatch], uowm: UnitOfWorkManager) -> List[Dict[ImagePostSearchMatch, RepostWatch]]:
     results = []
     with uowm.start() as uow:
         for match in matches:
@@ -171,7 +160,7 @@ def check_for_post_watch(matches: List[ImageMatch], uowm: UnitOfWorkManager) -> 
                     results.append({'match': match, 'watch': watch})
     return results
 
-def repost_watch_notify(watches: List[Dict[ImageMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
+def repost_watch_notify(watches: List[Dict[ImagePostSearchMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
     for watch in watches:
         # TODO - What happens if we don't get redditor back?
         redditor = reddit.redditor(watch['watch'].user)

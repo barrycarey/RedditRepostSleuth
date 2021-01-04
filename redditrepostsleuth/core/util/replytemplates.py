@@ -15,8 +15,10 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 
 COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n'
-IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]*'
-IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={false_negative_data}) ]*'
+IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]* \n\n' \
+                        '[View Search On repostsleuth.com]({search_url})'
+IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={false_negative_data}) ]* \n\n' \
+                        '[View Search On repostsleuth.com]({search_url})'
 LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
 FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}.  \n\n' \
                         '{first_seen}. {last_seen} \n\n' \
@@ -40,10 +42,11 @@ IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\
 SUMMONS_CROSSPOST = 'This is a crosspost. I\'ve seen the same {post_type} {match_count} {times_word}' \
                     '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n'
 
-MONITORED_SUB_ADDED = 'Congratulations! Your Subreddit is now monitored by Repost Sleuth Bot. I will start scanning all of your new posts shortly\n\n' \
+MONITORED_SUB_ADDED = 'Congratulations! Your Subreddit is now monitored by Repost Sleuth Bot. It will start scanning all of your new posts shortly\n\n' \
                       'If you gave me wiki permissions you can find my configuration file here {wiki_config}\n\n' \
                       'You can find details about the configuration options [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_configuration)\n\n' \
-                      'If you notice any issues please report them at r/RepostSleuthBot'
+                      'If you notice any issues please report them at r/RepostSleuthBot\n\n' \
+                      'You can also manage the bots settings by visiting https://repostsleuth.com'
 
 WATCH_ENABLED = 'I have set a watch on this submission.  If anybody reposts it I\'ll send you a PM'
 WATCH_DISABLED = 'I have removed your watch on this post.  You will no longer be notified if it gets reposted'
@@ -70,8 +73,11 @@ TOP_POST_WATCH_SUBJECT = 'Nice OC!  Want me to protect it?'
 TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someone stole it, right? \n\n Well I can help with that! \n\n Simply reply ' \
                       '"yes" to this message and I will keep an eye out. If someone uploads your image I\'ll send you a PM.  Simple as that. \n\n' \
                         'If you would like me to protect other posts, simply comment on the post, tagging me like this: u/RepostSleuthBot watch' \
-                      '{shortlink}'
+                      '\n\n{shortlink}'
 
 TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
 
 
+SEARCH_SETTING_TABLE = '| **Scope** | **Meme Filter** | **Meme Detected** | **Target %** | **Check Title** | **Max Age** |\n\n' \
+                    '| --- | ---| --- | --- | --- | --- |\n\n' \
+                    '| {scope} | {meme_filter} | {meme_detected} | {target_percent} | {check_title} | {max_age} |'
