@@ -8,7 +8,7 @@ from sqlalchemy.exc import InternalError
 
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser
+from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException, InvalidImageUrlException
@@ -86,38 +86,8 @@ class SummonsHandler:
             except Exception:
                 log.exception('Exception in handle summons thread', exc_info=True)
 
-    def _get_summons_cmd(self, cmd_body: Text, post_type: Text) -> RepostBaseCmd:
-        cmd_str = self._strip_summons_flags(cmd_body)
-        try:
-            base_command = self.command_parser.parse_root_command(cmd_str)
-            if base_command == 'repost' or base_command is None:
-                return self._get_repost_cmd(post_type, cmd_str)
-            elif base_command == 'watch':
-                return self.command_parser.parse_watch_cmd(cmd_str)
-            elif base_command == 'unwatch':
-                pass
-            else:
-                return self._get_repost_cmd(post_type, cmd_str)
-        except InvalidCommandException:
-            log.error('Summons has no base command.  Defaulting to repost')
-
-        return self._get_repost_cmd(post_type, cmd_str)
-
-    def _get_repost_cmd(self, post_type: Text, cmd_body: Text) -> RepostBaseCmd:
-        if cmd_body:
-            cmd_body = cmd_body.strip('repost ')
-        if post_type == 'image':
-            return self._get_image_repost_cmd(cmd_body)
-        elif post_type == 'link':
-            return self._get_link_repost_cmd(cmd_body)
-
-    def _get_image_repost_cmd(self, cmd_body: Text) -> RepostImageCmd:
-        return self.command_parser.parse_repost_image_cmd(cmd_body)
-
-    def _get_link_repost_cmd(self, cmd_body: Text):
-        return self.command_parser.parse_repost_link_cmd(cmd_body)
-
-    def _strip_summons_flags(self, comment_body: Text) -> Optional[Text]:
+    @staticmethod
+    def _strip_summons_flags(comment_body: Text) -> Optional[Text]:
         """
         Take the body of a comment where the bot is tagged and remove the tag
         :rtype: Optional[Text]
@@ -140,6 +110,11 @@ class SummonsHandler:
     def process_summons(self, summons: Summons, post: Post):
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
+
+        if post.post_type is None or post.post_type not in self.config.supported_post_types:
+            log.error('Post %s: Type %s not support', f'https://redd.it/{post.post_id}', post.post_type)
+            self._send_unsupported_msg(summons, post.post_type)
+            return
 
         if self._is_banned(summons.requestor):
             log.info('User %s is currently banned', summons.requestor)
@@ -175,7 +150,6 @@ class SummonsHandler:
                             self._delete_mention(summons.comment_id)
                         return
 
-
         stripped_comment = self._strip_summons_flags(summons.comment_body)
         try:
             if not stripped_comment:
@@ -186,22 +160,14 @@ class SummonsHandler:
             log.error('Invalid command in summons: %s', summons.comment_body)
             base_command = 'repost'
 
-        if post.post_type is None or post.post_type not in self.config.supported_post_types:
-            log.error('Post %s: Type %s not support', f'https://redd.it/{post.post_id}', post.post_type)
-            self._send_unsupported_msg(summons, post.post_type)
-            return
-
-        # TODO - Create command registry instead of manually defining
-        if base_command == 'stats':
-            pass
-        elif base_command == 'watch':
+        if base_command == 'watch':
             self._enable_watch(summons)
             return
         elif base_command == 'unwatch':
             self._disable_watch(summons)
             return
-        elif base_command == 'repost':
-            self.process_repost_request(summons, post)
+        else:
+            self.process_repost_request(summons, post, monitored_sub=monitored_sub)
             return
 
     def _delete_mention(self, comment_id: Text) -> NoReturn:
@@ -268,7 +234,6 @@ class SummonsHandler:
 
     def _enable_watch(self, summons: Summons) -> NoReturn:
 
-        cmd = self._get_summons_cmd(summons.comment_body, '')
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
             existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
@@ -288,8 +253,6 @@ class SummonsHandler:
         repost_watch = RepostWatch(
             post_id=summons.post_id,
             user=summons.requestor,
-            expire_after=cmd.expire,
-            same_sub=cmd.same_sub,
             enabled=True
         )
 
@@ -304,15 +267,14 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def process_repost_request(self, summons: Summons, post: Post):
+    def process_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
         if post.post_type == 'image':
-            self.process_image_repost_request(summons, post)
+            self.process_image_repost_request(summons, post, monitored_sub=monitored_sub)
         elif post.post_type == 'link':
             self.process_link_repost_request(summons, post)
 
     def process_link_repost_request(self, summons: Summons, post: Post):
         response = SummonsResponse(summons=summons)
-        cmd = self._get_repost_cmd(post.post_type, summons.comment_body)
         search_results = check_link_repost(post, self.uowm, get_total=True)
         msg_values = build_msg_values_from_search(search_results, self.uowm)
 
@@ -320,47 +282,16 @@ class SummonsHandler:
             response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
         else:
             save_link_repost(post, search_results.matches[0].post, self.uowm, 'summons')
-        # TODO - Move this to message builder
-            if cmd.all_matches:
-                response.message = IMAGE_REPOST_ALL.format(
-                    count=len(search_results.matches),
-                    searched_posts=searched_post_str(post, search_results.index_size),
-                    firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
-                    time=search_results.total_search_time
-
-                )
-                response.message = response.message + build_markdown_list(search_results.matches)
-                if len(search_results.matches) > 4:
-                    log.info('Sending check all results via PM with %s matches', len(search_results.matches))
-                    comment = self.reddit.comment(summons.comment_id)
-                    self.response_handler.send_private_message(
-                        comment.author,
-                        response.message,
-                        post_id=summons.post_id,
-                        comment_id=summons.comment_id,
-                        source='summons'
-                    )
-                    response.message = f'I found {len(search_results.matches)} matches.  ' \
-                                       f'I\'m sending them to you via PM to reduce comment spam'
-
-                response.message = response.message
-            else:
-                response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
+            response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
 
         self._send_response(response)
 
-    def process_image_repost_request(self, summons: Summons, post: Post):
+    def process_image_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
 
-        with self.uowm.start() as uow:
-            monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
-
-
-        cmd = self._get_summons_cmd(summons.comment_body, post.post_type)
         response = SummonsResponse(summons=summons)
 
         target_image_match, target_meme_match, target_annoy_distance = self._get_target_distances(
-            post.subreddit,
-            override_target_match_percent=cmd.strictness
+            monitored_sub
         )
 
         try:
@@ -370,9 +301,9 @@ class SummonsHandler:
                 target_annoy_distance=target_annoy_distance,
                 target_match_percent=target_image_match,
                 target_meme_match_percent=target_meme_match,
-                meme_filter=monitored_sub.meme_filter if monitored_sub else cmd.meme_filter,
-                same_sub=monitored_sub.same_sub_only if monitored_sub else cmd.same_sub,
-                date_cutoff=monitored_sub.target_days_old if monitored_sub else cmd.match_age,
+                meme_filter=monitored_sub.meme_filter if monitored_sub else False,
+                same_sub=monitored_sub.same_sub_only if monitored_sub else False,
+                date_cutoff=monitored_sub.target_days_old if monitored_sub else None,
                 max_matches=250,
                 max_depth=-1,
                 source='summons'
@@ -389,57 +320,26 @@ class SummonsHandler:
             response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
         else:
             save_image_repost_general(search_results, self.uowm, 'summons')
-            # TODO - Move this to message builder
-            if cmd.all_matches:
-                response.message = IMAGE_REPOST_ALL.format(
-                    count=len(search_results.matches),
-                    searched_posts=searched_post_str(post, search_results.total_searched),
-                    firstseen=create_first_seen(search_results.matches[0].post, summons.subreddit),
-                    time=search_results.total_search_time
-
-                )
-                response.message = response.message + build_markdown_list(search_results.matches)
-                if len(search_results.matches) > 4:
-                    log.info('Sending check all results via PM with %s matches', len(search_results.matches))
-                    comment = self.reddit.comment(summons.comment_id)
-                    self.response_handler.send_private_message(
-                        comment.author,
-                        response.message,
-                        post_id=summons.post_id,
-                        comment_id=summons.comment_id,
-                        source='summons'
-                    )
-                    response.message = f'I found {len(search_results.matches)} matches.  ' \
-                                       f'I\'m sending them to you via PM to reduce comment spam'
-
-                response.message = response.message
-            else:
-
-                response.message = self.response_builder.build_sub_repost_comment(
-                    post.subreddit, msg_values,
-                    post.post_type
-                )
+            response.message = self.response_builder.build_sub_repost_comment(
+                post.subreddit, msg_values,
+                post.post_type
+            )
 
         self._send_response(response)
 
-    def _get_target_distances(self, subreddit: str, override_target_match_percent: int = None) -> Tuple[int, int, float]:
+    def _get_target_distances(self, monitored_sub: MonitoredSub) -> Tuple[int, int, float]:
         """
         Check if the post we were summoned on is in a monitored sub.  If it is get the target distances for that sub
         :rtype: Tuple[int,float]
-        :param subreddit: Subreddit name
+        :param monitored_sub: Subreddit name
         :return: Tuple with target hamming and annoy
         """
-        target_match_percent = None
-        target_meme_match_percent = None
-        target_annoy_distance = None
-        with self.uowm.start() as uow:
-            monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
-            if monitored_sub:
-                target_match_percent = override_target_match_percent or monitored_sub.target_image_match
-                target_meme_match_percent = monitored_sub.target_image_meme_match
-                target_annoy_distance = monitored_sub.target_annoy
-                return target_match_percent, target_meme_match_percent, target_annoy_distance
-            return override_target_match_percent or self.config.target_image_match, self.config.target_image_meme_match, self.config.default_annoy_distance
+        if monitored_sub:
+            target_match_percent = monitored_sub.target_image_match
+            target_meme_match_percent = monitored_sub.target_image_meme_match
+            target_annoy_distance = monitored_sub.target_annoy
+            return target_match_percent, target_meme_match_percent, target_annoy_distance
+        return self.config.target_image_match, self.config.target_image_meme_match, self.config.default_annoy_distance
 
     def _send_response(self, response: SummonsResponse) -> NoReturn:
         """
