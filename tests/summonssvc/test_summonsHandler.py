@@ -9,29 +9,6 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 class TestSummonsHandler(TestCase):
 
-    def test__get_summons_cmd_no_params_return_default_repost(self):
-        config = Config(redis_host='dummy')
-        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
-        summons = 'u/repostsleuthbot'
-        cmd = sum_handler._get_summons_cmd(summons, 'image')
-        self.assertEqual(RepostImageCmd, type(cmd))
-
-    def test__get_summons_cmd_no_root_command_with_params_return_default_repost(self):
-        config = Config(redis_host='dummy')
-        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
-        summons = 'u/repostsleuthbot -all'
-        cmd = sum_handler._get_summons_cmd(summons, 'image')
-        self.assertEqual(RepostImageCmd, type(cmd))
-        self.assertTrue(cmd.all_matches)
-
-    def test__get_summons_repost_cmd_with_param_return_configured_cmd(self):
-        config = Config(redis_host='dummy')
-        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
-        summons = 'u/repostsleuthbot repost -all'
-        cmd = sum_handler._get_summons_cmd(summons, 'image')
-        self.assertEqual(RepostImageCmd, type(cmd))
-        self.assertTrue(cmd.all_matches)
-
     def test__strip_summons_flags__clean_input_usertag(self):
         config = Config(redis_host='dummy')
         sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
