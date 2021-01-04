@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch
@@ -145,7 +144,7 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
     return {**results_values, **base_values, **kwargs}
 
 
-def build_msg_values_from_search(search_results: ImageSearchResults, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -171,11 +170,11 @@ def build_msg_values_from_search(search_results: ImageSearchResults, uowm: UnitO
     if search_results.matches:
         results_values = {
             'oldest_created_at': search_results.matches[0].post.created_at,
-            'oldest_url': search_results.matches[0].post.searched_url,
+            'oldest_url': search_results.matches[0].post.url,
             'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
             'oldest_sub': search_results.matches[0].post.subreddit,
             'newest_created_at': search_results.matches[-1].post.created_at,
-            'newest_url': search_results.matches[-1].post.searched_url,
+            'newest_url': search_results.matches[-1].post.url,
             'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
             'newest_sub': search_results.matches[-1].post.subreddit,
             'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),

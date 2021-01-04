@@ -126,7 +126,7 @@ class DuplicateImageService:
             target_meme_match_percent: float = None,
             target_annoy_distance: float = None,
             post: Post = None,
-            max_matches: int = 50,
+            max_matches: int = 100,
             filter_dead_matches: bool = True,
             filter_removed_matches: bool = True,
             target_title_match: int = None,
@@ -205,6 +205,7 @@ class DuplicateImageService:
         )
         search_results.search_times.stop_timer('total_filter_time')
         search_results.search_times.stop_timer('total_search_time')
+        self._log_search_time(search_results, source)
 
         search_results.logged_search = self._log_search(
             search_results,
