@@ -27,7 +27,7 @@ class SqlAlchemyTask(Task):
 class AnnoyTask(Task):
     def __init__(self):
         self.config = Config()
-        from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+        from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging()
         self.reddit = get_reddit_instance(self.config)

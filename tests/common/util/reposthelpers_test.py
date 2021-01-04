@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
-from redditrepostsleuth.core.util.reposthelpers import filter_matching_images
+from redditrepostsleuth.core.util.repost_helpers import filter_matching_images
 
 
 class TestRepostHelpers(TestCase):

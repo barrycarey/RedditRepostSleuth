@@ -1,15 +1,15 @@
 from unittest import TestCase
 
-from redditrepostsleuth.core.model.imagematch import ImageMatch
-from redditrepostsleuth.core.util.reposthelpers import get_closest_image_match
+from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
+from redditrepostsleuth.core.util.repost_helpers import get_closest_image_match
 
 
 class Test_Repost_Helpers(TestCase):
     def test_get_closest_image_match__return_closest(self):
         matches = []
-        match1 = ImageMatch()
-        match2 = ImageMatch()
-        match3 = ImageMatch()
+        match1 = ImagePostSearchMatch()
+        match2 = ImagePostSearchMatch()
+        match3 = ImagePostSearchMatch()
         match1.hamming_match_percent = 98
         match2.hamming_match_percent = 80
         match3.hamming_match_percent = 85

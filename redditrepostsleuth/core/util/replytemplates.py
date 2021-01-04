@@ -78,3 +78,6 @@ TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someon
 TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
 
 
+SEARCH_SETTING_TABLE = '| **Scope** | **Meme Filter** | **Meme Detected** | **Target %** | **Check Title** | **Max Age** |\n\n' \
+                    '| --- | ---| --- | --- | --- | --- |\n\n' \
+                    '| {scope} | {meme_filter} | {meme_detected} | {target_percent} | {check_title} | {max_age} |'

@@ -1,23 +1,19 @@
+
+
 import json
+from typing import Dict, List, Text, TYPE_CHECKING
 
-import requests
-from typing import Dict, List, Text
+from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 
-import imagehash
-from praw.exceptions import APIException
-from praw.models import Subreddit
-from prawcore import Forbidden
+if TYPE_CHECKING:
+    from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
+    from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, LinkRepost, ImageSearch
-from redditrepostsleuth.core.model.imagematch import ImageMatch
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -95,7 +91,7 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def build_markdown_list(matches: List[ImageMatch]) -> str:
+def build_markdown_list(matches: List['ImagePostSearchMatch']) -> str:
     result = ''
     for match in matches:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
@@ -112,7 +108,7 @@ def build_site_search_url(image_search: ImageSearch) -> Text:
     return url
 
 
-def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     results_values = {}
     base_values = {
         'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
@@ -150,7 +146,7 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
     return {**results_values, **base_values, **kwargs}
 
 
-def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -158,7 +154,6 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
     """
     base_values = {
         'total_searched': f'{search_results.total_searched:,}',
-        'search_time': search_results.total_search_time,
         'total_posts': 0,
         'match_count': len(search_results.matches),
         'post_type': search_results.checked_post.post_type,
@@ -169,6 +164,8 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
         'post_author': search_results.checked_post.author
 
     }
+    if search_results.search_times:
+        base_values['search_time'] = search_results.search_times.total_search_time
 
     results_values = {}
 
@@ -193,7 +190,7 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
 
     return {**base_values, **results_values, **kwargs}
 
-def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
+def create_search_result_json(search_results: 'ImageSearchResults') -> dict:
     """
     Take an ImageRepostWrapper object and create the json to be stored in the database
     :rtype: dict
@@ -227,7 +224,7 @@ def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
 
     return table
 
-def get_hamming_from_percent(match_percent: int, hash_length: int) -> float:
+def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
 def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
@@ -247,3 +244,9 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
             uow.commit()
         except Exception as e:
             log.exception('Failed to save link repost', exc_info=True)
+
+def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
+    pass
+
+def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
+    pass

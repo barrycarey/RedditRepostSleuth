@@ -10,7 +10,7 @@ from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repos
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.commands.repost_base_cmd import RepostBaseCmd
@@ -28,7 +28,7 @@ from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, IMAGE_REPOST_ALL, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
-from redditrepostsleuth.core.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
@@ -364,8 +364,9 @@ class SummonsHandler:
         )
 
         try:
-            search_results = self.image_service.check_duplicates_wrapped(
-                post,
+            search_results = self.image_service.check_image(
+                post.url,
+                post=post,
                 target_annoy_distance=target_annoy_distance,
                 target_match_percent=target_image_match,
                 target_meme_match_percent=target_meme_match,

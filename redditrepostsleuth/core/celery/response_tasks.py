@@ -1,7 +1,6 @@
 import json
 import time
 from datetime import datetime
-from json import JSONDecodeError
 from typing import Dict
 
 import requests
@@ -15,7 +14,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent

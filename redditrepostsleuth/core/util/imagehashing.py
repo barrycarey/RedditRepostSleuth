@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict
+from typing import Dict, Text
 
 import requests
 from collections import Counter
@@ -80,18 +80,14 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
 
     return post
 
-def get_image_hashes(post: Post, hash_size: int = 16) -> Dict:
+def get_image_hashes(url: Text, hash_size: int = 16) -> Dict:
     result = {
         'dhash_h': None,
         'dhash_v': None,
         'ahash': None,
     }
-    log.debug('Hashing image post %s', post.post_id)
-    try:
-        img = generate_img_by_url(post.url)
-    except ImageConversioinException as e:
-        raise
-
+    log.debug('Hashing image %s', url)
+    img = generate_img_by_url(url)
     try:
         dhash_h = imagehash.dhash(img, hash_size=hash_size)
         dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
