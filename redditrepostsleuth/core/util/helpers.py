@@ -184,7 +184,8 @@ def build_msg_values_from_search(search_results: 'ImageSearchResults', uowm: Uni
 
     return {**base_values, **results_values, **kwargs}
 
-def create_search_result_json(search_results: 'ImageSearchResults') -> dict:
+
+def create_search_result_json(search_results: 'ImageSearchResults') -> Text:
     """
     Take an ImageRepostWrapper object and create the json to be stored in the database
     :rtype: dict
@@ -260,6 +261,8 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         same_sub=monitored_sub.same_sub_only,
         max_days_old=monitored_sub.target_days_old,
         filter_same_author=monitored_sub.filter_same_author,
-        filter_crossposts=monitored_sub.filter_crossposts
+        filter_crossposts=monitored_sub.filter_crossposts,
+        max_depth=-1,
+        max_matches=100
 
     )

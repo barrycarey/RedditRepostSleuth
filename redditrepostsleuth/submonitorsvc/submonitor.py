@@ -21,7 +21,7 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost
+    save_link_repost, get_image_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
@@ -287,17 +287,9 @@ class SubMonitor:
         search_results = self.image_service.check_image(
             post.url,
             post=post,
-            target_annoy_distance=monitored_sub.target_annoy,
-            target_match_percent=monitored_sub.target_image_match,
-            target_meme_match_percent=monitored_sub.target_image_meme_match,
-            date_cutoff=monitored_sub.target_days_old,
-            same_sub=monitored_sub.same_sub_only,
-            meme_filter=monitored_sub.meme_filter,
-            filter_removed_matches=True,
-            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
-            max_depth=-1,
-            max_matches=100,
-            source='sub_monitor'
+            source='sub_monitor',
+            search_settings=get_image_search_settings_for_monitored_sub(monitored_sub,
+                                                                        target_annoy_distance=self.config.default_annoy_distance)
         )
         if search_results.matches:
             save_image_repost_general(search_results ,self.uowm, 'sub_monitor')

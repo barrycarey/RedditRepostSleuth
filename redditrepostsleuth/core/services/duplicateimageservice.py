@@ -123,6 +123,7 @@ class DuplicateImageService:
         log.info('Checking URL for matches: %s', url)
 
         if not search_settings:
+            log.info('No search settings provided, using default')
             search_settings = get_default_image_search_settings(self.config)
 
         search_results = ImageSearchResults(
@@ -176,14 +177,6 @@ class DuplicateImageService:
         search_results.search_times.start_timer('total_filter_time')
         search_results = self._filter_results_for_reposts(
             search_results,
-            filter_dead_matches=filter_dead_matches,
-            filter_removed_matches=filter_removed_matches,
-            target_title_match=target_title_match,
-            same_sub=same_sub,
-            date_cutoff=date_cutoff,
-            only_older_matches=only_older_matches,
-            filter_crossposts=filter_crossposts,
-            filter_author=filter_author,
             sort_by=sort_by
         )
         search_results.search_times.stop_timer('total_filter_time')
@@ -192,17 +185,9 @@ class DuplicateImageService:
 
         search_results.logged_search = self._log_search(
             search_results,
-            same_sub,
-            date_cutoff,
-            filter_dead_matches,
-            only_older_matches,
-            meme_filter,
             source,
-            target_title_match,
             api_search_results.used_current_index,
             api_search_results.used_historical_index,
-            search_results.target_match_percent,
-            target_image_meme_match=search_results.target_meme_match_percent
         )
         if search_results.logged_search:
             search_results.search_id = search_results.logged_search.id
@@ -341,40 +326,32 @@ class DuplicateImageService:
     def _log_search(
             self,
             search_results: ImageSearchResults,
-            same_sub: bool,
-            max_days_old: int,
-            filter_dead_matches: bool,
-            only_older_matches: bool,
-            meme_filter: bool,
             source: str,
-            target_title_match: int,
             used_current_index: bool,
             used_historical_index: bool,
-            target_image_match: int,
-            target_image_meme_match: int
     ) -> Optional[ImageSearchResults]:
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id if search_results.checked_post else 'url',
             used_historical_index=used_historical_index,
             used_current_index=used_current_index,
             target_hamming_distance=search_results.target_hamming_distance,
-            target_annoy_distance=search_results.target_annoy_distance,
-            same_sub=same_sub if same_sub else False,
-            max_days_old=max_days_old if max_days_old else False,
-            filter_dead_matches=filter_dead_matches,
-            only_older_matches=only_older_matches,
-            meme_filter=meme_filter,
+            target_annoy_distance=search_results.search_settings.target_annoy_distance,
+            same_sub=search_results.search_settings.same_sub,
+            max_days_old=search_results.search_settings.max_days_old,
+            filter_dead_matches=search_results.search_settings.filter_dead_matches,
+            only_older_matches=search_results.search_settings.only_older_matches,
+            meme_filter=search_results.search_settings.meme_filter,
             meme_template_used=search_results.meme_template.id if search_results.meme_template else None,
             search_time=search_results.search_times.total_search_time,
             index_search_time=search_results.search_times.index_search_time,
             total_filter_time=search_results.search_times.total_filter_time,
-            target_title_match=target_title_match,
+            target_title_match=search_results.search_settings.target_title_match,
             matches_found=len(search_results.matches),
             source=source,
             subreddit=search_results.checked_post.subreddit if search_results.checked_post else 'url',
             search_results=create_search_result_json(search_results),
-            target_image_meme_match=target_image_meme_match,
-            target_image_match=target_image_match
+            target_image_meme_match=search_results.search_settings.target_meme_match_percent,
+            target_image_match=search_results.search_settings.target_match_percent
         )
 
         with self.uowm.start() as uow:
