@@ -3,6 +3,8 @@
 import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
+from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
+
 if TYPE_CHECKING:
     from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
     from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
@@ -11,7 +13,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -242,3 +244,9 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
             uow.commit()
         except Exception as e:
             log.exception('Failed to save link repost', exc_info=True)
+
+def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
+    pass
+
+def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
+    pass
