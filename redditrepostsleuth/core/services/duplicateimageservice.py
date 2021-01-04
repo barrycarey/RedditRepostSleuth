@@ -16,7 +16,6 @@ from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiRe
 from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
-from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.helpers import create_search_result_json, get_default_image_search_settings
@@ -50,7 +49,7 @@ class DuplicateImageService:
         :param search_results: A cleaned list of matches
         :param target_hamming_distance: Hamming cutoff for matches
         :param target_annoy_distance: Annoy cutoff for matches
-        :rtype: List[ImagePostSearchMatch]
+        :rtype: List[ImageSearchMatch]
         """
 
         log.debug('Starting result filters with %s matches', len(search_results.matches))
@@ -146,6 +145,8 @@ class DuplicateImageService:
                     search_results.meme_template = None
                 else:
                     log.info('Using meme filter %s', search_results.meme_template.id)
+
+        log.debug('Search Settings: %s', search_settings)
 
         api_search_results = self._get_matches(
             search_results.target_hash,

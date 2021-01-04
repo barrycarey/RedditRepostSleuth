@@ -4,8 +4,8 @@ from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, RepostW
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
@@ -138,10 +138,10 @@ def save_image_repost_general(search_results: ImageSearchResults, uowm: UnitOfWo
         uow.commit()
 
 
-def get_oldest_active_match(matches: List[ImagePostSearchMatch]) -> ImagePostSearchMatch:
+def get_oldest_active_match(matches: List[SearchMatch]) -> SearchMatch:
     """
     Take a list of ImageMatches and return the oldest match that is still alive
-    :rtype: ImagePostSearchMatch
+    :rtype: SearchMatch
     :param matches: List of matches
     :return: ImageMatch
     """
@@ -149,7 +149,7 @@ def get_oldest_active_match(matches: List[ImagePostSearchMatch]) -> ImagePostSea
         if filter_dead_urls(match):
             return match
 
-def check_for_post_watch(matches: List[ImagePostSearchMatch], uowm: UnitOfWorkManager) -> List[Dict[ImagePostSearchMatch, RepostWatch]]:
+def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) -> List[Dict]:
     results = []
     with uowm.start() as uow:
         for match in matches:
@@ -160,7 +160,7 @@ def check_for_post_watch(matches: List[ImagePostSearchMatch], uowm: UnitOfWorkMa
                     results.append({'match': match, 'watch': watch})
     return results
 
-def repost_watch_notify(watches: List[Dict[ImagePostSearchMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
+def repost_watch_notify(watches: List[Dict[SearchMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
     for watch in watches:
         # TODO - What happens if we don't get redditor back?
         redditor = reddit.redditor(watch['watch'].user)
