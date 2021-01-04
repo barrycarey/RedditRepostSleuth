@@ -218,18 +218,18 @@ class TestResponseBuilder(TestCase):
     @mock.patch('redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager.SqlAlchemyUnitOfWorkManager')
     def test_build_default_oc_comment_no_sig(self, uowm):
         response_builder = ResponseBuilder(uowm)
-        expected = 'There\'s a good chance this is unique! I checked 10 image posts and didn\'t find a close match\n\n'
-        result = response_builder.build_default_oc_comment({'total_searched': 10, 'post_type': 'image', 'search_time': 5}, 'image', signature=False)
+        expected = "I didn't find any posts that meet the matching requirements for r/memes. \n\nIt might be OC, it might not. Things such as JPEG artifacts and cropping may impact the results.\n\n "
+        result = response_builder.build_default_oc_comment({'total_searched': 10, 'post_type': 'image', 'search_time': 5, 'this_subreddit': 'memes'}, 'image', signature=False)
         self.assertEqual(expected, result)
 
     @mock.patch('redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager.SqlAlchemyUnitOfWorkManager')
     def test_build_default_oc_comment_sig(self, uowm):
         response_builder = ResponseBuilder(uowm)
-        expected = 'There\'s a good chance this is unique! I checked 10 image posts and didn\'t find a close match\n\n' \
-                   '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report ' \
-                   '[ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={"post_id": 1111, "meme_template": null}) ]*'
+        expected = "I didn't find any posts that meet the matching requirements for r/memes. " \
+                   "It might be OC, it might not. Things such as JPEG artifacts and cropping may impact the results.\n\n" \
+
         result = response_builder.build_default_oc_comment(
-            {'total_searched': 10, 'post_type': 'image', 'search_time': 5, 'post_shortlink': 'http://redd.it/1234', 'false_negative_data': json.dumps(
+            {'total_searched': 10, 'post_type': 'image', 'search_url': 'www.test.com', 'search_time': 5, 'post_shortlink': 'http://redd.it/1234', 'this_subreddit': 'memes', 'false_negative_data': json.dumps(
                 {
                     'post_id': 1111,
                     'meme_template': None

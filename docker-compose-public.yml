@@ -1,0 +1,15 @@
+version: "3.7"
+services:
+    api:
+        container_name: api
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
+        environment:
+            LOG_LEVEL: INFO
+        restart: always
+        entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10
+        volumes:
+            - /opt/letsencrypt/etc/letsencrypt/live/www.repostsleuth.com:/config/keys
+        ports:
+            - 8443:8443

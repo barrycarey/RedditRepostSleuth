@@ -3,7 +3,6 @@ import sys
 import time
 
 import redis
-from kombu.exceptions import OperationalError
 
 sys.path.append('./')
 from redditrepostsleuth.core.config import Config
@@ -17,7 +16,7 @@ from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchem
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
 if __name__ == '__main__':
@@ -25,14 +24,15 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     response_builder = ResponseBuilder(uowm)
-    dup = DuplicateImageService(uowm, event_logger, config=config)
-    reddit = RedditManager(get_reddit_instance(config))
+    reddit = get_reddit_instance(config)
+    reddit_manager = RedditManager(reddit)
+    dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
     monitor = SubMonitor(
         dup,
         uowm,
-        reddit,
+        reddit_manager,
         response_builder,
-        ResponseHandler(reddit, uowm, event_logger, source='submonitor', live_response=config.live_responses),
+        ResponseHandler(reddit_manager, uowm, event_logger, source='submonitor', live_response=config.live_responses),
         event_logger=event_logger,
         config=config
     )

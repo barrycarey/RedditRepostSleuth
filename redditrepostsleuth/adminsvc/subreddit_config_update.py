@@ -17,16 +17,8 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
-from redditrepostsleuth.core.util.helpers import bot_has_permission
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
-# Needed to map database column names to friendly config options
-CONFIG_OPTION_MAP = {
-    'only_comment_on_repost': 'repost_only',
-    'report_reposts': 'report_submission',
-    'match_percent_dif': 'target_hamming',
-
-}
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, bot_has_permission
 
 class SubredditConfigUpdater:
 
@@ -54,11 +46,11 @@ class SubredditConfigUpdater:
 
         print('[Scheduled Job] Config Updates End')
 
-    def check_for_config_update(self, monitored_sub: MonitoredSub):
+    def check_for_config_update(self, monitored_sub: MonitoredSub, notify_missing_keys=True):
         # TODO - Possibly pass the subreddit to get_wiki_config
         subreddit = self.reddit.subreddit(monitored_sub.name)
 
-        if not bot_has_permission(subreddit, 'wiki'):
+        if not bot_has_permission(monitored_sub.name, 'wiki', self.reddit):
             return
 
         wiki_page = subreddit.wiki[self.config.wiki_config_name]
@@ -67,6 +59,8 @@ class SubredditConfigUpdater:
             wiki_page.content_md
         except NotFound:
             self.create_initial_wiki_config(subreddit, wiki_page, monitored_sub)
+            return
+        except Forbidden:
             return
 
         try:
@@ -91,8 +85,9 @@ class SubredditConfigUpdater:
         wiki_page = subreddit.wiki['repost_sleuth_config'] # Force refresh so we can get latest revision ID
         self._create_revision(wiki_page)
         self._set_config_validity(wiki_page.revision_id, True)
-        if self._notify_new_options(subreddit, missing_keys):
-            self._set_config_notified(wiki_page.revision_id)
+        if notify_missing_keys:
+            if self._notify_new_options(subreddit, missing_keys):
+                self._set_config_notified(wiki_page.revision_id)
 
 
     def create_initial_wiki_config(self, subreddit: Subreddit, wiki_page: WikiPage, monitored_sub: MonitoredSub) -> NoReturn:
@@ -215,12 +210,8 @@ class SubredditConfigUpdater:
         """
         new_config = {}
         for k in self.config.sub_monitor_exposed_config_options:
-            if k in CONFIG_OPTION_MAP:
-                db_key = CONFIG_OPTION_MAP[k]
-            else:
-                db_key = k
-            if hasattr(monitored_sub, db_key):
-                new_config[k] = getattr(monitored_sub, db_key)
+            if hasattr(monitored_sub, k):
+                new_config[k] = getattr(monitored_sub, k)
 
         return new_config
 
@@ -235,14 +226,10 @@ class SubredditConfigUpdater:
         """
 
         for k in self.config.sub_monitor_exposed_config_options:
-            if k in CONFIG_OPTION_MAP:
-                db_key = CONFIG_OPTION_MAP[k]
-            else:
-                db_key = k
-            if hasattr(monitored_sub, db_key) and k in wiki_config:
-                if getattr(monitored_sub, db_key) != wiki_config[k]:
-                    log.debug('Changing %s from %s to %s for %s', db_key, getattr(monitored_sub, db_key), wiki_config[k], monitored_sub.name)
-                    setattr(monitored_sub, db_key, wiki_config[k])
+            if hasattr(monitored_sub, k) and k in wiki_config:
+                if getattr(monitored_sub, k) != wiki_config[k]:
+                    log.debug('Changing %s from %s to %s for %s', k, getattr(monitored_sub, k), wiki_config[k], monitored_sub.name)
+                    setattr(monitored_sub, k, wiki_config[k])
 
         return monitored_sub
 

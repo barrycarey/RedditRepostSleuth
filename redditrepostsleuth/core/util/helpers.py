@@ -1,23 +1,19 @@
+
+
 import json
+from typing import Dict, List, Text, TYPE_CHECKING
 
-import requests
-from typing import Dict, List, Text
+from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 
-import imagehash
-from praw.exceptions import APIException
-from praw.models import Subreddit
-from prawcore import Forbidden
+if TYPE_CHECKING:
+    from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
+    from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, LinkRepost
-from redditrepostsleuth.core.model.imagematch import ImageMatch
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
-from redditrepostsleuth.core.util.imagehashing import generate_img_by_url
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -95,13 +91,24 @@ def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> 
 
     return seen
 
-def build_markdown_list(matches: List[ImageMatch]) -> str:
+def build_markdown_list(matches: List['ImagePostSearchMatch']) -> str:
     result = ''
     for match in matches:
         result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
     return result
 
-def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_site_search_url(image_search: ImageSearch) -> Text:
+    url = f'https://www.repostsleuth.com?postId={image_search.post_id}&'
+    url += f'sameSub={str(image_search.same_sub).lower()}&'
+    url += f'filterOnlyOlder={str(image_search.only_older_matches).lower()}&'
+    url += f'memeFilter={str(image_search.meme_filter).lower()}&'
+    url += f'filterDeadMatches={str(image_search.filter_dead_matches).lower()}&'
+    url += f'targetImageMatch={str(image_search.target_image_match)}&'
+    url += f'targetImageMemeMatch={str(image_search.target_image_meme_match)}'
+    return url
+
+
+def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     results_values = {}
     base_values = {
         'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
@@ -110,7 +117,8 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
         'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
         'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
         'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
-        'meme_filter': True if search_results.meme_template else False
+        'meme_filter': True if search_results.meme_template else False,
+        'search_url': build_site_search_url(search_results.logged_search)
     }
     if search_results.matches:
         results_values = {
@@ -138,7 +146,7 @@ def build_image_msg_values_from_search(search_results: ImageRepostWrapper, uowm:
     return {**results_values, **base_values, **kwargs}
 
 
-def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -146,7 +154,6 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
     """
     base_values = {
         'total_searched': f'{search_results.total_searched:,}',
-        'search_time': search_results.total_search_time,
         'total_posts': 0,
         'match_count': len(search_results.matches),
         'post_type': search_results.checked_post.post_type,
@@ -157,6 +164,8 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
         'post_author': search_results.checked_post.author
 
     }
+    if search_results.search_times:
+        base_values['search_time'] = search_results.search_times.total_search_time
 
     results_values = {}
 
@@ -181,7 +190,7 @@ def build_msg_values_from_search(search_results: RepostWrapper, uowm: UnitOfWork
 
     return {**base_values, **results_values, **kwargs}
 
-def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
+def create_search_result_json(search_results: 'ImageSearchResults') -> dict:
     """
     Take an ImageRepostWrapper object and create the json to be stored in the database
     :rtype: dict
@@ -193,63 +202,9 @@ def create_search_result_json(search_results: ImageRepostWrapper) -> dict:
     }
     return json.dumps(search_data)
 
-def is_moderator(subreddit: Subreddit, user: Text) -> bool:
-    """
-    Check if a given username is a moderator on a given sub
-    :rtype: bool
-    :param subreddit: Praw SubReddit obj
-    :param user: username
-    :return: bool
-    """
-    try:
-        for mod in subreddit.moderator():
-            if mod.name.lower() == user.lower():
-                return True
-        return False
-    except Forbidden:
-        log.error('[Mod Check] Forbidden On Sub %s', subreddit.display_name)
-        return False
 
-def bot_has_permission(subreddit: Subreddit, permission_name: Text) -> bool:
-    log.debug('Checking if bot has %s permission in %s', permission_name, subreddit.display_name)
-    try:
-        for mod in subreddit.moderator():
-            if mod.name == 'RepostSleuthBot':
-                if 'all' in mod.mod_permissions:
-                    log.debug('Bot has All permissions in %s', subreddit.display_name)
-                    return True
-                elif permission_name.lower() in mod.mod_permissions:
-                    log.debug('Bot has %s permission in %s', permission_name, subreddit.display_name)
-                    return True
-                else:
-                    log.debug('Bot does not have %s permission in %s', permission_name, subreddit.display_name)
-                    return False
-        log.error('Bot is not mod on %s', subreddit.display_name)
-        return False
-    except Forbidden:
-        return False
 
-def is_bot_banned(subreddit: Subreddit) -> bool:
-    """
-    Check if bot is banned on a given sub
-    :rtype: bool
-    :param subreddit: Sub to check
-    :return: bool
-    """
-    banned = False
-    try:
-        sub = subreddit.submit('ban test', selftext='ban test')
-        sub.delete()
-    except Forbidden:
-        banned = True
-    except APIException as e:
-        if e.error_type == 'SUBREDDIT_NOTALLOWED':
-            banned = True
-    if banned:
-        log.info('Bot is banned from %s', subreddit.display_name)
-    else:
-        log.info('Bot is allowed on %s', subreddit.display_name)
-    return banned
+
 
 def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
     if len(rows[0]) != len(headers):
@@ -269,7 +224,7 @@ def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
 
     return table
 
-def get_hamming_from_percent(match_percent: int, hash_length: int) -> float:
+def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
 def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
@@ -289,3 +244,9 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
             uow.commit()
         except Exception as e:
             log.exception('Failed to save link repost', exc_info=True)
+
+def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
+    pass
+
+def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
+    pass

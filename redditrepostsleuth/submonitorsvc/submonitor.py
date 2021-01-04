@@ -3,20 +3,19 @@ from typing import List, Text, NoReturn, Optional
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
-from prawcore import Forbidden, BadRequest
+from prawcore import Forbidden
 from redlock import RedLockError
 from time import perf_counter
-from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
-from redditrepostsleuth.core.model.imagerepostwrapper import ImageRepostWrapper
+from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -24,8 +23,7 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     save_link_repost
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -131,7 +129,7 @@ class SubMonitor:
             log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
-        if not search_results.matches and monitored_sub.repost_only:
+        if not search_results.matches and monitored_sub.only_comment_on_repost:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
@@ -210,7 +208,7 @@ class SubMonitor:
                 log.error('New search index is being loaded. Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
                 continue
 
-            if not search_results.matches and monitored_sub.repost_only:
+            if not search_results.matches and monitored_sub.only_comment_on_repost:
                 log.debug('No matches for post %s and comment OC is disabled',
                          f'https://redd.it/{search_results.checked_post.post_id}')
                 self._create_checked_post(post)
@@ -279,21 +277,24 @@ class SubMonitor:
             get_total=False
         )
 
-    def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageRepostWrapper:
+    def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageSearchResults:
         """
         Check if provided post is a repost
         :param post: DB Post obj
         :return: None
         """
 
-        search_results = self.image_service.check_duplicates_wrapped(
-            post,
+        search_results = self.image_service.check_image(
+            post.url,
+            post=post,
             target_annoy_distance=monitored_sub.target_annoy,
             target_match_percent=monitored_sub.target_image_match,
             target_meme_match_percent=monitored_sub.target_image_meme_match,
             date_cutoff=monitored_sub.target_days_old,
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter,
+            filter_removed_matches=True,
+            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
             max_depth=-1,
             max_matches=100,
             source='sub_monitor'
@@ -358,7 +359,7 @@ class SubMonitor:
 
 
     def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission, report_msg: Text) -> NoReturn:
-        if not monitored_sub.report_submission:
+        if not monitored_sub.report_reposts:
             return
         log.info('Reporting post %s on %s', f'https://redd.it/{submission.id}', monitored_sub.name)
         try:
@@ -366,7 +367,7 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to report submission', exc_info=True)
 
-    def _leave_comment(self, search_results: ImageRepostWrapper, monitored_sub: MonitoredSub) -> Comment:
+    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
 
         msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
         if search_results.checked_post.post_type == 'image':

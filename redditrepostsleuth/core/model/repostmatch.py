@@ -1,6 +1,7 @@
 from redditrepostsleuth.core.db.databasemodels import Post
 
 
+# TODO - Remove
 class RepostMatch:
     def __init__(self):
         self.post: Post = None
