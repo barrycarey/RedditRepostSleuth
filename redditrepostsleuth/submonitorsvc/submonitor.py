@@ -294,6 +294,7 @@ class SubMonitor:
             same_sub=monitored_sub.same_sub_only,
             meme_filter=monitored_sub.meme_filter,
             filter_removed_matches=True,
+            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
             max_depth=-1,
             max_matches=100,
             source='sub_monitor'
