@@ -466,3 +466,4 @@ class DuplicateImageService:
             results.append(match)
 
         return results
+
