@@ -3,14 +3,15 @@ from unittest import TestCase
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
+from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MonitoredSub
 from redditrepostsleuth.core.exception import ImageConversioinException
 from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
 
-from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, create_meme_template, \
+from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, \
     post_type_from_url, build_markdown_list, build_msg_values_from_search, build_image_msg_values_from_search, \
-    is_moderator, bot_has_permission
+    get_image_search_settings_for_monitored_sub, get_default_image_search_settings
 
 
 class TestHelpers(TestCase):
@@ -56,25 +57,6 @@ class TestHelpers(TestCase):
         expected = f'First seen in somesub on {post.created_at.strftime("%Y-%m-%d")}'
         self.assertEqual(expected, r)
 
-    """
-    @patch('redditrepostsleuth.core.util.helpers.generate_img_by_url')
-    def test_create_meme_template_valid_url(self, generate_img_by_url):
-        url = 'https://i.imgur.com/oIxwC9M.jpg'
-        img = Image.open(os.path.join(os.getcwd(), 'data', 'demo.jpg'))
-        generate_img_by_url.return_value = img
-        template = create_meme_template(url)
-
-        self.assertEqual('3ffeffffffffffffffffffffffff7ffe3ffc0180018003800000000000000000', template.ahash)
-        self.assertEqual('ff00ff00ff00ff00ff00ff00ff00ff00fe00ff00f700fe00f260308102200000', template.dhash_h)
-        self.assertEqual('fffffffffffffffffffe0fe00180000000000000ffc10b7ff0000400033c0000', template.dhash_v)
-        self.assertEqual(url, template.example)
-        self.assertEqual(10, template.template_detection_hamming)
-    """
-    @patch('redditrepostsleuth.core.util.helpers.generate_img_by_url')
-    def test_create_meme_template_raise_exception(self, generate_img_by_url):
-        url = 'https://i.imgur.com/oIxwC9M.jpg'
-        generate_img_by_url.side_effect = ImageConversioinException('broke')
-        self.assertRaises(ImageConversioinException, create_meme_template, url)
 
     def test_post_type_from_url_image_lowercase(self):
         self.assertEqual('image', post_type_from_url('www.example.com/test.jpg'))
@@ -203,54 +185,47 @@ class TestHelpers(TestCase):
         self.assertEqual(result['item1'], 'value1')
         self.assertEqual(result['item2'], 'value2')
 
-    def test_is_moderator_true(self):
-        @dataclass
-        class Moderator:
-            name: str
-        subreddit = MagicMock()
-        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot')]
-        self.assertTrue(is_moderator(subreddit, 'RepostSleuthBot'))
 
-    def test_is_moderator_false(self):
-        @dataclass
-        class Moderator:
-            name: str
-        subreddit = MagicMock()
-        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot')]
-        self.assertFalse(is_moderator(subreddit, 'Test'))
+    def test_get_image_search_settings_for_monitored_sub(self):
+        monitored_sub = MonitoredSub(
+            target_image_match=51,
+            target_image_meme_match=66,
+            meme_filter=True,
+            target_title_match=88,
+            check_title_similarity=True,
+            same_sub_only=True,
+            target_days_old=44,
+            filter_same_author=False,
+            filter_crossposts=False
+        )
+        r = get_image_search_settings_for_monitored_sub(monitored_sub)
+        self.assertEqual(51, r.target_match_percent)
+        self.assertEqual(66, r.target_meme_match_percent)
+        self.assertTrue(r.meme_filter)
+        self.assertEqual(88, r.target_title_match)
+        self.assertEqual(75, r.max_matches)
+        self.assertTrue(r.same_sub)
+        self.assertEqual(44, r.max_days_old)
+        self.assertFalse(r.filter_same_author)
+        self.assertFalse(r.filter_crossposts)
 
-    def test_bot_has_permission_true(self):
-        @dataclass
-        class Moderator:
-            name: str
-            mod_permissions: list
-        subreddit = MagicMock()
-        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['posts'])]
-        self.assertTrue(bot_has_permission(subreddit, 'posts'))
-
-    def test_bot_has_permission_false(self):
-        @dataclass
-        class Moderator:
-            name: str
-            mod_permissions: list
-        subreddit = MagicMock()
-        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['posts'])]
-        self.assertFalse(bot_has_permission(subreddit, 'wiki'))
-
-    def test_bot_has_permission_weird_capitalization_true(self):
-        @dataclass
-        class Moderator:
-            name: str
-            mod_permissions: list
-        subreddit = MagicMock()
-        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['posts'])]
-        self.assertTrue(bot_has_permission(subreddit, 'pOsTs'))
-
-    def test_bot_has_permission_all_permission_true(self):
-        @dataclass
-        class Moderator:
-            name: str
-            mod_permissions: list
-        subreddit = MagicMock()
-        subreddit.moderator.return_value = [Moderator(name='RepostSleuthBot', mod_permissions=['all'])]
-        self.assertTrue(bot_has_permission(subreddit, 'posts'))
+    def test_get_default_image_search_settings(self):
+        config = Config(
+            target_image_match=55,
+            target_image_meme_match=22,
+            summons_meme_filter=True,
+            summons_same_sub=True,
+            summons_max_age=77,
+            default_annoy_distance=.177
+        )
+        r = get_default_image_search_settings(config)
+        self.assertEqual(55, r.target_match_percent)
+        self.assertEqual(22, r.target_meme_match_percent)
+        self.assertTrue(r.meme_filter)
+        self.assertIsNone(r.target_title_match)
+        self.assertEqual(75, r.max_matches)
+        self.assertTrue(r.same_sub)
+        self.assertEqual(77, r.max_days_old)
+        self.assertTrue(r.filter_same_author)
+        self.assertTrue(r.filter_crossposts)
+        self.assertEqual(.177, r.target_annoy_distance)

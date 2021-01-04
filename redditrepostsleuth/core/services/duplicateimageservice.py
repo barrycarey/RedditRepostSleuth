@@ -14,11 +14,12 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult
 from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import create_search_result_json
+from redditrepostsleuth.core.util.helpers import create_search_result_json, get_default_image_search_settings
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
@@ -40,14 +41,6 @@ class DuplicateImageService:
     def _filter_results_for_reposts(
             self,
             search_results: ImageSearchResults,
-            target_title_match: int = None,
-            same_sub: bool = False,
-            date_cutoff: int = None,
-            filter_dead_matches: bool = True,
-            filter_removed_matches: bool = True,
-            only_older_matches: bool = True,
-            filter_crossposts=True,
-            filter_author=True,
             sort_by='created'
     ) -> ImageSearchResults:
         """
@@ -69,40 +62,40 @@ class DuplicateImageService:
         if search_results.checked_post:
             matches = list(filter(filter_same_post(search_results.checked_post.post_id), matches))
 
-            if filter_author:
+            if search_results.search_settings.filter_same_author:
                 matches = list(filter(filter_same_author(search_results.checked_post.author), matches))
 
-            if filter_crossposts:
+            if search_results.search_settings.filter_crossposts:
                 matches = list(filter(cross_post_filter, matches))
 
-            if only_older_matches:
+            if search_results.search_settings.only_older_matches:
                 matches = list(filter(filter_newer_matches(search_results.checked_post.created_at), matches))
 
-            if same_sub:
+            if search_results.search_settings.same_sub:
                 matches = list(filter(same_sub_filter(search_results.checked_post.subreddit), matches))
 
-            if target_title_match:
-                matches = list(filter(filter_title_distance(target_title_match), matches))
+            if search_results.search_settings.target_title_match:
+                matches = list(filter(filter_title_distance(search_results.search_settings.target_title_match), matches))
 
-            if date_cutoff:
-                matches = list(filter(filter_days_old_matches(date_cutoff), matches))
+            if search_results.search_settings.max_days_old:
+                matches = list(filter(filter_days_old_matches(search_results.search_settings.max_days_old), matches))
 
         closest_match = get_closest_image_match(matches, check_url=True)
-        if closest_match and closest_match.hamming_match_percent > 40:
+        if closest_match and closest_match.hamming_match_percent > 40: # TODO - Move to config
             search_results.closest_match = closest_match
 
         # Has to be after closest match so we don't drop closest
-        matches = list(filter(annoy_distance_filter(search_results.target_annoy_distance), matches))
+        matches = list(filter(annoy_distance_filter(search_results.search_settings.target_annoy_distance), matches))
         matches = list(filter(hamming_distance_filter(search_results.target_hamming_distance), matches))
 
-        if filter_dead_matches:
+        if search_results.search_settings.filter_dead_matches:
             matches = filter_dead_urls_remote(
                 f'{self.config.util_api}/maintenance/removed',
                 self.reddit,
                 matches
             )
 
-        if filter_removed_matches:
+        if search_results.search_settings.filter_removed_matches:
             matches = filter_removed_posts(self.reddit, matches)
 
         if search_results.meme_template:
@@ -122,42 +115,31 @@ class DuplicateImageService:
     def check_image(
             self,
             url: Text,
-            target_match_percent: float = None,
-            target_meme_match_percent: float = None,
-            target_annoy_distance: float = None,
             post: Post = None,
-            max_matches: int = 100,
-            filter_dead_matches: bool = True,
-            filter_removed_matches: bool = True,
-            target_title_match: int = None,
-            same_sub: bool = False,
-            date_cutoff: int = None,
-            only_older_matches=True,
-            meme_filter=False,
-            filter_crossposts=True,
-            filter_author=True,
             source='unknown',
             sort_by='created',
-            max_depth=4000,
+            search_settings: ImageSearchSettings = None
 
     ) -> ImageSearchResults:
         log.info('Checking URL for matches: %s', url)
+
+        if not search_settings:
+            search_settings = get_default_image_search_settings(self.config)
+
         search_results = ImageSearchResults(
             url,
-            target_match_percent or self.config.target_image_match,
-            target_annoy_distance or self.config.default_annoy_distance,
-            target_meme_match_percent or self.config.target_image_meme_match,
             checked_post=post,
+            search_settings=search_settings
         )
         search_results.search_times = ImageSearchTimes()
         search_results.search_times.start_timer('total_search_time')
 
-        if meme_filter:
+        if search_settings.meme_filter:
             search_results.search_times.start_timer('meme_detection_time')
             search_results.meme_template = self._get_meme_template(search_results.target_hash)
             search_results.search_times.stop_timer('meme_detection_time')
             if search_results.meme_template:
-                search_results.target_match_percent = 100  # Keep only 100% matches on default hash size
+                search_settings.target_match_percent = 100  # Keep only 100% matches on default hash size
                 search_results.meme_hash = self._get_meme_hash(url)
                 if not search_results.meme_hash:
                     log.error('No meme hash, disabled meme filter')
@@ -168,9 +150,9 @@ class DuplicateImageService:
         api_search_results = self._get_matches(
             search_results.target_hash,
             search_results.target_hamming_distance,
-            search_results.target_annoy_distance,
-            max_matches=max_matches,
-            max_depth=max_depth,
+            search_settings.target_annoy_distance,
+            max_matches=search_settings.max_matches,
+            max_depth=search_settings.max_depth,
             search_times=search_results.search_times
         )
 

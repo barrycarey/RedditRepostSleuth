@@ -17,7 +17,7 @@ class SearchSettings:
             filter_removed_matches: bool = False,
             only_older_matches: bool = True,
             filter_same_author: bool = True,
-            filter_cross_posts: bool = True
+            filter_crossposts: bool = True
     ):
         """
 
@@ -30,7 +30,7 @@ class SearchSettings:
         :param only_older_matches:  Only include matches older than the searched post
         :param filter_same_author: Remove matches by the same author is searched post
         """
-        self.filter_cross_posts = filter_cross_posts
+        self.filter_crossposts = filter_crossposts
         self.filter_same_author = filter_same_author
         self.only_older_matches = only_older_matches
         self.filter_removed_matches = filter_removed_matches

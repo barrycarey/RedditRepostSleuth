@@ -246,7 +246,25 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
             log.exception('Failed to save link repost', exc_info=True)
 
 def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
-    pass
+    return ImageSearchSettings(
+        config.target_image_match,
+        target_meme_match_percent=config.target_image_meme_match,
+        meme_filter=config.summons_meme_filter,
+        same_sub=config.summons_same_sub,
+        max_days_old=config.summons_max_age,
+        target_annoy_distance=config.default_annoy_distance,
+
+    )
 
 def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
-    pass
+    return ImageSearchSettings(
+        monitored_sub.target_image_match,
+        target_meme_match_percent=monitored_sub.target_image_meme_match,
+        meme_filter=monitored_sub.meme_filter,
+        target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+        same_sub=monitored_sub.same_sub_only,
+        max_days_old=monitored_sub.target_days_old,
+        filter_same_author=monitored_sub.filter_same_author,
+        filter_crossposts=monitored_sub.filter_crossposts
+
+    )
