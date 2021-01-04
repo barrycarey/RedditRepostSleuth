@@ -4,6 +4,7 @@ import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
+from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE
 
 if TYPE_CHECKING:
     from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
@@ -12,7 +13,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch, MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -267,4 +268,19 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         max_depth=-1,
         max_matches=200
 
+    )
+
+def build_image_search_setting_table(search_results: 'ImageSearchResults') -> Text:
+
+    target_percent = f'{search_results.search_settings.target_match_percent}%'
+    if search_results.meme_template:
+        target_percent = f'{search_results.search_settings.target_meme_match_percent}%'
+
+    return IMAGE_SEARCH_SETTING_TABLE.format(
+        scope='Reddit' if not search_results.search_settings.same_sub else f'r/{search_results.checked_post.subreddit}',
+        meme_filter=search_results.search_settings.meme_filter,
+        meme_detected='True' if search_results.meme_template else 'False',
+        target_percent=target_percent,
+        check_title='True' if search_results.search_settings.target_title_match else 'False',
+        max_age='None' if search_results.search_settings.max_days_old == 99999 else search_results.search_settings.max_days_old
     )
