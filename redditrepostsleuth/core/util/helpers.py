@@ -107,7 +107,7 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
     results_values = {}
     base_values = {
         'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
-        'target_match_percent': f'{search_results.target_match_percent}%' if search_results.closest_match else None,
+        'target_match_percent': f'{search_results.search_settings.target_match_percent}%',
         'closest_url': search_results.closest_match.post.url if search_results.closest_match else None,
         'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
         'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
@@ -248,6 +248,8 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
         same_sub=config.summons_same_sub,
         max_days_old=config.summons_max_age,
         target_annoy_distance=config.default_annoy_distance,
+        max_depth=-1,
+        max_matches=250
 
     )
 
@@ -263,6 +265,6 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         filter_same_author=monitored_sub.filter_same_author,
         filter_crossposts=monitored_sub.filter_crossposts,
         max_depth=-1,
-        max_matches=100
+        max_matches=200
 
     )
