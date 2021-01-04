@@ -1,4 +1,3 @@
-from time import perf_counter
 from typing import List, Dict
 
 import requests
@@ -8,16 +7,15 @@ from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck, IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
-from redditrepostsleuth.core.model.imagematch import ImageMatch
+from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
-from redditrepostsleuth.core.util.reposthelpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask
-from redditrepostsleuth.core.celery.helpers.repost_image import find_matching_images, save_image_repost_result, \
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
 
@@ -31,7 +29,7 @@ def ingest_repost_check(post):
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
-def check_image_repost_save(self, post: Post) -> RepostWrapper:
+def check_image_repost_save(self, post: Post) -> ImageSearchResults:
     r = requests.head(post.url)
     if r.status_code != 200:
         log.info('Skipping image that is deleted %s', post.url)
@@ -41,7 +39,13 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
-    result = find_matching_images(post, self.dup_service)
+    result = self.dup_service.check_image(
+        post.url,
+        post=post,
+        meme_filter=True,
+        filter_dead_matches=False,
+        filter_removed_matches=False
+    )
 
     save_image_repost_result(result, self.uowm)
 
@@ -63,6 +67,9 @@ def check_image_repost_save(self, post: Post) -> RepostWrapper:
 def link_repost_check(self, posts, ):
     with self.uowm.start() as uow:
         for post in posts:
+            if post.url_hash == '540f1167d27dcca2ea2772443beb5c79':
+                continue
+            log.debug('Checking URL for repost: %s', post.url_hash)
             repost = check_link_repost(post, self.uowm)
             if not repost.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
@@ -99,7 +106,7 @@ def link_repost_check(self, posts, ):
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def notify_watch(self, watches: List[Dict[ImageMatch, RepostWatch]], repost: Post):
+def notify_watch(self, watches: List[Dict[ImagePostSearchMatch, RepostWatch]], repost: Post):
     repost_watch_notify(watches, self.reddit, self.response_handler, repost)
     with self.uowm.start() as uow:
         for w in watches:

@@ -13,3 +13,4 @@ with uowm.start() as uow:
             print(f'Removing watch {watch.id} for post {watch.post_id}')
             uow.repostwatch.remove(watch)
             uow.commit()
+

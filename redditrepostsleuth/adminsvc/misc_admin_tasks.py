@@ -174,7 +174,7 @@ def send_reports_to_meme_voting(uowm: UnitOfWorkManager) -> NoReturn:
             if not post:
                 continue
             try:
-                if not requests.head(post.url).status_code == 200:
+                if not requests.head(post.searched_url).status_code == 200:
                     continue
             except Exception:
                 continue
@@ -203,7 +203,7 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                 log.info('Post %s received %s votes.  Creating meme template', potential_template.post_id, potential_template.vote_total)
                 post = uow.posts.get_by_post_id(potential_template.post_id)
                 try:
-                    meme_hashes = get_image_hashes(post, hash_size=32)
+                    meme_hashes = get_image_hashes(post.searched_url, hash_size=32)
                 except Exception as e:
                     log.error('Failed to get meme hash for %s', post.post_id)
                     return

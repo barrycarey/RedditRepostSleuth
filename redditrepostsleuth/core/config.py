@@ -180,7 +180,8 @@ class Config:
             'ocr_min_confidence',
             'ocr_bounding_padding',
             'ocr_image_width',
-            'ocr_image_height'
+            'ocr_image_height',
+            'default_meme_filter_hash_size'
 
         ]
 

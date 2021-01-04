@@ -22,9 +22,9 @@ def get_non_reddit_links(uowm):
         all_posts = []
         posts = uow.posts.find_all_for_delete_check(hours=1440, limit=2500000)
         for post in posts:
-            if 'reddit.com' in post.url or 'redd.it' in post.url:
+            if 'reddit.com' in post.searched_url or 'redd.it' in post.searched_url:
                 continue
-            all_posts.append({'id': post.post_id, 'url': post.url})
+            all_posts.append({'id': post.post_id, 'url': post.searched_url})
         chunks = chunk_list(all_posts, 400)
         for chunk in chunks:
             cleanup_removed_posts_batch.apply_async((chunk,), queue='delete')
@@ -35,8 +35,8 @@ def get_certain_sites(uowm):
         all_posts = []
         posts = uow.posts.find_all_for_delete_check(hours=1440, limit=2000000)
         for post in posts:
-            if 'reddit' in post.url:
-                all_posts.append({'id': post.post_id, 'url': post.url})
+            if 'reddit' in post.searched_url:
+                all_posts.append({'id': post.post_id, 'url': post.searched_url})
         chunks = chunk_list(all_posts, 10)
         for chunk in chunks:
             cleanup_removed_posts_batch.apply_async((chunk,), queue='delete')
@@ -91,7 +91,7 @@ def get_all_links_old(uowm):
         batch = []
         posts = uow.posts.find_all_for_delete_check(hours=1440, limit=2000000)
         for post in posts:
-            batch.append({'id': post.post_id, 'url': post.url})
+            batch.append({'id': post.post_id, 'url': post.searched_url})
             if len(batch) >= 15:
                 cleanup_removed_posts_batch.apply_async((batch,), queue='delete')
                 batch = []
