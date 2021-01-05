@@ -8,8 +8,8 @@ from praw import Reddit
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
-from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 
 

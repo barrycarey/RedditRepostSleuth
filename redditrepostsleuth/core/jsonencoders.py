@@ -1,6 +1,6 @@
 import json
 
-from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 
 
 class ImageRepostWrapperEncoder(json.JSONEncoder):

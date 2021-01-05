@@ -3,26 +3,21 @@ from typing import List, Text
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch, Post
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.util.helpers import get_hamming_from_percent
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 
 
-class ImageSearchResults:
-    def __init__(
-            self,
-            checked_url: Text,
-            search_settings: ImageSearchSettings,
-            checked_post: Post = None,
-            search_times: ImageSearchTimes = None
-
-    ):
+class ImageSearchResults(SearchResults):
+    def __init__(self, checked_url: Text, search_settings: ImageSearchSettings, checked_post: Post = None,
+                 search_times: ImageSearchTimes = None):
+        super().__init__(checked_url, search_settings, checked_post)
         self.search_times = search_times
         self.search_settings = search_settings
         self.checked_url = checked_url
         self.checked_post = checked_post
         self._target_hash = None
-        self.total_searched: int = 0
         self.meme_template: MemeTemplate = None
         self.closest_match: ImageSearchMatch = None
         self.matches: List[ImageSearchMatch] = []
