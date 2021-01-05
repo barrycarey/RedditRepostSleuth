@@ -9,8 +9,8 @@ from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostC
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
-from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
-from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask

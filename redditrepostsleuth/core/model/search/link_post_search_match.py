@@ -1,5 +1,5 @@
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.core.model.search_results.link_search_match import LinkSearchMatch
+from redditrepostsleuth.core.model.search.link_search_match import LinkSearchMatch
 
 
 class LinkPostSearchMatch(LinkSearchMatch):

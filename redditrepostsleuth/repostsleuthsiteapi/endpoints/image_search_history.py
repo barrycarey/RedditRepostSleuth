@@ -37,7 +37,7 @@ class ImageSearchHistory:
                 results.append({
                     'checked_post': post.to_dict(),
                     'search': search.to_dict(),
-                    'search_results': json.loads(search.search_results)
+                    'search': json.loads(search.search_results)
                 })
         resp.body = json.dumps(results)
 

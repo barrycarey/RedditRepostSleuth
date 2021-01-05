@@ -1,13 +1,13 @@
 from unittest import TestCase
 from datetime import datetime
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import Mock
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MonitoredSub
-from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \

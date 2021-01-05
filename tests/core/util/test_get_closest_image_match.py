@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.util.repost_helpers import get_closest_image_match
 
 

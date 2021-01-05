@@ -13,10 +13,10 @@ from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult
-from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.helpers import create_search_result_json, get_default_image_search_settings
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes

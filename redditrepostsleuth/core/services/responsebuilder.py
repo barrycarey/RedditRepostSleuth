@@ -1,10 +1,12 @@
-from typing import Dict, Text
+from typing import Dict, Text, Type
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COMMENT, \
     DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH, \
     DEFAULT_COMMENT_OC, COMMENT_STATS, IMAGE_REPOST_SIGNATURE, IMAGE_OC_SIGNATURE, DEFAULT_REPOST_LINK_COMMENT, \
@@ -28,23 +30,29 @@ class ResponseBuilder:
             'link_signature': LINK_SIGNATURE
         }
 
-    def build_sub_repost_comment(self, monitored_sub: MonitoredSub, msg_values: Dict, post_type: Text, stats: bool = True, signature: bool = True) -> Text:
-        with self.uowm.start() as uow:
-            monitored_sub = uow.monitored_sub.get_by_sub(sub)
-            if not monitored_sub or not monitored_sub.repost_response_template:
-                return self.build_default_repost_comment(msg_values, post_type)
-            msg = monitored_sub.repost_response_template
-            if stats:
-                msg = msg + COMMENT_STATS
-            if signature:
-                if msg[-2:] != '\n\n':
-                    msg = msg + '\n\n'
-                msg = msg + IMAGE_REPOST_SIGNATURE
-            try:
-                return msg.format(**msg_values)
-            except KeyError:
-                log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
-                return self.build_default_repost_comment(msg_values, post_type, signature=False, stats=False)
+    def build_sub_repost_comment(self, monitored_sub: MonitoredSub, search_results: SearchResults):
+        if search_results.checked_post.post_type == 'image':
+            return self._build_sub_image_repost_comment(monitored_sub, search_results)
+
+    def _build_sub_image_repost_comment(
+            self, monitored_sub: MonitoredSub, search_results: ImageSearchResults,
+            stats: bool = True, signature: bool = True
+    ) -> Text:
+
+        if not monitored_sub.repost_response_template:
+            return self.build_default_repost_comment(msg_values, post_type)
+        msg = monitored_sub.repost_response_template
+        if stats:
+            msg = msg + COMMENT_STATS
+        if signature:
+            if msg[-2:] != '\n\n':
+                msg = msg + '\n\n'
+            msg = msg + IMAGE_REPOST_SIGNATURE
+        try:
+            return msg.format(**msg_values)
+        except KeyError:
+            log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
+            return self.build_default_repost_comment(msg_values, post_type, signature=False, stats=False)
 
     def build_default_repost_comment(self, values: Dict, post_type: Text,  stats: bool = True, signature: bool = True) -> Text:
         # TODO - Why am I doing this? There should be matches if calling this method

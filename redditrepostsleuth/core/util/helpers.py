@@ -7,7 +7,7 @@ from redditrepostsleuth.core.model.image_search_settings import ImageSearchSetti
 from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE
 
 if TYPE_CHECKING:
-    from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+    from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log

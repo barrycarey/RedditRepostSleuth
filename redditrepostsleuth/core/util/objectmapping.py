@@ -7,7 +7,7 @@ from prawcore import Forbidden
 
 from redditrepostsleuth.core.db.databasemodels import Post, RedditImagePost, RedditImagePostCurrent
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
-from redditrepostsleuth.core.model.search_results.link_post_search_match import LinkPostSearchMatch
+from redditrepostsleuth.core.model.search.link_post_search_match import LinkPostSearchMatch
 from redditrepostsleuth.core.util.helpers import get_post_type_pushshift
 
 

@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_sub_filter, annoy_distance_filter, \
     hamming_distance_filter, filter_newer_matches, filter_days_old_matches, filter_same_author, filter_same_post, \
     filter_title_keywords, filter_title_distance
