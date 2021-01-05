@@ -1,11 +1,6 @@
 
 UNSUPPORTED_POST_TYPE = 'Sorry, I don\'t support this post type ({post_type}) right now.  Feel free to check back in the future!'
 
-
-LINK_ALL = 'I have seen this link {occurrences} times\n\n**Total Searched:** {searched}\n\n**Oldest Post:** [{original_href}]({link_text})'
-UNKNOWN_COMMAND = 'I don\'t understand your command. You can use \'!repost commands\' to see a list of commands I understand'
-STATS = '**Total Posts indexed:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n**Reposts Found:** {reposts}\n\n**Times Summoned:** {summoned}'
-
 WIKI_STATS = '### Submission Index Stats\n\n**Total Posts:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n### Repost Statistics\n\n**Image Reposts:** {image_reposts}\n\n**Times Summoned:** {summoned}'
 
 
@@ -80,4 +75,6 @@ TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_c
 
 IMAGE_SEARCH_SETTING_TABLE = '| **Scope** | **Meme Filter** | **Meme Detected** | **Target %** | **Check Title** | **Max Age** |\n' \
                     '| --- | ---| --- | --- | --- | --- |\n' \
-                    '| {scope} | {meme_filter} | {meme_detected} | {target_percent} | {check_title} | {max_age} |'
+                    '| {scope} | {meme_filter} | {meme_detected} | {target_percent}% | {check_title} | {max_age} |'
+
+IMAGE_SEARCH_SETTINGS = '--- \n**Scope:** {scope}} | **Meme Filter:** {meme_filter} | **Target:** {target_percent} | **Check Title:** {check_title} | **Max Age:** {max_age}'

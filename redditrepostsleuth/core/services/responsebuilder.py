@@ -1,6 +1,7 @@
 from typing import Dict, Text
 
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.logging import log
@@ -27,11 +28,11 @@ class ResponseBuilder:
             'link_signature': LINK_SIGNATURE
         }
 
-    def build_sub_repost_comment(self, sub: str, values: Dict, post_type: Text, stats: bool = True, signature: bool = True) -> Text:
+    def build_sub_repost_comment(self, monitored_sub: MonitoredSub, msg_values: Dict, post_type: Text, stats: bool = True, signature: bool = True) -> Text:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(sub)
             if not monitored_sub or not monitored_sub.repost_response_template:
-                return self.build_default_repost_comment(values, post_type)
+                return self.build_default_repost_comment(msg_values, post_type)
             msg = monitored_sub.repost_response_template
             if stats:
                 msg = msg + COMMENT_STATS
@@ -40,10 +41,10 @@ class ResponseBuilder:
                     msg = msg + '\n\n'
                 msg = msg + IMAGE_REPOST_SIGNATURE
             try:
-                return msg.format(**values)
+                return msg.format(**msg_values)
             except KeyError:
                 log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
-                return self.build_default_repost_comment(values, post_type, signature=False, stats=False)
+                return self.build_default_repost_comment(msg_values, post_type, signature=False, stats=False)
 
     def build_default_repost_comment(self, values: Dict, post_type: Text,  stats: bool = True, signature: bool = True) -> Text:
         # TODO - Why am I doing this? There should be matches if calling this method

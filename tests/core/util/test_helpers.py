@@ -105,7 +105,10 @@ class TestHelpers(TestCase):
             32
         )
 
-        wrapper = ImageSearchResults('test.com', Mock())
+        wrapper = ImageSearchResults(
+            'test.com',
+            ImageSearchSettings(90, .177, 50, True, max_days_old=99999)
+        )
         wrapper.search_times = ImageSearchTimes()
         wrapper.search_times.total_search_time = 1
         wrapper.matches.append(match1)
@@ -116,6 +119,8 @@ class TestHelpers(TestCase):
         result = build_image_msg_values_from_search(wrapper)
         self.assertIn('false_positive_data', result)
         self.assertEqual('{"post_id": "1234", "meme_template": 10}', result['false_positive_data'])
+        self.assertIn('max_age', result)
+        self.assertIsNone(result['max_age'])
 
     def test_build_image_msg_values_from_search_correct_match_percent(self):
         match1 = ImageSearchMatch(
@@ -216,7 +221,7 @@ class TestHelpers(TestCase):
         self.assertEqual(66, r.target_meme_match_percent)
         self.assertTrue(r.meme_filter)
         self.assertEqual(88, r.target_title_match)
-        self.assertEqual(75, r.max_matches)
+        self.assertEqual(200, r.max_matches)
         self.assertTrue(r.same_sub)
         self.assertEqual(44, r.max_days_old)
         self.assertFalse(r.filter_same_author)
@@ -236,7 +241,7 @@ class TestHelpers(TestCase):
         self.assertEqual(22, r.target_meme_match_percent)
         self.assertTrue(r.meme_filter)
         self.assertIsNone(r.target_title_match)
-        self.assertEqual(75, r.max_matches)
+        self.assertEqual(250, r.max_matches)
         self.assertTrue(r.same_sub)
         self.assertEqual(77, r.max_days_old)
         self.assertTrue(r.filter_same_author)

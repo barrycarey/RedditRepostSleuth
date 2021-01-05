@@ -104,18 +104,50 @@ def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -
     return url
 
 
-def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
-    results_values = {}
+def build_image_search_setting_table(search_results: 'ImageSearchResults') -> Text:
+
+    target_percent = f'{search_results.search_settings.target_match_percent}%'
+    if search_results.meme_template:
+        target_percent = f'{search_results.search_settings.target_meme_match_percent}%'
+
+    return IMAGE_SEARCH_SETTING_TABLE.format(
+        scope='Reddit' if not search_results.search_settings.same_sub else f'r/{search_results.checked_post.subreddit}',
+        meme_filter=search_results.search_settings.meme_filter,
+        meme_detected='True' if search_results.meme_template else 'False',
+        target_percent=target_percent,
+        check_title='True' if search_results.search_settings.target_title_match else 'False',
+        max_age='None' if search_results.search_settings.max_days_old == 99999 else search_results.search_settings.max_days_old
+    )
+
+def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None,
+                                       **kwargs) -> Dict:
+
     base_values = {
         'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
-        'target_match_percent': f'{search_results.search_settings.target_match_percent}%',
         'closest_url': search_results.closest_match.post.url if search_results.closest_match else None,
         'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
         'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
         'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
         'meme_filter': True if search_results.meme_template else False,
-        'search_url': build_site_search_url(search_results.checked_post.post_id, search_results.search_settings)
+        'search_url': build_site_search_url(search_results.checked_post.post_id, search_results.search_settings),
+        'check_title': 'True' if search_results.search_settings.target_title_match else 'False'
     }
+
+    if search_results.meme_template:
+        base_values['target_match_percent'] = search_results.search_settings.target_meme_match_percent
+    else:
+        base_values['target_match_percent'] = search_results.search_settings.target_match_percent
+
+    if search_results.search_settings.same_sub:
+        base_values['scope'] = f'r/{search_results.checked_post.subreddit}'
+    else:
+        base_values['scope'] = 'Reddit'
+
+    if search_results.search_settings.max_days_old == 99999:
+        base_values['max_age'] = None
+    else:
+        base_values['max_age'] = search_results.search_settings.max_days_old
+
     if search_results.matches:
         results_values = {
             'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent}%',
@@ -270,17 +302,3 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
 
     )
 
-def build_image_search_setting_table(search_results: 'ImageSearchResults') -> Text:
-
-    target_percent = f'{search_results.search_settings.target_match_percent}%'
-    if search_results.meme_template:
-        target_percent = f'{search_results.search_settings.target_meme_match_percent}%'
-
-    return IMAGE_SEARCH_SETTING_TABLE.format(
-        scope='Reddit' if not search_results.search_settings.same_sub else f'r/{search_results.checked_post.subreddit}',
-        meme_filter=search_results.search_settings.meme_filter,
-        meme_detected='True' if search_results.meme_template else 'False',
-        target_percent=target_percent,
-        check_title='True' if search_results.search_settings.target_title_match else 'False',
-        max_age='None' if search_results.search_settings.max_days_old == 99999 else search_results.search_settings.max_days_old
-    )
