@@ -1,4 +1,5 @@
-from typing import List, Text
+import json
+from typing import List, Text, Optional
 
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch, Post
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
@@ -45,6 +46,20 @@ class ImageSearchResults(SearchResults):
     @property
     def target_meme_hamming_distance(self):
         return get_hamming_from_percent(self.search_settings.target_meme_match_percent, len(self.meme_hash))
+
+    @property
+    def report_data(self) -> Optional[Text]:
+        """
+        Return a JSON dump to use in the report message for this search
+        :return: dumped JSON
+        """
+        if not self.checked_post:
+            return None
+        return json.dumps(
+            {'post_id': self.checked_post.post_id,
+             'meme_template': self.meme_template.id if self.meme_template else None
+             }
+        )
 
     def to_dict(self):
         return {

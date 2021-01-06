@@ -11,7 +11,8 @@ from redditrepostsleuth.core.model.search.image_search_match import ImageSearchM
 
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, create_first_seen, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
-    get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url
+    get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url, \
+    build_image_report_link
 
 
 class TestHelpers(TestCase):
@@ -264,3 +265,16 @@ class TestHelpers(TestCase):
         r = build_site_search_url('abc123', search_settings)
         expected = 'https://www.repostsleuth.com?postId=abc123&sameSub=true&filterOnlyOlder=true&memeFilter=true&filterDeadMatches=true&targetImageMatch=90&targetImageMemeMatch=95'
         self.assertEqual(expected, r)
+
+    def test_build_image_report_link_negative(self):
+        search_results = ImageSearchResults('test.com', Mock(), checked_post=Post(post_id='abc123'))
+        result = build_image_report_link(search_results)
+        expected = "I'm not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]* \n\n"
+        self.assertEqual(expected, result)
+
+    def test_build_image_report_link_positive(self):
+        search_results = ImageSearchResults('test.com', Mock(), checked_post=Post(post_id='abc123'))
+        search_results.matches.append(ImageSearchMatch('test.com', 123, Mock(), 1, 1, 32))
+        result = build_image_report_link(search_results)
+        expected = "I'm not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]* \n\n"
+        self.assertEqual(expected, result)
