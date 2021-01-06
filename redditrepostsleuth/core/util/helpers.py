@@ -4,10 +4,10 @@ import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
-from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE
+from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE, IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
-    from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+    from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
@@ -15,7 +15,6 @@ from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-
 
 
 def post_type_from_url(url: str) -> str:
@@ -104,20 +103,65 @@ def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -
     return url
 
 
-def build_image_search_setting_table(search_results: 'ImageSearchResults') -> Text:
+def build_image_report_link(search_results: 'SearchResults') -> Text:
+    """
+    Take a set of search results and construct the report message.  Either a positive or negative report
+    will be created from the provided search results
+    :param search_results:
+    :return:
+    """
+    if len(search_results.matches) > 0:
+        pos_neg_text = 'Positive'
+    else:
+        pos_neg_text = 'Negative'
 
-    target_percent = f'{search_results.search_settings.target_match_percent}%'
-    if search_results.meme_template:
-        target_percent = f'{search_results.search_settings.target_meme_match_percent}%'
+    return IMAGE_REPORT_TEXT.format(pos_neg_text=pos_neg_text, report_data=search_results.report_data)
 
-    return IMAGE_SEARCH_SETTING_TABLE.format(
-        scope='Reddit' if not search_results.search_settings.same_sub else f'r/{search_results.checked_post.subreddit}',
-        meme_filter=search_results.search_settings.meme_filter,
-        meme_detected='True' if search_results.meme_template else 'False',
-        target_percent=target_percent,
-        check_title='True' if search_results.search_settings.target_title_match else 'False',
-        max_age='None' if search_results.search_settings.max_days_old == 99999 else search_results.search_settings.max_days_old
-    )
+
+def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+    """
+    Take a ImageRepostWrapper object and return a dict of values for use in a message template
+    :param search_results: ImageRepostWrapper
+    :param uowm: UnitOfWorkManager
+    """
+    base_values = {
+        'total_searched': f'{search_results.total_searched:,}',
+        'total_posts': 0,
+        'match_count': len(search_results.matches),
+        'post_type': search_results.checked_post.post_type,
+        'this_subreddit': search_results.checked_post.subreddit,
+        'times_word': 'times' if len(search_results.matches) > 1 else 'time',
+        'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
+        'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}',
+        'post_author': search_results.checked_post.author
+
+    }
+
+        base_values['search_time'] = search_results.search_times.total_search_time if search_results.search_settings
+
+    results_values = {}
+
+    if search_results.matches:
+        results_values = {
+            'oldest_created_at': search_results.matches[0].post.created_at,
+            'oldest_url': search_results.matches[0].post.url,
+            'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
+            'oldest_sub': search_results.matches[0].post.subreddit,
+            'newest_created_at': search_results.matches[-1].post.created_at,
+            'newest_url': search_results.matches[-1].post.url,
+            'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
+            'newest_sub': search_results.matches[-1].post.subreddit,
+            'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
+            'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
+
+        }
+
+    if uowm:
+        with uowm.start() as uow:
+            base_values['total_posts'] = f'{uow.posts.get_newest_post().id:,}'
+
+    return {**base_values, **results_values, **kwargs}
+
 
 def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None,
                                        **kwargs) -> Dict:
@@ -148,74 +192,15 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
     else:
         base_values['max_age'] = search_results.search_settings.max_days_old
 
+    results_values = {}
     if search_results.matches:
         results_values = {
             'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent}%',
             'oldest_percent_match': f'{search_results.matches[0].hamming_match_percent}%',
             'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
-            'false_positive_data': json.dumps(
-                {
-                    'post_id': search_results.checked_post.post_id,
-                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
-                }
-            ),
-        }
-    else:
-        results_values = {
-            'false_negative_data': json.dumps(
-                {
-                    'post_id': search_results.checked_post.post_id,
-                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
-                }
-            ),
         }
 
-    return {**results_values, **base_values, **kwargs}
-
-
-def build_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
-    """
-    Take a ImageRepostWrapper object and return a dict of values for use in a message template
-    :param search_results: ImageRepostWrapper
-    :param uowm: UnitOfWorkManager
-    """
-    base_values = {
-        'total_searched': f'{search_results.total_searched:,}',
-        'total_posts': 0,
-        'match_count': len(search_results.matches),
-        'post_type': search_results.checked_post.post_type,
-        'this_subreddit': search_results.checked_post.subreddit,
-        'times_word': 'times' if len(search_results.matches) > 1 else 'time',
-        'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
-        'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}',
-        'post_author': search_results.checked_post.author
-
-    }
-    if search_results.search_times:
-        base_values['search_time'] = search_results.search_times.total_search_time
-
-    results_values = {}
-
-    if search_results.matches:
-        results_values = {
-            'oldest_created_at': search_results.matches[0].post.created_at,
-            'oldest_url': search_results.matches[0].post.url,
-            'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
-            'oldest_sub': search_results.matches[0].post.subreddit,
-            'newest_created_at': search_results.matches[-1].post.created_at,
-            'newest_url': search_results.matches[-1].post.url,
-            'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
-            'newest_sub': search_results.matches[-1].post.subreddit,
-            'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
-            'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
-
-        }
-
-    if uowm:
-        with uowm.start() as uow:
-            base_values['total_posts'] = f'{uow.posts.get_newest_post().id:,}'
-
-    return {**base_values, **results_values, **kwargs}
+    return {**results_values, **base_values, **kwargs, **build_msg_values_from_search(search_results, **kwargs)}
 
 
 def create_search_result_json(search_results: 'ImageSearchResults') -> Text:
@@ -229,10 +214,6 @@ def create_search_result_json(search_results: 'ImageSearchResults') -> Text:
         'matches': [match.to_dict() for match in search_results.matches],
     }
     return json.dumps(search_data)
-
-
-
-
 
 def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
     if len(rows[0]) != len(headers):
@@ -301,4 +282,5 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         max_matches=200
 
     )
+
 

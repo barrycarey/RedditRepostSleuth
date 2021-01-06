@@ -21,7 +21,7 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost, get_default_image_search_settings, build_image_search_setting_table
+    save_link_repost, get_default_image_search_settings
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
@@ -318,7 +318,6 @@ class SummonsHandler:
                 post.post_type
             )
 
-        response.message += f'\n\n{build_image_search_setting_table(search_results)}'
         self._send_response(response)
 
     def _get_target_distances(self, monitored_sub: MonitoredSub) -> Tuple[int, int, float]:

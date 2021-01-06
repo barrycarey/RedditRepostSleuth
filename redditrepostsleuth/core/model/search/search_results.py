@@ -1,4 +1,5 @@
-from typing import Text, List
+import json
+from typing import Text, List, Optional
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
@@ -12,3 +13,13 @@ class SearchResults:
         self.checked_url = checked_url
         self.total_searched: int = 0
         self.matches: List[SearchMatch] = []
+
+    @property
+    def report_data(self) -> Optional[Text]:
+        """
+        Return a JSON dump to use in the report message for this search
+        :return: dumped JSON
+        """
+        if not self.checked_post:
+            return None
+        return json.dumps({'post_id': self.checked_post.post_id})
