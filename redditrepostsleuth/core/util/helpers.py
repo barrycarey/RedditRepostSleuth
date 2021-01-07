@@ -77,18 +77,6 @@ def searched_post_str(post: Post, count: int) -> str:
 
     return output
 
-def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> str:
-    """
-    Create a first seen string to use in a comment.  Takes into account subs that dont' allow links
-    :param post: DB Post obj
-    :return: final string
-    """
-    if subreddit and subreddit in NO_LINK_SUBREDDITS:
-        seen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')}"
-    else:
-        seen = f"{first_last} seen [Here](https://redd.it/{post.post_id}) on {post.created_at.strftime('%Y-%m-%d')}"
-
-    return seen
 
 def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -> Text:
     if not search_settings:
@@ -136,8 +124,8 @@ def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWo
         'post_author': search_results.checked_post.author
 
     }
-
-        base_values['search_time'] = search_results.search_times.total_search_time if search_results.search_settings
+    if search_results.search_times:
+        base_values['search_time'] = search_results.search_times.total_search_time
 
     results_values = {}
 
@@ -151,10 +139,13 @@ def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWo
             'newest_url': search_results.matches[-1].post.url,
             'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
             'newest_sub': search_results.matches[-1].post.subreddit,
-            'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
-            'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
+            'first_seen': f"First Seen [Here](https://redd.it/{search_results.matches[0].post.post_id}) on {search_results.matches[0].post.created_at.strftime('%Y-%m-%d')}",
+            'last_seen': f"Last Seen [Here](https://redd.it/{search_results.matches[-1].post.post_id}) on {search_results.matches[-1].post.created_at.strftime('%Y-%m-%d')}",
 
         }
+
+    if 'report_link' not in kwargs:
+        kwargs['report_link'] = ''
 
     if uowm:
         with uowm.start() as uow:
@@ -174,7 +165,8 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
         'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
         'meme_filter': True if search_results.meme_template else False,
         'search_url': build_site_search_url(search_results.checked_post.post_id, search_results.search_settings),
-        'check_title': 'True' if search_results.search_settings.target_title_match else 'False'
+        'check_title': 'True' if search_results.search_settings.target_title_match else 'False',
+        'report_post_link': build_image_report_link(search_results)
     }
 
     if search_results.meme_template:
