@@ -119,6 +119,7 @@ class ResponseBuilder:
         :param kwargs: Args to pass along to default comment builder
         :return:
         """
+
         if len(search_results.matches) > 0:
             message = monitored_sub.repost_response_template
         else:
