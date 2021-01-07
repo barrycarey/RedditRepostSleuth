@@ -30,3 +30,6 @@ class ImageSearchSettings(SearchSettings):
         self.target_annoy_distance = target_annoy_distance
         self.target_meme_match_percent = target_meme_match_percent
         self.target_match_percent = target_match_percent
+
+    def to_dict(self):
+        return {**super().to_dict(), **self.__dict__}

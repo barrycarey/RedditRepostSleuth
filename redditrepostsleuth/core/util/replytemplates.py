@@ -10,13 +10,14 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 
 COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s'
-IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot'
-IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot'
+COMMENT_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot'
 SEARCH_URL = '[View Search On repostsleuth.com]({search_url})'
-IMAGE_REPORT_TEXT = 'I\'m not perfect, but you can help. Report [ [False {pos_neg_text}](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20{pos_neg_text}&message={report_data}) ]*'
-LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
-FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}.  \n\n' \
-                        '{first_seen}. {last_seen} \n\n' \
+IMAGE_REPORT_TEXT = ' - I\'m not perfect, but you can help. Report [ [False {pos_neg_text}](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20{pos_neg_text}&message={report_data}) ]*'
+
+LINK_OC = 'Looks like this is the first time this link has been shared on Reddit'
+LINK_REPOST = 'This link has been shared {match_count} {times_word}.\n\n' \
+                        '{first_seen}. {last_seen}' \
+
 
 DEFAULT_REPOST_IMAGE_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}.\n\n' \
                          '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match' \
@@ -77,4 +78,5 @@ IMAGE_SEARCH_SETTING_TABLE = '| **Scope** | **Meme Filter** | **Meme Detected** 
                     '| --- | ---| --- | --- | --- | --- |\n' \
                     '| {scope} | {meme_filter} | {meme_detected} | {target_percent}% | {check_title} | {max_age} |'
 
-IMAGE_SEARCH_SETTINGS = '**Scope:** {scope} | **Meme Filter:** {meme_filter} | **Target:** {target_match_percent} | **Check Title:** {check_title} | **Max Age:** {max_age}'
+IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filter_used} | **Target:** {target_match_percent} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'
+GENERIC_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'

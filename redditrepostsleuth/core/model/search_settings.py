@@ -40,8 +40,31 @@ class SearchSettings:
         self.max_matches = max_matches
         self.target_title_match = target_title_match
 
+    @property
+    def search_scope(self):
+        return 'This Sub' if self.same_sub else 'Reddit'
+
+    @property
+    def check_title(self):
+        return self.target_title_match is None
+
     def __repr__(self):
         r = ''
         for k, v in self.__dict__.items():
             r += f'{k}: {v} | '
         return r
+
+    def to_dict(self):
+        return {
+            'filter_crossposts': self.filter_crossposts,
+            'filter_same_author': self.filter_same_author,
+            'only_older_matches': self.only_older_matches,
+            'filter_removed_matches': self.filter_removed_matches,
+            'filter_dead_matches': self.filter_dead_matches,
+            'max_days_old': self.max_days_old,
+            'same_sub': self.same_sub,
+            'max_matches': self.max_matches,
+            'target_title_match': self.target_title_match,
+            'search_scope': self.search_scope,
+            'check_title': self.check_title
+        }

@@ -13,10 +13,12 @@ from redditrepostsleuth.core.util.helpers import build_image_msg_values_from_sea
     build_msg_values_from_search
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COMMENT, \
     DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH, \
-    DEFAULT_COMMENT_OC, COMMENT_STATS, IMAGE_REPOST_SIGNATURE, IMAGE_OC_SIGNATURE, DEFAULT_REPOST_LINK_COMMENT, \
-    LINK_SIGNATURE, CLOSEST_MATCH, SEARCH_URL, REPORT_POST_LINK, IMAGE_SEARCH_SETTINGS
+    DEFAULT_COMMENT_OC, COMMENT_STATS, DEFAULT_REPOST_LINK_COMMENT, \
+    CLOSEST_MATCH, SEARCH_URL, REPORT_POST_LINK, IMAGE_SEARCH_SETTINGS, GENERIC_SEARCH_SETTINGS, \
+    COMMENT_SIGNATURE, LINK_REPOST, LINK_OC
 
 DEFAULT_REPORT_MSG = 'RepostSleuthBot-Repost'
+
 
 class ResponseBuilder:
     """
@@ -26,25 +28,15 @@ class ResponseBuilder:
         self.uowm = uowm
 
     @staticmethod
-    def _get_signature(search_results: SearchResults, post_type: Text = None) -> Text:
+    def _get_signature(search_results: SearchResults) -> Text:
         """
         Take a given set of search results and return the correct signature
         :rtype: Text
         :param search_results: Set of search results
         :return: Message signature
         """
-        signature = ''
-        if search_results.checked_post.post_type == 'image':
-            if len(search_results.matches) == 0:
-                signature = IMAGE_OC_SIGNATURE
-            else:
-                signature = IMAGE_REPOST_SIGNATURE
-
-        if search_results.checked_post.post_type == 'link':
-            signature = LINK_SIGNATURE
-
-        log.debug('Built Signature: %s', signature)
-        return signature
+        # Was previously logic here.  Leaving method in case it's needed again
+        return COMMENT_SIGNATURE
 
     @staticmethod
     def _get_message_template(search_results: SearchResults) -> Text:
@@ -64,9 +56,9 @@ class ResponseBuilder:
 
         if search_results.checked_post.post_type == 'link':
             if len(search_results.matches) == 0:
-                msg_template = DEFAULT_COMMENT_OC
+                msg_template = LINK_OC
             else:
-                msg_template = DEFAULT_REPOST_LINK_COMMENT
+                msg_template = LINK_REPOST
 
         return msg_template
 
@@ -80,7 +72,7 @@ class ResponseBuilder:
 
     @_get_message_values.register
     def _(self, search_results: ImageSearchResults):
-        return build_image_msg_values_from_search(search_results)
+        return {**build_msg_values_from_search(search_results), **build_image_msg_values_from_search(search_results)}
 
     # Allow getting closest match template based on the type of results
     @singledispatchmethod
@@ -95,8 +87,15 @@ class ResponseBuilder:
     def _(self, search_results: ImageSearchResults) -> Optional[Text]:
         if not search_results.closest_match:
             return None
-
         return CLOSEST_MATCH
+
+    @singledispatchmethod
+    def _get_search_settings_template(self, search_results):
+        return GENERIC_SEARCH_SETTINGS
+
+    @_get_search_settings_template.register
+    def _(self, search_results: ImageSearchResults):
+        return IMAGE_SEARCH_SETTINGS
 
     @staticmethod
     def _get_monitored_sub_template(monitored_sub: MonitoredSub, search_results: SearchResults) -> Text:
@@ -164,18 +163,19 @@ class ResponseBuilder:
                 message += f'\n\n{closest_template}'
 
         if signature:
-            message += f'\n\n{self._get_signature(search_results)} - {REPORT_POST_LINK}'
+            message += f'\n\n{self._get_signature(search_results)}{REPORT_POST_LINK}'
         else:
             message += f'\n\n{REPORT_POST_LINK}'
 
-        if search_link:
+        # Checking post type is temp until the site supports everything
+        if search_link and search_results.checked_post.post_type in ['image']:
             message += f'\n\n{SEARCH_URL}'
 
         if search_settings or stats:
             message += '\n\n---'
 
         if search_settings:
-            message += f'\n\n{IMAGE_SEARCH_SETTINGS}\n'
+            message += f'\n\n{self._get_search_settings_template(search_results)}\n'
 
         if stats:
             if not search_settings:
