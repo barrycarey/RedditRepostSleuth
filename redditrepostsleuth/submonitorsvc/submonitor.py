@@ -361,24 +361,8 @@ class SubMonitor:
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
 
-        msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
-        if search_results.checked_post.post_type == 'image':
-            msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
-
-        if search_results.matches:
-            msg = self.response_builder.build_sub_repost_comment(
-                search_results.checked_post.subreddit,
-                msg_values,
-                search_results.checked_post.post_type,
-                stats=True if search_results.checked_post.post_type == 'image' else False
-            )
-        else:
-            msg = self.response_builder.build_sub_oc_comment(
-                search_results.checked_post.subreddit,
-                msg_values, search_results.checked_post.post_type
-            )
-
-        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, msg)
+        message = self.response_builder.build_sub_comment(monitored_sub, search_results, )
+        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message)
 
     def save_unknown_post(self, post_id: str) -> Post:
         """
