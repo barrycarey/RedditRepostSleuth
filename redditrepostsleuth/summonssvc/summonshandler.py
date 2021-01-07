@@ -306,17 +306,13 @@ class SummonsHandler:
             time.sleep(10)
             return
 
-        msg_values = build_msg_values_from_search(search_results, self.uowm)
-        msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
-
-        if not search_results.matches:
-            response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
+        if monitored_sub:
+            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results)
         else:
+            response.message = self.response_builder.build_default_comment(search_results)
+
+        if search_results.matches:
             save_image_repost_general(search_results, self.uowm, 'summons')
-            response.message = self.response_builder.build_sub_repost_comment(
-                post.subreddit, msg_values,
-                post.post_type
-            )
 
         self._send_response(response)
 

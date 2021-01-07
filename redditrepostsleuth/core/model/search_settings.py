@@ -46,7 +46,7 @@ class SearchSettings:
 
     @property
     def check_title(self):
-        return self.target_title_match is None
+        return self.target_title_match is not None
 
     def __repr__(self):
         r = ''

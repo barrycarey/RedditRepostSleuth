@@ -18,11 +18,16 @@ class EventLoggerTask(Task):
         self.event_logger = EventLogging(config=self.config)
 
 class SqlAlchemyTask(Task):
-
     def __init__(self):
         self.config = Config()
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging()
+
+class RepostTask(SqlAlchemyTask):
+    def __init__(self):
+        super().__init__()
+        self.link_blacklist = [] # Temp fix.  People were spamming onlyfans links 10s of thousands of times
+
 
 class AnnoyTask(Task):
     def __init__(self):

@@ -13,7 +13,7 @@ from redditrepostsleuth.core.model.search.image_search_results import ImageSearc
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.repost_helpers import check_link_repost
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask
+from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
@@ -41,9 +41,7 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
     result = self.dup_service.check_image(
         post.url,
         post=post,
-        meme_filter=True,
-        filter_dead_matches=False,
-        filter_removed_matches=False
+        source='ingest_repost'
     )
 
     save_image_repost_result(result, self.uowm)
@@ -62,12 +60,18 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
     return result
 
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
+@celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts, ):
     with self.uowm.start() as uow:
         for post in posts:
+            """
             if post.url_hash == '540f1167d27dcca2ea2772443beb5c79':
                 continue
+            """
+            if post.url_hash in self.link_blacklist:
+                log.info('Skipping blacklisted URL hash %s', post.url_hash)
+                continue
+
             log.debug('Checking URL for repost: %s', post.url_hash)
             repost = check_link_repost(post, self.uowm)
             if not repost.matches:
@@ -76,6 +80,10 @@ def link_repost_check(self, posts, ):
                 uow.posts.update(post)
                 uow.commit()
                 continue
+
+            if len(repost.matches) > 1000:
+                log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(repost.matches))
+                self.link_blacklist.append(post.url_hash)
 
             log.info('Found %s matching links', len(repost.matches))
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)

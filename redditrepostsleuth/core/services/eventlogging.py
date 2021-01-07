@@ -47,7 +47,7 @@ class EventLogging:
         return True
 
     def save_event(self, event: InfluxEvent):
-        log.info('Unsaved events %s', len(self._unsaved_events))
+        log.debug('Unsaved events %s', len(self._unsaved_events))
         if not self.can_save():
             log.info('Event logging disabled until %s', self._retry_time)
             self._unsaved_events.append(event)
