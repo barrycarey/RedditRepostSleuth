@@ -19,12 +19,11 @@ class ImageSearchResults(SearchResults):
         self.checked_url = checked_url
         self.checked_post = checked_post
         self._target_hash = None
-        self.meme_template: MemeTemplate = None
-        self.closest_match: ImageSearchMatch = None
+        self.meme_template: Optional[MemeTemplate] = None
+        self.closest_match: Optional[ImageSearchMatch] = None
         self.matches: List[ImageSearchMatch] = []
-        self.search_id: int = None
-        self.search_times: ImageSearchTimes = None
-        self.logged_search: ImageSearch = None
+        self.search_id: Optional[int]
+        self.logged_search: Optional[ImageSearch] = None
         self.meme_hash: Text = None
 
     @property

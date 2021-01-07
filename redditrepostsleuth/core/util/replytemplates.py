@@ -9,30 +9,31 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
                               '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help [ [Report Bad Match](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={post_url}) ]*'
 
 
-COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n'
-IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot \n\n[View Search On repostsleuth.com]({search_url})'
-IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot\n\n[View Search On repostsleuth.com]({search_url})'
-IMAGE_REPORT_TEXT = 'I\'m not perfect, but you can help. Report [ [False {pos_neg_text}](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20{pos_neg_text}&message={report_data}) ]* \n\n'
+COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s'
+IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot'
+IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot'
+SEARCH_URL = '[View Search On repostsleuth.com]({search_url})'
+IMAGE_REPORT_TEXT = 'I\'m not perfect, but you can help. Report [ [False {pos_neg_text}](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20{pos_neg_text}&message={report_data}) ]*'
 LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
 FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}.  \n\n' \
                         '{first_seen}. {last_seen} \n\n' \
 
-DEFAULT_REPOST_IMAGE_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
-                         '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n' \
+DEFAULT_REPOST_IMAGE_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}.\n\n' \
+                         '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match' \
 
 DEFAULT_REPOST_LINK_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
                          '{first_seen}. {last_seen} \n\n' \
 
-DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
-                                '{first_seen} {oldest_percent_match} match. \n\n' \
+DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}.\n\n' \
+                                '{first_seen} {oldest_percent_match} match.' \
 
-DEFAULT_COMMENT_OC = 'I didn\'t find any posts that meet the matching requirements for r/{this_subreddit}. \n\nIt might be OC, it might not. Things such as JPEG artifacts and cropping may impact the results.'
+DEFAULT_COMMENT_OC = 'I didn\'t find any posts that meet the matching requirements for r/{this_subreddit}.\n\nIt might be OC, it might not. Things such as JPEG artifacts and cropping may impact the results.'
 
-CLOSEST_MATCH = 'I did find [this post]({closest_shortlink}) that is {closest_percent_match} similar.  It might be a match but I cannot be certain. \n\n'
+CLOSEST_MATCH = 'I did find [this post]({closest_shortlink}) that is {closest_percent_match} similar.  It might be a match but I cannot be certain.'
 CLOSEST_MATCH_MEME = 'This search triggered my meme filter. This enabled strict matching requirements. The closest match that did not meet the requirements [is this post]({closest_shortlink})\n\n'
 
 IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\n\n**Search Time:** {time}s \n\nHere are all the instances I\'ve seen:\n\n'
-
+REPORT_POST_LINK = '{report_post_link}'
 SUMMONS_CROSSPOST = 'This is a crosspost. I\'ve seen the same {post_type} {match_count} {times_word}' \
                     '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n'
 
@@ -76,4 +77,4 @@ IMAGE_SEARCH_SETTING_TABLE = '| **Scope** | **Meme Filter** | **Meme Detected** 
                     '| --- | ---| --- | --- | --- | --- |\n' \
                     '| {scope} | {meme_filter} | {meme_detected} | {target_percent}% | {check_title} | {max_age} |'
 
-IMAGE_SEARCH_SETTINGS = '--- \n**Scope:** {scope}} | **Meme Filter:** {meme_filter} | **Target:** {target_percent} | **Check Title:** {check_title} | **Max Age:** {max_age}'
+IMAGE_SEARCH_SETTINGS = '**Scope:** {scope} | **Meme Filter:** {meme_filter} | **Target:** {target_match_percent} | **Check Title:** {check_title} | **Max Age:** {max_age}'

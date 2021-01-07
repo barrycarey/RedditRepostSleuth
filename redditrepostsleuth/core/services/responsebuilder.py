@@ -1,33 +1,22 @@
 from functools import singledispatchmethod
-from typing import Dict, Text, Type, Optional
+from typing import Dict, Text, Optional
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
-from redditrepostsleuth.core.util.helpers import build_image_report_link, build_image_msg_values_from_search, \
+from redditrepostsleuth.core.util.helpers import build_image_msg_values_from_search, \
     build_msg_values_from_search
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COMMENT, \
     DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH, \
     DEFAULT_COMMENT_OC, COMMENT_STATS, IMAGE_REPOST_SIGNATURE, IMAGE_OC_SIGNATURE, DEFAULT_REPOST_LINK_COMMENT, \
-    LINK_SIGNATURE, CLOSEST_MATCH, CLOSEST_MATCH_MEME
-from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+    LINK_SIGNATURE, CLOSEST_MATCH, SEARCH_URL, REPORT_POST_LINK, IMAGE_SEARCH_SETTINGS
 
 DEFAULT_REPORT_MSG = 'RepostSleuthBot-Repost'
-DEFAULT_MSG_TEMPLATES = {
-            'image_repost_multi': DEFAULT_REPOST_IMAGE_COMMENT,
-            'image_repost_single': DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH,
-            'image_repost_signature': IMAGE_REPOST_SIGNATURE,
-            'image_oc_signature': IMAGE_OC_SIGNATURE,
-            'image_oc': DEFAULT_COMMENT_OC,
-            'link_repost': DEFAULT_REPOST_LINK_COMMENT,
-            'link_oc': DEFAULT_COMMENT_OC,
-            'link_signature': LINK_SIGNATURE
-        }
-
 
 class ResponseBuilder:
     """
@@ -54,7 +43,6 @@ class ResponseBuilder:
         if search_results.checked_post.post_type == 'link':
             signature = LINK_SIGNATURE
 
-        signature += f' - {build_image_report_link(search_results)}'
         log.debug('Built Signature: %s', signature)
         return signature
 
@@ -105,10 +93,10 @@ class ResponseBuilder:
 
     @_get_closest_match_template.register
     def _(self, search_results: ImageSearchResults) -> Optional[Text]:
-        if search_results.meme_template:
-            return CLOSEST_MATCH_MEME
-        else:
-            return CLOSEST_MATCH
+        if not search_results.closest_match:
+            return None
+
+        return CLOSEST_MATCH
 
     @staticmethod
     def _get_monitored_sub_template(monitored_sub: MonitoredSub, search_results: SearchResults) -> Text:
@@ -117,71 +105,88 @@ class ResponseBuilder:
         else:
             return monitored_sub.repost_response_template
 
-    def build_sub_repost_comment(
-            self, monitored_sub: MonitoredSub, search_results: SearchResults,
-            stats: bool = True, signature: bool = True
+    def build_sub_comment(
+            self,
+            monitored_sub: MonitoredSub,
+            search_results: SearchResults,
+            **kwargs
     ) -> Text:
+        """
+        Take a given MonitoredSub and attempt to build their customer message templates using the search results.
+        If the final formatting of the template fails, it will revert to the default response template
+        :rtype: Text
+        :param monitored_sub: MonitoredSub to get template from
+        :param search_results: Set of search results
+        :param kwargs: Args to pass along to default comment builder
+        :return:
+        """
+        if len(search_results.matches) > 0:
+            message = monitored_sub.repost_response_template
+        else:
+            message = monitored_sub.oc_response_template
 
-        msg = monitored_sub.repost_response_template
-
-        if not msg:
-            return self.build_default_repost_comment(search_results, stats=stats, signature=signature)
-
-        if stats:
-            msg += f'\n\n {COMMENT_STATS}'
-
-        if signature:
-            msg += f'\n\n {self._get_signature(search_results)}'
-
-        msg_values = self._get_message_values(search_results)
+        if not message:
+            return self.build_default_comment(search_results, **kwargs)
 
         try:
-            msg = msg.format(**msg_values)
-            log.debug('Final Message: %s', msg)
-            return msg
+            return self.build_default_comment(search_results, message, **kwargs)
         except KeyError:
             log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
-            return self.build_default_repost_comment(search_results, signature=signature, stats=stats)
+            return self.build_default_comment(search_results, **kwargs)
 
-    def build_sub_oc_comment(self, sub: Text, values: Dict, post_type: Text,  signature: bool = True) -> Text:
-        with self.uowm.start() as uow:
-            monitored_sub = uow.monitored_sub.get_by_sub(sub)
-            if not monitored_sub or not monitored_sub.oc_response_template:
-                return self.build_default_oc_comment(values, post_type, signature=signature)
-            msg = monitored_sub.oc_response_template
-            if signature:
-                if msg[-2:] != '\n\n':
-                    msg = msg + '\n\n'
-                if post_type == 'image':
-                    msg = msg + self.default_templates['image_oc_signature']
-                elif post_type == 'link':
-                    msg = msg + self.default_templates['link_signature']
-            try:
-                return msg.format(**values)
-            except KeyError:
-                log.error('Custom oc template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
-                return self.build_default_oc_comment(values, post_type)
-
-    def build_default_repost_comment(self, search_results: SearchResults, stats: bool = True, signature: bool = True) -> Text:
-
-        msg = self._get_message_template(search_results)
+    def build_default_comment(
+            self,
+            search_results: SearchResults,
+            message: Text = '',
+            stats: bool = True,
+            signature: bool = True,
+            search_link: bool = True,
+            search_settings: bool = True
+    ) -> Text:
+        """
+        Take a given set of search results, and an optional starting message to construct the final comment the bot will
+        make on a post.
+        :rtype: Text
+        :param search_results: Set of search results
+        :param message: Message template to start with
+        :param stats: Include search status in message
+        :param signature: Include signature in message
+        :param search_link: Include a link to search on repostsleuth.com
+        :param search_settings: Include the settings used for the search
+        :return: Final message template
+        """
+        if not message:
+            message = self._get_message_template(search_results)
 
         if len(search_results.matches) == 0:
             closest_template = self._get_closest_match_template(search_results)
             if closest_template:
-                msg += f'\n\n{closest_template}'
-
-        if stats:
-            msg += f'\n\n {COMMENT_STATS}'
+                message += f'\n\n{closest_template}'
 
         if signature:
-            msg += f'\n\n {self._get_signature(search_results)}'
+            message += f'\n\n{self._get_signature(search_results)} - {REPORT_POST_LINK}'
+        else:
+            message += f'\n\n{REPORT_POST_LINK}'
+
+        if search_link:
+            message += f'\n\n{SEARCH_URL}'
+
+        if search_settings or stats:
+            message += '\n\n---'
+
+        if search_settings:
+            message += f'\n\n{IMAGE_SEARCH_SETTINGS}\n'
+
+        if stats:
+            if not search_settings:
+                message += '\n\n'
+            message += f'{COMMENT_STATS}'
 
         msg_values = self._get_message_values(search_results)
 
-        msg = msg.format(**msg_values)
-        log.debug('Final Message: %s', msg)
-        return msg
+        message = message.format(**msg_values)
+        log.debug('Final Message: %s', message)
+        return message
 
     def build_provided_comment_template(self, values: Dict, template: Text, post_type: Text, stats: bool = True, signature: bool = True):
         msg = template
