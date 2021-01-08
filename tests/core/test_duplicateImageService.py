@@ -8,7 +8,7 @@ from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 
 
 def get_mock_response(*args, **kwargs):

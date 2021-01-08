@@ -10,22 +10,20 @@ from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repos
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.commands.repost_base_cmd import RepostBaseCmd
-from redditrepostsleuth.core.model.commands.repost_image_cmd import RepostImageCmd
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import SummonsResponse
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import build_markdown_list, build_msg_values_from_search, create_first_seen, \
-    searched_post_str, build_image_msg_values_from_search, save_link_repost
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
+    save_link_repost, get_default_image_search_settings
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, IMAGE_REPOST_ALL, WATCH_ENABLED, \
+from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
 from redditrepostsleuth.core.util.repost_helpers import check_link_repost
@@ -289,23 +287,18 @@ class SummonsHandler:
     def process_image_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
 
         response = SummonsResponse(summons=summons)
-
+        search_settings = get_default_image_search_settings(self.config)
         target_image_match, target_meme_match, target_annoy_distance = self._get_target_distances(
             monitored_sub
         )
+        search_settings.target_match_percent = target_image_match
+        search_settings.target_meme_match_percent = target_meme_match
 
         try:
             search_results = self.image_service.check_image(
                 post.url,
                 post=post,
-                target_annoy_distance=target_annoy_distance,
-                target_match_percent=target_image_match,
-                target_meme_match_percent=target_meme_match,
-                meme_filter=monitored_sub.meme_filter if monitored_sub else False,
-                same_sub=monitored_sub.same_sub_only if monitored_sub else False,
-                date_cutoff=monitored_sub.target_days_old if monitored_sub else None,
-                max_matches=250,
-                max_depth=-1,
+                search_settings=search_settings,
                 source='summons'
             )
         except NoIndexException:
@@ -313,17 +306,13 @@ class SummonsHandler:
             time.sleep(10)
             return
 
-        msg_values = build_msg_values_from_search(search_results, self.uowm)
-        msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
-
-        if not search_results.matches:
-            response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
+        if monitored_sub:
+            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results)
         else:
+            response.message = self.response_builder.build_default_comment(search_results)
+
+        if search_results.matches:
             save_image_repost_general(search_results, self.uowm, 'summons')
-            response.message = self.response_builder.build_sub_repost_comment(
-                post.subreddit, msg_values,
-                post.post_type
-            )
 
         self._send_response(response)
 

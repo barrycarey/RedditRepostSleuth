@@ -105,7 +105,12 @@ class Config:
         env_value = os.getenv(key)
         ini_value = self._fetch_deafult(key)
 
-        return env_value or ini_value or self.CONFIG_NOT_SET
+        if env_value is not None:
+            return env_value
+        elif ini_value is not None:
+            return ini_value
+        else:
+            return self.CONFIG_NOT_SET
 
     def _fetch(self, key):
         value = self.custom[key]

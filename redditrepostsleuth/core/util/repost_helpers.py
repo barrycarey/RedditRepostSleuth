@@ -14,8 +14,8 @@ from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
-from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.objectmapping import post_to_link_post_search_match
 
@@ -125,7 +125,7 @@ def check_link_repost(
         )
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')
-        #search_results.total_search_time = perf_counter() - start
+        #search.total_search_time = perf_counter() - start
 
     return search_results
 

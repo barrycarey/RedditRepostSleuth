@@ -5,8 +5,8 @@ from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from datetime import datetime
 
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
-from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_first_active_match, get_closest_image_match
 
 
