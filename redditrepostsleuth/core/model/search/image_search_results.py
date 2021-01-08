@@ -1,35 +1,29 @@
-from typing import List, Text
+import json
+from typing import List, Text, Optional
 
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch, Post
+from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.util.helpers import get_hamming_from_percent
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 
 
-class ImageSearchResults:
-    def __init__(
-            self,
-            checked_url: Text,
-            target_match_percent: float,
-            target_annoy_distance: float,
-            target_meme_match_percent: float = None,
-            checked_post: Post = None,
-
-    ):
-        self.target_match_percent = target_match_percent
-        self.target_meme_match_percent = target_meme_match_percent
+class ImageSearchResults(SearchResults):
+    def __init__(self, checked_url: Text, search_settings: ImageSearchSettings, checked_post: Post = None,
+                 search_times: ImageSearchTimes = None):
+        super().__init__(checked_url, search_settings, checked_post)
+        self.search_times = search_times
+        self.search_settings = search_settings
         self.checked_url = checked_url
         self.checked_post = checked_post
-        self.target_annoy_distance = target_annoy_distance
         self._target_hash = None
-        self.total_searched: int = 0
-        self.meme_template: MemeTemplate = None
-        self.closest_match: ImageSearchMatch = None
+        self.meme_template: Optional[MemeTemplate] = None
+        self.closest_match: Optional[ImageSearchMatch] = None
         self.matches: List[ImageSearchMatch] = []
-        self.search_id: int = None
-        self.search_times: ImageSearchTimes = None
-        self.logged_search: ImageSearch = None
+        self.search_id: Optional[int]
+        self.logged_search: Optional[ImageSearch] = None
         self.meme_hash: Text = None
 
     @property
@@ -46,11 +40,25 @@ class ImageSearchResults:
 
     @property
     def target_hamming_distance(self):
-        return get_hamming_from_percent(self.target_match_percent, len(self.target_hash))
+        return get_hamming_from_percent(self.search_settings.target_match_percent, len(self.target_hash))
 
     @property
     def target_meme_hamming_distance(self):
-        return get_hamming_from_percent(self.target_meme_match_percent, len(self.meme_hash))
+        return get_hamming_from_percent(self.search_settings.target_meme_match_percent, len(self.meme_hash))
+
+    @property
+    def report_data(self) -> Optional[Text]:
+        """
+        Return a JSON dump to use in the report message for this search
+        :return: dumped JSON
+        """
+        if not self.checked_post:
+            return None
+        return json.dumps(
+            {'post_id': self.checked_post.post_id,
+             'meme_template': self.meme_template.id if self.meme_template else None
+             }
+        )
 
     def to_dict(self):
         return {

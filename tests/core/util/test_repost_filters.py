@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_sub_filter, annoy_distance_filter, \
     hamming_distance_filter, filter_newer_matches, filter_days_old_matches, filter_same_author, filter_same_post, \
     filter_title_keywords, filter_title_distance
@@ -12,8 +12,8 @@ from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_
 class TestCross_post_filter(TestCase):
     def test_cross_post_filter__remove_crosspost(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match1.post = Post()
@@ -26,8 +26,8 @@ class TestCross_post_filter(TestCase):
 
     def test_same_sub_filter__remove_same_sub(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match1.post = Post(subreddit='sub1')
@@ -40,11 +40,11 @@ class TestCross_post_filter(TestCase):
 
     def test_hamming_distance_filter__remove_higher_distance(self):
         matches = []
-        match1 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
         match1.post = Post(id=1)
-        match2 = ImagePostSearchMatch()
+        match2 = ImageSearchMatch()
         match2.post = Post(id=2)
-        match3 = ImagePostSearchMatch()
+        match3 = ImageSearchMatch()
         match3.post = Post(id=3)
         match1.match_id = 1
         match2.match_id = 2
@@ -61,11 +61,11 @@ class TestCross_post_filter(TestCase):
 
     def test_annoy_distance_filter__remove_higher_distance(self):
         matches = []
-        match1 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
         match1.post = Post(id=1)
-        match2 = ImagePostSearchMatch()
+        match2 = ImageSearchMatch()
         match2.post = Post(id=2)
-        match3 = ImagePostSearchMatch()
+        match3 = ImageSearchMatch()
         match3.post = Post(id=3)
         match1.match_id = 1
         match2.match_id = 2
@@ -82,9 +82,9 @@ class TestCross_post_filter(TestCase):
 
     def test_filter_newer_matches__remove_newer(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
-        match3 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
+        match3 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
@@ -100,9 +100,9 @@ class TestCross_post_filter(TestCase):
 
     def test_filter_days_old_matches__remove_older(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
-        match3 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
+        match3 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
@@ -120,9 +120,9 @@ class TestCross_post_filter(TestCase):
 
     def test_filter_newer_matches__remove_newer(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
-        match3 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
+        match3 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
@@ -138,9 +138,9 @@ class TestCross_post_filter(TestCase):
 
     def test_filter_title_similarity__remove_lower(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
-        match3 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
+        match3 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
@@ -159,9 +159,9 @@ class TestCross_post_filter(TestCase):
 
     def test_filter_same_post__remove_same(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
-        match3 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
+        match3 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
@@ -178,9 +178,9 @@ class TestCross_post_filter(TestCase):
 
     def test_filter_title_keywords(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
-        match3 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
+        match3 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3
@@ -196,9 +196,9 @@ class TestCross_post_filter(TestCase):
 
     def test_filter_title_keywords_uppercase__remove_keyword(self):
         matches = []
-        match1 = ImagePostSearchMatch()
-        match2 = ImagePostSearchMatch()
-        match3 = ImagePostSearchMatch()
+        match1 = ImageSearchMatch()
+        match2 = ImageSearchMatch()
+        match3 = ImageSearchMatch()
         match1.match_id = 1
         match2.match_id = 2
         match3.match_id = 3

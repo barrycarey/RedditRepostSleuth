@@ -1,11 +1,6 @@
 
 UNSUPPORTED_POST_TYPE = 'Sorry, I don\'t support this post type ({post_type}) right now.  Feel free to check back in the future!'
 
-
-LINK_ALL = 'I have seen this link {occurrences} times\n\n**Total Searched:** {searched}\n\n**Oldest Post:** [{original_href}]({link_text})'
-UNKNOWN_COMMAND = 'I don\'t understand your command. You can use \'!repost commands\' to see a list of commands I understand'
-STATS = '**Total Posts indexed:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n**Reposts Found:** {reposts}\n\n**Times Summoned:** {summoned}'
-
 WIKI_STATS = '### Submission Index Stats\n\n**Total Posts:** {post_count}\n\n**Image Posts:** {images}\n\n**Link Posts:** {links}\n\n**Video Posts:** {video}\n\n **Text Posts:** {text}\n\n **Oldest Post:** {oldest}\n\n### Repost Statistics\n\n**Image Reposts:** {image_reposts}\n\n**Times Summoned:** {summoned}'
 
 
@@ -14,31 +9,32 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
                               '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help [ [Report Bad Match](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={post_url}) ]*'
 
 
-COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s \n\n'
-IMAGE_REPOST_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={false_positive_data}) ]* \n\n' \
-                        '[View Search On repostsleuth.com]({search_url})'
-IMAGE_OC_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot - I\'m not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={false_negative_data}) ]* \n\n' \
-                        '[View Search On repostsleuth.com]({search_url})'
-LINK_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot*'
-FRONTPAGE_LINK_REPOST = 'This link has been shared {match_count} {times_word}.  \n\n' \
-                        '{first_seen}. {last_seen} \n\n' \
+COMMENT_STATS = '{stats_searched_post_str} | **Indexed Posts:** {total_posts} | **Search Time:** {search_time}s'
+COMMENT_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot'
+SEARCH_URL = '[View Search On repostsleuth.com]({search_url})'
+IMAGE_REPORT_TEXT = ' - I\'m not perfect, but you can help. Report [ [False {pos_neg_text}](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20{pos_neg_text}&message={report_data}) ]*'
 
-DEFAULT_REPOST_IMAGE_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
-                         '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n' \
+LINK_OC = 'Looks like this is the first time this link has been shared on Reddit'
+LINK_REPOST = 'This link has been shared {match_count} {times_word}.\n\n' \
+                        '{first_seen}. {last_seen}' \
+
+
+DEFAULT_REPOST_IMAGE_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}.\n\n' \
+                         '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match' \
 
 DEFAULT_REPOST_LINK_COMMENT = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
                          '{first_seen}. {last_seen} \n\n' \
 
-DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. \n\n' \
-                                '{first_seen} {oldest_percent_match} match. \n\n' \
+DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}.\n\n' \
+                                '{first_seen} {oldest_percent_match} match.' \
 
-DEFAULT_COMMENT_OC = 'I didn\'t find any posts that meet the matching requirements for r/{this_subreddit}. \n\nIt might be OC, it might not. Things such as JPEG artifacts and cropping may impact the results.\n\n '
+DEFAULT_COMMENT_OC = 'I didn\'t find any posts that meet the matching requirements for r/{this_subreddit}.\n\nIt might be OC, it might not. Things such as JPEG artifacts and cropping may impact the results.'
 
-CLOSEST_MATCH = 'I did find [this post]({closest_shortlink}) that is {closest_percent_match} similar.  It might be a match but I cannot be certain. \n\n'
+CLOSEST_MATCH = 'I did find [this post]({closest_shortlink}) that is {closest_percent_match} similar.  It might be a match but I cannot be certain.'
 CLOSEST_MATCH_MEME = 'This search triggered my meme filter. This enabled strict matching requirements. The closest match that did not meet the requirements [is this post]({closest_shortlink})\n\n'
 
 IMAGE_REPOST_ALL = '**Times Seen:** {count} \n\n{searched_posts}\n\n{firstseen}\n\n**Search Time:** {time}s \n\nHere are all the instances I\'ve seen:\n\n'
-
+REPORT_POST_LINK = '{report_post_link}'
 SUMMONS_CROSSPOST = 'This is a crosspost. I\'ve seen the same {post_type} {match_count} {times_word}' \
                     '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n'
 
@@ -78,6 +74,9 @@ TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someon
 TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
 
 
-SEARCH_SETTING_TABLE = '| **Scope** | **Meme Filter** | **Meme Detected** | **Target %** | **Check Title** | **Max Age** |\n\n' \
-                    '| --- | ---| --- | --- | --- | --- |\n\n' \
-                    '| {scope} | {meme_filter} | {meme_detected} | {target_percent} | {check_title} | {max_age} |'
+IMAGE_SEARCH_SETTING_TABLE = '| **Scope** | **Meme Filter** | **Meme Detected** | **Target %** | **Check Title** | **Max Age** |\n' \
+                    '| --- | ---| --- | --- | --- | --- |\n' \
+                    '| {scope} | {meme_filter} | {meme_detected} | {target_percent}% | {check_title} | {max_age} |'
+
+IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filter_used} | **Target:** {target_match_percent} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'
+GENERIC_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'

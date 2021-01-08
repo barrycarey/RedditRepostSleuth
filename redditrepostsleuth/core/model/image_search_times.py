@@ -1,35 +1,22 @@
-from time import perf_counter
-from typing import Text
-
-from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.search_times import SearchTimes
 
 
-class ImageSearchTimes:
+class ImageSearchTimes(SearchTimes):
+    """
+    Class to dynamically start and stop perf_counts with variable names
+    """
     def __init__(self):
-        self._timers = []
-        self.total_search_time: float = float(0)
+        super().__init__()
         self.pre_annoy_filter_time: float = float(0)
         self.index_search_time: float = float(0)
         self.meme_filter_time: float = float(0)
         self.meme_detection_time: float = float(0)
-        self.total_filter_time: float = float(0)
         self.set_match_post_time: float = float(0)
         self.remove_duplicate_time: float = float(0)
         self.set_match_hamming: float = float(0)
         self.image_search_api_time: float = float(0)
 
-    def start_timer(self, name: Text):
-        self._timers.append({
-            'name': name,
-            'start': perf_counter()
-        })
 
-    def stop_timer(self, name: Text):
-        timer = next((x for x in self._timers if x['name'] == name), None)
-        if not timer:
-            log.error('Failed to find timer %s', name)
-        if hasattr(self, name):
-            setattr(self, name, round(perf_counter() - timer['start'], 5))
 
     def to_dict(self):
         return {

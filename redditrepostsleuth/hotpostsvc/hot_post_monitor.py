@@ -180,7 +180,7 @@ class TopPostMonitor:
     def _offer_watch(self, submission: Submission) -> NoReturn:
         """
         Offer to add watch to OC post
-        :param search_results:
+        :param search:
         """
         if not self.config.top_post_offer_watch:
             log.debug('Top Post Offer Watch Disabled')
