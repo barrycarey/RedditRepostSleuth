@@ -203,4 +203,4 @@ if __name__ == '__main__':
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     ingestor = PostIngestor(reddit, uowm, config)
-    ingestor.ingest_pushshift_old()
+    ingestor.ingest_pushshift()
