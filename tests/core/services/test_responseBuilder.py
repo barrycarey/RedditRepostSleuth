@@ -127,7 +127,7 @@ class TestResponseBuilder(TestCase):
             target_meme_match_percent=50,
             meme_filter=False,
             max_depth=5000,
-            target_title_match=90,
+            target_title_match=None,
             max_matches=75,
             same_sub=False,
             max_days_old=190,
@@ -140,7 +140,7 @@ class TestResponseBuilder(TestCase):
 
     def _get_search_settings(self):
         return SearchSettings(
-            target_title_match=90,
+            target_title_match=None,
             max_matches=75,
             same_sub=False,
             max_days_old=190,

@@ -66,7 +66,6 @@ class DiscordAgent(NotificationAgent):
         else:
             text = body
 
-        text += '\n\n'
         payload = {'content': text}
         if self.username:
             payload['username'] = self.username

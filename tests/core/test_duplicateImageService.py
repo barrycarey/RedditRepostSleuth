@@ -33,9 +33,10 @@ class TestDuplicateImageService(TestCase):
             'index_search_time': 1.234,
             'total_searched': 100,
             'used_current_index': True,
-            'used_historical_index': True
+            'used_historical_index': True,
+            'target_result': {}
         }
-        with mock.patch('redditrepostsleuth.core.duplicateimageservice.requests.get') as mock_get:
+        with mock.patch('redditrepostsleuth.core.services.duplicateimageservice.requests.get') as mock_get:
             dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock(index_api='http://good.com'))
             mock_get.return_value = SimpleNamespace(**{'text': json.dumps(res), 'status_code': 200})
             res = dup_svc._get_matches('111', 1, 1)
@@ -44,25 +45,25 @@ class TestDuplicateImageService(TestCase):
             self.assertTrue(len(res.historical_matches) == 1)
 
     def test__get_matches_connection_error(self):
-        with mock.patch('redditrepostsleuth.core.duplicateimageservice.requests.get') as mock_get:
+        with mock.patch('redditrepostsleuth.core.services.duplicateimageservice.requests.get') as mock_get:
             dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock(index_api='http://test.com'))
             mock_get.side_effect = ConnectionError('ouch!')
             self.assertRaises(NoIndexException, dup_svc._get_matches, '111', 1, 1)
 
     def test__get_matches_unknown_exception(self):
-        with mock.patch('redditrepostsleuth.core.duplicateimageservice.requests.get') as mock_get:
+        with mock.patch('redditrepostsleuth.core.services.duplicateimageservice.requests.get') as mock_get:
             dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock(index_api='http://test.com'))
             mock_get.side_effect = Exception('Ouch')
             self.assertRaises(Exception, dup_svc._get_matches, '111', 1, 1)
 
     def test__get_matches_bad_status_code(self):
-        with mock.patch('redditrepostsleuth.core.duplicateimageservice.requests.get') as mock_get:
+        with mock.patch('redditrepostsleuth.core.services.duplicateimageservice.requests.get') as mock_get:
             dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock(index_api='http://test.com'))
             mock_get.return_value = SimpleNamespace(**{'status_code': 500})
             self.assertRaises(NoIndexException, dup_svc._get_matches, '111', 1, 1)
 
     def test__get_matches_invalid_response_data(self):
-        with mock.patch('redditrepostsleuth.core.duplicateimageservice.requests.get') as mock_get:
+        with mock.patch('redditrepostsleuth.core.services.duplicateimageservice.requests.get') as mock_get:
             dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock(index_api='http://test.com'))
             mock_get.return_value = SimpleNamespace(**{'text': json.dumps({'junk': 'data'}), 'status_code': 200})
             self.assertRaises(NoIndexException, dup_svc._get_matches, '111', 1, 1)
@@ -181,9 +182,9 @@ class TestDuplicateImageService(TestCase):
 
     def test__remove_duplicates_one_dup_remove(self):
         matches = [
-            ImageSearchMatch('test.com', 123, Post(id=1), 10),
-            ImageSearchMatch('test.com', 123, Post(id=1), 10),
-            ImageSearchMatch('test.com', 123, Post(id=2), 10)
+            ImageSearchMatch('test.com', 123, Post(id=1), 10, 10, 32),
+            ImageSearchMatch('test.com', 123, Post(id=1), 10, 10, 32),
+            ImageSearchMatch('test.com', 123, Post(id=2), 10, 10, 32)
         ]
         dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock())
         r = dup_svc._remove_duplicates(matches)
