@@ -15,6 +15,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import SummonsResponse
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -41,8 +42,10 @@ class SummonsHandler:
             response_handler: ResponseHandler,
             config: Config = None,
             event_logger: EventLogging = None,
+            notification_svc: NotificationService = None,
             summons_disabled=False
     ):
+        self.notification_svc = notification_svc
         self.uowm = uowm
         self.image_service = image_service
         self.reddit = reddit
@@ -458,6 +461,9 @@ class SummonsHandler:
                 )
             )
             uow.commit()
+
+        if self.notification_svc:
+            self.notification_svc.send_notification(f'User banned until {ban_expires}', subject=f'Banned {requestor}')
 
     def _has_user_exceeded_limit(self, requestor: Text) -> bool:
         with self.uowm.start() as uow:

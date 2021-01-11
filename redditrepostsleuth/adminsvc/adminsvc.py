@@ -5,12 +5,12 @@ import time
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_SCHEDULER_STARTED, EVENT_JOB_SUBMITTED
 from apscheduler.schedulers.background import BackgroundScheduler
 
-
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 
 sys.path.append('./')
 from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers, \
     remove_expired_bans, update_banned_sub_wiki, send_reports_to_meme_voting, update_top_image_reposts, \
-    update_monitored_sub_data, check_meme_template_potential_votes
+    update_monitored_sub_data, check_meme_template_potential_votes, update_ban_list
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
 from redditrepostsleuth.core.services.eventlogging import EventLogging
@@ -32,12 +32,13 @@ if __name__ == '__main__':
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     reddit = get_reddit_instance(config)
     reddit_manager = RedditManager(reddit)
-    comment_monitor = BotCommentMonitor(reddit_manager, uowm, config)
+    notification_svc = NotificationService(config)
+    comment_monitor = BotCommentMonitor(reddit_manager, uowm, config, notification_svc=notification_svc)
     stats_updater = StatsUpdater()
-    activation_monitor = NewActivationMonitor(uowm, get_reddit_instance(config))
+    activation_monitor = NewActivationMonitor(uowm, get_reddit_instance(config), notification_svc=notification_svc)
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
-    config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler, config)
+    config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler, config, notification_svc=notification_svc)
     inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
 
     #config_updater.update_configs()
@@ -89,7 +90,7 @@ if __name__ == '__main__':
     )
     scheduler.add_job(
         func=remove_expired_bans,
-        args=(uowm,),
+        args=(uowm, notification_svc),
         trigger='interval',
         minutes=5,
         name='remove_expired_bans',
@@ -125,6 +126,14 @@ if __name__ == '__main__':
         trigger='interval',
         minutes=30,
         name='check_meme_template_votes',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=update_ban_list,
+        args=(uowm,notification_svc),
+        trigger='interval',
+        hours=24,
+        name='check_banned_subs',
         max_instances=1
     )
     scheduler.start()

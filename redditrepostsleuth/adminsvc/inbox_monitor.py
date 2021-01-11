@@ -13,6 +13,7 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_SUBJECT, WATCH_ENABLED
@@ -20,7 +21,14 @@ from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_SUBJECT, 
 
 class InboxMonitor:
 
-    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, event_logger: EventLogging = None):
+    def __init__(
+            self,
+            uowm: UnitOfWorkManager,
+            reddit: Reddit,
+            event_logger: EventLogging = None,
+            notification_svc: NotificationService = None
+    ):
+        self.notification_svc = notification_svc
         self.uowm = uowm
         self.event_logger = event_logger
         self.reddit = reddit
@@ -33,6 +41,7 @@ class InboxMonitor:
                 self._process_user_report(msg)
             elif TOP_POST_WATCH_SUBJECT.lower() in msg.subject.lower():
                 self._process_watch_request(msg)
+
 
     def _process_watch_request(self, msg: Message) -> NoReturn:
         """

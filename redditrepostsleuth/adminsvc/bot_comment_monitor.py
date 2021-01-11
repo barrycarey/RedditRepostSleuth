@@ -10,13 +10,21 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
 class BotCommentMonitor:
 
-    def __init__(self, reddit: RedditManager, uowm: UnitOfWorkManager, config: Config):
+    def __init__(
+            self,
+            reddit: RedditManager,
+            uowm: UnitOfWorkManager,
+            config: Config,
+            notification_svc: NotificationService = None
+    ):
+        self.notification_svc = notification_svc
         self.reddit = reddit
         self.uowm = uowm
         if config:
@@ -45,6 +53,11 @@ class BotCommentMonitor:
         bot_comment.karma = reddit_comment['ups']
         if bot_comment.karma <= self.config.bot_comment_karma_remove_threshold:
             log.info('Comment %s has karma of %s.  Removing', bot_comment.comment_id, bot_comment.karma)
+            if self.notification_svc:
+                self.notification_svc.send_notification(
+                    f'Removing comment with {bot_comment.karma} karma. {bot_comment.perma_link}',
+                    subject='Removing Downvoted Comment'
+                )
             comment = self.reddit.comment(bot_comment.comment_id)
             try:
                 comment.delete()

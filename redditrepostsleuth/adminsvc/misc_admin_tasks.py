@@ -14,6 +14,7 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.util.helpers import build_markdown_table, \
     chunk_list
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
@@ -49,7 +50,7 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             uow.commit()
     print('[Scheduled Job] Checking Mod Status End')
 
-def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None) -> NoReturn:
     """
     Go through banned subs and see if we're still banned
     :rtype: NoReturn
@@ -66,6 +67,10 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             else:
                 log.info('[Subreddit Ban Check] No longer banned on %s', ban.subreddit)
                 uow.banned_subreddit.remove(ban)
+                if notification_svc:
+                    notification_svc.send_notification(
+                        f'Removed {ban.name} from ban list'
+                    )
             uow.commit()
 
 # TODO - Can be removed
@@ -97,11 +102,16 @@ def update_monitored_sub_data(uowm: UnitOfWorkManager) -> NoReturn:
         for sub in subs:
             update_monitored_sub_stats.apply_async((sub.name,))
 
-def remove_expired_bans(uowm: UnitOfWorkManager) -> NoReturn:
+def remove_expired_bans(uowm: UnitOfWorkManager, notification_svc: NotificationService = None) -> NoReturn:
     print('[Scheduled Job] Removed Expired Bans Start')
     with uowm.start() as uow:
         bans = uow.banned_user.get_expired_bans()
         for ban in bans:
+            if notification_svc:
+                notification_svc.send(
+                    f'Removing expired ban for user {ban.name}',
+                    subject='**Expired Ban Removed**'
+                )
             log.info('[Ban Remover] Removing %s from ban list', ban.name)
             uow.banned_user.remove(ban)
             uow.commit()
@@ -224,6 +234,7 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
 
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_monitored_sub_data(uowm)
+    update_ban_list(uowm, reddit, notification_svc)

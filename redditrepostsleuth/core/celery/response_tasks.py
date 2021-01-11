@@ -14,6 +14,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logging import log
@@ -38,11 +39,15 @@ class SummonsHandlerTask(Task):
         self.reddit_manager = RedditManager(self.reddit)
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
-        self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons', live_response=self.config.live_responses)
+        notification_svc = NotificationService(self.config)
+        self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons',
+                                                live_response=self.config.live_responses,
+                                                notification_svc=notification_svc)
         dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit_manager, response_builder,
-                                              self.response_handler, event_logger=self.event_logger, summons_disabled=False)
+                                              self.response_handler, event_logger=self.event_logger,
+                                              summons_disabled=False, notification_svc=notification_svc)
 
 class SubMonitorTask(Task):
     def __init__(self):
