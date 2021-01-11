@@ -6,7 +6,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/ingestsvc/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
 
     admin_svc:
@@ -21,7 +21,7 @@ services:
                 max_attempts: 3
                 window: 120s
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
 
     deleted_post_cleanup:
         restart: always
@@ -30,7 +30,7 @@ services:
             dockerfile: redditrepostsleuth/adminsvc/Dockerfile
         entrypoint: python -u /src/redditrepostsleuth/adminsvc/deleted_post_cleanup.py
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.maintenance_tasks
 
     hot_post:
@@ -39,7 +39,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/hotpostsvc/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
         entrypoint: python -u /src/redditrepostsleuth/hotpostsvc/hotpostsvc.py
         volumes:
             - /opt/imageindex:/opt/imageindex
@@ -50,7 +50,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/summonssvc/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
         entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
 
     stat_monitor_svc:
@@ -59,7 +59,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/monitorsvc/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
         entrypoint: python -u /src/redditrepostsleuth/monitorsvc/monitorsvc.py
 
     summons_handler:
@@ -68,7 +68,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/summonssvc/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
         entrypoint: python -u /src/redditrepostsleuth/summonssvc/summons_handler_svc_celery.py
         volumes:
             - /opt/imageindex:/opt/imageindex
@@ -79,7 +79,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
@@ -93,7 +93,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/submonitorsvc/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
         entrypoint: python -u /src/redditrepostsleuth/submonitorsvc/sub_monitor_svc_celery.py
         volumes:
@@ -119,7 +119,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
             #- HASH_API=http://157.230.64.152:8000/hash
@@ -131,7 +131,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
@@ -158,7 +158,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q deleted_post_cleanup -c 5
@@ -169,7 +169,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q monitored_sub_update -c 5
@@ -181,7 +181,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
@@ -193,7 +193,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_intake -c 1
@@ -204,7 +204,7 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/Dockerfile
         environment:
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_ingest -c 1
