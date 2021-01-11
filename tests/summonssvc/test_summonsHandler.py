@@ -40,34 +40,9 @@ class TestSummonsHandler(TestCase):
         self.assertEqual(sum_handler._strip_summons_flags(summons), 'some junk')
 
     def test__get_target_distances__monitored_sub(self):
-        sub_repo = MagicMock()
-        uow = MagicMock()
-        uowm = MagicMock()
-        sub_repo.get_by_sub.return_value = MonitoredSub(target_annoy=0.100, target_hamming=0)
-        type(uow).monitored_sub = mock.PropertyMock(return_value=sub_repo)
-        uow.__enter__.return_value = uow
-        uowm.start.return_value = uow
-
-        sum_handler = SummonsHandler(uowm, MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=MagicMock())
-
-        target_hamming, target_annoy = sum_handler._get_target_distances('test')
-
-        self.assertEqual(0, target_hamming)
-        self.assertEqual(0.1, target_annoy)
-
-    def test__get_target_distances__no_monitored_sub(self):
-        sub_repo = MagicMock()
-        uow = MagicMock()
-        uowm = MagicMock()
-        sub_repo.get_by_sub.return_value = None
-        type(uow).monitored_sub = mock.PropertyMock(return_value=sub_repo)
-        uow.__enter__.return_value = uow
-        uowm.start.return_value = uow
-        config = Config(default_hamming_distance=3, default_annoy_distance=4.0)
-        sum_handler = SummonsHandler(uowm, MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=config)
-
-        target_hamming, target_annoy = sum_handler._get_target_distances('test')
-
-        self.assertEqual(3, target_hamming)
-        self.assertEqual(4.0, target_annoy)
+        monitored_sub = MonitoredSub(target_image_match=98, target_image_meme_match=5)
+        sum_handler = SummonsHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=MagicMock(default_annoy_distance=0.777))
+        target_image_match, target_image_meme_match, target_annoy = sum_handler._get_target_distances(monitored_sub)
+        self.assertEqual(98, target_image_match)
+        self.assertEqual(5, target_image_meme_match)
 

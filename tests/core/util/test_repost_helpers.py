@@ -8,6 +8,7 @@ from datetime import datetime
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_first_active_match, get_closest_image_match
+from tests.core.helpers import get_image_search_results_multi_match
 
 
 class TestHelpers(TestCase):
@@ -46,11 +47,9 @@ class TestHelpers(TestCase):
             self.assertEqual(3, r.post.id)
 
     def test_get_closest_image_match(self):
-            matches = [
-                ImageSearchMatch('www.dummy.com', 1, Post(id=1, url='www.bad.com'), hamming_distance=2),
-                ImageSearchMatch('www.dummy.com', 1, Post(id=2, url='www.bad.com'), hamming_distance=98),
-                ImageSearchMatch('www.dummy.com', 1, Post(id=3, url='www.good.com'), hamming_distance=25),
-                ImageSearchMatch('www.dummy.com', 1, Post(id=4, url='www.good.com'), hamming_distance=24),
-            ]
-            r = get_closest_image_match(matches, check_url=False)
-            self.assertEqual(2, r.post.id)
+        search_results = get_image_search_results_multi_match()
+        search_results.matches[0].hamming_distance = 98
+        search_results.matches[1].hamming_distance = 2
+        search_results.matches[2].hamming_distance = 25
+        r = get_closest_image_match(search_results.matches, check_url=False)
+        self.assertEqual(2, r.post.id)
