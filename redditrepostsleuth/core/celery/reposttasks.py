@@ -45,7 +45,8 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
     )
 
     save_image_repost_result(result, self.uowm)
-
+    if len(result.matches):
+        self.notification_svc.send_notification(result)
     self.event_logger.save_event(RepostEvent(
         event_type='repost_found' if result.matches else 'repost_check',
         status='success',
@@ -84,6 +85,7 @@ def link_repost_check(self, posts, ):
             if len(repost.matches) > 1000:
                 log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(repost.matches))
                 self.link_blacklist.append(post.url_hash)
+                self.notification_svc.send_notification(f'URL has been shared {len(repost.matches)} times. Adding to blacklist. \n\n {post.url}')
 
             log.info('Found %s matching links', len(repost.matches))
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)

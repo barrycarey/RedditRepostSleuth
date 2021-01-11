@@ -14,6 +14,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.reddit_api_event import RedditApiEvent
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 
@@ -25,10 +26,12 @@ class ResponseHandler:
             reddit: RedditManager,
             uowm: UnitOfWorkManager,
             event_logger: EventLogging,
+            notification_svc: NotificationService = None,
             live_response: bool = False,
             log_response: bool = True,
             source='unknown'
     ):
+        self.notification_svc = notification_svc
         self.live_response = live_response
         self.uowm = uowm
         self.reddit = reddit
@@ -220,3 +223,6 @@ class ResponseHandler:
                     )
                 )
             uow.commit()
+
+        if self.notification_svc:
+            self.notification_svc.send_notification(f'Subreddit r/{subreddit} added to ban list', subject='Added Banned Sub')
