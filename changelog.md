@@ -8,10 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [bugfix] - Matches from current month were getting dropped if IDs overlapped historical images
 * [bugfix] - Summons on a monitored subreddit were ignoring subs custom settings
 * [bugfix] - Closest match was no longer being included in comments
+* [bugfix] - If config for monitored sub failed to validate default values were being written to database and mod mail was sent
 * [backend] - Added API to support repostsleuth.com
+* [backend] - Rebuilt bot response template engine to make it more flexible 
+* [backend] - Built in support for searching by URL instead of existing posts.  This will support searching by image on repostsleuth.com
 * [feature] - Bot now checks if a post is removed from Reddit, in addition to checking if the image has been removed
 * [feature] - Added search_url message slug to open search on repostsleuth.com
 * [feature] - False positive reports automatically added to voting on repostsleuth.com
+* [feature] - Add notification framework.  Currently only exposed for backend but will be available for monitored subs
+* [feature] - Added daily job to check banned subs to see if bot is still banned
 
 
 ## [0.1.8] - 8/29/2020

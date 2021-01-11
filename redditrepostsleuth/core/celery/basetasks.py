@@ -3,6 +3,7 @@ from celery import Task
 from redditrepostsleuth.core import logging
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
@@ -26,6 +27,7 @@ class SqlAlchemyTask(Task):
 class RepostTask(SqlAlchemyTask):
     def __init__(self):
         super().__init__()
+        self.notification_svc = NotificationService(self.config)
         self.link_blacklist = [] # Temp fix.  People were spamming onlyfans links 10s of thousands of times
 
 
@@ -34,6 +36,7 @@ class AnnoyTask(Task):
         self.config = Config()
         from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.notification_svc = NotificationService(self.config)
         self.event_logger = EventLogging()
         self.reddit = get_reddit_instance(self.config)
         self.dup_service = DuplicateImageService(self.uowm, self.event_logger, self.reddit)
