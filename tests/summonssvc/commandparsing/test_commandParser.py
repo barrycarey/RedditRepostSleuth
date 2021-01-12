@@ -2,8 +2,6 @@ from unittest import TestCase
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.exception import InvalidCommandException
-from redditrepostsleuth.core.model.commands.repost_link_cmd import RepostLinkCmd
-from redditrepostsleuth.core.model.commands.watch_cmd import WatchCmd
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
 
