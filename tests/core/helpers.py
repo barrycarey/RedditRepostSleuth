@@ -78,7 +78,7 @@ def get_image_search_results_multi_match():
         ImageSearchMatch(
             'test.com',
             1,
-            Post(id=1, post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
+            Post(id=1, post_id='1111', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
             10,
             10,
             32
@@ -88,7 +88,7 @@ def get_image_search_results_multi_match():
         ImageSearchMatch(
             'test.com',
             1,
-            Post(id=2, post_id='123abc', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
+            Post(id=2, post_id='2222', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
             10,
             10,
             32
