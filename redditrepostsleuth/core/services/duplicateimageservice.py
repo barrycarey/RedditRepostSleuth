@@ -23,7 +23,8 @@ from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_days_old_matches, annoy_distance_filter, hamming_distance_filter, \
     filter_no_dhash, filter_title_distance, filter_removed_posts, filter_dead_urls_remote
-from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity
+from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
+    filter_search_results
 
 
 class DuplicateImageService:
@@ -53,59 +54,33 @@ class DuplicateImageService:
         """
 
         log.debug('Starting result filters with %s matches', len(search_results.matches))
-        matches = search_results.matches
 
-        matches = list(filter(filter_no_dhash, matches))
+        search_results.matches = list(filter(filter_no_dhash, search_results.matches))
 
-        # Only run these if we are search for an existing post
-        if search_results.checked_post:
-            matches = list(filter(filter_same_post(search_results.checked_post.post_id), matches))
+        search_results = filter_search_results(
+            search_results,
+            self.reddit,
+            f'{self.config.util_api}/maintenance/removed'
+        )
 
-            if search_results.search_settings.filter_same_author:
-                matches = list(filter(filter_same_author(search_results.checked_post.author), matches))
-
-            if search_results.search_settings.filter_crossposts:
-                matches = list(filter(cross_post_filter, matches))
-
-            if search_results.search_settings.only_older_matches:
-                matches = list(filter(filter_newer_matches(search_results.checked_post.created_at), matches))
-
-            if search_results.search_settings.same_sub:
-                matches = list(filter(same_sub_filter(search_results.checked_post.subreddit), matches))
-
-            if search_results.search_settings.target_title_match:
-                matches = list(filter(filter_title_distance(search_results.search_settings.target_title_match), matches))
-
-            if search_results.search_settings.max_days_old:
-                matches = list(filter(filter_days_old_matches(search_results.search_settings.max_days_old), matches))
-
-        closest_match = get_closest_image_match(matches, check_url=True)
+        closest_match = get_closest_image_match(search_results.matches, check_url=True)
         if closest_match and closest_match.hamming_match_percent > 40: # TODO - Move to config
             search_results.closest_match = closest_match
 
         # Has to be after closest match so we don't drop closest
-        matches = list(filter(annoy_distance_filter(search_results.search_settings.target_annoy_distance), matches))
-        matches = list(filter(hamming_distance_filter(search_results.target_hamming_distance), matches))
+        search_results.matches = list(filter(annoy_distance_filter(search_results.search_settings.target_annoy_distance), search_results.matches))
+        search_results.matches = list(filter(hamming_distance_filter(search_results.target_hamming_distance), search_results.matches))
 
-        if search_results.search_settings.filter_dead_matches:
-            matches = filter_dead_urls_remote(
-                f'{self.config.util_api}/maintenance/removed',
-                self.reddit,
-                matches
-            )
-
-        if search_results.search_settings.filter_removed_matches:
-            matches = filter_removed_posts(self.reddit, matches)
 
         if search_results.meme_template:
             search_results.search_times.start_timer('meme_filter_time')
-            matches = self._final_meme_filter(search_results.meme_hash, matches,
+            search_results.matches = self._final_meme_filter(search_results.meme_hash, search_results.matches,
                                               search_results.target_meme_hamming_distance)
             search_results.search_times.stop_timer('meme_filter_time')
 
-        search_results.matches = sort_reposts(matches, sort_by=sort_by)
+        search_results.matches = sort_reposts(search_results.matches, sort_by=sort_by)
 
-        for match in matches:
+        for match in search_results.matches:
             log.debug('Match found: %s - A:%s H:%s P:%s', f'https://redd.it/{match.post.post_id}',
                       round(match.annoy_distance, 5), match.hamming_distance, f'{match.hamming_match_percent}%')
 
