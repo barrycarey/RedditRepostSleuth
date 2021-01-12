@@ -1,11 +1,8 @@
 <div align="center">
-	<img width="500" height="auto" src="hero.png" alt="hero">
+	<img width="600" height="auto" src="hero.png" alt="hero">
 	<br>
-	<h4> 
-		A bot to monitor for and detect reposted content on Reddit
-	</h4>
 	<h4>
-		Check out <a href="https://reddit.com/r/repostsleuthbot">r/RepostSleuthBot</a> as well as <a href="https://repostsleuth.com">RepostSleuth.com</a> 
+		Check out <a href="https://repostsleuth.com">RepostSleuth.com</a> 
 	</h4>
 </div>
 
@@ -14,16 +11,16 @@
 ## About
 The Repost Sleuth bot continually ingests all new posts and stores them in a database. It then uses various methods including perceptual image hashing and binary search trees to find reposted content.
 
-### Images
+#### Images
 A difference hash is generated for each image that is ingested. We then use a hamming distance comparision to find matching images in the database
 
-### Links
+#### Links
 We use the exact URL to find matches
 
-### Videos
+#### Videos
 Not currently supported
 
-### Text
+#### Text
 Not currently supported
 
 ## Features
@@ -34,7 +31,7 @@ Repost Sleuth responds to various commands.  See command section below
 * Set watches on a post and get notifications if someone else posts the same thing
 * More to come
 
-## Commands
+#### Commands
 **!repost all message|comment** - Find all matching posts and list them in a comment reply or via PM
 
 **!repost watch message|comment** - Monitor this post and notify you if we see it posted somewhere else
@@ -43,7 +40,7 @@ Repost Sleuth responds to various commands.  See command section below
 
 **!repost stats** - Get stats about the bot
 
-### Technology
+## Technology
 
 Repost Sleuth makes heavy use of Celery with a Redis backend.  Celery allows a large number of CPU bound tasks to be run in parallel with a number of benefits  
 
@@ -59,8 +56,8 @@ If you are interested in seeing a specific feature please open an issue
 At the moment I'm not looking for any contributions. The code base is super messy and still pretty experimental. 
 
 
-## reddit usage FAQ
-### Your Bot Sucks, It Said a Reposted Meme Was Unique
+### reddit usage FAQ
+#### Your Bot Sucks, It Said a Reposted Meme Was Unique
 Memes are by far the hardest reposts to detect accurately. Many templates can produces the same exact hash even with different text in the meme. Due to this most other reposts bots don't work well on meme subs since they produce tons of false positives.
 
 Repost Sleuth has an extra layer of processing for memes that weeds out most false positives. It does result in some false negatives but it's generally pretty accurate.
@@ -69,10 +66,7 @@ Using the report False Positive / False Negative in the bots signature helps me 
 
 At the moment only ~3.5 percent of comments the bot leaves are reported as false negatives.
 
-### Your Bot Sucks, It Said my original meme was a repost. 
----
-See answer above. 
-
+#### Your Bot Sucks, It Said my original meme was a repost. 
 This is called a False Positive.  Repost Sleuth is good at avoiding most false positives by erring on the side of being too strict.  But they happen.  That's life.  Don't take it personally. We constantly monitor reports and tune the bot the best we can. 
 
 ### The bot said it didn't find a match, but the closest match was the same one!
