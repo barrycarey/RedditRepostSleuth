@@ -276,6 +276,7 @@ class SummonsHandler:
 
     def process_link_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
         response = SummonsResponse(summons=summons)
+
         search_results = get_link_reposts(
             post.url,
             self.uowm,
