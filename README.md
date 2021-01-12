@@ -1,14 +1,15 @@
 <div align="center">
-	<img width="500" height="350" src="hero.png" alt="hero">
+	<img width="500" height="auto" src="hero.png" alt="hero">
 	<br>
+	<h4> 
+		A bot to monitor for and detect reposted content on Reddit
+	</h4>
 	<h4>
-		Check out <a href="https://reddit.com/r/repostsleuthbot">r/RepostSleuthBot</a> as well as <a href="https://repostsleuth.com">RepostSleuth.com</a> which lets you add photos to your home screen
+		Check out <a href="https://reddit.com/r/repostsleuthbot">r/RepostSleuthBot</a> as well as <a href="https://repostsleuth.com">RepostSleuth.com</a> 
 	</h4>
 </div>
 
 
-# Reddit Repost Sleuth
-###### A bot to monitor for and detect reposted content on Reddit
 
 ## About
 The Repost Sleuth bot continually ingests all new posts and stores them in a database. It then uses various methods including perceptual image hashing and binary search trees to find reposted content.
