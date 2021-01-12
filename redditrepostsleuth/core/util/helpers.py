@@ -267,6 +267,17 @@ def get_default_link_search_settings(config: Config) -> SearchSettings:
 
     )
 
+def get_link_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> SearchSettings:
+    return SearchSettings(
+        target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+        same_sub=monitored_sub.same_sub_only,
+        max_days_old=monitored_sub.target_days_old,
+        only_older_matches=True,
+        filter_same_author=monitored_sub.filter_same_author,
+        filter_crossposts=monitored_sub.filter_crossposts,
+
+    )
+
 def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, target_annoy_distance: float = 170.0) -> ImageSearchSettings:
     return ImageSearchSettings(
         monitored_sub.target_image_match,

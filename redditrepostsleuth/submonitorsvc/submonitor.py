@@ -21,7 +21,7 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost, get_image_search_settings_for_monitored_sub
+    save_link_repost, get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts
 from redditrepostsleuth.ingestsvc.util import pre_process_post
@@ -121,7 +121,11 @@ class SubMonitor:
             elif post.post_type == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
                 if search_results.matches:
+                    # TODO - 1/12/2021 - Why are we doing this?
                     save_link_repost(post, search_results.matches[0].post, self.uowm, 'sub_monitor')
+            else:
+                log.error('Unsuported post type %s', post.post_type)
+                return
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)
             return
@@ -269,11 +273,10 @@ class SubMonitor:
 
     def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub):
         return get_link_reposts(
-            post,
+            post.url,
             self.uowm,
-            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
-            same_sub=monitored_sub.same_sub_only,
-            date_cutoff=monitored_sub.target_days_old,
+            get_link_search_settings_for_monitored_sub(monitored_sub),
+            post=post,
             get_total=False
         )
 
