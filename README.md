@@ -1,3 +1,12 @@
+<div align="center">
+	<img width="500" height="350" src="hero.png" alt="hero">
+	<br>
+	<h4>
+		Check out <a href="https://reddit.com/r/repostsleuthbot">r/RepostSleuthBot</a> as well as <a href="https://repostsleuth.com">RepostSleuth.com</a> which lets you add photos to your home screen
+	</h4>
+</div>
+
+
 # Reddit Repost Sleuth
 ###### A bot to monitor for and detect reposted content on Reddit
 
