@@ -1,24 +1,27 @@
-import json
-from datetime import datetime
+from hashlib import md5
 import random
-from time import perf_counter
+import random
+from hashlib import md5
 from typing import List, Text
 
 import Levenshtein
 import requests
 from praw import Reddit
-from praw.models import Submission
 
-from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
-from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.link_search_results import LinkSearchResults
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.search_results import SearchResults
+from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.constants import USER_AGENTS
-from redditrepostsleuth.core.util.objectmapping import post_to_link_post_search_match
-
+from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
+    filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_dead_urls_remote, \
+    filter_removed_posts
 
 
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
@@ -32,16 +35,6 @@ def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post
     """
     # TODO - Clean this up
     return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
-
-def clean_repost_matches(repost: RepostWrapper) -> List[RepostMatch]:
-    """
-    Take a list of reposts, remove any cross posts and deleted posts
-    :param posts: List of posts
-    """
-    #repost.matches = filter_matching_images(repost.matches, repost.checked_post)
-    matches = [match for match in repost.matches if not match.post.crosspost_parent and match.post.created_at < repost.checked_post.created_at]
-    matches = sort_reposts(matches)
-    return matches
 
 
 def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> List[RepostMatch]:
@@ -65,128 +58,76 @@ def get_closest_image_match(posts: List[ImageSearchMatch], reverse=True, check_u
     sorted_matches = sorted(posts, key=lambda x: x.hamming_match_percent, reverse=reverse)
     return get_first_active_match(sorted_matches)
 
-
-def remove_newer_posts(posts: List[Post], repost_check: Post):
-    return [post for post in posts if post.created_at < repost_check.created_at]
-
-
-def get_crosspost_parent_batch(ids: List[str], reddit: Reddit):
-    submissions = reddit.info(fullnames=ids)
-    result = []
-    for submission in submissions:
-        result.append({
-            'id': submission.id,
-            'crosspost_Parent': submission.__dict__.get('crosspost_parent', None)
-        })
-    return result
-
-
-def verify_oc(submission: Submission, repost_service) -> bool:
-    """
-    Check a provided post to see if it is OC
-    :param submission: Submission to check
-    :param repost_service: Repost processing service
-    :return: boolean
-    """
-    result = repost_service.find_all_occurrences(submission)
-    matches = [match for match in result.matches if not match.post.crosspost_parent]
-    if matches:
-        return False
-    else:
-        return True
-
-
-def check_link_repost(
-        post: Post,
+def get_link_reposts(
+        url: Text,
         uowm: UnitOfWorkManager,
+        search_settings: SearchSettings,
+        post: Post = None,
         get_total: bool = False,
-        target_title_match: int = None,
-        same_sub: bool = False,
-        date_cutoff: int = None,
-        filter_dead_matches: bool = True,
-        only_older_matches: bool = True
-        ) -> RepostWrapper:
+        ) -> LinkSearchResults:
+
+    url_hash = md5(post.url.encode('utf-8'))
+    url_hash = url_hash.hexdigest()
     with uowm.start() as uow:
-        start = perf_counter()
-        search_results = RepostWrapper()
-        search_results.checked_post = post
-        raw_results = uow.posts.find_all_by_url_hash(post.url_hash)
-        search_results.total_search_time = round(perf_counter() - start, 3)
-        log.debug('Query time: %s', search_results.total_search_time)
-        search_results.matches = [post_to_link_post_search_match(match, post.id) for match in raw_results]
-        search_results.matches = filter_repost_results(
-            search_results.matches,
-            post,
-            target_title_match=target_title_match,
-            same_sub=same_sub,
-            date_cutoff=date_cutoff,
-            filter_dead_matches=filter_dead_matches,
-            only_older_matches=only_older_matches
-        )
+        search_results = LinkSearchResults(url, search_settings, checked_post=post, search_times=LinkSearchTimes())
+        search_results.search_times.start_timer('query_time')
+        raw_results = uow.posts.find_all_by_url_hash(url_hash)
+        search_results.search_times.stop_timer('query_time')
+        log.debug('Query time: %s', search_results.search_times.query_time)
+        search_results.matches = [SearchMatch(url, match) for match in raw_results]
+
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')
-        #search_results.total_search_time = perf_counter() - start
 
     return search_results
 
 
-def check_link_repost_by_post_id(post_id: str, uowm: UnitOfWorkManager) -> RepostWrapper:
-    with uowm.start() as uow:
-        post = uow.posts.get_by_post_id(post_id)
-        if post is None:
-            return
-    return check_link_repost(post, uowm)
+def filter_search_results(
+        search_results: SearchResults,
+        reddit: Reddit = None,
+        uitl_api: Text = None
+) -> SearchResults:
+    """
+    Filter a set of search results based on the image search settings
+    :param reddit: Used for filter removed post
+    :param uitl_api: Used for filtering removed posts
+    :param search_results: SearchResults obj
+    """
+    log.debug('%s results pre-filter', len(search_results.matches))
+    # Only run these if we are search for an existing post
+    if search_results.checked_post:
+        search_results.matches = list(filter(filter_same_post(search_results.checked_post.post_id), search_results.matches))
 
+        if search_results.search_settings.filter_same_author:
+            search_results.matches = list(filter(filter_same_author(search_results.checked_post.author), search_results.matches))
 
-def filter_repost_results(
-        matches: List[RepostMatch],
-        checked_post: Post,
-        target_title_match: int = None,
-        same_sub: bool = False,
-        date_cutoff: int = None,
-        filter_dead_matches: bool = True,
-        only_older_matches: bool = True,
-        exclude_crossposts: bool = True
+        if search_results.search_settings.filter_crossposts:
+            search_results.matches = list(filter(cross_post_filter, search_results.matches))
 
-) -> List[RepostMatch]:
-    results = []
-    if target_title_match:
-        matches = set_all_title_similarity(checked_post.title, matches)
+        if search_results.search_settings.only_older_matches:
+            search_results.matches = list(filter(filter_newer_matches(search_results.checked_post.created_at), search_results.matches))
 
-    for match in matches:
+        if search_results.search_settings.same_sub:
+            search_results.matches = list(filter(same_sub_filter(search_results.checked_post.subreddit), search_results.matches))
 
-        if match.post.post_id == checked_post.post_id:
-            continue
+        if search_results.search_settings.target_title_match:
+            search_results.matches = list(filter(filter_title_distance(search_results.search_settings.target_title_match), search_results.matches))
 
-        if match.post.author == checked_post.author:
-            log.debug('Author Cutoff Reject')
-            continue
+        if search_results.search_settings.max_days_old:
+            search_results.matches = list(filter(filter_days_old_matches(search_results.search_settings.max_days_old), search_results.matches))
 
-        if same_sub and match.post.subreddit != checked_post.subreddit:
-            log.debug('Same Sub Reject: Orig sub: %s - Match Sub: %s - %s', checked_post.subreddit, match.post.subreddit, f'https://redd.it/{match.post.post_id}')
-            continue
+    if reddit and uitl_api:
+        if search_results.search_settings.filter_dead_matches:
+            search_results.matches = filter_dead_urls_remote(
+                uitl_api,
+                search_results.matches
+            )
 
-        if only_older_matches and match.post.created_at > checked_post.created_at:
-            log.debug('Date Filter Reject: Target: %s Actual: %s - %s', checked_post.created_at.strftime('%Y-%d-%m'),
-                      match.post.created_at.strftime('%Y-%d-%m'), f'https://redd.it/{match.post.post_id}')
-            continue
+    if search_results.search_settings.filter_removed_matches and reddit:
+        search_results.matches = filter_removed_posts(reddit, search_results.matches)
 
-        if date_cutoff and (datetime.utcnow() - match.post.created_at).days > date_cutoff:
-            log.debug('Date Cutoff Reject: Target: %s Actual: %s - %s', date_cutoff,
-                      (datetime.utcnow() - match.post.created_at).days, f'https://redd.it/{match.post.post_id}')
-            continue
-
-        if exclude_crossposts and match.post.crosspost_parent is not None:
-            log.debug('Crosspost Reject: %s', f'https://redd.it/{match.post.post_id}')
-            continue
-
-        if target_title_match and match.title_similarity <= target_title_match:
-            log.debug('Title Similarity Filter Reject: Target: %s Actual: %s', target_title_match, match.title_similarity)
-            continue
-
-        results.append(match)
-
-    return results
+    log.debug('%s results post-filter', len(search_results.matches))
+    return search_results
 
 
 def get_first_active_match(matches: List[SearchMatch]) -> SearchMatch:

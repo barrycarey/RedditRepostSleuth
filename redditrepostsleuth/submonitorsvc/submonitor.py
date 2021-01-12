@@ -15,15 +15,15 @@ from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImag
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
-from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost
+    save_link_repost, get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.repost_helpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -121,7 +121,11 @@ class SubMonitor:
             elif post.post_type == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
                 if search_results.matches:
+                    # TODO - 1/12/2021 - Why are we doing this?
                     save_link_repost(post, search_results.matches[0].post, self.uowm, 'sub_monitor')
+            else:
+                log.error('Unsuported post type %s', post.post_type)
+                return
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)
             return
@@ -268,12 +272,11 @@ class SubMonitor:
             log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
 
     def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub):
-        return check_link_repost(
-            post,
+        return get_link_reposts(
+            post.url,
             self.uowm,
-            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
-            same_sub=monitored_sub.same_sub_only,
-            date_cutoff=monitored_sub.target_days_old,
+            get_link_search_settings_for_monitored_sub(monitored_sub),
+            post=post,
             get_total=False
         )
 
@@ -287,17 +290,9 @@ class SubMonitor:
         search_results = self.image_service.check_image(
             post.url,
             post=post,
-            target_annoy_distance=monitored_sub.target_annoy,
-            target_match_percent=monitored_sub.target_image_match,
-            target_meme_match_percent=monitored_sub.target_image_meme_match,
-            date_cutoff=monitored_sub.target_days_old,
-            same_sub=monitored_sub.same_sub_only,
-            meme_filter=monitored_sub.meme_filter,
-            filter_removed_matches=True,
-            target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
-            max_depth=-1,
-            max_matches=100,
-            source='sub_monitor'
+            source='sub_monitor',
+            search_settings=get_image_search_settings_for_monitored_sub(monitored_sub,
+                                                                        target_annoy_distance=self.config.default_annoy_distance)
         )
         if search_results.matches:
             save_image_repost_general(search_results ,self.uowm, 'sub_monitor')
@@ -369,24 +364,8 @@ class SubMonitor:
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
 
-        msg_values = build_msg_values_from_search(search_results, self.uowm, target_days_old=monitored_sub.target_days_old)
-        if search_results.checked_post.post_type == 'image':
-            msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
-
-        if search_results.matches:
-            msg = self.response_builder.build_sub_repost_comment(
-                search_results.checked_post.subreddit,
-                msg_values,
-                search_results.checked_post.post_type,
-                stats=True if search_results.checked_post.post_type == 'image' else False
-            )
-        else:
-            msg = self.response_builder.build_sub_oc_comment(
-                search_results.checked_post.subreddit,
-                msg_values, search_results.checked_post.post_type
-            )
-
-        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, msg)
+        message = self.response_builder.build_sub_comment(monitored_sub, search_results, )
+        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message)
 
     def save_unknown_post(self, post_id: str) -> Post:
         """

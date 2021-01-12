@@ -3,19 +3,21 @@
 import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
+from redlock import RedLockFactory
+
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
+from redditrepostsleuth.core.model.search_settings import SearchSettings
+from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE, IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
-    from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
-    from redditrepostsleuth.core.model.image_search_results import ImageSearchResults
+    from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, ImageSearch, MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-
 
 
 def post_type_from_url(url: str) -> str:
@@ -78,75 +80,36 @@ def searched_post_str(post: Post, count: int) -> str:
 
     return output
 
-def create_first_seen(post: Post, subreddit: str, first_last: str = 'First') -> str:
-    """
-    Create a first seen string to use in a comment.  Takes into account subs that dont' allow links
-    :param post: DB Post obj
-    :return: final string
-    """
-    if subreddit and subreddit in NO_LINK_SUBREDDITS:
-        seen = f"First seen in {post.subreddit} on {post.created_at.strftime('%Y-%m-%d')}"
-    else:
-        seen = f"{first_last} seen [Here](https://redd.it/{post.post_id}) on {post.created_at.strftime('%Y-%m-%d')}"
 
-    return seen
-
-def build_markdown_list(matches: List['ImagePostSearchMatch']) -> str:
-    result = ''
-    for match in matches:
-        result += f'* {match.post.created_at.strftime("%d-%m-%Y")} - [https://redd.it/{match.post.post_id}](https://redd.it/{match.post.post_id}) [{match.post.subreddit}] [{(100 - match.hamming_distance) / 100:.2%} match]\n'
-    return result
-
-def build_site_search_url(image_search: ImageSearch) -> Text:
-    url = f'https://www.repostsleuth.com?postId={image_search.post_id}&'
-    url += f'sameSub={str(image_search.same_sub).lower()}&'
-    url += f'filterOnlyOlder={str(image_search.only_older_matches).lower()}&'
-    url += f'memeFilter={str(image_search.meme_filter).lower()}&'
-    url += f'filterDeadMatches={str(image_search.filter_dead_matches).lower()}&'
-    url += f'targetImageMatch={str(image_search.target_image_match)}&'
-    url += f'targetImageMemeMatch={str(image_search.target_image_meme_match)}'
+def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -> Text:
+    if not search_settings:
+        return None
+    url = f'https://www.repostsleuth.com?postId={post_id}&'
+    url += f'sameSub={str(search_settings.same_sub).lower()}&'
+    url += f'filterOnlyOlder={str(search_settings.only_older_matches).lower()}&'
+    url += f'memeFilter={str(search_settings.meme_filter).lower()}&'
+    url += f'filterDeadMatches={str(search_settings.filter_dead_matches).lower()}&'
+    url += f'targetImageMatch={str(search_settings.target_match_percent)}&'
+    url += f'targetImageMemeMatch={str(search_settings.target_meme_match_percent)}'
     return url
 
 
-def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
-    results_values = {}
-    base_values = {
-        'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
-        'target_match_percent': f'{search_results.target_match_percent}%' if search_results.closest_match else None,
-        'closest_url': search_results.closest_match.post.url if search_results.closest_match else None,
-        'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
-        'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
-        'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
-        'meme_filter': True if search_results.meme_template else False,
-        'search_url': build_site_search_url(search_results.logged_search)
-    }
-    if search_results.matches:
-        results_values = {
-            'newest_percent_match': f'{search_results.matches[-1].hamming_match_percent}%',
-            'oldest_percent_match': f'{search_results.matches[0].hamming_match_percent}%',
-            'match_list': build_markdown_list(search_results.matches),
-            'meme_template_id': search_results.meme_template.id if search_results.meme_template else None,
-            'false_positive_data': json.dumps(
-                {
-                    'post_id': search_results.checked_post.post_id,
-                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
-                }
-            ),
-        }
+def build_image_report_link(search_results: 'SearchResults') -> Text:
+    """
+    Take a set of search results and construct the report message.  Either a positive or negative report
+    will be created from the provided search results
+    :param search_results:
+    :return:
+    """
+    if len(search_results.matches) > 0:
+        pos_neg_text = 'Positive'
     else:
-        results_values = {
-            'false_negative_data': json.dumps(
-                {
-                    'post_id': search_results.checked_post.post_id,
-                    'meme_template': search_results.meme_template.id if search_results.meme_template else None
-                }
-            ),
-        }
+        pos_neg_text = 'Negative'
 
-    return {**results_values, **base_values, **kwargs}
+    return IMAGE_REPORT_TEXT.format(pos_neg_text=pos_neg_text, report_data=search_results.report_data)
 
 
-def build_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -161,36 +124,67 @@ def build_msg_values_from_search(search_results: 'ImageSearchResults', uowm: Uni
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
         'post_shortlink': f'https://redd.it/{search_results.checked_post.post_id}',
-        'post_author': search_results.checked_post.author
+        'post_author': search_results.checked_post.author,
+        'report_post_link': ''
 
     }
     if search_results.search_times:
         base_values['search_time'] = search_results.search_times.total_search_time
 
-    results_values = {}
-
     if search_results.matches:
-        results_values = {
-            'oldest_created_at': search_results.matches[0].post.created_at,
-            'oldest_url': search_results.matches[0].post.url,
-            'oldest_shortlink': f'https://redd.it/{search_results.matches[0].post.post_id}',
-            'oldest_sub': search_results.matches[0].post.subreddit,
-            'newest_created_at': search_results.matches[-1].post.created_at,
-            'newest_url': search_results.matches[-1].post.url,
-            'newest_shortlink': f'https://redd.it/{search_results.matches[-1].post.post_id}',
-            'newest_sub': search_results.matches[-1].post.subreddit,
-            'first_seen': create_first_seen(search_results.matches[0].post, search_results.checked_post.subreddit),
-            'last_seen': create_first_seen(search_results.matches[-1].post, search_results.checked_post.subreddit, 'Last'),
-
-        }
+        base_values['oldest_created_at'] = search_results.matches[0].post.created_at
+        base_values['oldest_url'] = search_results.matches[0].post.url
+        base_values['oldest_shortlink'] = f'https://redd.it/{search_results.matches[0].post.post_id}'
+        base_values['oldest_sub'] = search_results.matches[0].post.subreddit
+        base_values['newest_created_at'] = search_results.matches[-1].post.created_at
+        base_values['newest_url'] = search_results.matches[-1].post.url
+        base_values['newest_shortlink'] = f'https://redd.it/{search_results.matches[-1].post.post_id}'
+        base_values['newest_sub'] = search_results.matches[-1].post.subreddit
+        base_values['first_seen'] = f"First Seen [Here](https://redd.it/{search_results.matches[0].post.post_id}) on {search_results.matches[0].post.created_at.strftime('%Y-%m-%d')}"
+        base_values['last_seen'] = f"Last Seen [Here](https://redd.it/{search_results.matches[-1].post.post_id}) on {search_results.matches[-1].post.created_at.strftime('%Y-%m-%d')}"
 
     if uowm:
         with uowm.start() as uow:
             base_values['total_posts'] = f'{uow.posts.get_newest_post().id:,}'
 
-    return {**base_values, **results_values, **kwargs}
+    return {**base_values, **search_results.search_settings.to_dict(), **kwargs}
 
-def create_search_result_json(search_results: 'ImageSearchResults') -> dict:
+
+def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None,
+                                       **kwargs) -> Dict:
+
+    base_values = {
+        'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
+        'closest_url': search_results.closest_match.post.url if search_results.closest_match else None,
+        'closest_shortlink': f'https://redd.it/{search_results.closest_match.post.post_id}' if search_results.closest_match else None,
+        'closest_percent_match': f'{search_results.closest_match.hamming_match_percent}%' if search_results.closest_match else None,
+        'closest_created_at': search_results.closest_match.post.created_at if search_results.closest_match else None,
+        'meme_filter_used': True if search_results.meme_template else False,
+        'search_url': build_site_search_url(search_results.checked_post.post_id, search_results.search_settings),
+        'check_title': 'True' if search_results.search_settings.target_title_match else 'False',
+        'report_post_link': build_image_report_link(search_results)
+    }
+
+    if search_results.meme_template:
+        base_values['target_match_percent'] = search_results.search_settings.target_meme_match_percent
+    else:
+        base_values['target_match_percent'] = search_results.search_settings.target_match_percent
+
+    if search_results.search_settings.max_days_old == 99999:
+        base_values['max_age'] = None
+    else:
+        base_values['max_age'] = search_results.search_settings.max_days_old
+
+    if search_results.matches:
+        base_values['newest_percent_match'] = f'{search_results.matches[-1].hamming_match_percent}%'
+        base_values['oldest_percent_match'] = f'{search_results.matches[0].hamming_match_percent}%'
+        base_values['meme_template_id'] = search_results.meme_template.id if search_results.meme_template else None
+
+
+    return {**base_values, **search_results.search_settings.to_dict(), **kwargs}
+
+
+def create_search_result_json(search_results: 'ImageSearchResults') -> Text:
     """
     Take an ImageRepostWrapper object and create the json to be stored in the database
     :rtype: dict
@@ -201,10 +195,6 @@ def create_search_result_json(search_results: 'ImageSearchResults') -> dict:
         'matches': [match.to_dict() for match in search_results.matches],
     }
     return json.dumps(search_data)
-
-
-
-
 
 def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
     if len(rows[0]) != len(headers):
@@ -246,7 +236,66 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
             log.exception('Failed to save link repost', exc_info=True)
 
 def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
-    pass
+    return ImageSearchSettings(
+        config.default_image_target_match,
+        target_title_match=config.default_image_target_title_match,
+        filter_dead_matches=config.default_image_dead_matches_filter,
+        filter_removed_matches=config.default_image_removed_match_filter,
+        only_older_matches=config.default_image_only_older_matches,
+        filter_same_author=config.default_image_same_author_filter,
+        filter_crossposts=config.default_image_crosspost_filter,
+        target_meme_match_percent=config.default_image_target_meme_match,
+        meme_filter=config.default_image_meme_filter,
+        same_sub=config.default_image_same_sub_filter,
+        max_days_old=config.default_image_max_days_old_filter,
+        target_annoy_distance=config.default_image_target_annoy_distance,
+        max_depth=-1,
+        max_matches=config.default_image_max_matches
 
-def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
-    pass
+    )
+
+def get_default_link_search_settings(config: Config) -> SearchSettings:
+    return SearchSettings(
+        target_title_match=config.default_link_target_title_match,
+        same_sub=config.default_link_same_sub_filter,
+        max_days_old=config.default_link_max_days_old_filter,
+        filter_removed_matches=config.default_link_removed_match_filter,
+        filter_dead_matches=config.default_link_dead_matches_filter,
+        only_older_matches=config.default_link_only_older_matches,
+        filter_same_author=config.default_link_same_author_filter,
+        filter_crossposts=config.default_link_crosspost_filter
+
+    )
+
+def get_link_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> SearchSettings:
+    return SearchSettings(
+        target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+        same_sub=monitored_sub.same_sub_only,
+        max_days_old=monitored_sub.target_days_old,
+        only_older_matches=True,
+        filter_same_author=monitored_sub.filter_same_author,
+        filter_crossposts=monitored_sub.filter_crossposts,
+
+    )
+
+def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, target_annoy_distance: float = 170.0) -> ImageSearchSettings:
+    return ImageSearchSettings(
+        monitored_sub.target_image_match,
+        target_annoy_distance,
+        target_meme_match_percent=monitored_sub.target_image_meme_match,
+        meme_filter=monitored_sub.meme_filter,
+        target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+        same_sub=monitored_sub.same_sub_only,
+        max_days_old=monitored_sub.target_days_old,
+        filter_same_author=monitored_sub.filter_same_author,
+        filter_crossposts=monitored_sub.filter_crossposts,
+        max_depth=-1,
+        max_matches=200
+
+    )
+
+def get_redlock_factory(config: Config) -> RedLockFactory:
+    return RedLockFactory(
+        connection_details=[
+            {'host': config.redis_host, 'port': config.redis_port, 'password': config.redis_password, 'db': 1}
+        ])

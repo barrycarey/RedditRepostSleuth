@@ -3,25 +3,25 @@ from typing import Text, NoReturn, Optional
 
 from praw.exceptions import APIException
 from praw.models import Comment, Submission
-from redlock import RedLockError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.replytemplates import FRONTPAGE_LINK_REPOST, TOP_POST_WATCH_BODY, \
+from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_BODY, \
     TOP_POST_WATCH_SUBJECT, TOP_POST_REPORT_MSG
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post, BotComment
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
-from redditrepostsleuth.core.util.repost_helpers import check_link_repost
+from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
+    get_default_link_search_settings
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
@@ -76,10 +76,6 @@ class TopPostMonitor:
                     if post.post_type == 'image' and len(results.matches) == 0:
                         self._offer_watch(sub)
 
-                    if len(results.matches) > 0:
-                        #self._report_post(results)
-                        pass
-
                     time.sleep(0.2)
 
             log.info('Processed all top posts.  Sleeping')
@@ -92,38 +88,40 @@ class TopPostMonitor:
                 return True
             return False
 
-    def check_for_repost(self, post: Post) -> Optional[RepostWrapper]:
+    def check_for_repost(self, post: Post) -> Optional[SearchResults]:
         """
         Take a given post and check if it's a repost
-        :rtype: RepostWrapper
+        :rtype: SearchResults
         :param post: Post obj
         :return: Search results
         """
         if post.post_type == 'image':
-            if not post.dhash_h:
-                log.info('Post %s has no dhash value, skipping', post.post_id)
-                return
             try:
-
                 return self.image_service.check_image(
                     post.url,
                     post=post,
-                    same_sub=False,
-                    meme_filter=True
                 )
             except NoIndexException:
                 log.error('No available index for image repost check.  Trying again later')
                 return
-            except RedLockError:
-                log.error('Could not get RedLock.  Trying again later')
-                return
+
         elif post.post_type == 'link':
-            return check_link_repost(post, self.uowm, get_total=True)
+            search_results = get_link_reposts(
+                post.url,
+                self.uowm,
+                get_default_link_search_settings(self.config),
+                get_total=True
+            )
+            return filter_search_results(
+                search_results,
+                reddit=self.reddit,
+                uitl_api=f'{self.config.util_api}/maintenance/removed'
+            )
         else:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
 
-    def _add_comment(self, post: Post, search_results: RepostWrapper) -> NoReturn:
+    def _add_comment(self, post: Post, search_results: SearchResults) -> NoReturn:
         """
         Add a comment to the post
         :rtype: NoReturn
@@ -150,20 +148,7 @@ class TopPostMonitor:
                 log.info('Skipping monitored sub %s', post.subreddit)
                 return
 
-        msg_values = build_msg_values_from_search(search_results, self.uowm)
-        if search_results.checked_post.post_type == 'image':
-            msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
-
-        if search_results.matches:
-            if post.post_type == 'image':
-                msg = self.response_builder.build_default_repost_comment(msg_values, post.post_type)
-            else:
-                msg = self.response_builder.build_provided_comment_template(msg_values, FRONTPAGE_LINK_REPOST, post.post_type)
-        else:
-            if not self.config.hot_post_comment_on_oc:
-                log.info('Sub %s is set to repost comment only.  Skipping OC comment', post.subreddit)
-                return
-            msg = self.response_builder.build_default_oc_comment(msg_values)
+        msg = self.response_builder.build_default_comment(search_results)
 
         try:
             self.response_handler.reply_to_submission(post.post_id, msg)
@@ -180,7 +165,7 @@ class TopPostMonitor:
     def _offer_watch(self, submission: Submission) -> NoReturn:
         """
         Offer to add watch to OC post
-        :param search_results:
+        :param search:
         """
         if not self.config.top_post_offer_watch:
             log.debug('Top Post Offer Watch Disabled')
@@ -213,7 +198,7 @@ class TopPostMonitor:
             else:
                 log.exception('Unknown error sending PM to %s', submission.author.name, exc_info=True)
 
-    def _report_post(self, search_results: RepostWrapper) -> NoReturn:
+    def _report_post(self, search_results: SearchResults) -> NoReturn:
         """
         Report a given post
         :rtype: NoReturn

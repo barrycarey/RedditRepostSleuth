@@ -8,10 +8,8 @@ from praw import Reddit
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.search_results.image_post_search_match import ImagePostSearchMatch
-from redditrepostsleuth.core.model.repostmatch import RepostMatch
-from redditrepostsleuth.core.model.search_results.image_search_match import ImageSearchMatch
-from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 
 
@@ -42,10 +40,12 @@ def annoy_distance_filter(target_annoy_distance: float):
         return False
     return annoy_filter
 
+
 def raw_annoy_filter(target_annoy_distance: float):
     def annoy_filter(item):
         return item[1] < target_annoy_distance
     return annoy_filter
+
 
 def hamming_distance_filter(target_hamming_distance: float):
     def hamming_filter(match: ImageSearchMatch):
@@ -66,6 +66,7 @@ def filter_newer_matches(cutoff_date: datetime):
         return True
     return date_filter
 
+
 def filter_title_distance(threshold: int):
     def title_filter(match: SearchMatch):
         if match.title_similarity <= threshold:
@@ -73,6 +74,7 @@ def filter_title_distance(threshold: int):
             return False
         return True
     return title_filter
+
 
 def filter_days_old_matches(cutoff_days: int):
     def days_filter(match: SearchMatch):
@@ -101,6 +103,7 @@ def filter_same_post(post_id: Text):
         return True
     return same_post
 
+
 def filter_title_keywords(keywords: List[Text]):
     def filter_title(match: SearchMatch):
         for kw in keywords:
@@ -111,13 +114,15 @@ def filter_title_keywords(keywords: List[Text]):
         return True
     return filter_title
 
+
 def filter_no_dhash(match: ImageSearchMatch):
     if not match.post.dhash_h:
         log.debug('Dhash Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
         return False
     return True
 
-def filter_dead_urls(match: ImageSearchMatch):
+
+def filter_dead_urls(match: SearchMatch) -> bool:
     try:
         headers = {'User-Agent': random.choice(USER_AGENTS)}
         r = requests.head(match.post.url, timeout=3, headers=headers)
@@ -129,7 +134,14 @@ def filter_dead_urls(match: ImageSearchMatch):
         log.debug('Active URL Reject:  https://redd.it/%s', match.post.post_id)
         return False
 
+
 def filter_removed_posts(reddit: Reddit, matches: List[SearchMatch]) -> List[SearchMatch]:
+    """
+    Take a list of SearchMatches, get the submission from Reddit and see if they have been removed
+    :param reddit: Praw Reddit instance
+    :param matches: List of matches
+    :return: List of filtered matches
+    """
     if not matches:
         return matches
     if len(matches) > 100:
@@ -144,20 +156,39 @@ def filter_removed_posts(reddit: Reddit, matches: List[SearchMatch]) -> List[Sea
     return matches
 
 
-def filter_dead_urls_remote(util_api: Text, reddit: Reddit, matches: List[SearchMatch]) -> List[SearchMatch]:
+def filter_dead_urls_remote(util_api: Text, matches: List[SearchMatch]) -> List[SearchMatch]:
+    """
+    Batch checking a list of matches to see if the associated links have been removed.
+    This function is using our utility API that runs on a Pool of VMs so we can check matches at high volume
+
+    We are piggy backing the util API I use to clean deleted posts from the database.
+
+    API response is:
+    [
+        {'id': '12345', 'action': 'remove'
+
+    ]
+
+    Several actions can be returned.  However, we're only interested in the remove since that results from the post's
+    URL returning a 404
+
+    :param util_api: API URL to call to get results
+    :param matches: List of matches
+    :return: List of filtered matches
+    """
     match_urls = [{'id': match.post.post_id, 'url': match.post.url} for match in matches]
     try:
         res = requests.post(util_api, json=match_urls)
     except ConnectionError:
         log.error('Problem reaching retail API, doing local check')
-        return filter_removed_posts(reddit, matches)
+        return matches
     except Exception as e:
         log.exception('Problem reaching retail API, doing local check', exc_info=True)
-        return filter_removed_posts(reddit, matches)
+        return matches
 
     if res.status_code != 200:
         log.error('Non 200 status from util api (%s), doing local dead URL check', res.status_code)
-        return filter_removed_posts(reddit, matches)
+        return matches
     res_data = json.loads(res.text)
     removed_matches = [match['id'] for match in res_data if match['action'] == 'remove']
     for removed_id in removed_matches:

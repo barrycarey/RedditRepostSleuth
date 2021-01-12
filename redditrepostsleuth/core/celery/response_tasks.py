@@ -14,6 +14,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logging import log
@@ -24,9 +25,9 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.util.helpers import get_redlock_factory
 from redditrepostsleuth.core.util.objectmapping import submission_to_post, pushshift_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
@@ -34,15 +35,20 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 class SummonsHandlerTask(Task):
     def __init__(self):
         self.config = Config()
+        self.redlock = get_redlock_factory(self.config)
         self.reddit = get_reddit_instance(self.config)
         self.reddit_manager = RedditManager(self.reddit)
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
-        self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons', live_response=self.config.live_responses)
+        notification_svc = NotificationService(self.config)
+        self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons',
+                                                live_response=self.config.live_responses,
+                                                notification_svc=notification_svc)
         dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit_manager, response_builder,
-                                              self.response_handler, event_logger=self.event_logger, summons_disabled=False)
+                                              self.response_handler, event_logger=self.event_logger,
+                                              summons_disabled=False, notification_svc=notification_svc)
 
 class SubMonitorTask(Task):
     def __init__(self):
@@ -156,14 +162,13 @@ def process_monitored_sub_old(self, monitored_sub):
 @celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True, )
 def process_summons(self, s):
     with self.uowm.start() as uow:
-        #summons = uow.summons.get_unreplied(limit=5)
         log.info('Starting summons %s on sub %s', s.id, s.subreddit)
         updated_summons = uow.summons.get_by_id(s.id)
         if updated_summons and updated_summons.summons_replied_at:
             log.info('Summons %s already replied, skipping', s.id)
             return
         try:
-            with redlock.create_lock(f'summons_{s.id}', ttl=120000):
+            with self.redlock.create_lock(f'summons_{s.id}', ttl=120000):
                 post = uow.posts.get_by_post_id(s.post_id)
                 if not post:
                     post = self.summons_handler.save_unknown_post(s.post_id)
