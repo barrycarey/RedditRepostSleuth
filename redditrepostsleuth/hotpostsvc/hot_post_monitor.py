@@ -9,11 +9,12 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.replytemplates import FRONTPAGE_LINK_REPOST, TOP_POST_WATCH_BODY, \
+from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_BODY, \
     TOP_POST_WATCH_SUBJECT, TOP_POST_REPORT_MSG
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -92,7 +93,7 @@ class TopPostMonitor:
                 return True
             return False
 
-    def check_for_repost(self, post: Post) -> Optional[RepostWrapper]:
+    def check_for_repost(self, post: Post) -> Optional[SearchResults]:
         """
         Take a given post and check if it's a repost
         :rtype: RepostWrapper
