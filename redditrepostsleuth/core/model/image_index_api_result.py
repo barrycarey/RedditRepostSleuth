@@ -9,6 +9,6 @@ class ImageIndexApiResult:
     index_search_time: float
     total_searched: int
     used_current_index: bool
-    used_historical_index: dict
+    used_historical_index: bool
     target_result: dict
 

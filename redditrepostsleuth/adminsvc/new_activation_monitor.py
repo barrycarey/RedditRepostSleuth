@@ -12,6 +12,7 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_ADDED
@@ -19,7 +20,8 @@ from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_ADDED
 
 class NewActivationMonitor:
 
-    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit):
+    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None):
+        self.notification_svc = notification_svc
         self.uowm = uowm
         self.reddit = reddit
 
@@ -38,6 +40,7 @@ class NewActivationMonitor:
         try:
             monitored_sub = self._create_monitored_sub_in_db(msg)
         except Exception as e:
+            log.exception('Failed to save new monitored sub', exc_info=True)
             return
         subreddit = self.reddit.subreddit(msg.subreddit.display_name)
         try:
@@ -52,6 +55,11 @@ class NewActivationMonitor:
         if not monitored_sub.activation_notification_sent:
             self._notify_added(subreddit)
         self._create_wiki_page(subreddit)
+        if self.notification_svc:
+            self.notification_svc.send_notification(
+                f'Added new monitored sub r/{monitored_sub.name}',
+                subject='**New Monitored Sub Added!**'
+            )
         log.info('%s has been added as a monitored sub', subreddit.display_name)
 
 

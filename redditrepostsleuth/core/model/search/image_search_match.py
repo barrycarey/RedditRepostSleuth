@@ -1,7 +1,7 @@
 from typing import Text
 
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.core.model.search_results.search_match import SearchMatch
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 
 
 class ImageSearchMatch(SearchMatch):
