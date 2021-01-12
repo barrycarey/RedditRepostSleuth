@@ -1,17 +1,15 @@
-import time
 from time import perf_counter
 from typing import Text, NoReturn, Optional
 
-from praw.exceptions import APIException, ClientException
+from praw.exceptions import APIException
 from praw.models import Comment, Redditor
-from prawcore import Forbidden, PrawcoreException, ResponseException
+from prawcore import Forbidden
 from sqlalchemy import func
 
 from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddit, BotPrivateMessage
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import RateLimitException
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.model.comment_reply import CommentReply
 from redditrepostsleuth.core.model.events.reddit_api_event import RedditApiEvent
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
 from redditrepostsleuth.core.notification.notification_service import NotificationService
