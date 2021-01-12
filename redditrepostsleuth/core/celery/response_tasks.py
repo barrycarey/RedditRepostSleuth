@@ -25,9 +25,9 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.util.helpers import get_redlock_factory
 from redditrepostsleuth.core.util.objectmapping import submission_to_post, pushshift_to_post
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.redlock import redlock
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
@@ -35,6 +35,7 @@ from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 class SummonsHandlerTask(Task):
     def __init__(self):
         self.config = Config()
+        self.redlock = get_redlock_factory(self.config)
         self.reddit = get_reddit_instance(self.config)
         self.reddit_manager = RedditManager(self.reddit)
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
@@ -161,14 +162,13 @@ def process_monitored_sub_old(self, monitored_sub):
 @celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True, )
 def process_summons(self, s):
     with self.uowm.start() as uow:
-        #summons = uow.summons.get_unreplied(limit=5)
         log.info('Starting summons %s on sub %s', s.id, s.subreddit)
         updated_summons = uow.summons.get_by_id(s.id)
         if updated_summons and updated_summons.summons_replied_at:
             log.info('Summons %s already replied, skipping', s.id)
             return
         try:
-            with redlock.create_lock(f'summons_{s.id}', ttl=120000):
+            with self.redlock.create_lock(f'summons_{s.id}', ttl=120000):
                 post = uow.posts.get_by_post_id(s.post_id)
                 if not post:
                     post = self.summons_handler.save_unknown_post(s.post_id)

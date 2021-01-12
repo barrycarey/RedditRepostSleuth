@@ -136,6 +136,12 @@ def filter_dead_urls(match: SearchMatch) -> bool:
 
 
 def filter_removed_posts(reddit: Reddit, matches: List[SearchMatch]) -> List[SearchMatch]:
+    """
+    Take a list of SearchMatches, get the submission from Reddit and see if they have been removed
+    :param reddit: Praw Reddit instance
+    :param matches: List of matches
+    :return: List of filtered matches
+    """
     if not matches:
         return matches
     if len(matches) > 100:
@@ -150,20 +156,39 @@ def filter_removed_posts(reddit: Reddit, matches: List[SearchMatch]) -> List[Sea
     return matches
 
 
-def filter_dead_urls_remote(util_api: Text, reddit: Reddit, matches: List[SearchMatch]) -> List[SearchMatch]:
+def filter_dead_urls_remote(util_api: Text, matches: List[SearchMatch]) -> List[SearchMatch]:
+    """
+    Batch checking a list of matches to see if the associated links have been removed.
+    This function is using our utility API that runs on a Pool of VMs so we can check matches at high volume
+
+    We are piggy backing the util API I use to clean deleted posts from the database.
+
+    API response is:
+    [
+        {'id': '12345', 'action': 'remove'
+
+    ]
+
+    Several actions can be returned.  However, we're only interested in the remove since that results from the post's
+    URL returning a 404
+
+    :param util_api: API URL to call to get results
+    :param matches: List of matches
+    :return: List of filtered matches
+    """
     match_urls = [{'id': match.post.post_id, 'url': match.post.url} for match in matches]
     try:
         res = requests.post(util_api, json=match_urls)
     except ConnectionError:
         log.error('Problem reaching retail API, doing local check')
-        return filter_removed_posts(reddit, matches)
+        return matches
     except Exception as e:
         log.exception('Problem reaching retail API, doing local check', exc_info=True)
-        return filter_removed_posts(reddit, matches)
+        return matches
 
     if res.status_code != 200:
         log.error('Non 200 status from util api (%s), doing local dead URL check', res.status_code)
-        return filter_removed_posts(reddit, matches)
+        return matches
     res_data = json.loads(res.text)
     removed_matches = [match['id'] for match in res_data if match['action'] == 'remove']
     for removed_id in removed_matches:

@@ -3,7 +3,10 @@
 import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
+from redlock import RedLockFactory
+
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
+from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE, IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
@@ -234,14 +237,44 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
 
 def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
-        config.target_image_match,
-        target_meme_match_percent=config.target_image_meme_match,
-        meme_filter=config.summons_meme_filter,
-        same_sub=config.summons_same_sub,
-        max_days_old=config.summons_max_age,
-        target_annoy_distance=config.default_annoy_distance,
+        config.default_image_target_match,
+        target_title_match=config.default_image_target_title_match,
+        filter_dead_matches=config.default_image_dead_matches_filter,
+        filter_removed_matches=config.default_image_removed_match_filter,
+        only_older_matches=config.default_image_only_older_matches,
+        filter_same_author=config.default_image_same_author_filter,
+        filter_crossposts=config.default_image_crosspost_filter,
+        target_meme_match_percent=config.default_image_target_meme_match,
+        meme_filter=config.default_image_meme_filter,
+        same_sub=config.default_image_same_sub_filter,
+        max_days_old=config.default_image_max_days_old_filter,
+        target_annoy_distance=config.default_image_target_annoy_distance,
         max_depth=-1,
-        max_matches=250
+        max_matches=config.default_image_max_matches
+
+    )
+
+def get_default_link_search_settings(config: Config) -> SearchSettings:
+    return SearchSettings(
+        target_title_match=config.default_link_target_title_match,
+        same_sub=config.default_link_same_sub_filter,
+        max_days_old=config.default_link_max_days_old_filter,
+        filter_removed_matches=config.default_link_removed_match_filter,
+        filter_dead_matches=config.default_link_dead_matches_filter,
+        only_older_matches=config.default_link_only_older_matches,
+        filter_same_author=config.default_link_same_author_filter,
+        filter_crossposts=config.default_link_crosspost_filter
+
+    )
+
+def get_link_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> SearchSettings:
+    return SearchSettings(
+        target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+        same_sub=monitored_sub.same_sub_only,
+        max_days_old=monitored_sub.target_days_old,
+        only_older_matches=True,
+        filter_same_author=monitored_sub.filter_same_author,
+        filter_crossposts=monitored_sub.filter_crossposts,
 
     )
 
@@ -261,4 +294,8 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
 
     )
 
-
+def get_redlock_factory(config: Config) -> RedLockFactory:
+    return RedLockFactory(
+        connection_details=[
+            {'host': config.redis_host, 'port': config.redis_port, 'password': config.redis_password, 'db': 1}
+        ])
