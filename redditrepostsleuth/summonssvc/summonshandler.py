@@ -22,12 +22,12 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost, get_default_image_search_settings
+    save_link_repost, get_default_image_search_settings, get_default_link_search_settings
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
-from redditrepostsleuth.core.util.repost_helpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
@@ -274,16 +274,29 @@ class SummonsHandler:
         elif post.post_type == 'link':
             self.process_link_repost_request(summons, post)
 
-    def process_link_repost_request(self, summons: Summons, post: Post):
+    def process_link_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
         response = SummonsResponse(summons=summons)
-        search_results = check_link_repost(post, self.uowm, get_total=True)
-        msg_values = build_msg_values_from_search(search_results, self.uowm)
 
-        if not search_results.matches:
-            response.message = self.response_builder.build_default_oc_comment(msg_values, post.post_type)
+        search_results = get_link_reposts(
+            post.url,
+            self.uowm,
+            get_default_link_search_settings(self.config),
+            post=post,
+            get_total=True
+        )
+        search_results = filter_search_results(
+            search_results,
+            reddit=self.reddit.reddit,
+            uitl_api=f'{self.config.util_api}/maintenance/removed'
+        )
+
+        if not monitored_sub:
+            response.message = self.response_builder.build_default_comment(search_results)
         else:
+            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results)
+
+        if search_results.matches:
             save_link_repost(post, search_results.matches[0].post, self.uowm, 'summons')
-            response.message = self.response_builder.build_sub_repost_comment(post.subreddit, msg_values, post.post_type)
 
         self._send_response(response)
 
@@ -331,7 +344,7 @@ class SummonsHandler:
             target_meme_match_percent = monitored_sub.target_image_meme_match
             target_annoy_distance = monitored_sub.target_annoy
             return target_match_percent, target_meme_match_percent, target_annoy_distance
-        return self.config.target_image_match, self.config.target_image_meme_match, self.config.default_annoy_distance
+        return self.config.default_image_target_match, self.config.default_image_target_meme_match, self.config.default_image_target_annoy_distance
 
     def _send_response(self, response: SummonsResponse) -> NoReturn:
         """
