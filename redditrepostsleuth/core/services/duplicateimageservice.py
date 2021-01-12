@@ -59,8 +59,8 @@ class DuplicateImageService:
 
         search_results = filter_search_results(
             search_results,
-            self.reddit,
-            f'{self.config.util_api}/maintenance/removed'
+            reddit=self.reddit,
+            uitl_api=f'{self.config.util_api}/maintenance/removed'
         )
 
         closest_match = get_closest_image_match(search_results.matches, check_url=True)

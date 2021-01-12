@@ -10,8 +10,10 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.link_search_results import LinkSearchResults
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
-from redditrepostsleuth.core.util.repost_helpers import check_link_repost
+from redditrepostsleuth.core.util.helpers import get_default_link_search_settings
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
@@ -74,40 +76,47 @@ def link_repost_check(self, posts, ):
                 continue
 
             log.debug('Checking URL for repost: %s', post.url_hash)
-            repost = check_link_repost(post, self.uowm)
-            if not repost.matches:
+            search_results = get_link_reposts(post.url, self.uowm, get_default_link_search_settings(self.config),
+                                              post=post)
+
+            if len(search_results.matches) > 10000:
+                log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(search_results.matches))
+                self.link_blacklist.append(post.url_hash)
+                self.notification_svc.send_notification(f'URL has been shared {len(search_results.matches)} times. Adding to blacklist. \n\n {post.url}')
+
+            search_results = filter_search_results(
+                search_results,
+                reddit=self.reddit,
+                uitl_api=f'{self.config.util_api}/maintenance/removed'
+            )
+
+            if not search_results.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
                 post.checked_repost = True
                 uow.posts.update(post)
                 uow.commit()
                 continue
 
-            if len(repost.matches) > 1000:
-                log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(repost.matches))
-                self.link_blacklist.append(post.url_hash)
-                self.notification_svc.send_notification(f'URL has been shared {len(repost.matches)} times. Adding to blacklist. \n\n {post.url}')
+            log.info('Found %s matching links', len(search_results.matches))
+            log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, search_results.matches[0].post.post_id)
 
-            log.info('Found %s matching links', len(repost.matches))
-            log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, repost.matches[0].post.post_id)
-
-            repost_of = repost.matches[0].post
+            repost_of = search_results.matches[0].post
             new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author, source='ingest', subreddit=post.subreddit)
             repost_of.repost_count += 1
             post.checked_repost = True
             uow.posts.update(post)
             uow.link_repost.add(new_repost)
-            # uow.posts.update(repost.matches[0].post)
-            # log_repost.apply_async((repost,))
+
             try:
                 uow.commit()
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
-                                                         repost_of=repost.matches[0].post.post_id,
+                                                         repost_of=search_results.matches[0].post.post_id,
                                                          post_type=post.post_type))
             except IntegrityError as e:
                 uow.rollback()
                 log.exception('Error saving link repost', exc_info=True)
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
-                                                         repost_of=repost.matches[0].post.post_id,
+                                                         repost_of=search_results.matches[0].post.post_id,
                                                          post_type=post.post_type))
 
         self.event_logger.save_event(

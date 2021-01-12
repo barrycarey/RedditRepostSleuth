@@ -29,6 +29,7 @@ class RepostTask(SqlAlchemyTask):
         super().__init__()
         self.notification_svc = NotificationService(self.config)
         self.link_blacklist = [] # Temp fix.  People were spamming onlyfans links 10s of thousands of times
+        self.reddit = get_reddit_instance(self.config)
 
 
 class AnnoyTask(Task):

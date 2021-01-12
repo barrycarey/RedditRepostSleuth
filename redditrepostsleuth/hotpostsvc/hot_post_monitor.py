@@ -21,7 +21,7 @@ from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post, BotComment
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search
-from redditrepostsleuth.core.util.repost_helpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
@@ -118,7 +118,7 @@ class TopPostMonitor:
                 log.error('Could not get RedLock.  Trying again later')
                 return
         elif post.post_type == 'link':
-            return check_link_repost(post, self.uowm, get_total=True)
+            return get_link_reposts(post, self.uowm, get_total=True)
         else:
             log.info(f'Post {post.post_id} is a {post.post_type} post.  Skipping')
             return
