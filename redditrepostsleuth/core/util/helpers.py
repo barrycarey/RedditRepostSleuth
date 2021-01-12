@@ -3,6 +3,8 @@
 import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
+from redlock import RedLockFactory
+
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE, IMAGE_REPORT_TEXT
@@ -281,4 +283,8 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
 
     )
 
-
+def get_redlock_factory(config: Config) -> RedLockFactory:
+    return RedLockFactory(
+        connection_details=[
+            {'host': config.redis_host, 'port': config.redis_port, 'password': config.redis_password, 'db': 1}
+        ])
