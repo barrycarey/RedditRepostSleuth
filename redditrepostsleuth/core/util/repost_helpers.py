@@ -13,7 +13,6 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
-from redditrepostsleuth.core.model.repostwrapper import RepostWrapper
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.link_search_results import LinkSearchResults
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
@@ -81,14 +80,6 @@ def get_link_reposts(
             search_results.total_searched = uow.posts.count_by_type('link')
 
     return search_results
-
-
-def check_link_repost_by_post_id(post_id: str, uowm: UnitOfWorkManager) -> RepostWrapper:
-    with uowm.start() as uow:
-        post = uow.posts.get_by_post_id(post_id)
-        if post is None:
-            return
-    return get_link_reposts(post, uowm)
 
 
 def filter_search_results(
