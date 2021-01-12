@@ -20,7 +20,7 @@ class SearchResults:
         self.checked_url = checked_url
         self.total_searched: int = 0
         self.matches: List[SearchMatch] = []
-        self.search_times: SearchTimes = search_times
+        self.search_times: SearchTimes = search_times or SearchTimes()
 
     @property
     def report_data(self) -> Optional[Text]:

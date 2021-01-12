@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
-from redditrepostsleuth.core.model.commands.repost_image_cmd import RepostImageCmd
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 

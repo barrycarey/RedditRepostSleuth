@@ -15,4 +15,4 @@ class LinkSearchResults(SearchResults):
             search_times: LinkSearchTimes = None
     ):
         super().__init__(checked_url, search_settings, checked_post=checked_post)
-        self.search_times = search_times
+        self.search_times = search_times or LinkSearchTimes()
