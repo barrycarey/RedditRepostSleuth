@@ -14,7 +14,7 @@ class ImageSearchResults(SearchResults):
     def __init__(self, checked_url: Text, search_settings: ImageSearchSettings, checked_post: Post = None,
                  search_times: ImageSearchTimes = None):
         super().__init__(checked_url, search_settings, checked_post)
-        self.search_times = search_times
+        self.search_times = search_times or ImageSearchTimes()
         self.search_settings = search_settings
         self.checked_url = checked_url
         self.checked_post = checked_post
