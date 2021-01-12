@@ -27,7 +27,7 @@ from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
-from redditrepostsleuth.core.util.repost_helpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
@@ -276,7 +276,7 @@ class SummonsHandler:
 
     def process_link_repost_request(self, summons: Summons, post: Post):
         response = SummonsResponse(summons=summons)
-        search_results = check_link_repost(post, self.uowm, get_total=True)
+        search_results = get_link_reposts(post, self.uowm, get_total=True)
         msg_values = build_msg_values_from_search(search_results, self.uowm)
 
         if not search_results.matches:

@@ -23,7 +23,7 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     save_link_repost, get_image_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.repost_helpers import check_link_repost
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -268,7 +268,7 @@ class SubMonitor:
             log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
 
     def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub):
-        return check_link_repost(
+        return get_link_reposts(
             post,
             self.uowm,
             target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,

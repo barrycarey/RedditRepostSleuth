@@ -13,7 +13,7 @@ from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url, \
-    build_image_report_link
+    build_image_report_link, get_default_link_search_settings
 
 
 class TestHelpers(TestCase):
@@ -118,24 +118,59 @@ class TestHelpers(TestCase):
 
     def test_get_default_image_search_settings(self):
         config = Config(
-            target_image_match=55,
-            target_image_meme_match=22,
-            summons_meme_filter=True,
-            summons_same_sub=True,
-            summons_max_age=77,
-            default_annoy_distance=.177
+            default_image_target_match=55,
+            default_image_target_meme_match=99,
+            default_image_target_title_match=99,
+            default_image_dead_matches_filter=True,
+            default_image_removed_match_filter=True,
+            default_image_only_older_matches=True,
+            default_image_same_author_filter=True,
+            default_image_crosspost_filter=True,
+            default_image_meme_filter=True,
+            default_image_same_sub_filter=True,
+            default_image_max_days_old_filter=180,
+            default_image_target_annoy_distance=.177,
+            default_image_max_matches=250
+
         )
         r = get_default_image_search_settings(config)
         self.assertEqual(55, r.target_match_percent)
-        self.assertEqual(22, r.target_meme_match_percent)
-        self.assertTrue(r.meme_filter)
-        self.assertIsNone(r.target_title_match)
-        self.assertEqual(250, r.max_matches)
-        self.assertTrue(r.same_sub)
-        self.assertEqual(77, r.max_days_old)
+        self.assertEqual(99, r.target_meme_match_percent)
+        self.assertEqual(99, r.target_title_match)
+        self.assertTrue(r.filter_dead_matches)
+        self.assertTrue(r.filter_removed_matches)
+        self.assertTrue(r.only_older_matches)
         self.assertTrue(r.filter_same_author)
         self.assertTrue(r.filter_crossposts)
+        self.assertTrue(r.meme_filter)
+        self.assertTrue(r.same_sub)
+        self.assertEqual(180, r.max_days_old)
         self.assertEqual(.177, r.target_annoy_distance)
+        self.assertEqual(250, r.max_matches)
+
+    def test_get_default_link_search_settings(self):
+        config = Config(
+            default_link_target_title_match=99,
+            default_link_dead_matches_filter=True,
+            default_link_removed_match_filter=True,
+            default_link_only_older_matches=True,
+            default_link_same_author_filter=True,
+            default_link_crosspost_filter=True,
+            default_link_same_sub_filter=True,
+            default_link_max_days_old_filter=180,
+
+        )
+        r = get_default_link_search_settings(config)
+        self.assertEqual(99, r.target_title_match)
+        self.assertTrue(r.filter_dead_matches)
+        self.assertTrue(r.filter_removed_matches)
+        self.assertTrue(r.only_older_matches)
+        self.assertTrue(r.filter_same_author)
+        self.assertTrue(r.filter_crossposts)
+        self.assertTrue(r.same_sub)
+        self.assertEqual(180, r.max_days_old)
+        self.assertEqual(75, r.max_matches)
+
 
     def test_build_site_search_url_no_search_settings(self):
         self.assertIsNone(build_site_search_url('123', None))

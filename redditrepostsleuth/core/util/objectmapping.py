@@ -1,13 +1,10 @@
+from datetime import datetime
 from typing import Dict
 
 from praw.models import Submission
-from datetime import datetime
-
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.db.databasemodels import Post, RedditImagePost, RedditImagePostCurrent
-from redditrepostsleuth.core.model.repostmatch import RepostMatch
-from redditrepostsleuth.core.model.search.link_post_search_match import LinkPostSearchMatch
 from redditrepostsleuth.core.util.helpers import get_post_type_pushshift
 
 
@@ -67,13 +64,6 @@ def pushshift_to_post(submission: Dict, source: str = 'pushshift') -> Post:
 
     return post
 
-
-def post_to_link_post_search_match(post: Post, orig_id: int) -> RepostMatch:
-    match = LinkPostSearchMatch(post, post.id)
-    match.post = post
-    match.match_id = post.id
-    match.original_id = orig_id
-    return match
 
 def post_to_image_post(post: Post) -> RedditImagePost:
     return RedditImagePost(
