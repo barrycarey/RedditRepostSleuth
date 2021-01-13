@@ -25,6 +25,7 @@ DEFAULT_CONFIG_VALUES = {
               "check_link_posts": True,
               "target_image_match": 92,
               "target_image_meme_match": 97,
-              "only_comment_on_repost": True,
-              "report_reposts": False
+              "report_reposts": False,
+              "comment_on_repost": True,
+              "comment_on_oc": False
 }

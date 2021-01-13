@@ -133,14 +133,15 @@ class SubMonitor:
             log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
-        if not search_results.matches and monitored_sub.only_comment_on_repost:
+        if not search_results.matches and monitored_sub.comment_on_oc:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
             return
 
         try:
-            comment = self._leave_comment(search_results, monitored_sub)
+            if monitored_sub.comment_on_repost:
+                comment = self._leave_comment(search_results, monitored_sub)
         except APIException as e:
             error_type = None
             if hasattr(e, 'error_type'):
