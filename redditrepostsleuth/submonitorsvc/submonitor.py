@@ -133,7 +133,7 @@ class SubMonitor:
             log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
-        if not search_results.matches and monitored_sub.comment_on_oc:
+        if not search_results.matches and not monitored_sub.comment_on_oc:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
@@ -333,7 +333,7 @@ class SubMonitor:
         """
         if monitored_sub.remove_repost:
             if not monitored_sub.removal_reason:
-                log.error('Sub %s does not have a removal reason set.  Cannot remove')
+                log.error('Sub %s does not have a removal reason set.  Cannot remove', monitored_sub.name)
                 return
             try:
                 removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)

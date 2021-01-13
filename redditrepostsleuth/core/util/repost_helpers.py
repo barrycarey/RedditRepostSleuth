@@ -66,7 +66,7 @@ def get_link_reposts(
         get_total: bool = False,
         ) -> LinkSearchResults:
 
-    url_hash = md5(post.url.encode('utf-8'))
+    url_hash = md5(url.encode('utf-8'))
     url_hash = url_hash.hexdigest()
     with uowm.start() as uow:
         search_results = LinkSearchResults(url, search_settings, checked_post=post, search_times=LinkSearchTimes())

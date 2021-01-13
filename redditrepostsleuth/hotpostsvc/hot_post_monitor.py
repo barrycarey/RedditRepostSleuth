@@ -108,6 +108,7 @@ class TopPostMonitor:
                 post.url,
                 self.uowm,
                 get_default_link_search_settings(self.config),
+                post=post,
                 get_total=True
             )
             return filter_search_results(
