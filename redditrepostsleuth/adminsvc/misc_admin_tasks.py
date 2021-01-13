@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from typing import NoReturn, List
 
 import requests
@@ -61,6 +62,10 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
     with uowm.start() as uow:
         bans = uow.banned_subreddit.get_all()
         for ban in bans:
+            last_checked_delta = (datetime.utcnow() - ban.last_checked).days
+            if last_checked_delta < 1:
+                log.debug('Banned sub %s last checked %s days ago.  Skipping', ban.subreddit, last_checked_delta)
+                continue
             if is_bot_banned(ban.subreddit, reddit):
                 log.info('[Subreddit Ban Check] Still banned on %s', ban.subreddit)
                 ban.last_checked = func.utc_timestamp()
@@ -69,7 +74,8 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
                 uow.banned_subreddit.remove(ban)
                 if notification_svc:
                     notification_svc.send_notification(
-                        f'Removed {ban.name} from ban list'
+                        f'Removed {ban.subreddit} from ban list',
+                        subject='**Subreddit Removed From Ban List!**'
                     )
             uow.commit()
 
