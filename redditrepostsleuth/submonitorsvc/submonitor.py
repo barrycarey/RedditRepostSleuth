@@ -292,7 +292,7 @@ class SubMonitor:
             post=post,
             source='sub_monitor',
             search_settings=get_image_search_settings_for_monitored_sub(monitored_sub,
-                                                                        target_annoy_distance=self.config.default_annoy_distance)
+                                                                        target_annoy_distance=self.config.default_image_target_annoy_distance)
         )
         if search_results.matches:
             save_image_repost_result(search_results ,self.uowm, source='sub_monitor')

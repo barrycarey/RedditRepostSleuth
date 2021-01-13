@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [bugfix] - When watch detection is triggered it failed to link to the offending post
 * [feature] - Add {post_author} message slug to response and report templates
 * [feature] - Bot now sends PM to all front page posts giving author the option to enable a watch
+* [improvement] - Bot comments now include the settings used to execute the search
 
 
 ## [0.1.7] - 5/17/2020

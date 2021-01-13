@@ -291,9 +291,9 @@ class SummonsHandler:
         )
 
         if not monitored_sub:
-            response.message = self.response_builder.build_default_comment(search_results)
+            response.message = self.response_builder.build_default_comment(search_results, signature=False)
         else:
-            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results)
+            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
 
         if search_results.matches:
             save_link_repost(post, search_results.matches[0].post, self.uowm, 'summons')
@@ -323,9 +323,9 @@ class SummonsHandler:
             return
 
         if monitored_sub:
-            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results)
+            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
         else:
-            response.message = self.response_builder.build_default_comment(search_results)
+            response.message = self.response_builder.build_default_comment(search_results, signature=False)
 
         if search_results.matches:
             save_image_repost_result(search_results, self.uowm, source='summons')
