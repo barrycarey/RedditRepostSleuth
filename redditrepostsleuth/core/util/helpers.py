@@ -4,6 +4,7 @@ import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
 from redlock import RedLockFactory
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
@@ -231,6 +232,8 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
         uow.link_repost.add(new_repost)
         try:
             uow.commit()
+        except IntegrityError:
+            log.error('Failed to save link repost, it already exists')
         except Exception as e:
             log.exception('Failed to save link repost', exc_info=True)
 

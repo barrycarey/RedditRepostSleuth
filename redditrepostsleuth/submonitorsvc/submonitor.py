@@ -310,15 +310,22 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
 
-    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission):
+    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission) -> NoReturn:
         """
         Check if given sub wants posts removed.  Remove is enabled
         @param monitored_sub: Monitored sub
         @param submission: Submission to remove
         """
         if monitored_sub.remove_repost:
+            if not monitored_sub.removal_reason:
+                log.error('Sub %s does not have a removal reason set.  Cannot remove')
+                return
             try:
-                submission.mod.remove(reason_id=self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit))
+                removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
+                if not removal_reason_id:
+                    log.error('Failed to get Removal Reason ID from reason %s', monitored_sub.removal_reason)
+                    return
+                submission.mod.remove(reason_id=removal_reason_id)
                 log.error('[%s][%s] - Failed to remove post using reason ID %s.  Likely a bad reasons ID', monitored_sub.name, submission.id, monitored_sub.removal_reason_id)
                 submission.mod.remove()
             except Forbidden:
@@ -364,7 +371,7 @@ class SubMonitor:
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
 
-        message = self.response_builder.build_sub_comment(monitored_sub, search_results, )
+        message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
         return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message)
 
     def save_unknown_post(self, post_id: str) -> Post:

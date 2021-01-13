@@ -1,15 +1,12 @@
 import sys
-import threading
 import time
 
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_SCHEDULER_STARTED, EVENT_JOB_SUBMITTED
+from apscheduler.events import EVENT_JOB_ERROR
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from redditrepostsleuth.core.notification.notification_service import NotificationService
-
 sys.path.append('./')
-from redditrepostsleuth.adminsvc.misc_admin_tasks import update_mod_status, update_monitored_sub_subscribers, \
-    remove_expired_bans, update_banned_sub_wiki, send_reports_to_meme_voting, update_top_image_reposts, \
+from redditrepostsleuth.core.notification.notification_service import NotificationService
+from redditrepostsleuth.adminsvc.misc_admin_tasks import remove_expired_bans, update_banned_sub_wiki, send_reports_to_meme_voting, update_top_image_reposts, \
     update_monitored_sub_data, check_meme_template_potential_votes, update_ban_list
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater

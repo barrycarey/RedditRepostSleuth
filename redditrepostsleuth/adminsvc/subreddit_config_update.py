@@ -37,7 +37,7 @@ class SubredditConfigUpdater:
         self.response_handler = response_handler
         self.config = config
 
-    def update_configs(self):
+    def update_configs(self, notify_missing_keys: bool = True):
         print('[Scheduled Job] Config Updates Start')
         try:
             with self.uowm.start() as uow:
@@ -46,7 +46,7 @@ class SubredditConfigUpdater:
                     if not sub.active:
                         continue
                     try:
-                        self.check_for_config_update(sub)
+                        self.check_for_config_update(sub, notify_missing_keys=notify_missing_keys)
                     except Exception as e:
                         log.exception('Config failure ')
                 time.sleep(180)
@@ -422,6 +422,4 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config, notification_svc=notification_svc)
-    with uowm.start() as uow:
-        sub = uow.monitored_sub.get_by_sub('RepostSleuthBot')
-    updater.check_for_config_update(sub)
+    updater.update_configs(notify_missing_keys=False)
