@@ -27,5 +27,6 @@ DEFAULT_CONFIG_VALUES = {
               "target_image_meme_match": 97,
               "report_reposts": False,
               "comment_on_repost": True,
-              "comment_on_oc": False
+              "comment_on_oc": False,
+              "lock_response_comment": False
 }

@@ -139,9 +139,10 @@ class SubMonitor:
             self._create_checked_post(post)
             return
 
+        reply_comment = None
         try:
             if monitored_sub.comment_on_repost:
-                comment = self._leave_comment(search_results, monitored_sub)
+                reply_comment = self._leave_comment(search_results, monitored_sub)
         except APIException as e:
             error_type = None
             if hasattr(e, 'error_type'):
@@ -173,7 +174,9 @@ class SubMonitor:
         else:
             self._mark_post_as_oc(monitored_sub, submission)
 
-        self._sticky_reply(monitored_sub, comment)
+        if reply_comment:
+            self._sticky_reply(monitored_sub, reply_comment)
+            self._lock_comment(monitored_sub, reply_comment)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
 
@@ -301,7 +304,7 @@ class SubMonitor:
         log.debug(search_results)
         return search_results
 
-    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment):
+    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
         if monitored_sub.sticky_comment:
             try:
                 comment.mod.distinguish(sticky=True)
@@ -310,6 +313,17 @@ class SubMonitor:
                 log.error('Failed to sticky comment, no permissions')
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
+
+    def _lock_comment(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
+        if monitored_sub.lock_response_comment:
+            log.info('Attempting to lock comment %s on subreddit %s', comment.id, monitored_sub.name)
+            try:
+                comment.mod.lock()
+                log.info('Locked comment')
+            except Forbidden:
+                log.error('Failed to lock comment, no permission')
+            except Exception as e:
+                log.exception('Failed to lock comment', exc_info=True)
 
     def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission) -> NoReturn:
         """
