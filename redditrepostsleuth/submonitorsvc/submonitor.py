@@ -133,14 +133,16 @@ class SubMonitor:
             log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
-        if not search_results.matches and monitored_sub.only_comment_on_repost:
+        if not search_results.matches and not monitored_sub.comment_on_oc:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
             return
 
+        reply_comment = None
         try:
-            comment = self._leave_comment(search_results, monitored_sub)
+            if monitored_sub.comment_on_repost:
+                reply_comment = self._leave_comment(search_results, monitored_sub)
         except APIException as e:
             error_type = None
             if hasattr(e, 'error_type'):
@@ -172,7 +174,9 @@ class SubMonitor:
         else:
             self._mark_post_as_oc(monitored_sub, submission)
 
-        self._sticky_reply(monitored_sub, comment)
+        if reply_comment:
+            self._sticky_reply(monitored_sub, reply_comment)
+            self._lock_comment(monitored_sub, reply_comment)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
 
@@ -300,7 +304,7 @@ class SubMonitor:
         log.debug(search_results)
         return search_results
 
-    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment):
+    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
         if monitored_sub.sticky_comment:
             try:
                 comment.mod.distinguish(sticky=True)
@@ -310,6 +314,17 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
 
+    def _lock_comment(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
+        if monitored_sub.lock_response_comment:
+            log.info('Attempting to lock comment %s on subreddit %s', comment.id, monitored_sub.name)
+            try:
+                comment.mod.lock()
+                log.info('Locked comment')
+            except Forbidden:
+                log.error('Failed to lock comment, no permission')
+            except Exception as e:
+                log.exception('Failed to lock comment', exc_info=True)
+
     def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission) -> NoReturn:
         """
         Check if given sub wants posts removed.  Remove is enabled
@@ -318,7 +333,7 @@ class SubMonitor:
         """
         if monitored_sub.remove_repost:
             if not monitored_sub.removal_reason:
-                log.error('Sub %s does not have a removal reason set.  Cannot remove')
+                log.error('Sub %s does not have a removal reason set.  Cannot remove', monitored_sub.name)
                 return
             try:
                 removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
