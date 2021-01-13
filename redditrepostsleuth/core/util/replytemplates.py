@@ -10,7 +10,7 @@ REPOST_MESSAGE_TEMPLATE = 'Looks like a repost. I\'ve seen this {post_type} {cou
 
 
 COMMENT_STATS = '{stats_searched_post_str} | **Search Time:** {search_time}s'
-COMMENT_SIGNATURE = '*Feedback? Hate? Visit r/repostsleuthbot'
+COMMENT_SIGNATURE = 'Feedback? Hate? Visit r/repostsleuthbot'
 SEARCH_URL = '[View Search On repostsleuth.com]({search_url})'
 IMAGE_REPORT_TEXT = '*I\'m not perfect, but you can help. Report [ [False {pos_neg_text}](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20{pos_neg_text}&message={report_data}) ]*'
 

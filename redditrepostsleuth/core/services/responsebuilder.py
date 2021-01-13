@@ -164,7 +164,7 @@ class ResponseBuilder:
                 message += f'\n\n{closest_template}'
 
         if signature:
-            message += f'\n\n{self._get_signature(search_results)}{REPORT_POST_LINK}'
+            message += f'\n\n{self._get_signature(search_results)} - {REPORT_POST_LINK}'
         else:
             message += f'\n\n{REPORT_POST_LINK}'
 
@@ -176,7 +176,7 @@ class ResponseBuilder:
             message += '\n\n---'
 
         if search_settings:
-            message += f'\n\n{self._get_search_settings_template(search_results)}\n'
+            message += f'\n\n{self._get_search_settings_template(search_results)}'
 
         if stats:
             if not search_settings:

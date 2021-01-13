@@ -152,12 +152,10 @@ class DuplicateImageService:
             search_results.matches = set_all_title_similarity(search_results.checked_post.title, search_results.matches)
         search_results.search_times.stop_timer('remove_duplicate_time')
 
-        search_results.search_times.start_timer('total_filter_time')
         search_results = self._filter_results_for_reposts(
             search_results,
             sort_by=sort_by
         )
-        search_results.search_times.stop_timer('total_filter_time')
         search_results.search_times.stop_timer('total_search_time')
         self._log_search_time(search_results, source)
 

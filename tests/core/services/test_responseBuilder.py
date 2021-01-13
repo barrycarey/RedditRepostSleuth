@@ -67,7 +67,7 @@ class TestResponseBuilder(TestCase):
                                                         search_settings=False)
         self.assertEqual(IMAGE_OC_LINK_ONLY, result)
 
-    def test_build_default_comment__image_oc_only_search_settingsk(self):
+    def test_build_default_comment__image_oc_only_search_settings(self):
         response_builder = ResponseBuilder(MagicMock())
         search_results = self._get_image_search_results_no_match()
         result = response_builder.build_default_comment(search_results, signature=False, stats=False, search_link=False,
