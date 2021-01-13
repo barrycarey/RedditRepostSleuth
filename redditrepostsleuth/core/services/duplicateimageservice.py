@@ -158,14 +158,13 @@ class DuplicateImageService:
         search_results.search_times.stop_timer('total_search_time')
         self._log_search_time(search_results, source)
 
-        search_results.logged_search = self._log_search(
+        search_results = self._log_search(
             search_results,
             source,
             api_search_results.used_current_index,
             api_search_results.used_historical_index,
         )
-        if search_results.logged_search:
-            search_results.search_id = search_results.logged_search.id
+
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
@@ -304,7 +303,7 @@ class DuplicateImageService:
             source: str,
             used_current_index: bool,
             used_historical_index: bool,
-    ) -> Optional[ImageSearchResults]:
+    ) -> ImageSearchResults:
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id if search_results.checked_post else 'url',
             used_historical_index=used_historical_index,
@@ -333,9 +332,11 @@ class DuplicateImageService:
             uow.image_search.add(image_search)
             try:
                 uow.commit()
-                return image_search
+                search_results.logged_search = image_search
             except Exception as e:
                 log.exception('Failed to save image search', exc_info=False)
+
+        return search_results
 
     def _remove_duplicates(self, matches: List[ImageSearchMatch]) -> List[ImageSearchMatch]:
         log.debug('Remove duplicates from %s matches', len(matches))

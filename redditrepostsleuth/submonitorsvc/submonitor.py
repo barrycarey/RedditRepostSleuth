@@ -1,21 +1,21 @@
 import time
+from time import perf_counter
 from typing import List, Text, NoReturn, Optional
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 from redlock import RedLockError
-from time import perf_counter
 
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -178,7 +178,7 @@ class SubMonitor:
 
 
 
-
+    # TODO - 1/12/2021 - This should be deleted. Checking is now done via celery.  This method is no longer used.
     def _check_sub(self, monitored_sub: MonitoredSub):
         log.info('Checking sub %s', monitored_sub.name)
         start_time = perf_counter()
@@ -295,7 +295,7 @@ class SubMonitor:
                                                                         target_annoy_distance=self.config.default_annoy_distance)
         )
         if search_results.matches:
-            save_image_repost_general(search_results ,self.uowm, 'sub_monitor')
+            save_image_repost_result(search_results ,self.uowm, source='sub_monitor')
 
         log.debug(search_results)
         return search_results

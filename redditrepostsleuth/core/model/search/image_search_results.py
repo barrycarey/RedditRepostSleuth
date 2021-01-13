@@ -22,7 +22,6 @@ class ImageSearchResults(SearchResults):
         self.meme_template: Optional[MemeTemplate] = None
         self.closest_match: Optional[ImageSearchMatch] = None
         self.matches: List[ImageSearchMatch] = []
-        self.search_id: Optional[int]
         self.logged_search: Optional[ImageSearch] = None
         self.meme_hash: Text = None
 
