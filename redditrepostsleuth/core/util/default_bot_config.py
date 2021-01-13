@@ -3,7 +3,7 @@ DEFAULT_CONFIG_VALUES = {
               "report_msg": "RepostSleuthBot-Repost",
               "same_sub_only": False,
               "sticky_comment": False,
-              "target_days_old": 0,
+              "target_days_old": None,
               "meme_filter": False,
               "oc_response_template": None,
               "repost_response_template": None,

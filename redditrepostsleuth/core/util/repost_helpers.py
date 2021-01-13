@@ -71,6 +71,7 @@ def get_link_reposts(
     with uowm.start() as uow:
         search_results = LinkSearchResults(url, search_settings, checked_post=post, search_times=LinkSearchTimes())
         search_results.search_times.start_timer('query_time')
+        search_results.search_times.start_timer('total_search_time')
         raw_results = uow.posts.find_all_by_url_hash(url_hash)
         search_results.search_times.stop_timer('query_time')
         log.debug('Query time: %s', search_results.search_times.query_time)
@@ -95,6 +96,7 @@ def filter_search_results(
     :param search_results: SearchResults obj
     """
     log.debug('%s results pre-filter', len(search_results.matches))
+    search_results.search_times.start_timer('total_filter_time')
     # Only run these if we are search for an existing post
     if search_results.checked_post:
         search_results.matches = list(filter(filter_same_post(search_results.checked_post.post_id), search_results.matches))
@@ -127,6 +129,7 @@ def filter_search_results(
     if search_results.search_settings.filter_removed_matches and reddit:
         search_results.matches = filter_removed_posts(reddit, search_results.matches)
 
+    search_results.search_times.stop_timer('total_filter_time')
     log.debug('%s results post-filter', len(search_results.matches))
     return search_results
 
