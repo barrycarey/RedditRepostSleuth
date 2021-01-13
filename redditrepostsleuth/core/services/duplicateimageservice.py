@@ -66,11 +66,14 @@ class DuplicateImageService:
         closest_match = get_closest_image_match(search_results.matches, check_url=True)
         if closest_match and closest_match.hamming_match_percent > 40: # TODO - Move to config
             search_results.closest_match = closest_match
+            if search_results.closest_match and search_results.meme_template:
+                match_hash = self._get_meme_hash(search_results.closest_match.post.url)
+                search_results.closest_match.hamming_distance = hamming(search_results.meme_hash, match_hash)
+                search_results.closest_match.hash_size = len(match_hash)
 
         # Has to be after closest match so we don't drop closest
         search_results.matches = list(filter(annoy_distance_filter(search_results.search_settings.target_annoy_distance), search_results.matches))
         search_results.matches = list(filter(hamming_distance_filter(search_results.target_hamming_distance), search_results.matches))
-
 
         if search_results.meme_template:
             search_results.search_times.start_timer('meme_filter_time')
@@ -106,7 +109,7 @@ class DuplicateImageService:
             checked_post=post,
             search_settings=search_settings
         )
-        search_results.search_times = ImageSearchTimes()
+
         search_results.search_times.start_timer('total_search_time')
 
         if search_settings.meme_filter:
@@ -424,12 +427,12 @@ class DuplicateImageService:
 
         for match in matches:
             try:
-                match_hashes = get_image_hashes(match.post.url, hash_size=self.config.default_meme_filter_hash_size)
+                match_hash = self._get_meme_hash(match.post.url)
             except Exception as e:
                 log.error('Failed to get meme hash for %s', match.post.id)
                 continue
 
-            h_distance = hamming(searched_hash, match_hashes['dhash_h'])
+            h_distance = hamming(searched_hash, match_hash)
 
             if h_distance > target_hamming:
                 log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,

@@ -19,6 +19,8 @@ class ImageSearchResults(SearchResults):
         self.checked_url = checked_url
         self.checked_post = checked_post
         self._target_hash = None
+        if self.checked_post:
+            self._target_hash = self.checked_post.dhash_h
         self.meme_template: Optional[MemeTemplate] = None
         self.closest_match: Optional[ImageSearchMatch] = None
         self.matches: List[ImageSearchMatch] = []

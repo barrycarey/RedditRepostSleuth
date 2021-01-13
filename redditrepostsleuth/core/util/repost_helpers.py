@@ -82,6 +82,7 @@ def get_link_reposts(
     return search_results
 
 
+# TODO - 1/12/2021 - Possibly make the generic. It's messing with auto complete when used for image searches
 def filter_search_results(
         search_results: SearchResults,
         reddit: Reddit = None,
@@ -130,7 +131,7 @@ def filter_search_results(
     return search_results
 
 
-def get_first_active_match(matches: List[SearchMatch]) -> SearchMatch:
+def get_first_active_match(matches: List[ImageSearchMatch]) -> ImageSearchMatch:
     for match in matches:
         try:
             headers = {'User-Agent': random.choice(USER_AGENTS)}

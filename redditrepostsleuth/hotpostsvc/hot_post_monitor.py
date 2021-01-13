@@ -5,25 +5,23 @@ from praw.exceptions import APIException
 from praw.models import Comment, Submission
 
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import Post, BotComment
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.model.search.search_results import SearchResults
-from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.services.reddit_manager import RedditManager
-from redditrepostsleuth.core.services.response_handler import ResponseHandler
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_BODY, \
-    TOP_POST_WATCH_SUBJECT, TOP_POST_REPORT_MSG
-
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.db.databasemodels import Post, BotComment
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    get_default_link_search_settings
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
+from redditrepostsleuth.core.services.eventlogging import EventLogging
+from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
+from redditrepostsleuth.core.util.helpers import get_default_link_search_settings
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_BODY, \
+    TOP_POST_WATCH_SUBJECT
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 
 
 class TopPostMonitor:
@@ -197,34 +195,6 @@ class TopPostMonitor:
                 log.error('Not whitelisted API error')
             else:
                 log.exception('Unknown error sending PM to %s', submission.author.name, exc_info=True)
-
-    def _report_post(self, search_results: SearchResults) -> NoReturn:
-        """
-        Report a given post
-        :rtype: NoReturn
-        :param post: Post to report
-        """
-        if search_results.checked_post.post_type != 'image':
-            log.info('Post %s is not an image, skipping report', search_results.checked_post.post_id)
-            return
-
-        submission = self.reddit.submission(search_results.checked_post.post_id)
-        msg_values = build_msg_values_from_search(search_results, self.uowm)
-        msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
-        report_msg = self.response_builder.build_provided_comment_template(
-            msg_values,
-            TOP_POST_REPORT_MSG,
-            post_type='image',
-            signature=False,
-            stats=False
-        )
-
-        try:
-            submission.report(report_msg)
-        except Exception as e:
-            # TODO - Specific exception
-            log.exception('Failed to report submission', exc_info=True)
-
 
     def _left_comment(self, post_id: Text) -> bool:
         """

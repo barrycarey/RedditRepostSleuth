@@ -7,14 +7,13 @@ from redlock import RedLockFactory
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
-from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE, IMAGE_REPORT_TEXT
+from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
     from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
@@ -166,12 +165,12 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
     }
 
     if search_results.meme_template:
-        base_values['target_match_percent'] = search_results.search_settings.target_meme_match_percent
+        base_values['effective_target_match_percent'] = search_results.search_settings.target_meme_match_percent
     else:
-        base_values['target_match_percent'] = search_results.search_settings.target_match_percent
+        base_values['effective_target_match_percent'] = search_results.search_settings.target_match_percent
 
     if search_results.search_settings.max_days_old == 99999:
-        base_values['max_age'] = None
+        base_values['max_age'] = 'Unlimited'
     else:
         base_values['max_age'] = search_results.search_settings.max_days_old
 
