@@ -304,6 +304,9 @@ class MonitoredSub(Base):
     report_reposts = Column(Boolean, default=False)
     failed_admin_check_count = Column(Integer, default=0)
     activation_notification_sent = Column(Boolean, default=False)
+    comment_on_repost = Column(Boolean, default=True)
+    comment_on_oc = Column(Boolean, default=False)
+    lock_response_comment = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -353,8 +356,11 @@ class MonitoredSub(Base):
             'post_permission': self.post_permission,
             'only_comment_on_repost': self.only_comment_on_repost,
             'report_reposts': self.report_reposts,
-            'failed_admin_check_count': self.failed_admin_check_count
-
+            'failed_admin_check_count': self.failed_admin_check_count,
+            'activation_notification_sent': self.activation_notification_sent,
+            'comment_on_repost': self.comment_on_repost,
+            'comment_on_oc': self.comment_on_oc,
+            'lock_response_comment': self.lock_response_comment
         }
 
 
