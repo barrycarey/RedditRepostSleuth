@@ -10,7 +10,6 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
-from redditrepostsleuth.core.util.repost_filters import filter_dead_urls
 
 
 def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWorkManager) -> NoReturn:
@@ -19,6 +18,7 @@ def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWo
 
     with uowm.start() as uow:
         meme_template = None
+        # TODO - 1/12/2021 - Should probably remember the meme in subreddit check and generate more templates
         if len(search_results.matches) > 5 and 'meme' in search_results.checked_post.subreddit.lower():
             try:
                 meme_hashes = get_image_hashes(search_results.checked_post.url, hash_size=32)
@@ -45,110 +45,57 @@ def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWo
             raise IngestHighMatchMeme('Created meme template.  Post needs to be rechecked')
 
 
-def save_image_repost_result(search_results: ImageSearchResults, uowm: UnitOfWorkManager) -> None:
+def save_image_repost_result(
+        search_results: ImageSearchResults,
+        uowm: UnitOfWorkManager,
+        high_match_check: bool = False,
+        source: Text = 'unknown'
+) -> NoReturn:
     """
     Take a found repost and save to the database
-    :param search_results:
-    :param uowm:
-    :return:
+    :param source: What triggered this search
+    :rtype: NoReturn
+    :param high_match_check: Perform a high match meme check.
+    :param search_results: Set of search results
+    :param uowm: Unit of Work Manager
+    :return:None
     """
-    # TODO - This whole function needs to be broken up
-    with uowm.start() as uow:
 
+    with uowm.start() as uow:
         search_results.checked_post.checked_repost = True
+
         if not search_results.matches:
             log.debug('Post %s has no matches', search_results.checked_post.post_id)
             uow.posts.update(search_results.checked_post)
             uow.commit()
             return
 
-        if len(search_results.matches) > 0:
+        # This is used for ingest repost checking.  If a meme template gets created, it intentionally throws a
+        # IngestHighMatchMeme exception.  This will cause celery to retry the task so the newly created meme template
+        # gets used
+        if high_match_check:
             check_for_high_match_meme(search_results, uowm) # This intentionally throws if we create a meme template
-            final_matches = search_results.matches
-            log.debug('Checked Image (%s): %s', search_results.checked_post.created_at, search_results.checked_post.url)
-            for match in final_matches:
-                log.debug('Matching Image: %s (%s) (Hamming: %s - Annoy: %s): %s', match.post.post_id,
-                          match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
-            repost_of = get_oldest_active_match(search_results.matches)
-            if not repost_of:
-                log.info('No active matches, not saving report')
-                return
 
-            log.info('Creating repost. Post %s is a repost of %s', search_results.checked_post.url, repost_of.post.url)
+        log.info('Creating repost. Post %s is a repost of %s', search_results.checked_post.url,
+                 search_results.matches[0].post.url)
+        new_repost = ImageRepost(post_id=search_results.checked_post.post_id,
+                                 repost_of=search_results.matches[0].post.post_id,
+                                 hamming_distance=search_results.matches[0].hamming_distance,
+                                 annoy_distance=search_results.matches[0].annoy_distance,
+                                 author=search_results.checked_post.author,
+                                 search_id=search_results.logged_search.id if search_results.logged_search else None,
+                                 subreddit=search_results.checked_post.subreddit,
+                                 source=source
+                                 )
 
-            new_repost = ImageRepost(post_id=search_results.checked_post.post_id,
-                                     repost_of=repost_of.post.post_id,
-                                     hamming_distance=repost_of.hamming_distance,
-                                     annoy_distance=repost_of.annoy_distance,
-                                     author=search_results.checked_post.author,
-                                     search_id=search_results.search_id,
-                                     subreddit=search_results.checked_post.subreddit)
-            repost_of.post.repost_count += 1
-            uow.posts.update(repost_of.post)
-            uow.image_repost.add(new_repost)
-            search_results.matches = final_matches
+        uow.image_repost.add(new_repost)
+    uow.posts.update(search_results.checked_post)
 
-        uow.posts.update(search_results.checked_post)
+    try:
         uow.commit()
+    except Exception as e:
+        log.exception('Failed to save image repost', exc_info=True)
 
-def save_image_repost_general(search_results: ImageSearchResults, uowm: UnitOfWorkManager, source: Text) -> None:
-    """
-    Take a found repost and save to the database
-    :param search_results:
-    :param uowm:
-    :return:
-    """
-    # TODO - This whole function needs to be broken up
-    # TODO - 1/6/2021 - What the fuck is this?
-    with uowm.start() as uow:
-
-        search_results.checked_post.checked_repost = True
-        if not search_results.matches:
-            log.debug('Post %s has no matches', search_results.checked_post.post_id)
-            uow.posts.update(search_results.checked_post)
-            uow.commit()
-            return
-
-        if len(search_results.matches) > 0:
-            final_matches = search_results.matches
-            log.debug('Checked Image (%s): %s', search_results.checked_post.created_at, search_results.checked_post.url)
-            for match in final_matches:
-                log.debug('Matching Image: %s (%s) (Hamming: %s - Annoy: %s): %s', match.post.post_id,
-                          match.post.created_at, match.hamming_distance, match.annoy_distance, match.post.url)
-            repost_of = get_oldest_active_match(search_results.matches)
-            if not repost_of:
-                log.info('No active matches, not saving report')
-                return
-
-            log.info('Creating repost. Post %s is a repost of %s', search_results.checked_post.url, repost_of.post.url)
-
-            new_repost = ImageRepost(post_id=search_results.checked_post.post_id,
-                                     repost_of=repost_of.post.post_id,
-                                     hamming_distance=repost_of.hamming_distance,
-                                     annoy_distance=repost_of.annoy_distance,
-                                     author=search_results.checked_post.author,
-                                     search_id=search_results.search_id,
-                                     subreddit=search_results.checked_post.subreddit,
-                                     source=source
-                                     )
-
-            uow.image_repost.add(new_repost)
-            search_results.matches = final_matches
-
-        uow.posts.update(search_results.checked_post)
-        uow.commit()
-
-
-def get_oldest_active_match(matches: List[SearchMatch]) -> SearchMatch:
-    """
-    Take a list of ImageMatches and return the oldest match that is still alive
-    :rtype: SearchMatch
-    :param matches: List of matches
-    :return: ImageMatch
-    """
-    for match in matches:
-        if filter_dead_urls(match):
-            return match
 
 def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) -> List[Dict]:
     results = []
@@ -160,6 +107,7 @@ def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) ->
                 for watch in watches:
                     results.append({'match': match, 'watch': watch})
     return results
+
 
 def repost_watch_notify(watches: List[Dict[SearchMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
     for watch in watches:

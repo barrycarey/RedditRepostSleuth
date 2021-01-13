@@ -6,7 +6,7 @@ from praw.exceptions import APIException
 from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -21,8 +21,8 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost, get_default_image_search_settings, get_default_link_search_settings
+from redditrepostsleuth.core.util.helpers import save_link_repost, get_default_image_search_settings, \
+    get_default_link_search_settings
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
@@ -328,7 +328,7 @@ class SummonsHandler:
             response.message = self.response_builder.build_default_comment(search_results)
 
         if search_results.matches:
-            save_image_repost_general(search_results, self.uowm, 'summons')
+            save_image_repost_result(search_results, self.uowm, source='summons')
 
         self._send_response(response)
 

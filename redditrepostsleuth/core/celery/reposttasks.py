@@ -40,27 +40,27 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
-    result = self.dup_service.check_image(
+    search_results = self.dup_service.check_image(
         post.url,
         post=post,
         source='ingest_repost'
     )
 
-    save_image_repost_result(result, self.uowm)
-    if len(result.matches):
-        self.notification_svc.send_notification(result)
+    save_image_repost_result(search_results, self.uowm, source='ingest')
+    if len(search_results.matches):
+        self.notification_svc.send_notification(search_results)
     self.event_logger.save_event(RepostEvent(
-        event_type='repost_found' if result.matches else 'repost_check',
+        event_type='repost_found' if search_results.matches else 'repost_check',
         status='success',
         post_type='image',
-        repost_of=result.matches[0].post.post_id if result.matches else None,
+        repost_of=search_results.matches[0].post.post_id if search_results.matches else None,
 
     ))
-    watches = check_for_post_watch(result.matches, self.uowm)
+    watches = check_for_post_watch(search_results.matches, self.uowm)
     if watches and self.config.enable_repost_watch:
         notify_watch.apply_async((watches, post), queue='watch_notify')
 
-    return result
+    return search_results
 
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
