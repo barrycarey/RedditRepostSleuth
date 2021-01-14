@@ -4,9 +4,12 @@ from falcon_cors import CORS
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
+from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.general_admin import GeneralAdmin
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.message_template import MessageTemplate
@@ -26,6 +29,17 @@ uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
 reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
 dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
+response_handler = ResponseHandler(reddit, uowm, event_logger, live_response=config.live_responses)
+notification_svc = NotificationService(config)
+config_updater = SubredditConfigUpdater(
+    uowm,
+    reddit,
+    response_handler,
+    config,
+    notification_svc=notification_svc
+)
+
+
 
 cors = CORS(allow_origins_list=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
 
@@ -43,11 +57,11 @@ api.add_route('/history/search', ImageSearchHistory(uowm), suffix='search_histor
 api.add_route('/history/monitored', ImageSearchHistory(uowm), suffix='monitored_sub_with_history', )
 api.add_route('/history/reposts', RepostHistoryEndpoint(uowm), suffix='image_with_search')
 api.add_route('/history/reposts/all', RepostHistoryEndpoint(uowm), suffix='repost_image_feed')
-api.add_route('/monitored-sub/default-config', MonitoredSub(uowm, config, reddit), suffix='default_config')
-api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit))
-api.add_route('/monitored-sub/{subreddit}/refresh', MonitoredSub(uowm, config, reddit), suffix='refresh')
-api.add_route('/monitored-sub/popular', MonitoredSub(uowm, config, reddit), suffix='popular')
-api.add_route('/monitored-sub/all', MonitoredSub(uowm, config, reddit), suffix='all')
+api.add_route('/monitored-sub/default-config', MonitoredSub(uowm, config, reddit, config_updater), suffix='default_config')
+api.add_route('/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddit, config_updater))
+api.add_route('/monitored-sub/{subreddit}/refresh', MonitoredSub(uowm, config, reddit, config_updater), suffix='refresh')
+api.add_route('/monitored-sub/popular', MonitoredSub(uowm, config, reddit, config_updater), suffix='popular')
+api.add_route('/monitored-sub/all', MonitoredSub(uowm, config, reddit, config_updater), suffix='all')
 api.add_route('/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
 api.add_route('/meme-template/', MemeTemplateEndpoint(uowm))
 api.add_route('/meme-template/potential', MemeTemplateEndpoint(uowm), suffix='potential')

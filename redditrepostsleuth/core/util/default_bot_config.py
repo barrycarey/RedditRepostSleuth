@@ -3,7 +3,7 @@ DEFAULT_CONFIG_VALUES = {
               "report_msg": "RepostSleuthBot-Repost",
               "same_sub_only": False,
               "sticky_comment": False,
-              "target_days_old": 0,
+              "target_days_old": None,
               "meme_filter": False,
               "oc_response_template": None,
               "repost_response_template": None,
@@ -25,6 +25,8 @@ DEFAULT_CONFIG_VALUES = {
               "check_link_posts": True,
               "target_image_match": 92,
               "target_image_meme_match": 97,
-              "only_comment_on_repost": True,
-              "report_reposts": False
+              "report_reposts": False,
+              "comment_on_repost": True,
+              "comment_on_oc": False,
+              "lock_response_comment": False
 }

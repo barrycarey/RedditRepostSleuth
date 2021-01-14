@@ -16,7 +16,7 @@ class SearchMatch:
 
     def to_dict(self):
         return {
-            'url': self.searched_url,
+            'searched_url': self.searched_url,
             'post': self.post.to_dict() if self.post else None,
             'title_similarity': self.title_similarity
         }

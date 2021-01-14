@@ -8,7 +8,9 @@ from redditrepostsleuth.core.model.search.image_search_results import ImageSearc
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.model.search.search_results import SearchResults
+from redditrepostsleuth.core.model.search_settings import SearchSettings
 
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
@@ -192,14 +194,14 @@ class TestHelpers(TestCase):
     def test_build_image_report_link_negative(self):
         search_results = ImageSearchResults('test.com', Mock(), checked_post=Post(post_id='abc123'))
         result = build_image_report_link(search_results)
-        expected = " - I'm not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]*"
+        expected = "*I'm not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]*"
         self.assertEqual(expected, result)
 
     def test_build_image_report_link_positive(self):
         search_results = ImageSearchResults('test.com', Mock(), checked_post=Post(post_id='abc123'))
         search_results.matches.append(ImageSearchMatch('test.com', 123, Mock(), 1, 1, 32))
         result = build_image_report_link(search_results)
-        expected = " - I'm not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]*"
+        expected = "*I'm not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]*"
         self.assertEqual(expected, result)
 
 

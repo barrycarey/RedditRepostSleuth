@@ -1,21 +1,21 @@
 import time
+from time import perf_counter
 from typing import List, Text, NoReturn, Optional
 
 from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 from redlock import RedLockError
-from time import perf_counter
 
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -133,14 +133,16 @@ class SubMonitor:
             log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
-        if not search_results.matches and monitored_sub.only_comment_on_repost:
+        if not search_results.matches and not monitored_sub.comment_on_oc:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
             return
 
+        reply_comment = None
         try:
-            comment = self._leave_comment(search_results, monitored_sub)
+            if monitored_sub.comment_on_repost:
+                reply_comment = self._leave_comment(search_results, monitored_sub)
         except APIException as e:
             error_type = None
             if hasattr(e, 'error_type'):
@@ -172,13 +174,15 @@ class SubMonitor:
         else:
             self._mark_post_as_oc(monitored_sub, submission)
 
-        self._sticky_reply(monitored_sub, comment)
+        if reply_comment:
+            self._sticky_reply(monitored_sub, reply_comment)
+            self._lock_comment(monitored_sub, reply_comment)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
 
 
 
-
+    # TODO - 1/12/2021 - This should be deleted. Checking is now done via celery.  This method is no longer used.
     def _check_sub(self, monitored_sub: MonitoredSub):
         log.info('Checking sub %s', monitored_sub.name)
         start_time = perf_counter()
@@ -292,15 +296,15 @@ class SubMonitor:
             post=post,
             source='sub_monitor',
             search_settings=get_image_search_settings_for_monitored_sub(monitored_sub,
-                                                                        target_annoy_distance=self.config.default_annoy_distance)
+                                                                        target_annoy_distance=self.config.default_image_target_annoy_distance)
         )
         if search_results.matches:
-            save_image_repost_general(search_results ,self.uowm, 'sub_monitor')
+            save_image_repost_result(search_results ,self.uowm, source='sub_monitor')
 
         log.debug(search_results)
         return search_results
 
-    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment):
+    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
         if monitored_sub.sticky_comment:
             try:
                 comment.mod.distinguish(sticky=True)
@@ -310,15 +314,33 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
 
-    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission):
+    def _lock_comment(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
+        if monitored_sub.lock_response_comment:
+            log.info('Attempting to lock comment %s on subreddit %s', comment.id, monitored_sub.name)
+            try:
+                comment.mod.lock()
+                log.info('Locked comment')
+            except Forbidden:
+                log.error('Failed to lock comment, no permission')
+            except Exception as e:
+                log.exception('Failed to lock comment', exc_info=True)
+
+    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission) -> NoReturn:
         """
         Check if given sub wants posts removed.  Remove is enabled
         @param monitored_sub: Monitored sub
         @param submission: Submission to remove
         """
         if monitored_sub.remove_repost:
+            if not monitored_sub.removal_reason:
+                log.error('Sub %s does not have a removal reason set.  Cannot remove', monitored_sub.name)
+                return
             try:
-                submission.mod.remove(reason_id=self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit))
+                removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
+                if not removal_reason_id:
+                    log.error('Failed to get Removal Reason ID from reason %s', monitored_sub.removal_reason)
+                    return
+                submission.mod.remove(reason_id=removal_reason_id)
                 log.error('[%s][%s] - Failed to remove post using reason ID %s.  Likely a bad reasons ID', monitored_sub.name, submission.id, monitored_sub.removal_reason_id)
                 submission.mod.remove()
             except Forbidden:
@@ -364,7 +386,7 @@ class SubMonitor:
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
 
-        message = self.response_builder.build_sub_comment(monitored_sub, search_results, )
+        message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
         return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message)
 
     def save_unknown_post(self, post_id: str) -> Post:

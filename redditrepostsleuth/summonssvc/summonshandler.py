@@ -6,7 +6,7 @@ from praw.exceptions import APIException
 from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_general
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -21,8 +21,8 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost, get_default_image_search_settings, get_default_link_search_settings
+from redditrepostsleuth.core.util.helpers import save_link_repost, get_default_image_search_settings, \
+    get_default_link_search_settings
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
@@ -291,9 +291,9 @@ class SummonsHandler:
         )
 
         if not monitored_sub:
-            response.message = self.response_builder.build_default_comment(search_results)
+            response.message = self.response_builder.build_default_comment(search_results, signature=False)
         else:
-            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results)
+            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
 
         if search_results.matches:
             save_link_repost(post, search_results.matches[0].post, self.uowm, 'summons')
@@ -323,12 +323,12 @@ class SummonsHandler:
             return
 
         if monitored_sub:
-            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results)
+            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
         else:
-            response.message = self.response_builder.build_default_comment(search_results)
+            response.message = self.response_builder.build_default_comment(search_results, signature=False)
 
         if search_results.matches:
-            save_image_repost_general(search_results, self.uowm, 'summons')
+            save_image_repost_result(search_results, self.uowm, source='summons')
 
         self._send_response(response)
 

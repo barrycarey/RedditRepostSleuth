@@ -9,7 +9,7 @@ from requests.exceptions import ConnectionError
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult
@@ -66,11 +66,14 @@ class DuplicateImageService:
         closest_match = get_closest_image_match(search_results.matches, check_url=True)
         if closest_match and closest_match.hamming_match_percent > 40: # TODO - Move to config
             search_results.closest_match = closest_match
+            if search_results.closest_match and search_results.meme_template:
+                match_hash = self._get_meme_hash(search_results.closest_match.post.url)
+                search_results.closest_match.hamming_distance = hamming(search_results.meme_hash, match_hash)
+                search_results.closest_match.hash_size = len(match_hash)
 
         # Has to be after closest match so we don't drop closest
         search_results.matches = list(filter(annoy_distance_filter(search_results.search_settings.target_annoy_distance), search_results.matches))
         search_results.matches = list(filter(hamming_distance_filter(search_results.target_hamming_distance), search_results.matches))
-
 
         if search_results.meme_template:
             search_results.search_times.start_timer('meme_filter_time')
@@ -106,7 +109,7 @@ class DuplicateImageService:
             checked_post=post,
             search_settings=search_settings
         )
-        search_results.search_times = ImageSearchTimes()
+
         search_results.search_times.start_timer('total_search_time')
 
         if search_settings.meme_filter:
@@ -149,23 +152,20 @@ class DuplicateImageService:
             search_results.matches = set_all_title_similarity(search_results.checked_post.title, search_results.matches)
         search_results.search_times.stop_timer('remove_duplicate_time')
 
-        search_results.search_times.start_timer('total_filter_time')
         search_results = self._filter_results_for_reposts(
             search_results,
             sort_by=sort_by
         )
-        search_results.search_times.stop_timer('total_filter_time')
         search_results.search_times.stop_timer('total_search_time')
         self._log_search_time(search_results, source)
 
-        search_results.logged_search = self._log_search(
+        search_results = self._log_search(
             search_results,
             source,
             api_search_results.used_current_index,
             api_search_results.used_historical_index,
         )
-        if search_results.logged_search:
-            search_results.search_id = search_results.logged_search.id
+
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
@@ -179,6 +179,9 @@ class DuplicateImageService:
         try:
             meme_hashes = get_image_hashes(url, hash_size=self.config.default_meme_filter_hash_size)
             return meme_hashes['dhash_h']
+        except ImageConversioinException:
+            log.error('Failed to get meme hash')
+            return
         except Exception:
             log.exception('Failed to get meme hash for %s', url, exc_info=True)
             return
@@ -304,7 +307,7 @@ class DuplicateImageService:
             source: str,
             used_current_index: bool,
             used_historical_index: bool,
-    ) -> Optional[ImageSearchResults]:
+    ) -> ImageSearchResults:
         image_search = ImageSearch(
             post_id=search_results.checked_post.post_id if search_results.checked_post else 'url',
             used_historical_index=used_historical_index,
@@ -333,9 +336,11 @@ class DuplicateImageService:
             uow.image_search.add(image_search)
             try:
                 uow.commit()
-                return image_search
+                search_results.logged_search = image_search
             except Exception as e:
                 log.exception('Failed to save image search', exc_info=False)
+
+        return search_results
 
     def _remove_duplicates(self, matches: List[ImageSearchMatch]) -> List[ImageSearchMatch]:
         log.debug('Remove duplicates from %s matches', len(matches))
@@ -423,12 +428,12 @@ class DuplicateImageService:
 
         for match in matches:
             try:
-                match_hashes = get_image_hashes(match.post.url, hash_size=self.config.default_meme_filter_hash_size)
+                match_hash = self._get_meme_hash(match.post.url)
             except Exception as e:
                 log.error('Failed to get meme hash for %s', match.post.id)
                 continue
 
-            h_distance = hamming(searched_hash, match_hashes['dhash_h'])
+            h_distance = hamming(searched_hash, match_hash)
 
             if h_distance > target_hamming:
                 log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
