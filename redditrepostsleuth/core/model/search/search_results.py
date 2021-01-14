@@ -31,3 +31,12 @@ class SearchResults:
         if not self.checked_post:
             return None
         return json.dumps({'post_id': self.checked_post.post_id})
+
+    def to_dict(self):
+        return {
+            'checked_url': self.checked_url,
+            'checked_post': self.checked_post.to_dict() if self.checked_post else None,
+            'search_settings': self.search_settings.to_dict(),
+            'search_times': self.search_times.to_dict(),
+            'matches': [match.to_dict() for match in self.matches]
+        }

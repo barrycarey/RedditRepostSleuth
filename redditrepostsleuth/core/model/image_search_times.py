@@ -16,20 +16,16 @@ class ImageSearchTimes(SearchTimes):
         self.set_match_hamming: float = float(0)
         self.image_search_api_time: float = float(0)
 
-
-
     def to_dict(self):
-        return {
-            'total_search_time': self.total_search_time,
+        return {**{
             'pre_annoy_filter_time': self.pre_annoy_filter_time,
             'index_search_time': self.index_search_time,
             'meme_filter_time': self.meme_filter_time,
             'meme_detection_time': self.meme_detection_time,
-            'total_filter_time': self.total_filter_time,
             'set_match_post_time': self.set_match_post_time,
             'remove_duplicate_time': self.remove_duplicate_time,
             'set_match_hamming': self.set_match_hamming,
             'image_search_api_time': self.image_search_api_time
 
-        }
+        }, **super().to_dict()}
 
