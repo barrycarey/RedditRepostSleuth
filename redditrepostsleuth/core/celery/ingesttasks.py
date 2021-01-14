@@ -1,11 +1,11 @@
 from time import perf_counter
 
-from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent
-from redditrepostsleuth.core.exception import ImageConversioinException, InvalidImageUrlException
-from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
+from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent
+from redditrepostsleuth.core.exception import InvalidImageUrlException
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 

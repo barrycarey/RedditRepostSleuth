@@ -7,7 +7,7 @@ from praw import Reddit
 from prawcore import Forbidden, NotFound
 from sqlalchemy import func
 
-from redditrepostsleuth.core.celery.admin_tasks import update_subreddit_config
+from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task
 from redditrepostsleuth.core.celery.maintenance_tasks import update_monitored_sub_stats
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost, MemeTemplatePotential, \
@@ -249,7 +249,7 @@ def queue_config_updates(uowm: UnitOfWorkManager, config: Config) -> NoReturn:
     with uowm.start() as uow:
         monitored_subs = uow.monitored_sub.get_all()
         for monitored_sub in monitored_subs:
-            update_subreddit_config.apply_async((monitored_sub,))
+            check_for_subreddit_config_update_task.apply_async((monitored_sub,))
 
     print('[Scheduled Job Complete] Queue config update check')
 

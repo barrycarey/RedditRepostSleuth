@@ -56,12 +56,11 @@ class SubredditConfigUpdater:
         print('[Scheduled Job] Config Updates End')
 
     def check_for_config_update(self, monitored_sub: MonitoredSub, notify_missing_keys=True):
-        # TODO - Possibly pass the subreddit to get_wiki_config
-        subreddit = self.reddit.subreddit(monitored_sub.name)
 
         if not bot_has_permission(monitored_sub.name, 'wiki', self.reddit):
             return
 
+        subreddit = self.reddit.subreddit(monitored_sub.name)
         wiki_page = subreddit.wiki[self.config.wiki_config_name]
 
         try:
@@ -86,14 +85,10 @@ class SubredditConfigUpdater:
         if not missing_keys:
             return
         log.info('Sub %s is missing keys %s', monitored_sub.name, missing_keys)
-        new_config = self._create_wiki_config_from_database(monitored_sub)
-        if not new_config:
-            log.error('Failed to generate new config for %s', monitored_sub.name)
+
+        if not self.update_wiki_config_from_database(monitored_sub, wiki_page):
             return
-        self._update_wiki_page(wiki_page, new_config)
-        wiki_page = subreddit.wiki['repost_sleuth_config'] # Force refresh so we can get latest revision ID
-        self._create_revision(wiki_page)
-        self._set_config_validity(wiki_page.revision_id, True)
+
         if notify_missing_keys:
             if self._notify_new_options(subreddit, missing_keys):
                 self._set_config_notified(wiki_page.revision_id)
@@ -203,6 +198,36 @@ class SubredditConfigUpdater:
         else:
             log.info('Confings match')
         return results
+
+    def update_wiki_config_from_database(
+            self,
+            monitored_sub: MonitoredSub,
+            wiki_page: WikiPage = None,
+            notify: bool = False
+    ) -> bool:
+        """
+        Sync the database settings to a given monitor sub's wiki page
+        :param notify: Send notification when config is loaded
+        :param wiki_page: Wiki Page object
+        :param monitored_sub: Monitored Sub to update
+        :rtype: bool
+        :return: bool if config was successfully loaded
+        """
+        subreddit = self.reddit.subreddit(monitored_sub.name)
+        if not wiki_page:
+            wiki_page = subreddit.wiki[self.config.wiki_config_name]
+
+        new_config = self._create_wiki_config_from_database(monitored_sub)
+        if not new_config:
+            log.error('Failed to generate new config for %s', monitored_sub.name)
+            return False
+        self._update_wiki_page(wiki_page, new_config)
+        wiki_page = subreddit.wiki['repost_sleuth_config']  # Force refresh so we can get latest revision ID
+        self._create_revision(wiki_page)
+        self._set_config_validity(wiki_page.revision_id, True)
+        if notify:
+            self._notify_successful_load(subreddit)
+        return True
 
     def _update_wiki_page(self, wiki_page: WikiPage, new_config: Dict) -> NoReturn:
         log.info('Writing new config to %s', wiki_page.subreddit.display_name)
