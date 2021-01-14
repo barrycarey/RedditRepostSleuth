@@ -6,10 +6,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 sys.path.append('./')
 from redditrepostsleuth.core.notification.notification_service import NotificationService
-from redditrepostsleuth.adminsvc.misc_admin_tasks import remove_expired_bans, update_banned_sub_wiki, send_reports_to_meme_voting, update_top_image_reposts, \
-    update_monitored_sub_data, check_meme_template_potential_votes, update_ban_list
+from redditrepostsleuth.adminsvc.misc_admin_tasks import remove_expired_bans, update_banned_sub_wiki, \
+    send_reports_to_meme_voting, update_top_image_reposts, \
+    update_monitored_sub_data, check_meme_template_potential_votes, update_ban_list, queue_config_updates
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
-from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
@@ -35,20 +35,12 @@ if __name__ == '__main__':
     activation_monitor = NewActivationMonitor(uowm, get_reddit_instance(config), notification_svc=notification_svc)
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
-    config_updater = SubredditConfigUpdater(uowm, reddit_manager.reddit, response_handler, config, notification_svc=notification_svc)
     inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
 
     #config_updater.update_configs()
 
     scheduler = BackgroundScheduler()
     scheduler.add_listener(event_callback, EVENT_JOB_ERROR)
-    scheduler.add_job(
-        func=config_updater.update_configs,
-        trigger='interval',
-        minutes=15,
-        name='update_configs',
-        max_instances=3
-    )
     scheduler.add_job(
         func=activation_monitor.check_for_new_invites,
         trigger='interval',
@@ -131,6 +123,14 @@ if __name__ == '__main__':
         trigger='interval',
         hours=24,
         name='check_banned_subs',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=queue_config_updates,
+        args=(uowm, config),
+        trigger='interval',
+        minutes=2,
+        name='queue_config_update_check',
         max_instances=1
     )
     scheduler.start()

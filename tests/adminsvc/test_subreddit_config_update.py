@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from redditrepostsleuth.adminsvc.subreddit_config_update import SubredditConfigUpdater
+from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 

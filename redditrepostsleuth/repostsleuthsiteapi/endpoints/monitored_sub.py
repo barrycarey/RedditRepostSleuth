@@ -1,27 +1,32 @@
 import json
 from typing import Text
 
-import requests
-from falcon import Response, Request, HTTP_NOT_FOUND, HTTPNotFound, HTTPUnauthorized, HTTPInternalServerError
+from falcon import Response, Request, HTTPNotFound, HTTPUnauthorized, HTTPInternalServerError
 from praw import Reddit
 from praw.exceptions import APIException
 
+from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSubConfigChange
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.managed_subreddit import create_monitored_sub_in_db
-
-import logging
-
+from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
 from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_token, get_user_data, get_subscribers, \
-    is_sub_mod_praw, bot_has_permission, get_bot_permissions
+    is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin
 
 
 class MonitoredSub:
-    def __init__(self, uowm: UnitOfWorkManager, config: Config, reddit: Reddit):
+    def __init__(
+            self,
+            uowm: UnitOfWorkManager,
+            config: Config,
+            reddit: Reddit,
+            config_updater: SubredditConfigUpdater
+    ):
+        self.config_updater = config_updater
         self.reddit = reddit
         self.config = config
         self.uowm = uowm
@@ -99,28 +104,37 @@ class MonitoredSub:
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}', f'You\'re not a moderator on {subreddit}')
         with self.uowm.start() as uow:
-            sub = uow.monitored_sub.get_by_sub(subreddit)
-            if not sub:
+            monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
+            if not monitored_sub:
                 raise HTTPNotFound(title=f'Subreddit {subreddit} Not Found', description=f'Subreddit {subreddit} Not Found')
             raw = json.load(req.bounded_stream)
             for k,v in raw.items():
                 if k not in self.config.sub_monitor_exposed_config_options:
                     continue
-                if hasattr(sub, k):
-                    if getattr(sub, k) != v:
-                        log.debug('Update %s config | %s: %s => %s', subreddit, k, getattr(sub, k), v)
+                if hasattr(monitored_sub, k):
+                    if getattr(monitored_sub, k) != v:
+                        log.debug('Update %s config | %s: %s => %s', subreddit, k, getattr(monitored_sub, k), v)
                         uow.monitored_sub_config_change.add(
                             MonitoredSubConfigChange(
                                 source='site',
                                 subreddit=subreddit,
                                 config_key=k,
-                                old_value=str(getattr(sub, k)),
+                                old_value=str(getattr(monitored_sub, k)),
                                 new_value=str(v),
                                 updated_by=user_data['name']
                             )
                         )
-                        setattr(sub, k, v)
-            uow.commit()
+                        setattr(monitored_sub, k, v)
+            try:
+                uow.commit()
+            except Exception as e:
+                log.exception('Problem saving config', exc_info=True)
+                raise HTTPInternalServerError(title='Problem Saving Config', description='Something went tits up when saving the config')
+
+        celery.send_task('redditrepostsleuth.core.celery.admin_tasks.update_subreddit_config_from_database', args=[monitored_sub, user_data],
+                         queue='monitored_sub_config_update')
+
+
 
 
     def on_delete(self, req: Request, resp: Response, subreddit: Text):
