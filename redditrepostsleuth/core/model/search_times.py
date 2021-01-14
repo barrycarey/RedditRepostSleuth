@@ -22,3 +22,9 @@ class SearchTimes:
             log.error('Failed to find timer %s', name)
         if hasattr(self, name):
             setattr(self, name, round(perf_counter() - timer['start'], 5))
+
+    def to_dict(self):
+        return {
+            'total_search_time': self.total_search_time,
+            'total_filter_time': self.total_filter_time
+        }
