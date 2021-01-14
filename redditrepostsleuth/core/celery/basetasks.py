@@ -6,6 +6,7 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
+from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
 
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
@@ -49,6 +50,23 @@ class RedditTask(Task):
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
         self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, live_response=self.config.live_responses)
+
+class AdminTask(Task):
+    def __init__(self):
+        self.config = Config()
+        self.reddit = RedditManager(get_reddit_instance(self.config))
+        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.event_logger = EventLogging(config=self.config)
+        self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger,
+                                                live_response=self.config.live_responses)
+        self.notification_svc = NotificationService(self.config)
+        self.config_updater = SubredditConfigUpdater(
+            self.uowm,
+            self.reddit.reddit,
+            self.response_handler,
+            self.config,
+            notification_svc=self.notification_svc
+        )
 
 class RepostLogger(Task):
     def __init__(self):

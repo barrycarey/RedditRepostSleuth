@@ -6,39 +6,53 @@
 	</h4>
 </div>
 
+![Master](https://github.com/barrycarey/RedditRepostSleuth/workflows/Python%20application/badge.svg)
+![semver](https://img.shields.io/badge/semver-1.0.0-blue)
+![CodeFactor Grade](https://img.shields.io/codefactor/grade/github/barrycarey/RedditRepostSleuth/master)
 
+![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/repostsleuthbot?style=social)
+![Reddit User Karma](https://img.shields.io/reddit/user-karma/comment/repostsleuthbot?style=social)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/barrycarey/redditrepostsleuth)
+![Discord](https://img.shields.io/discord/636038154951852042?style=plastic)
 
 ## About
-The Repost Sleuth bot continually ingests all new posts and stores them in a database. It then uses various methods including perceptual image hashing and binary search trees to find reposted content.
+Repost Sleuth Bot is a high performance bot that is able to detect Reddit reposts extremely fast.  
 
-#### Images
-A difference hash is generated for each image that is ingested. We then use a hamming distance comparision to find matching images in the database
+It also includes a large number of custom admin abilities to help moderators deal with reposts on their Subreddits
 
-#### Links
-We use the exact URL to find matches
+#### Support Post Types
 
-#### Videos
-Not currently supported
+- **Images:** Fully support
+- **Links:** Fully Supported 
+- **Videos:** Not Supported
+- **Text:** Not Supported
 
-#### Text
-Not currently supported
+Code has been written for videos and text.  However, they are far too resource demanding to make public. 
 
-## Features
-Repost Sleuth responds to various commands.  See command section below
 
-* Ingest all new posts and comments
-* Compare several posts types and determin if they are a repost
-* Set watches on a post and get notifications if someone else posts the same thing
-* More to come
+## General Features
+- Realtime repost detection for ALL supported content submitted to Reddit
+- Ability to monitor any post and notify you if someone reposts it 
+
+## Admin Features
+- Realtime repost detection
+- Comment on reposts
+- Customize search settings for your Subreddit (Limit by matching %, date, subreddit, author, ect)
+- Define custom comment templates
+- Automatically remove reposts
+- Automatically report reposts with custom report templates
+- Automatically lock reposts 
+- Automatically sticky the bot's comment
+- Automatically mark a post as OC
+- Automatically lock the bot's comment
+- Custom report dashboard and management on www.repostsleuth.com
+- Discord notifications (coming soon)
 
 #### Commands
-**!repost all message|comment** - Find all matching posts and list them in a comment reply or via PM
 
-**!repost watch message|comment** - Monitor this post and notify you if we see it posted somewhere else
+**!repost watch** - Monitor this post and notify you if we see it posted somewhere else
 
 **!repost unwatch** - Disable an active repost monitors for this post
-
-**!repost stats** - Get stats about the bot
 
 ## Technology
 
@@ -46,17 +60,23 @@ Repost Sleuth makes heavy use of Celery with a Redis backend.  Celery allows a l
 
 All data is store in a MySQL database and we use SQLAlchemy to interact with the data
 
-Repost Sleuth is hosted in a Virtual machine on Dell hardware. The VM has 16 cores and 32gb of RAM.  The bot requires a large amount of CPU cores to efficiently deal with the workload.  The RAM is needed to store all images hashes in memory for fast searching
+The bot is split into roughly 9 Docker containers with various instances. 
+
+Hardware wise, the bot runs on a Dell r620 with 2x Xeon 2670v2 CPUs and 256gb of RAM. Storage is an all flash array consisting of 8 Samsung Evo 500gb SSDs in RAID 10.
+
+It currently consumes around 70% of these resources. 
 
 ## Feature Suggestions
-If you are interested in seeing a specific feature please open an issue 
+If you are interested in seeing a specific feature [please open a discussion thread](https://github.com/barrycarey/RedditRepostSleuth/discussions)
 
 ## Contributing 
 
-At the moment I'm not looking for any contributions. The code base is super messy and still pretty experimental. 
+I'm open to contributions however I'm still working out how to handle it.  The bot cannot be easily run locally and.  
+If you feel you can contribute something, please include tests for any for any code you wish to submit. 
 
 
 ### reddit usage FAQ
+
 #### Your Bot Sucks, It Said a Reposted Meme Was Unique
 Memes are by far the hardest reposts to detect accurately. Many templates can produces the same exact hash even with different text in the meme. Due to this most other reposts bots don't work well on meme subs since they produce tons of false positives.
 

@@ -75,7 +75,7 @@ class ResponseHandler:
         return Comment(self.reddit.reddit, id='1111')
 
 
-    def _reply_to_comment(self, comment_id: str, comment_body: str) -> Optional[Comment]:
+    def _reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
         """
         Post a given reply to a given comment ID
         :rtype: Optional[Comment]
@@ -100,16 +100,19 @@ class ResponseHandler:
             return reply_comment
         except Forbidden:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
-            self._save_banned_sub(comment.subreddit.display_name)
+            # If we get Forbidden there's a chance we don't have hte comment data to get subreddit
+            if subreddit:
+                self._save_banned_sub(subreddit)
             raise
         except AssertionError:
             log.exception('Problem leaving comment', exc_info=True)
             raise
 
-    def reply_to_comment(self, comment_id: str, comment_body: str) -> Optional[Comment]:
+    def reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
         if self.live_response:
-            return self._reply_to_comment(comment_id, comment_body)
+            return self._reply_to_comment(comment_id, comment_body, subreddit=subreddit)
         log.debug('Live response disabled')
+        # TODO - 1/12/2021 - Sketchy at best
         return Comment(self.reddit.reddit, id='1111')
 
     def _send_private_message(

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from typing import NoReturn, List
 
 import requests
@@ -6,6 +7,7 @@ from praw import Reddit
 from prawcore import Forbidden, NotFound
 from sqlalchemy import func
 
+from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task
 from redditrepostsleuth.core.celery.maintenance_tasks import update_monitored_sub_stats
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost, MemeTemplatePotential, \
@@ -16,7 +18,7 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.util.helpers import build_markdown_table, \
-    chunk_list
+    chunk_list, get_redis_client
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, is_sub_mod_praw, is_bot_banned, \
     bot_has_permission
@@ -61,6 +63,10 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
     with uowm.start() as uow:
         bans = uow.banned_subreddit.get_all()
         for ban in bans:
+            last_checked_delta = (datetime.utcnow() - ban.last_checked).days
+            if last_checked_delta < 1:
+                log.debug('Banned sub %s last checked %s days ago.  Skipping', ban.subreddit, last_checked_delta)
+                continue
             if is_bot_banned(ban.subreddit, reddit):
                 log.info('[Subreddit Ban Check] Still banned on %s', ban.subreddit)
                 ban.last_checked = func.utc_timestamp()
@@ -69,7 +75,8 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
                 uow.banned_subreddit.remove(ban)
                 if notification_svc:
                     notification_svc.send_notification(
-                        f'Removed {ban.name} from ban list'
+                        f'Removed {ban.subreddit} from ban list',
+                        subject='**Subreddit Removed From Ban List!**'
                     )
             uow.commit()
 
@@ -232,9 +239,23 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                 continue
             uow.commit()
 
+def queue_config_updates(uowm: UnitOfWorkManager, config: Config) -> NoReturn:
+    print('[Scheduled Job] Queue config update check')
+    redis = get_redis_client(config)
+    if len(redis.lrange('config_update_check', 0, 20000)) > 0:
+        log.info('Config update queue still has pending jobs.  Skipping update queueing ')
+        return
+
+    with uowm.start() as uow:
+        monitored_subs = uow.monitored_sub.get_all()
+        for monitored_sub in monitored_subs:
+            check_for_subreddit_config_update_task.apply_async((monitored_sub,))
+
+    print('[Scheduled Job Complete] Queue config update check')
+
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_ban_list(uowm, reddit, notification_svc)
+    queue_config_updates(uowm, config)

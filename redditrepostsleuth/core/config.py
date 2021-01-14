@@ -110,7 +110,10 @@ class Config:
         elif ini_value is not None:
             return ini_value
         else:
-            return self.CONFIG_NOT_SET
+            # This needs more thought. Return turning NoSet causes some database inserts to fail. I don't see an issue
+            # using a straight None but I'm sure it will bite me in the ass
+            return None
+            #return self.CONFIG_NOT_SET
 
     def _fetch(self, key):
         value = self.custom[key]

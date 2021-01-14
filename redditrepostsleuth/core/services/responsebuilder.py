@@ -164,7 +164,7 @@ class ResponseBuilder:
                 message += f'\n\n{closest_template}'
 
         if signature:
-            message += f'\n\n{self._get_signature(search_results)}{REPORT_POST_LINK}'
+            message += f'\n\n{self._get_signature(search_results)} - {REPORT_POST_LINK}'
         else:
             message += f'\n\n{REPORT_POST_LINK}'
 
@@ -176,11 +176,13 @@ class ResponseBuilder:
             message += '\n\n---'
 
         if search_settings:
-            message += f'\n\n{self._get_search_settings_template(search_results)}\n'
+            message += f'\n\n{self._get_search_settings_template(search_results)}'
 
         if stats:
             if not search_settings:
                 message += '\n\n'
+            else:
+                message += ' | '
             message += f'{COMMENT_STATS}'
 
         msg_values = self._get_message_values(search_results)
@@ -188,20 +190,6 @@ class ResponseBuilder:
         message = message.format(**msg_values)
         log.debug('Final Message: %s', message)
         return message
-
-    def build_provided_comment_template(self, values: Dict, template: Text, post_type: Text, stats: bool = True, signature: bool = True):
-        msg = template
-        if stats:
-            msg = msg + COMMENT_STATS
-        if signature:
-            if msg[-2:] != '\n\n':
-                msg = msg + '\n\n'
-            if post_type == 'image':
-                msg = msg + self.default_templates['image_oc_signature']
-            elif post_type == 'link':
-                msg = msg + self.default_templates['link_signature']
-
-        return msg.format(**values)
 
     def build_report_msg(self, subreddit: Text, values: Dict) -> Text:
         with self.uowm.start() as uow:

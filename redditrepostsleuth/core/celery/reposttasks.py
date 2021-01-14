@@ -1,3 +1,4 @@
+from time import perf_counter
 from typing import List, Dict
 
 import requests
@@ -40,27 +41,27 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
         log.info('Post %sis a crosspost, skipping repost check', post.post_id)
         raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
-    result = self.dup_service.check_image(
+    search_results = self.dup_service.check_image(
         post.url,
         post=post,
         source='ingest_repost'
     )
 
-    save_image_repost_result(result, self.uowm)
-    if len(result.matches):
-        self.notification_svc.send_notification(result)
+    save_image_repost_result(search_results, self.uowm, source='ingest')
+    if len(search_results.matches):
+        self.notification_svc.send_notification(search_results)
     self.event_logger.save_event(RepostEvent(
-        event_type='repost_found' if result.matches else 'repost_check',
+        event_type='repost_found' if search_results.matches else 'repost_check',
         status='success',
         post_type='image',
-        repost_of=result.matches[0].post.post_id if result.matches else None,
+        repost_of=search_results.matches[0].post.post_id if search_results.matches else None,
 
     ))
-    watches = check_for_post_watch(result.matches, self.uowm)
+    watches = check_for_post_watch(search_results.matches, self.uowm)
     if watches and self.config.enable_repost_watch:
         notify_watch.apply_async((watches, post), queue='watch_notify')
 
-    return result
+    return search_results
 
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
@@ -86,10 +87,10 @@ def link_repost_check(self, posts, ):
 
             search_results = filter_search_results(
                 search_results,
-                reddit=self.reddit,
                 uitl_api=f'{self.config.util_api}/maintenance/removed'
             )
-
+            search_results.search_times.stop_timer('total_search_time')
+            log.info('Link Query Time: %s', search_results.search_times.query_time)
             if not search_results.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
                 post.checked_repost = True
@@ -99,7 +100,6 @@ def link_repost_check(self, posts, ):
 
             log.info('Found %s matching links', len(search_results.matches))
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, search_results.matches[0].post.post_id)
-
             repost_of = search_results.matches[0].post
             new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author, source='ingest', subreddit=post.subreddit)
             repost_of.repost_count += 1
@@ -118,9 +118,10 @@ def link_repost_check(self, posts, ):
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
                                                          repost_of=search_results.matches[0].post.post_id,
                                                          post_type=post.post_type))
-
         self.event_logger.save_event(
             BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
+
+
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)

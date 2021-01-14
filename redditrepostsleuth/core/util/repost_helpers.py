@@ -21,7 +21,7 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_dead_urls_remote, \
-    filter_removed_posts
+    filter_removed_posts, filter_dead_urls
 
 
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
@@ -66,11 +66,12 @@ def get_link_reposts(
         get_total: bool = False,
         ) -> LinkSearchResults:
 
-    url_hash = md5(post.url.encode('utf-8'))
+    url_hash = md5(url.encode('utf-8'))
     url_hash = url_hash.hexdigest()
     with uowm.start() as uow:
         search_results = LinkSearchResults(url, search_settings, checked_post=post, search_times=LinkSearchTimes())
         search_results.search_times.start_timer('query_time')
+        search_results.search_times.start_timer('total_search_time')
         raw_results = uow.posts.find_all_by_url_hash(url_hash)
         search_results.search_times.stop_timer('query_time')
         log.debug('Query time: %s', search_results.search_times.query_time)
@@ -82,6 +83,7 @@ def get_link_reposts(
     return search_results
 
 
+# TODO - 1/12/2021 - Possibly make the generic. It's messing with auto complete when used for image searches
 def filter_search_results(
         search_results: SearchResults,
         reddit: Reddit = None,
@@ -94,6 +96,7 @@ def filter_search_results(
     :param search_results: SearchResults obj
     """
     log.debug('%s results pre-filter', len(search_results.matches))
+    search_results.search_times.start_timer('total_filter_time')
     # Only run these if we are search for an existing post
     if search_results.checked_post:
         search_results.matches = list(filter(filter_same_post(search_results.checked_post.post_id), search_results.matches))
@@ -126,11 +129,12 @@ def filter_search_results(
     if search_results.search_settings.filter_removed_matches and reddit:
         search_results.matches = filter_removed_posts(reddit, search_results.matches)
 
+    search_results.search_times.stop_timer('total_filter_time')
     log.debug('%s results post-filter', len(search_results.matches))
     return search_results
 
 
-def get_first_active_match(matches: List[SearchMatch]) -> SearchMatch:
+def get_first_active_match(matches: List[ImageSearchMatch]) -> ImageSearchMatch:
     for match in matches:
         try:
             headers = {'User-Agent': random.choice(USER_AGENTS)}

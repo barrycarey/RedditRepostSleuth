@@ -3,18 +3,20 @@
 import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
+from falcon import Request
+from redis import Redis
 from redlock import RedLockFactory
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
-from redditrepostsleuth.core.util.replytemplates import IMAGE_SEARCH_SETTING_TABLE, IMAGE_REPORT_TEXT
+from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
     from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.util.constants import NO_LINK_SUBREDDITS
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
@@ -166,12 +168,12 @@ def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uow
     }
 
     if search_results.meme_template:
-        base_values['target_match_percent'] = search_results.search_settings.target_meme_match_percent
+        base_values['effective_target_match_percent'] = search_results.search_settings.target_meme_match_percent
     else:
-        base_values['target_match_percent'] = search_results.search_settings.target_match_percent
+        base_values['effective_target_match_percent'] = search_results.search_settings.target_match_percent
 
     if search_results.search_settings.max_days_old == 99999:
-        base_values['max_age'] = None
+        base_values['max_age'] = 'Unlimited'
     else:
         base_values['max_age'] = search_results.search_settings.max_days_old
 
@@ -232,6 +234,8 @@ def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, sourc
         uow.link_repost.add(new_repost)
         try:
             uow.commit()
+        except IntegrityError:
+            log.error('Failed to save link repost, it already exists')
         except Exception as e:
             log.exception('Failed to save link repost', exc_info=True)
 
@@ -253,6 +257,34 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
         max_matches=config.default_image_max_matches
 
     )
+
+def get_image_search_settings_from_request(req: Request, config: Config) -> ImageSearchSettings:
+    return ImageSearchSettings(
+        req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
+        config.default_image_target_annoy_distance,
+        target_title_match=req.get_param_as_int('target_title_match', required=False,
+                             default=None) or config.default_image_target_title_match,
+        filter_dead_matches=req.get_param_as_bool('filter_dead_matches', required=False,
+                              default=None) or config.default_image_dead_matches_filter,
+        filter_removed_matches=req.get_param_as_bool('filter_removed_matches', required=False,
+                              default=None) or config.default_image_removed_match_filter,
+        only_older_matches=req.get_param_as_bool('only_older_matches', required=False,
+                              default=None) or config.default_image_only_older_matches,
+        filter_same_author=req.get_param_as_bool('filter_same_author', required=False,
+                              default=None) or config.default_image_same_author_filter,
+        filter_crossposts=req.get_param_as_bool('filter_crossposts', required=False,
+                              default=None) or config.default_image_crosspost_filter,
+        target_meme_match_percent=req.get_param_as_int('target_meme_match_percent', required=False,
+                             default=None) or config.default_image_target_meme_match,
+        meme_filter=req.get_param_as_bool('meme_filter', required=False,
+                              default=None) or config.default_image_meme_filter,
+        same_sub=req.get_param_as_bool('same_sub', required=False,
+                              default=None) or config.default_image_same_sub_filter,
+        max_days_old=req.get_param_as_int('max_days_old', required=False,
+                             default=None) or config.default_image_target_annoy_distance,
+
+    )
+
 
 def get_default_link_search_settings(config: Config) -> SearchSettings:
     return SearchSettings(
@@ -294,8 +326,17 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
 
     )
 
+
 def get_redlock_factory(config: Config) -> RedLockFactory:
     return RedLockFactory(
         connection_details=[
             {'host': config.redis_host, 'port': config.redis_port, 'password': config.redis_password, 'db': 1}
         ])
+
+def get_redis_client(config: Config) -> Redis:
+    return Redis(
+        host=config.redis_host,
+        port=config.redis_port,
+        db=0,
+        password=config.redis_password
+    )
