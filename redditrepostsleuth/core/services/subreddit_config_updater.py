@@ -18,8 +18,8 @@ from redditrepostsleuth.core.notification.notification_service import Notificati
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
-
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, bot_has_permission
+
 
 class SubredditConfigUpdater:
 
@@ -313,7 +313,7 @@ class SubredditConfigUpdater:
 
     def _create_wiki_page(self, subreddit: Subreddit):
         log.info('Creating config wiki page for %s', subreddit.display_name)
-        with open('bot_config.md', 'r') as f:
+        with open('../../adminsvc/bot_config.md', 'r') as f:
             template = f.read()
         try:
             subreddit.wiki.create(self.config.wiki_config_name, template)
@@ -414,7 +414,7 @@ class SubredditConfigUpdater:
         pass
 
 if __name__ == '__main__':
-    config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config(r'/sleuth_config.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
