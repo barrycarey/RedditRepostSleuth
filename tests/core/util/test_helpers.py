@@ -9,6 +9,7 @@ from redditrepostsleuth.core.model.image_search_settings import ImageSearchSetti
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_results import SearchResults
+from redditrepostsleuth.core.model.search_settings import SearchSettings
 
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
