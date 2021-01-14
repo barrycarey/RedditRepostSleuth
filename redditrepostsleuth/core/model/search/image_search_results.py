@@ -25,7 +25,7 @@ class ImageSearchResults(SearchResults):
         self.closest_match: Optional[ImageSearchMatch] = None
         self.matches: List[ImageSearchMatch] = []
         self.logged_search: Optional[ImageSearch] = None
-        self.meme_hash: Text = None
+        self.meme_hash: Optional[Text] = None
 
     @property
     def target_hash(self) -> Text:
@@ -62,15 +62,10 @@ class ImageSearchResults(SearchResults):
         )
 
     def to_dict(self):
-        return {
-            'checked_post': self.checked_post.to_dict() if self.checked_post else None,
-            'checked_url': self.checked_url,
-            'index_size': self.total_searched,
+        return {**{
             'meme_template': self.meme_template.to_dict() if self.meme_template else None,
             'closest_match': self.closest_match.to_dict() if self.closest_match else None,
-            'search_id': self.search_id,
-            'search_times': self.search_times.to_dict()
-        }
+        }, **super().to_dict()}
 
     def __repr__(self):
         return f'Checked Post: {self.checked_post.post_id} - Matches: {len(self.matches)} - Meme Template: {self.meme_template}'

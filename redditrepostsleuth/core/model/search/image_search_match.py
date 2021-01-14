@@ -38,13 +38,10 @@ class ImageSearchMatch(SearchMatch):
         return round(100 - (self.hamming_distance / self.hash_size) * 100, 2)
 
     def to_dict(self):
-        return {
-            'title_similarity': self.title_similarity,
+        return {**{
             'hamming_distance': self.hamming_distance,
             'annoy_distance': self.annoy_distance,
             'hamming_match_percent': self.hamming_match_percent,
             'hash_size': self.hash_size,
-            'url': self.searched_url,
             'index_match_id': self.index_match_id,
-            'post': self.post.to_dict() if self.post else None
-        }
+        }, **super().to_dict()}
