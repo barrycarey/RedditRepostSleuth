@@ -3,6 +3,7 @@
 import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
+from falcon import Request
 from redlock import RedLockFactory
 from sqlalchemy.exc import IntegrityError
 
@@ -256,6 +257,34 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 
     )
 
+def get_image_search_settings_from_request(req: Request, config: Config) -> ImageSearchSettings:
+    return ImageSearchSettings(
+        req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
+        config.default_image_target_annoy_distance,
+        target_title_match=req.get_param_as_int('target_title_match', required=False,
+                             default=None) or config.default_image_target_title_match,
+        filter_dead_matches=req.get_param_as_bool('filter_dead_matches', required=False,
+                              default=None) or config.default_image_dead_matches_filter,
+        filter_removed_matches=req.get_param_as_bool('filter_removed_matches', required=False,
+                              default=None) or config.default_image_removed_match_filter,
+        only_older_matches=req.get_param_as_bool('only_older_matches', required=False,
+                              default=None) or config.default_image_only_older_matches,
+        filter_same_author=req.get_param_as_bool('filter_same_author', required=False,
+                              default=None) or config.default_image_same_author_filter,
+        filter_crossposts=req.get_param_as_bool('filter_crossposts', required=False,
+                              default=None) or config.default_image_crosspost_filter,
+        target_meme_match_percent=req.get_param_as_int('target_meme_match_percent', required=False,
+                             default=None) or config.default_image_target_meme_match,
+        meme_filter=req.get_param_as_bool('meme_filter', required=False,
+                              default=None) or config.default_image_meme_filter,
+        same_sub=req.get_param_as_bool('same_sub', required=False,
+                              default=None) or config.default_image_same_sub_filter,
+        max_days_old=req.get_param_as_int('max_days_old', required=False,
+                             default=None) or config.default_image_target_annoy_distance,
+
+    )
+
+
 def get_default_link_search_settings(config: Config) -> SearchSettings:
     return SearchSettings(
         target_title_match=config.default_link_target_title_match,
@@ -295,6 +324,7 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         max_matches=200
 
     )
+
 
 def get_redlock_factory(config: Config) -> RedLockFactory:
     return RedLockFactory(
