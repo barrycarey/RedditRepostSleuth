@@ -8,6 +8,7 @@ from redditrepostsleuth.core.model.search.image_search_results import ImageSearc
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
+from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 
