@@ -11,20 +11,8 @@ from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiRe
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 
 
-def get_mock_response(*args, **kwargs):
-    class MockResponse:
-        def __init__(self, text, status_code):
-            self.text = text
-            self.status_code = status_code
-
-    if args[0] == 'http://good.com/image':
-
-        return MockResponse(json.dumps(res), 200)
-    if args[0] == 'http://bad.com/image':
-        return MockResponse('<html></html>', 500)
 
 class TestDuplicateImageService(TestCase):
-
 
     def test__get_matches(self):
         res = {
