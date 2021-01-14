@@ -171,8 +171,8 @@ services:
         environment:
             - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q monitored_sub_update -c 5
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks,redditrepostsleuth.core.celery.admin_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q monitored_sub_update,config_update_check -c 5
 
 
     ingest_pushshift_worker:

@@ -6,7 +6,14 @@
 	</h4>
 </div>
 
+![Master](https://github.com/barrycarey/RedditRepostSleuth/workflows/Python%20application/badge.svg)
+![semver](https://img.shields.io/badge/semver-1.0.0-blue)
+![CodeFactor Grade](https://img.shields.io/codefactor/grade/github/barrycarey/RedditRepostSleuth/master)
 
+![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/repostsleuthbot?style=social)
+![Reddit User Karma](https://img.shields.io/reddit/user-karma/comment/repostsleuthbot?style=social)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/barrycarey/redditrepostsleuth)
+![Discord](https://img.shields.io/discord/636038154951852042?style=plastic)
 
 ## About
 The Repost Sleuth bot continually ingests all new posts and stores them in a database. It then uses various methods including perceptual image hashing and binary search trees to find reposted content.

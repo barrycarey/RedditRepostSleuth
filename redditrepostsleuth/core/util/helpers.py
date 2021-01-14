@@ -4,6 +4,7 @@ import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
 from falcon import Request
+from redis import Redis
 from redlock import RedLockFactory
 from sqlalchemy.exc import IntegrityError
 
@@ -331,3 +332,11 @@ def get_redlock_factory(config: Config) -> RedLockFactory:
         connection_details=[
             {'host': config.redis_host, 'port': config.redis_port, 'password': config.redis_password, 'db': 1}
         ])
+
+def get_redis_client(config: Config) -> Redis:
+    return Redis(
+        host=config.redis_host,
+        port=config.redis_port,
+        db=0,
+        password=config.redis_password
+    )
