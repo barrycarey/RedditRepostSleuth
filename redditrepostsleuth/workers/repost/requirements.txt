@@ -9,3 +9,4 @@ distance
 celery[redis]==4.4.7
 python-Levenshtein
 falcon
+redlock

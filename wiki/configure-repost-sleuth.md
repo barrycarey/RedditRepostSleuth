@@ -6,8 +6,6 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 **To avoid making errors in the JSON I recommend using an online JSON editor to ensure correct formatting**
 
-[Default Config Loaded Into Editor](https://jsoneditoronline.org/#left=cloud.5485ac46f0f349169a40e11f0db6a956)
-
 **Please Note:** Due to how the bot's popularity config updates take some time to be loaded.  Typically within 15 minutes. Once the bot loads your new config you will receive ModMail 
 
 **Example Config**
@@ -54,7 +52,9 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 **active:** Enable / Disable the bot
 
-**only_comment_on_repost:** If true the bot only comments on reposts.  If false it will also comment on OC
+**comment_on_repost:** If true the bot comments on reposts.
+
+**comment_on_oc:** If true the bot comments on OC.  
 
 **report_reposts:** Bot will report any reposts it finds
 
@@ -103,6 +103,10 @@ To change settings simply update the JSON and save.  The bot will load the new c
 **target_image_match:** The percentage an image must match to be considered a repost.  100% is a perfect match.  Default 92%
 
 **target_image_meme_match:** The percent a meme must match. Lower values increase false positives. 
+
+**lock_response_comment:** Locks the bot's reply
+
+**filter_removed_matches:** Checks all search results and drops any that are removed from Reddit
 
 ### Comment Templates
 ---
