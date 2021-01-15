@@ -1,6 +1,5 @@
 import json
 import re
-import time
 from json import JSONDecodeError
 from typing import Text, Dict, NoReturn
 
@@ -15,8 +14,9 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_SUBJECT, WATCH_ENABLED
+from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_SUBJECT, WATCH_ENABLED, REPORT_RESPONSE
 
 
 class InboxMonitor:
@@ -25,9 +25,11 @@ class InboxMonitor:
             self,
             uowm: UnitOfWorkManager,
             reddit: Reddit,
+            response_handler: ResponseHandler,
             event_logger: EventLogging = None,
             notification_svc: NotificationService = None
     ):
+        self.response_handler = response_handler
         self.notification_svc = notification_svc
         self.uowm = uowm
         self.event_logger = event_logger
@@ -41,7 +43,6 @@ class InboxMonitor:
                 self._process_user_report(msg)
             elif TOP_POST_WATCH_SUBJECT.lower() in msg.subject.lower():
                 self._process_watch_request(msg)
-
 
     def _process_watch_request(self, msg: Message) -> NoReturn:
         """
@@ -70,9 +71,7 @@ class InboxMonitor:
                 )
                 uow.commit()
                 log.info('Created post watch on %s for %s.  Source: Top Post', post_id, msg.author.name)
-                msg.reply(WATCH_ENABLED)
-
-
+                self.response_handler.reply_to_private_message(msg, WATCH_ENABLED)
 
     def _process_user_report(self, msg: Message):
         with self.uowm.start() as uow:
@@ -104,23 +103,7 @@ class InboxMonitor:
             uow.user_report.add(report)
             uow.commit()
 
-        try:
-            msg.reply('Thank you for your report. \n\nIt has been documented and will be reviewed further')
-        except Exception as e:
-            log.exception('Failed to send resposne to report.', exc_info=True)
-
-    def _process_unknown_message(self, msg: Message) -> NoReturn:
-        """
-        Take an unknown message and forward to dev
-        :param msg: Praw Message
-        """
-        dev = self.reddit.redditor('barrycarey')
-        try:
-            dev.message(f'FWD: {msg}', f'From {msg.author.name}\n\n{msg.body}')
-            msg.reply(
-                'Thank you for your message.  This inbox is not monitored.  I have forwarded your message to the developer')
-        except Exception as e:
-            log.exception('Failed to send message to dev', exc_info=True)
+        self.response_handler.reply_to_private_message(msg, REPORT_RESPONSE)
 
     def _load_msg_body_data(self, body: Text) -> Dict:
         """
@@ -149,6 +132,8 @@ if __name__ == '__main__':
     config = Config()
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     reddit = get_reddit_instance(config)
-    invite = InboxMonitor(uowm, reddit)
+    event_logger = EventLogging(config=config)
+    response_handler = ResponseHandler(reddit, uowm, event_logger, source='submonitor')
+    invite = InboxMonitor(uowm, reddit, response_handler)
     while True:
         invite.check_inbox()

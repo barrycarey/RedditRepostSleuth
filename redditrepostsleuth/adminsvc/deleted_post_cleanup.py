@@ -3,7 +3,9 @@ import time
 import pymysql
 import redis
 import sys
+
 sys.path.append('./')
+from redditrepostsleuth.core.util.helpers import get_redis_client
 from redditrepostsleuth.core.celery.maintenance_tasks import deleted_post_cleanup
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -19,6 +21,12 @@ def get_db_conn():
                            cursorclass=pymysql.cursors.DictCursor)
 
 def get_all_links():
+    print('[Scheduled Job] Queue deleted posts')
+    redis = get_redis_client(config)
+    if len(redis.lrange('deleted_post_cleanup', 0, 20000)) > 0:
+        log.info('Deleted post cleanup queue still has pending jobs.  Skipping queueing ')
+        return
+
     conn = get_db_conn()
     batch = []
     with conn.cursor() as cur:

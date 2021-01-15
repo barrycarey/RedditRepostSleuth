@@ -106,16 +106,3 @@ if __name__ == '__main__':
     sys.exit()
 
 
-
-
-    """
-    with conn.cursor() as cur:
-        query = "SELECT id,post_id FROM reddit_image_post ORDER BY id "
-        cur.execute(query)
-        group = []
-        for row in cur:
-            group.append(row['post_id'])
-            if len(group) >= 10000:
-                cleanup_orphan_image_post.apply_async((group,), queue='orphandelete')
-                group = []
-    """
