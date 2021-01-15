@@ -46,8 +46,7 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
     )
 
     save_image_repost_result(search_results, self.uowm, source='ingest')
-    if len(search_results.matches):
-        self.notification_svc.send_notification(search_results)
+
     self.event_logger.save_event(RepostEvent(
         event_type='repost_found' if search_results.matches else 'repost_check',
         status='success',

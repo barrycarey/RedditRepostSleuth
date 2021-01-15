@@ -18,6 +18,7 @@ from redditrepostsleuth.core.notification.notification_service import Notificati
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
+from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, bot_has_permission
 
 
@@ -57,7 +58,12 @@ class SubredditConfigUpdater:
 
     def check_for_config_update(self, monitored_sub: MonitoredSub, notify_missing_keys=True):
 
-        if not bot_has_permission(monitored_sub.name, 'wiki', self.reddit):
+        if not monitored_sub.is_mod:
+            log.error('Bot is not a mod on %s, skipping config update', monitored_sub.name)
+            return
+
+        if not monitored_sub.wiki_permission:
+            log.error('Bot does not have wiki permissions on %s', monitored_sub.name)
             return
 
         subreddit = self.reddit.subreddit(monitored_sub.name)
@@ -338,13 +344,16 @@ class SubredditConfigUpdater:
 
     def _create_wiki_page(self, subreddit: Subreddit):
         log.info('Creating config wiki page for %s', subreddit.display_name)
-        with open('../../adminsvc/bot_config.md', 'r') as f:
-            template = f.read()
         try:
-            subreddit.wiki.create(self.config.wiki_config_name, template)
+            subreddit.wiki.create(self.config.wiki_config_name, json.dumps(DEFAULT_CONFIG_VALUES))
         except NotFound:
             log.exception('Failed to create wiki page', exc_info=False)
             raise
+
+        self.notification_svc.send_notification(
+            f'Created new config for {subreddit.display_name}',
+            subject='Created new config from template'
+        )
 
     def _notify_config_created(self, subreddit: Subreddit) -> bool:
         """
