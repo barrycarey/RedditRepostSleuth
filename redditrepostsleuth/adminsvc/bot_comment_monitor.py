@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Text, Optional
 
 import requests
+from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import BotComment, Comment
@@ -74,6 +75,9 @@ class BotCommentMonitor:
         try:
             log.debug('Fetching Comment https://reddit.com%s', permalink)
             r = requests.get(f'{self.config.util_api}/reddit/comment', params={'permalink': permalink})
+        except ConnectionError:
+            log.error('Problem getting comment from util API')
+            return
         except Exception as e:
             log.error('Error getting comment from util api', exc_info=True)
             return

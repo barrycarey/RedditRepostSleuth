@@ -163,7 +163,7 @@ def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
                 uow.posts.remove(post)
                 """
             elif p['action'] == 'default':
-                log.info('Got default: %s', post.searched_url)
+                log.info('Got default: %s', post.url)
             else:
                 continue
 
@@ -211,7 +211,7 @@ def deleted_post_cleanup(self, posts: List[Text]) -> NoReturn:
 
                 # uow.posts.remove(post)
                 if image_post:
-                    log.info('Deleting image post %s - %s', image_post.id, post.searched_url)
+                    log.info('Deleting image post %s - %s', image_post.id, post.url)
                     # log.info(post.url)
                     uow.image_post.remove(image_post)
                 if image_post_current:
@@ -244,7 +244,7 @@ def deleted_post_cleanup(self, posts: List[Text]) -> NoReturn:
                     uow.posts.remove(post)
 
             elif p['action'] == 'default':
-                log.info('Got default: %s', post.searched_url)
+                log.info('Got default: %s', post.url)
             else:
                 continue
 
@@ -266,7 +266,7 @@ def image_post_cleanup(self, posts: List[Text]) -> NoReturn:
 
             # uow.posts.remove(post)
             if image_post:
-                log.info('Deleting image post %s - %s', image_post.id, post.searched_url)
+                log.info('Deleting image post %s - %s', image_post.id, post.url)
                 # log.info(post.url)
                 uow.image_post.remove(image_post)
             if image_post_current:

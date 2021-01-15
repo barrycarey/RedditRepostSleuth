@@ -25,10 +25,16 @@ The bot exposes several variables that can be used in the bot's comments as well
   * Newest Match Created: {newest_created_at}
   * Newest Match Shortlink: {newest_shortlink}
   * Newest Percent Match: {newest_percent_match}
-  * Newest Sub: {newest_sub}
+  * Newest Sub: {newest_sub}closest_shortlink
   * List of All Matches: {match_list}
   * Post Author: {post_author}
   * Search URL: {search_url}
+  * Meme Filter Used: {meme_filter_used}
+  * Search URL: {search_url} - URL to repostsleuth.com with exact search settings
+  * Checked Title: {check_title}
+  * Report Link: {report_post_link}
+  * Target % used on final matching: {effective_target_match_percent}
+  * Max match age: {max_age}
 
 ## Report Message
 

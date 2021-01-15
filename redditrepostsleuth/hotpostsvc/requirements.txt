@@ -7,3 +7,5 @@ imagehash
 distance
 redlock
 python-Levenshtein
+falcon
+redlock
