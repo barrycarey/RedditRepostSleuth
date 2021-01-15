@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+* [bugfix] - Comment on link reposts was pointing to itself as the source
+
 ## [1.0.0] - 1/15/2021
 * [change] - Removed CMD system from summoning.  Added too much complication and is made redundant by repostsleuth.com  
 * [backend] - Monitored sub config updates moved to worker pool to greatly increase speed loading of config changes

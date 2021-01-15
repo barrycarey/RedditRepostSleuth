@@ -15,6 +15,7 @@ from redditrepostsleuth.core.exception import NoIndexException, RateLimitExcepti
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -23,7 +24,7 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     save_link_repost, get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -275,13 +276,18 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
 
-    def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub):
-        return get_link_reposts(
+    def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub) -> SearchResults:
+        search_results = get_link_reposts(
             post.url,
             self.uowm,
             get_link_search_settings_for_monitored_sub(monitored_sub),
             post=post,
             get_total=False
+        )
+        return filter_search_results(
+            search_results,
+            reddit=self.reddit.reddit,
+            uitl_api=f'{self.config.util_api}/maintenance/removed'
         )
 
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageSearchResults:
