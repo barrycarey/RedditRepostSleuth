@@ -143,7 +143,10 @@ def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWo
         base_values['newest_shortlink'] = f'https://redd.it/{search_results.matches[-1].post.post_id}'
         base_values['newest_sub'] = search_results.matches[-1].post.subreddit
         base_values['first_seen'] = f"First Seen [Here](https://redd.it/{search_results.matches[0].post.post_id}) on {search_results.matches[0].post.created_at.strftime('%Y-%m-%d')}"
-        base_values['last_seen'] = f"Last Seen [Here](https://redd.it/{search_results.matches[-1].post.post_id}) on {search_results.matches[-1].post.created_at.strftime('%Y-%m-%d')}"
+        if len(search_results.matches) > 1:
+            base_values['last_seen'] = f"Last Seen [Here](https://redd.it/{search_results.matches[-1].post.post_id}) on {search_results.matches[-1].post.created_at.strftime('%Y-%m-%d')}"
+        else:
+            base_values['last_seen'] = ''
 
     if uowm:
         with uowm.start() as uow:

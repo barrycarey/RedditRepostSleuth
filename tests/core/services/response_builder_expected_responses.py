@@ -77,7 +77,7 @@ LINK_OC_ALL_ENABLED = 'Looks like this is the first time this link has been shar
                     ' | **Searched Links:** 0 | **Search Time:** 10s'
 
 LINK_REPOST_ALL_ENABLED = 'This link has been shared 1 time.\n\n' \
-                          'First Seen [Here](https://redd.it/123abc) on 2019-06-28. Last Seen [Here](https://redd.it/123abc) on 2019-06-28\n\n' \
+                          'First Seen [Here](https://redd.it/123abc) on 2019-06-28. \n\n' \
                     'Feedback? Hate? Visit r/repostsleuthbot - \n\n' \
                     '---\n\n' \
                     '**Scope:** Reddit | **Check Title:** False | **Max Age:** 190' \
