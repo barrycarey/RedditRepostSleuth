@@ -307,6 +307,7 @@ def get_link_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> S
         only_older_matches=True,
         filter_same_author=monitored_sub.filter_same_author,
         filter_crossposts=monitored_sub.filter_crossposts,
+        filter_removed_matches=monitored_sub.filter_removed_matches,
 
     )
 
@@ -321,6 +322,7 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         max_days_old=monitored_sub.target_days_old,
         filter_same_author=monitored_sub.filter_same_author,
         filter_crossposts=monitored_sub.filter_crossposts,
+        filter_removed_matches=monitored_sub.filter_removed_matches,
         max_depth=-1,
         max_matches=200
 

@@ -58,7 +58,7 @@ class NewActivationMonitor:
         if self.notification_svc:
             self.notification_svc.send_notification(
                 f'Added new monitored sub r/{monitored_sub.name}',
-                subject='**New Monitored Sub Added!**'
+                subject='New Monitored Sub Added!'
             )
         log.info('%s has been added as a monitored sub', subreddit.display_name)
 

@@ -62,7 +62,7 @@ class DiscordAgent(NotificationAgent):
 
     def _build_payload(self, body: Text, **kwargs) -> Dict:
         if self.include_subject:
-            text = f"{kwargs.get('subject', '')}\r\n{body}"
+            text = f"**{kwargs.get('subject', '')}**\r\n{body}"
         else:
             text = body
 

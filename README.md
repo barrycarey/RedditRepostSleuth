@@ -6,7 +6,8 @@
 	</h4>
 </div>
 
-![Master](https://github.com/barrycarey/RedditRepostSleuth/workflows/Python%20application/badge.svg)
+![Master](https://github.com/barrycarey/RedditRepostSleuth/workflows/Tests/badge.svg)
+![Travis (.com)](https://img.shields.io/travis/com/barrycarey/RedditRepostSleuth)
 ![semver](https://img.shields.io/badge/semver-1.0.0-blue)
 ![CodeFactor Grade](https://img.shields.io/codefactor/grade/github/barrycarey/RedditRepostSleuth/master)
 

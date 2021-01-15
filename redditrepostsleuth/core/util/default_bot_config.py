@@ -28,5 +28,6 @@ DEFAULT_CONFIG_VALUES = {
               "report_reposts": False,
               "comment_on_repost": True,
               "comment_on_oc": False,
-              "lock_response_comment": False
+              "lock_response_comment": False,
+              "filter_removed_matches": False
 }

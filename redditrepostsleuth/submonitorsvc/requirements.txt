@@ -8,3 +8,5 @@ influxdb
 annoy
 distance
 python-Levenshtein
+falcon
+redlock
