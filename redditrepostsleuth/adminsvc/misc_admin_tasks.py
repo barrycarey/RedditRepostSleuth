@@ -76,31 +76,10 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
                 if notification_svc:
                     notification_svc.send_notification(
                         f'Removed {ban.subreddit} from ban list',
-                        subject='**Subreddit Removed From Ban List!**'
+                        subject='Subreddit Removed From Ban List!'
                     )
             uow.commit()
 
-# TODO - Can be removed
-def update_monitored_sub_subscribers(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
-    print('[Scheduled Job] Update Subscribers Start')
-    with uowm.start() as uow:
-        subs = uow.monitored_sub.get_all_active()
-        for monitored_sub in subs:
-            subreddit = reddit.subreddit(monitored_sub.name)
-            if subreddit:
-                try:
-                    monitored_sub.subscribers = subreddit.subscribers
-                except Forbidden:
-                    log.error('[Subscriber Update] %s: Forbidden error', monitored_sub.name)
-                    continue
-                except NotFound:
-                    log.error('Sub %s not found', monitored_sub.name)
-                log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
-                try:
-                    uow.commit()
-                except Exception as e:
-                    log.exception('[Subscriber Update] Failed to update Monitored Sub %s', monitored_sub.name, exc_info=True)
-    print('[Scheduled Job] Update Subscribers End')
 
 def update_monitored_sub_data(uowm: UnitOfWorkManager) -> NoReturn:
     print('[Scheduled Job] Update Monitored Sub Data')
@@ -258,4 +237,4 @@ if __name__ == '__main__':
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_monitored_sub_data(uowm)
+    queue_config_updates(uowm, config)

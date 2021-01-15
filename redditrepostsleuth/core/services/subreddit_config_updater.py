@@ -366,7 +366,7 @@ class SubredditConfigUpdater:
         if self.notification_svc:
             self.notification_svc.send_notification(
                 f'Failed to load config for r/{subreddit.display_name}\n{error}',
-                subject=f'**Subreddit Config Load Failed**'
+                subject=f'Subreddit Config Load Failed'
             )
         body = f'I\'m unable to load your new config for r/{subreddit.display_name}. Your recent changes are invalid. \n\n' \
                 f'Error: {error} \n\n' \
@@ -384,7 +384,7 @@ class SubredditConfigUpdater:
         if self.notification_svc:
             self.notification_svc.send_notification(
                 f'New config loaded for r/{subreddit.display_name}',
-                subject=f'**Subreddit Config Load Success**'
+                subject=f'Subreddit Config Load Success'
             )
         try:
             subreddit.message('Repost Sleuth Has Loaded Your New Config!', 'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
@@ -439,7 +439,7 @@ class SubredditConfigUpdater:
         pass
 
 if __name__ == '__main__':
-    config = Config(r'/sleuth_config.json')
+    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
@@ -447,4 +447,6 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config, notification_svc=notification_svc)
-    updater.update_configs(notify_missing_keys=False)
+    with uowm.start() as uow:
+        sub = uow.monitored_sub.get_by_sub('RepostSleuthBot')
+    updater.check_for_config_update(sub, notify_missing_keys=False)

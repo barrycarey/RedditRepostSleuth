@@ -55,7 +55,7 @@ class BotCommentMonitor:
             log.info('Comment %s has karma of %s.  Removing', bot_comment.comment_id, bot_comment.karma)
             if self.notification_svc:
                 self.notification_svc.send_notification(
-                    f'Removing comment with {bot_comment.karma} karma. {bot_comment.perma_link}',
+                    f'Removing comment with {bot_comment.karma} karma. https://reddit.com{bot_comment.perma_link}',
                     subject='Removing Downvoted Comment'
                 )
             comment = self.reddit.comment(bot_comment.comment_id)

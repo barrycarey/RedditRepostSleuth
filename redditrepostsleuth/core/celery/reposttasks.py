@@ -1,4 +1,3 @@
-from time import perf_counter
 from typing import List, Dict
 
 import requests
@@ -6,20 +5,19 @@ from redlock import RedLockError
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.celery import celery
+from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
+from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
+    repost_watch_notify, check_for_post_watch
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
 from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck, IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
-from redditrepostsleuth.core.model.search.link_search_results import LinkSearchResults
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
-from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AnnoyTask, SqlAlchemyTask, RedditTask, RepostTask
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
-    repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
 
 
 @celery.task(ignore_results=True)
