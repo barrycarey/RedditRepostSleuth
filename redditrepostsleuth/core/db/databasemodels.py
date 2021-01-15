@@ -307,6 +307,7 @@ class MonitoredSub(Base):
     comment_on_repost = Column(Boolean, default=True)
     comment_on_oc = Column(Boolean, default=False)
     lock_response_comment = Column(Boolean, default=False)
+    filter_removed_matches = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -360,7 +361,8 @@ class MonitoredSub(Base):
             'activation_notification_sent': self.activation_notification_sent,
             'comment_on_repost': self.comment_on_repost,
             'comment_on_oc': self.comment_on_oc,
-            'lock_response_comment': self.lock_response_comment
+            'lock_response_comment': self.lock_response_comment,
+            'filter_removed_matches': self.filter_removed_matches
         }
 
 

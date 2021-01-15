@@ -449,4 +449,4 @@ if __name__ == '__main__':
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config, notification_svc=notification_svc)
     with uowm.start() as uow:
         sub = uow.monitored_sub.get_by_sub('RepostSleuthBot')
-    updater.check_for_config_update(sub, notify_missing_keys=False)
+    updater.update_configs(notify_missing_keys=False)
