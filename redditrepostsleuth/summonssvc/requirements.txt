@@ -10,3 +10,5 @@ influxdb
 redlock
 dataclasses
 python-Levenshtein
+redlock
+falcon

@@ -15,7 +15,7 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
-from redditrepostsleuth.core.util.helpers import get_reddit_instance
+from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_redis_client
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
@@ -36,8 +36,15 @@ if __name__ == '__main__':
         event_logger=event_logger,
         config=config
     )
-    redis_client = redis.Redis(host=config.redis_host, port=config.redis_port, db=0, password=config.redis_password)
+    redis = get_redis_client(config)
     while True:
+        while True:
+            queued_items = redis.lrange('submonitor', 0, 20000)
+            if len(queued_items) == 0:
+                log.info('Sub monitor queue empty.  Starting over')
+                break
+            log.info('Sub monitor queue still has %s tasks', len(queued_items))
+            time.sleep(60)
         with uowm.start() as uow:
             monitored_subs = uow.monitored_sub.get_all()
             for monitored_sub in monitored_subs:
@@ -56,11 +63,5 @@ if __name__ == '__main__':
                     log.error('Failed to submit job to Celery')
                 continue
 
-            while True:
-                queued_items = redis_client.lrange('submonitor', 0, 20000)
-                if len(queued_items) == 0:
-                    log.info('Sub monitor queue empty.  Starting over')
-                    break
-                log.info('Sub monitor queue still has %s tasks', len(queued_items))
-                time.sleep(60)
+
 

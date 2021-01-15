@@ -25,3 +25,5 @@ matplotlib
 scipy
 numpy
 pytesseract
+falcon
+redlock

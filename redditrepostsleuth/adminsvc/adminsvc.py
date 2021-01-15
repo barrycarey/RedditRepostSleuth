@@ -35,7 +35,7 @@ if __name__ == '__main__':
     activation_monitor = NewActivationMonitor(uowm, get_reddit_instance(config), notification_svc=notification_svc)
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger)
-    inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit)
+    inbox_monitor = InboxMonitor(uowm, reddit_manager.reddit, response_handler)
 
     #config_updater.update_configs()
 
@@ -73,7 +73,7 @@ if __name__ == '__main__':
         func=update_monitored_sub_data,
         args=(uowm,),
         trigger='interval',
-        hours=2,
+        hours=6,
         name='updated_monitored_sub_data',
         max_instances=1
     )

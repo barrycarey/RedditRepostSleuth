@@ -3,9 +3,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [UNRELEASED]
+## [1.0.0] - 1/15/2021
 * [change] - Removed CMD system from summoning.  Added too much complication and is made redundant by repostsleuth.com  
+* [backend] - Monitored sub config updates moved to worker pool to greatly increase speed loading of config changes
+* [backend] - Sub Monitoring - Scheduled job to check if bot has been removed as admin
+* [backend] - Added ability to search by URL instead of existing post.  This will allow any image to be searched on repostsleuth.com
 * [bugfix] - Matches from current month were getting dropped if IDs overlapped historical images
+* [bugfix] - If a sub added the bot as a mod and then removed, they were not able to add it again
 * [bugfix] - Summons on a monitored subreddit were ignoring subs custom settings
 * [bugfix] - Closest match was no longer being included in comments
 * [bugfix] - If config for monitored sub failed to validate default values were being written to database and mod mail was sent
@@ -17,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [feature] - False positive reports automatically added to voting on repostsleuth.com
 * [feature] - Add notification framework.  Currently only exposed for backend but will be available for monitored subs
 * [feature] - Added daily job to check banned subs to see if bot is still banned
+* [feature] - Sub Monitoring - lock_response_comment setting added to lock the bot's response
+* [feature] - Sub Monitoring - filter_removed_matches setting added to remove any search result that has been removed from Reddit
+* [feature] - Sub Monitoring - removed only_comment_on_repost setting and replaced with comment_on_repost and comment_on_oc
+* [feature] - Sub Monitoring - Config changes on repostsleuth.com now sync to wiki config
+* [feature] - The bot's comments now include the settings used to execute the search
 
 
 ## [0.1.8] - 8/29/2020
