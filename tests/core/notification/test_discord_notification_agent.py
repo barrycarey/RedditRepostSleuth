@@ -35,7 +35,7 @@ class TestDiscordAgent(TestCase):
         agent = DiscordAgent(name='discord', hook='test.com', include_subject=True)
         r = agent._build_payload('this is a test message', subject='this is a subject')
         self.assertIn('content', r)
-        self.assertEqual('this is a subject\r\nthis is a test message', r['content'])
+        self.assertEqual('**this is a subject**\r\nthis is a test message', r['content'])
 
     def test__build_image_repost_attachment_single_match(self):
         agent = DiscordAgent(name='discord', hook='test.com')
