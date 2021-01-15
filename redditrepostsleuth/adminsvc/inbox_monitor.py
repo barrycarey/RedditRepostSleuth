@@ -1,6 +1,5 @@
 import json
 import re
-import time
 from json import JSONDecodeError
 from typing import Text, Dict, NoReturn
 
