@@ -6,3 +6,5 @@ imagehash
 apscheduler
 redis
 celery[redis]==4.4.7
+falcon
+redlock
