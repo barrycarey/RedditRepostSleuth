@@ -8,19 +8,19 @@ from celery import Task
 from praw.exceptions import APIException
 from prawcore import ResponseException
 from redlock import RedLockError
+from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-from redditrepostsleuth.core.notification.notification_service import NotificationService
-from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import SummonsResponse
-
+from redditrepostsleuth.core.notification.notification_service import NotificationService
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -121,6 +121,9 @@ def process_monitored_sub(self, monitored_sub):
     try:
         log.info('Loading all submissions from %s', monitored_sub.name)
         r = requests.get(f'{self.config.util_api}/reddit/subreddit', params={'subreddit': monitored_sub.name, 'limit': 500})
+    except ConnectionError:
+        log.error('Connection error with util API')
+        return
     except Exception as e:
         log.error('Error getting new posts from util api', exc_info=True)
         return

@@ -75,7 +75,7 @@ class BotStats:
                     continue
                 results.append({
                     'post_id': post.post_id,
-                    'url': post.searched_url,
+                    'url': post.url,
                     'nsfw': repost.nsfw,
                     'author': post.author,
                     'shortlink': f'https://redd.it/{post.post_id}',
