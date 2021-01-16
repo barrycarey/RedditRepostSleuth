@@ -297,6 +297,8 @@ class DuplicateImageService:
                 meme_filter_time=search_results.search_times.meme_filter_time,
                 total_filter_time=search_results.search_times.total_filter_time,
                 match_post_time=search_results.search_times.set_match_post_time,
+                filter_removed_posts_time=search_results.search_times.filter_removed_posts_time,
+                filter_deleted_posts_time=search_results.search_times.filter_deleted_posts_time,
                 source=source
             )
         )
