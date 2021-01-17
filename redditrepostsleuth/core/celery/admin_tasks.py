@@ -46,7 +46,7 @@ def notify_subreddit_removed_mod(self, monitored_sub: MonitoredSub) -> NoReturn:
     if monitored_sub.failed_admin_check_count == 1:
         message = '72 hour notice'
     elif monitored_sub.failed_admin_check_count == 2:
-        message = '28 hour notice'
+        message = '48 hour notice'
     elif monitored_sub.failed_admin_check_count == 3:
         message = '24 hour notice'
     else:
