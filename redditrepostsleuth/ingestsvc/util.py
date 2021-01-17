@@ -25,7 +25,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
             log.debug('Post %s: Is an image', post.post_id)
             try:
                 post, image_post, image_post_current = process_image_post(post, hash_api)
-            except (ImageRemovedException, ImageConversioinException):
+            except (ImageRemovedException, ImageConversioinException, InvalidImageUrlException):
                 return
             if image_post is None or image_post_current is None:
                 log.error('Post %s: Failed to save image post. One of the post objects is null', post.post_id)
@@ -67,6 +67,9 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, Redd
             if r.status_code == 404:
                 log.error('Post %s: Image no longer exists %s: %s', post.post_id, r.status_code, post.url)
                 raise ImageRemovedException(f'Post {post.post_id} has been deleted')
+            elif r.status_code == 403:
+                log.error('Unauthorized (%s): https://redd.it/%s', post.subreddit, post.post_id)
+                raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')
             else:
                 log.debug('Bad status code from image URL %s', r.status_code)
                 raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')

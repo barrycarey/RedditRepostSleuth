@@ -338,16 +338,10 @@ class SubMonitor:
         @param submission: Submission to remove
         """
         if monitored_sub.remove_repost:
-            if not monitored_sub.removal_reason:
-                log.error('Sub %s does not have a removal reason set.  Cannot remove', monitored_sub.name)
-                return
             try:
                 removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
-                if not removal_reason_id:
-                    log.error('Failed to get Removal Reason ID from reason %s', monitored_sub.removal_reason)
-                    return
+                log.info('Attempting to remove post %s with removal ID', submission.id, removal_reason_id)
                 submission.mod.remove(reason_id=removal_reason_id)
-                log.error('[%s][%s] - Failed to remove post using reason ID %s.  Likely a bad reasons ID', monitored_sub.name, submission.id, monitored_sub.removal_reason_id)
                 submission.mod.remove()
             except Forbidden:
                 log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
