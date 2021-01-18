@@ -237,4 +237,4 @@ if __name__ == '__main__':
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    queue_config_updates(uowm, config)
+    update_monitored_sub_data(uowm)
