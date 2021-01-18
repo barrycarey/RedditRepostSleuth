@@ -119,15 +119,19 @@ def filter_search_results(
         if search_results.search_settings.max_days_old:
             search_results.matches = list(filter(filter_days_old_matches(search_results.search_settings.max_days_old), search_results.matches))
 
-    if reddit and uitl_api:
-        if search_results.search_settings.filter_dead_matches:
+        if search_results.search_settings.filter_dead_matches and uitl_api:
+            search_results.search_times.start_timer('filter_deleted_posts_time')
             search_results.matches = filter_dead_urls_remote(
                 uitl_api,
                 search_results.matches
             )
+            search_results.search_times.stop_timer('filter_deleted_posts_time')
+            print(f'Filter dead time: {search_results.search_times.filter_deleted_posts_time}')
 
     if search_results.search_settings.filter_removed_matches and reddit:
+        search_results.search_times.start_timer('filter_removed_posts_time')
         search_results.matches = filter_removed_posts(reddit, search_results.matches)
+        search_results.search_times.stop_timer('filter_removed_posts_time')
 
     search_results.search_times.stop_timer('total_filter_time')
     log.debug('%s results post-filter', len(search_results.matches))

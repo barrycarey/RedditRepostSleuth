@@ -1,4 +1,5 @@
-from typing import List, Dict
+from time import perf_counter
+from typing import List, Dict, NoReturn
 
 import requests
 from redlock import RedLockError
@@ -10,11 +11,10 @@ from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, Repo
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
-from redditrepostsleuth.core.exception import NoIndexException, CrosspostRepostCheck, IngestHighMatchMeme
+from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
-from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
@@ -29,15 +29,12 @@ def ingest_repost_check(post):
 
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
-def check_image_repost_save(self, post: Post) -> ImageSearchResults:
+def check_image_repost_save(self, post: Post) -> NoReturn:
+
     r = requests.head(post.url)
     if r.status_code != 200:
         log.info('Skipping image that is deleted %s', post.url)
         return
-
-    if post.crosspost_parent:
-        log.info('Post %sis a crosspost, skipping repost check', post.post_id)
-        raise CrosspostRepostCheck('Post {} is a crosspost, skipping repost check'.format(post.post_id))
 
     search_results = self.dup_service.check_image(
         post.url,
@@ -45,7 +42,7 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
         source='ingest_repost'
     )
 
-    save_image_repost_result(search_results, self.uowm, source='ingest')
+    save_image_repost_result(search_results, self.uowm, source='ingest', high_match_check=True)
 
     self.event_logger.save_event(RepostEvent(
         event_type='repost_found' if search_results.matches else 'repost_check',
@@ -54,12 +51,10 @@ def check_image_repost_save(self, post: Post) -> ImageSearchResults:
         repost_of=search_results.matches[0].post.post_id if search_results.matches else None,
 
     ))
+
     watches = check_for_post_watch(search_results.matches, self.uowm)
     if watches and self.config.enable_repost_watch:
         notify_watch.apply_async((watches, post), queue='watch_notify')
-
-    return search_results
-
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts, ):

@@ -1,8 +1,12 @@
-from typing import NoReturn, Dict
+from typing import NoReturn, Dict, Text
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AdminTask
+from redditrepostsleuth.core.celery.basetasks import AdminTask, RedditTask
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.reddithelpers import get_subscribers, is_sub_mod_praw, get_bot_permissions
+from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
+    MONITORED_SUB_MOD_REMOVED_SUBJECT
 
 
 @celery.task(bind=True, base=AdminTask)
@@ -16,3 +20,58 @@ def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, use
         f'r/{monitored_sub.name} config updated on site by {user_data["name"]}',
         subject='**Config updated on repostsleuth.com**'
     )
+
+
+@celery.task(bind=True, base=RedditTask)
+def update_monitored_sub_stats(self, sub_name: Text) -> NoReturn:
+    with self.uowm.start() as uow:
+        monitored_sub: MonitoredSub = uow.monitored_sub.get_by_sub(sub_name)
+        if not monitored_sub:
+            log.error('Failed to find subreddit %s', sub_name)
+            return
+
+        monitored_sub.subscribers = get_subscribers(monitored_sub.name, self.reddit.reddit)
+
+        log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
+        monitored_sub.is_mod = is_sub_mod_praw(monitored_sub.name, 'repostsleuthbot', self.reddit.reddit)
+        perms = get_bot_permissions(monitored_sub.name, self.reddit) if monitored_sub.is_mod else []
+        monitored_sub.post_permission = True if 'all' in perms or 'posts' in perms else None
+        monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
+        log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission, monitored_sub.wiki_permission)
+
+        if monitored_sub.is_mod:
+            monitored_sub.failed_admin_check_count = 0
+        else:
+            monitored_sub.failed_admin_check_count += 1
+            self.notification_svc.send_notification(
+                f'Failed admin check for r/{monitored_sub.name} increased to {monitored_sub.failed_admin_check_count}.',
+                subject='Failed Admin Check Increased'
+            )
+
+        if monitored_sub.failed_admin_check_count == 2:
+            subreddit = self.reddit.subreddit(monitored_sub.name)
+            message = MONITORED_SUB_MOD_REMOVED_CONTENT.format(hours='72', subreddit=monitored_sub.name)
+            subreddit.message(
+                MONITORED_SUB_MOD_REMOVED_SUBJECT,
+                message
+            )
+        elif monitored_sub.failed_admin_check_count >= 4:
+            self.notification_svc.send_notification(
+                f'Sub r/{monitored_sub.name} failed admin check 4 times.  Removing',
+                subject='Removing Monitored Subreddit'
+            )
+            uow.monitored_sub.remove(monitored_sub)
+
+        uow.commit()
+
+@celery.task(bind=True, base=RedditTask)
+def notify_subreddit_removed_mod(self, monitored_sub: MonitoredSub) -> NoReturn:
+    hours = ''
+    if monitored_sub.failed_admin_check_count == 1:
+        hours = '72'
+    elif monitored_sub.failed_admin_check_count == 2:
+        hours = '48'
+    elif monitored_sub.failed_admin_check_count == 3:
+        hours = '24'
+    else:
+        hours = 'remove'
