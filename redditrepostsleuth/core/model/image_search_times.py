@@ -33,7 +33,7 @@ class ImageSearchTimes(SearchTimes):
             'set_match_hamming': self.set_match_hamming,
             'image_search_api_time': self.image_search_api_time,
             'filter_removed_posts_time': self.filter_removed_posts_time,
-            'filter_deleted_posts_time': self.filter_deleted_posts_time
+            'filter_deleted_posts_time': self.filter_deleted_posts_time,
             'image_search_api_time': self.image_search_api_time,
             'set_meme_hash_time': self.set_meme_hash_time,
             'set_closest_meme_hash_time': self.set_closest_meme_hash_time,
