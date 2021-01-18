@@ -25,7 +25,7 @@ class MemeTemplateEndpoint:
                 post = uow.posts.get_by_post_id(template.post_id)
                 if not post:
                     continue
-                template_dict['url'] = post.searched_url
+                template_dict['url'] = post.url
                 results.append(template_dict)
             resp.body = json.dumps(results)
 
