@@ -1,3 +1,4 @@
+from time import perf_counter
 from typing import List, Dict, NoReturn
 
 import requests
@@ -29,6 +30,7 @@ def ingest_repost_check(post):
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
+
     r = requests.head(post.url)
     if r.status_code != 200:
         log.info('Skipping image that is deleted %s', post.url)
@@ -40,7 +42,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         source='ingest_repost'
     )
 
-    save_image_repost_result(search_results, self.uowm, source='ingest')
+    save_image_repost_result(search_results, self.uowm, source='ingest', high_match_check=True)
 
     self.event_logger.save_event(RepostEvent(
         event_type='repost_found' if search_results.matches else 'repost_check',
@@ -49,11 +51,10 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         repost_of=search_results.matches[0].post.post_id if search_results.matches else None,
 
     ))
+
     watches = check_for_post_watch(search_results.matches, self.uowm)
     if watches and self.config.enable_repost_watch:
         notify_watch.apply_async((watches, post), queue='watch_notify')
-
-
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts, ):

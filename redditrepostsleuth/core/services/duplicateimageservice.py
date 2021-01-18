@@ -61,7 +61,15 @@ class DuplicateImageService:
             uitl_api=f'{self.config.util_api}/maintenance/removed'
         )
 
-        closest_match = get_closest_image_match(search_results.matches, check_url=True)
+        search_results.search_times.start_timer('get_closest_match_time')
+        # Since we regenerate the hash for memes we have to make sure the match is alive regardless of setting
+        if search_results.meme_template:
+            closest_check_url = True
+        else:
+            closest_check_url = search_results.search_settings.filter_dead_matches
+        closest_match = get_closest_image_match(search_results.matches, check_url=closest_check_url)
+        search_results.search_times.stop_timer('get_closest_match_time')
+
         if closest_match and closest_match.hamming_match_percent > 40: # TODO - Move to config
             search_results.closest_match = closest_match
             if search_results.closest_match and search_results.meme_template:
