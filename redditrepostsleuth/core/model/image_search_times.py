@@ -18,6 +18,7 @@ class ImageSearchTimes(SearchTimes):
         self.set_meme_hash_time: float = float(0)
         self.set_closest_meme_hash_time: float = float(0)
         self.distance_filter_time: float = float(0)
+        self.get_closest_match_time: float = float(0)
 
     def to_dict(self):
         return {**{
@@ -31,7 +32,8 @@ class ImageSearchTimes(SearchTimes):
             'image_search_api_time': self.image_search_api_time,
             'set_meme_hash_time': self.set_meme_hash_time,
             'set_closest_meme_hash_time': self.set_closest_meme_hash_time,
-            'distance_filter_time': self.distance_filter_time
+            'distance_filter_time': self.distance_filter_time,
+            'get_closest_match_time': self.get_closest_match_time
 
         }, **super().to_dict()}
 
