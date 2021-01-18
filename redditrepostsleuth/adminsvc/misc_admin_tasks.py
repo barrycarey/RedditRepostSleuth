@@ -7,8 +7,8 @@ from praw import Reddit
 from prawcore import Forbidden, NotFound
 from sqlalchemy import func
 
-from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task
-from redditrepostsleuth.core.celery.maintenance_tasks import update_monitored_sub_stats
+from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
+    update_monitored_sub_stats
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost, MemeTemplatePotential, \
     MemeTemplate
@@ -237,4 +237,4 @@ if __name__ == '__main__':
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    queue_config_updates(uowm, config)
+    update_monitored_sub_data(uowm)

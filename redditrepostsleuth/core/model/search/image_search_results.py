@@ -2,6 +2,7 @@ import json
 from typing import List, Text, Optional
 
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch, Post
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
@@ -35,6 +36,7 @@ class ImageSearchResults(SearchResults):
         """
         if self._target_hash:
             return self._target_hash
+        log.error('No target hash set, attempting to get')
         hashes = get_image_hashes(self.checked_url, hash_size=16)
         self._target_hash = hashes['dhash_h']
         return self._target_hash

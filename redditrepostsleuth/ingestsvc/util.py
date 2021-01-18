@@ -1,5 +1,6 @@
 import os
 from typing import Tuple
+from urllib.parse import urlparse
 
 import requests
 from requests.exceptions import ConnectionError
@@ -12,6 +13,8 @@ from redditrepostsleuth.core.db.databasemodels import RedditImagePost, Post, Red
 
 from hashlib import md5
 
+from redditrepostsleuth.core.model.events.ingest_image_process_event import IngestImageProcessEvent
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes_api, set_image_hashes
 from redditrepostsleuth.core.util.objectmapping import post_to_image_post, post_to_image_post_current, \
@@ -25,7 +28,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
             log.debug('Post %s: Is an image', post.post_id)
             try:
                 post, image_post, image_post_current = process_image_post(post, hash_api)
-            except (ImageRemovedException, ImageConversioinException):
+            except (ImageRemovedException, ImageConversioinException, InvalidImageUrlException, ConnectionError):
                 return
             if image_post is None or image_post_current is None:
                 log.error('Post %s: Failed to save image post. One of the post objects is null', post.post_id)
@@ -56,7 +59,12 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Post:
 
 
 def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, RedditImagePostCurrent]:
-    if 'imgur' not in post.url:
+    if 'imgur' not in post.url: # TODO Why in the hell did I do this?
+        """
+        if 'preview.redd.it' in post.url:
+            log.error('Skipping preview URL in %s: %s', post.subreddit, post.url)
+            raise InvalidImageUrlException(f'Unable to get preview image: {post.url}')
+        """
         try: # Make sure URL is still valid
             r = requests.head(post.url)
         except ConnectionError as e:
@@ -67,6 +75,9 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, Redd
             if r.status_code == 404:
                 log.error('Post %s: Image no longer exists %s: %s', post.post_id, r.status_code, post.url)
                 raise ImageRemovedException(f'Post {post.post_id} has been deleted')
+            elif r.status_code == 403:
+                log.error('Unauthorized (%s): https://redd.it/%s', post.subreddit, post.post_id)
+                raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')
             else:
                 log.debug('Bad status code from image URL %s', r.status_code)
                 raise InvalidImageUrlException(f'Issue getting image url: {post.url} - Status Code {r.status_code}')
