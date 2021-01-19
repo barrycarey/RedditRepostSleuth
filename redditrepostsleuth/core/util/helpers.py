@@ -3,10 +3,12 @@
 import json
 from typing import Dict, List, Text, TYPE_CHECKING
 
+import requests
 from falcon import Request
 from redis import Redis
 from redlock import RedLockFactory
 from sqlalchemy.exc import IntegrityError
+from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
@@ -345,3 +347,44 @@ def get_redis_client(config: Config) -> Redis:
         db=0,
         password=config.redis_password
     )
+
+def batch_check_urls(urls: List[Dict], util_api: Text) -> List[Dict]:
+    """
+    Batch checking a list of URLs and Post ID pairs to see if the associated links have been removed.
+    This function is using our utility API that runs on a Pool of VMs so we can check matches at high volume
+
+    We are piggy backing the util API I use to clean deleted posts from the database.
+
+    API response is:
+    [
+        {'id': '12345', 'action': 'remove'
+
+    ]
+
+    Several actions can be returned.  However, we're only interested in the remove since that results from the post's
+    URL returning a 404
+    :rtype: List[Dict]
+    :param urls: List of URLs and Post ID pairs: {'url': 'example.com', 'id': '124abc}
+    :param util_api: API call to make
+    """
+    try:
+        res = requests.post(util_api, json=urls)
+    except ConnectionError:
+        log.error('Problem reaching retail API', exc_info=False)
+        return urls
+    except Exception as e:
+        log.exception('Problem reaching retail API', exc_info=True)
+        return urls
+
+    if res.status_code != 200:
+        log.error('Non 200 status from util api (%s), doing local dead URL check', res.status_code)
+        return urls
+
+    res_data = json.loads(res.text)
+    removed_ids = [match['id'] for match in res_data if match['action'] == 'remove']
+    for removed_id in removed_ids:
+        for i, url in enumerate(urls):
+            if url['id'] == removed_id:
+                del urls[i]
+        #del urls[next(i for i, x in enumerate(urls) if x['id'] == removed_id)]
+    return urls

@@ -1,9 +1,10 @@
-from typing import NoReturn, Dict, Text
+from typing import NoReturn, Dict, Text, List
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AdminTask, RedditTask
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.celery.basetasks import AdminTask, RedditTask, SqlAlchemyTask
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.util.helpers import batch_check_urls
 from redditrepostsleuth.core.util.reddithelpers import get_subscribers, is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
     MONITORED_SUB_MOD_REMOVED_SUBJECT
@@ -64,14 +65,24 @@ def update_monitored_sub_stats(self, sub_name: Text) -> NoReturn:
 
         uow.commit()
 
-@celery.task(bind=True, base=RedditTask)
-def notify_subreddit_removed_mod(self, monitored_sub: MonitoredSub) -> NoReturn:
-    hours = ''
-    if monitored_sub.failed_admin_check_count == 1:
-        hours = '72'
-    elif monitored_sub.failed_admin_check_count == 2:
-        hours = '48'
-    elif monitored_sub.failed_admin_check_count == 3:
-        hours = '24'
-    else:
-        hours = 'remove'
+@celery.task(bind=True, base=SqlAlchemyTask)
+def check_if_watched_post_is_active(self, watches: List[RepostWatch]):
+    urls_to_check = []
+    with self.uowm.start() as uow:
+        for watch in watches:
+            post = uow.posts.get_by_post_id(watch.post_id)
+            if not post:
+                continue
+            urls_to_check.append({'url': post.url, 'id': str(watch.id)})
+
+        active_urls = batch_check_urls(
+            urls_to_check,
+            f'{self.config.util_api}/maintenance/removed'
+        )
+
+    for watch in watches:
+        if not next((x for x in active_urls if x['id'] == str(watch.id)), None):
+            log.info('Removing watch %s', watch.id)
+            uow.repostwatch.remove(watch)
+
+    uow.commit()
