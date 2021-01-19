@@ -233,7 +233,7 @@ class TestRepostFilters(TestCase):
             {'id': '1111', 'action': 'remove'},
         ]
         search_results = get_image_search_results_multi_match()
-        with mock.patch('redditrepostsleuth.core.services.duplicateimageservice.requests.post') as mock_post:
+        with mock.patch('redditrepostsleuth.core.util.helpers.requests.post') as mock_post:
             mock_post.return_value = Mock(status_code=200, text=json.dumps(res))
             r = filter_dead_urls_remote('test.com', search_results.matches)
             self.assertEqual(2, len(r))

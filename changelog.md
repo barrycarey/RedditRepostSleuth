@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [bugfix] - Comment on link reposts was pointing to itself as the source
 * [bugfix] - Reposts not being removed from monitored subs without removal reason set
 * [backend] - Monitored subs are now checked to see if bot is still a mod. If not, it is removed in 72 hours
+* [backend] - Auto cleanup of repost watches on deleted posts
 
 ## [1.0.0] - 1/15/2021
 * [change] - Removed CMD system from summoning.  Added too much complication and is made redundant by repostsleuth.com  
