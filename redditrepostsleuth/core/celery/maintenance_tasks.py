@@ -155,6 +155,7 @@ def deleted_post_cleanup(self, posts: List[Text]) -> NoReturn:
                 summons = uow.summons.get_by_post_id(p['id'])
                 image_search = uow.image_search.get_by_post_id(p['id'])
                 user_reports = uow.user_report.get_by_post_id(p['id'])
+                watches = uow.repostwatch.get_all_by_post_id(p['id'])
 
                 # uow.posts.remove(post)
                 if image_post:
@@ -187,6 +188,10 @@ def deleted_post_cleanup(self, posts: List[Text]) -> NoReturn:
                     for u in user_reports:
                         log.info('Deleting report %s', u.id)
                         uow.user_report.remove(u)
+                if watches:
+                    for w in watches:
+                        log.info('Deleting watch %s', w.id)
+                        uow.repostwatch.remove(w)
                 if post:
                     uow.posts.remove(post)
 
