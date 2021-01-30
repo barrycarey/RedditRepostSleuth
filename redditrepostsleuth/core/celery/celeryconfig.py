@@ -17,7 +17,6 @@ task_routes = {
     'redditrepostsleuth.core.celery.reposttasks.process_repost_annoy': {'queue': 'process_repost'},
     'redditrepostsleuth.core.celery.tasks.link_repost_check': {'queue': 'repost_link'},
     'redditrepostsleuth.core.celery.tasks.log_repost': {'queue': 'logrepost'},
-    'redditrepostsleuth.core.celery.maintenance_tasks.update_monitored_sub_stats': {'queue': 'monitored_sub_update'},
     'redditrepostsleuth.core.celery.admin_tasks.check_for_subreddit_config_update_task': {'queue': 'config_update_check'},
     'redditrepostsleuth.core.celery.admin_tasks.update_monitored_sub_stats': {'queue': 'monitored_sub_update'},
     'redditrepostsleuth.core.celery.admin_tasks.check_if_watched_post_is_active': {'queue': 'watch_remove_deleted'},

@@ -74,7 +74,7 @@ if __name__ == '__main__':
         func=update_monitored_sub_data,
         args=(uowm,),
         trigger='interval',
-        hours=6,
+        hours=24,
         name='updated_monitored_sub_data',
         max_instances=1
     )

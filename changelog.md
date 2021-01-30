@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 * [bugfix] - Comment on link reposts was pointing to itself as the source
 * [bugfix] - Reposts not being removed from monitored subs without removal reason set
+* [bugfix] - Bot was attempting to remove reposts twice for monitored subs
+* [bugfix] - Bot was commenting on front page OC when it should not have been
 * [backend] - Monitored subs are now checked to see if bot is still a mod. If not, it is removed in 72 hours
 * [backend] - Auto cleanup of repost watches on deleted posts
 

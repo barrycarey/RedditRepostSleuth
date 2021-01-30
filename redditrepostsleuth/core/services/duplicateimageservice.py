@@ -147,6 +147,7 @@ class DuplicateImageService:
             max_matches=search_settings.max_matches,
             max_depth=search_settings.max_depth,
         )
+        print(f'Historical Matches: {len(api_search_results.historical_matches)} - Current Matches: {len(api_search_results.current_matches)}')
         search_results.search_times.stop_timer('image_search_api_time')
 
         search_results.search_times.index_search_time = api_search_results.index_search_time
@@ -158,6 +159,7 @@ class DuplicateImageService:
         search_results.matches += self._build_search_results(api_search_results.current_matches, url,
                                                              search_results.target_hash, historical_index=False)
         search_results.search_times.stop_timer('set_match_post_time')
+        #print(f'Set Match Time: {search_results.search_times.set_match_post_time}')
 
         search_results.search_times.start_timer('remove_duplicate_time')
         search_results.matches = self._remove_duplicates(search_results.matches)

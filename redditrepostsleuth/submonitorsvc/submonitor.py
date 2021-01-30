@@ -342,7 +342,6 @@ class SubMonitor:
                 removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
                 log.info('Attempting to remove post %s with removal ID', submission.id, removal_reason_id)
                 submission.mod.remove(reason_id=removal_reason_id)
-                submission.mod.remove()
             except Forbidden:
                 log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
             except Exception as e:
