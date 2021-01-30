@@ -29,5 +29,6 @@ DEFAULT_CONFIG_VALUES = {
               "comment_on_repost": True,
               "comment_on_oc": False,
               "lock_response_comment": False,
-              "filter_removed_matches": False
+              "filter_removed_matches": False,
+              "send_repost_modmail": False
 }

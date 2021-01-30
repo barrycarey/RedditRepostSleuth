@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* [feature] - Add send_repost_modmail to monitored subs.  This will trigger a mod mail when a repost is detected
 * [bugfix] - Comment on link reposts was pointing to itself as the source
 * [bugfix] - Reposts not being removed from monitored subs without removal reason set
 * [bugfix] - Bot was attempting to remove reposts twice for monitored subs
