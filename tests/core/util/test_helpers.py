@@ -1,6 +1,8 @@
-from unittest import TestCase
+import json
+from unittest import TestCase, mock
 from datetime import datetime
 from unittest.mock import Mock
+from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MonitoredSub
@@ -15,7 +17,7 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url, \
-    build_image_report_link, get_default_link_search_settings
+    build_image_report_link, get_default_link_search_settings, batch_check_urls
 
 
 class TestHelpers(TestCase):
@@ -205,6 +207,85 @@ class TestHelpers(TestCase):
         self.assertEqual(expected, result)
 
 
+    def test_batch_check_urls_valid_call(self):
+        urls = [
+            {'url': 'example.com', 'id': '1'},
+            {'url': 'example.com', 'id': '2'},
+            {'url': 'example.com', 'id': '3'},
+            {'url': 'example.com', 'id': '4'},
+            {'url': 'example.com', 'id': '5'},
+        ]
+
+        api_return = [
+            {'url': 'example.com', 'id': '1', 'action': 'remove'},
+            {'url': 'example.com', 'id': '2', 'action': 'update'},
+            {'url': 'example.com', 'id': '3', 'action': 'update'},
+            {'url': 'example.com', 'id': '4', 'action': 'remove'},
+            {'url': 'example.com', 'id': '5', 'action': 'update'},
+        ]
+
+        with mock.patch('redditrepostsleuth.core.util.helpers.requests.post') as mock_post:
+            mock_post.return_value = Mock(status_code=200, text=json.dumps(api_return))
+            res = batch_check_urls(urls, 'test.com')
+
+        self.assertEqual(3, len(res))
+        self.assertEqual('2', res[0]['id'])
+        self.assertEqual('3', res[1]['id'])
+        self.assertEqual('5', res[2]['id'])
+
+    def test_batch_check_urls_valid_call_none_removed(self):
+        urls = [
+            {'url': 'example.com', 'id': '1'},
+            {'url': 'example.com', 'id': '2'},
+            {'url': 'example.com', 'id': '3'},
+            {'url': 'example.com', 'id': '4'},
+            {'url': 'example.com', 'id': '5'},
+        ]
+
+        api_return = [
+            {'url': 'example.com', 'id': '1', 'action': 'update'},
+            {'url': 'example.com', 'id': '2', 'action': 'update'},
+            {'url': 'example.com', 'id': '3', 'action': 'update'},
+            {'url': 'example.com', 'id': '4', 'action': 'update'},
+            {'url': 'example.com', 'id': '5', 'action': 'update'},
+        ]
+
+        with mock.patch('redditrepostsleuth.core.util.helpers.requests.post') as mock_post:
+            mock_post.return_value = Mock(status_code=200, text=json.dumps(api_return))
+            res = batch_check_urls(urls, 'test.com')
+
+        self.assertEqual(5, len(res))
+
+    def test_batch_check_urls_valid_bad_status(self):
+        urls = [
+            {'url': 'example.com', 'id': '1'},
+            {'url': 'example.com', 'id': '2'},
+            {'url': 'example.com', 'id': '3'},
+            {'url': 'example.com', 'id': '4'},
+            {'url': 'example.com', 'id': '5'},
+        ]
+
+        with mock.patch('redditrepostsleuth.core.util.helpers.requests.post') as mock_post:
+            mock_post.return_value = Mock(status_code=500, text=json.dumps(urls))
+            res = batch_check_urls(urls, 'test.com')
+
+        self.assertEqual(5, len(res))
+
+    def test_batch_check_urls_valid_bad_connection_error(self):
+        urls = [
+            {'url': 'example.com', 'id': '1'},
+            {'url': 'example.com', 'id': '2'},
+            {'url': 'example.com', 'id': '3'},
+            {'url': 'example.com', 'id': '4'},
+            {'url': 'example.com', 'id': '5'},
+        ]
+
+        with mock.patch('redditrepostsleuth.core.util.helpers.requests.post') as mock_post:
+            mock_post.side_effect = ConnectionError()
+            res = batch_check_urls(urls, 'test.com')
+
+        self.assertEqual(5, len(res))
+
     def _get_image_search_settings(self):
         return ImageSearchSettings(
             90,
@@ -314,3 +395,4 @@ class TestHelpers(TestCase):
         )
 
         return search_results
+

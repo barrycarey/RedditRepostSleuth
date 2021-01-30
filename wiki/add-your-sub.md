@@ -24,6 +24,8 @@ Repost Sleuth can perform a number of Moderation actions to take the load off yo
 * Lock Reposts
 * Remove Reposts
 * Mark a post as OC
+* Blocking people from mentioning the bot
+* Limit mentions to a single time
 
 # All Features
 ---
@@ -41,3 +43,4 @@ Repost Sleuth can perform a number of Moderation actions to take the load off yo
 * Disable user tags of the bot
 * Check title similarity 
 * Check all new submissions
+* Limit checks by post type

@@ -108,6 +108,8 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 **filter_removed_matches:** Checks all search results and drops any that are removed from Reddit
 
+**send_repost_modmail:** Send a modmail when a repost is found
+
 ### Comment Templates
 ---
 Must be in markdown format.  You have a number of variables you can use in the template.  [Click here for a list](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)

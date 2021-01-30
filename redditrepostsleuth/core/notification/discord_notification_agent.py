@@ -57,7 +57,7 @@ class DiscordAgent(NotificationAgent):
             log.error('Failed to send discord notification')
             return
 
-        if r.status_code != 200:
+        if r.status_code != 204:
             log.error('Unexpected status code %s from Discord webhook: %s', r.status_code, r.text)
 
     def _build_payload(self, body: Text, **kwargs) -> Dict:

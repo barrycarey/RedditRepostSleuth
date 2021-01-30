@@ -11,6 +11,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.constants import USER_AGENTS
+from redditrepostsleuth.core.util.helpers import batch_check_urls
 
 
 def cross_post_filter(match: SearchMatch) -> bool:
@@ -176,21 +177,11 @@ def filter_dead_urls_remote(util_api: Text, matches: List[SearchMatch]) -> List[
     :param matches: List of matches
     :return: List of filtered matches
     """
+    results = []
     match_urls = [{'id': match.post.post_id, 'url': match.post.url} for match in matches]
-    try:
-        res = requests.post(util_api, json=match_urls)
-    except ConnectionError:
-        log.error('Problem reaching retail API, doing local check')
-        return matches
-    except Exception as e:
-        log.exception('Problem reaching retail API, doing local check', exc_info=True)
-        return matches
-
-    if res.status_code != 200:
-        log.error('Non 200 status from util api (%s), doing local dead URL check', res.status_code)
-        return matches
-    res_data = json.loads(res.text)
-    removed_matches = [match['id'] for match in res_data if match['action'] == 'remove']
-    for removed_id in removed_matches:
-        del matches[next(i for i, x in enumerate(matches) if x.post.post_id == removed_id)]
-    return matches
+    alive_urls = batch_check_urls(match_urls, util_api)
+    for url in alive_urls:
+        match = next((x for x in matches if x.post.post_id == url['id']), None)
+        if match:
+            results.append(match)
+    return results
