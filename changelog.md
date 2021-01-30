@@ -3,6 +3,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.0.1] - 1/30/2021
+* [feature] - Add send_repost_modmail to monitored subs.  This will trigger a mod mail when a repost is detected
+* [bugfix] - Comment on link reposts was pointing to itself as the source
+* [bugfix] - Reposts not being removed from monitored subs without removal reason set
+* [bugfix] - Bot was attempting to remove reposts twice for monitored subs
+* [bugfix] - Bot was commenting on front page OC when it should not have been
+* [backend] - Monitored subs are now checked to see if bot is still a mod. If not, it is removed in 72 hours
+* [backend] - Auto cleanup of repost watches on deleted posts
+
 ## [1.0.0] - 1/15/2021
 * [change] - Removed CMD system from summoning.  Added too much complication and is made redundant by repostsleuth.com  
 * [backend] - Monitored sub config updates moved to worker pool to greatly increase speed loading of config changes

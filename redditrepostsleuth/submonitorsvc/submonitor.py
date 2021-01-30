@@ -15,6 +15,7 @@ from redditrepostsleuth.core.exception import NoIndexException, RateLimitExcepti
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -23,7 +24,8 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     save_link_repost, get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts
+from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 
@@ -49,21 +51,6 @@ class SubMonitor:
             self.config = config
         else:
             self.config = Config()
-
-    def run(self):
-        while True:
-            try:
-                with self.uowm.start() as uow:
-                    monitored_subs = uow.monitored_sub.get_all()
-                    for sub in monitored_subs:
-                        if not sub.active:
-                            log.debug('Sub %s is disabled', sub.name)
-                            continue
-                        self._check_sub(sub)
-                log.info('Sleeping until next run')
-                time.sleep(60)
-            except Exception as e:
-                log.exception('Sub monitor service crashed', exc_info=True)
 
     def has_post_been_checked(self, post_id: Text) -> bool:
         """
@@ -171,6 +158,7 @@ class SubMonitor:
             self._report_submission(monitored_sub, submission, report_msg)
             self._lock_post(monitored_sub, submission)
             self._remove_post(monitored_sub, submission)
+            self._send_mod_mail(monitored_sub, search_results)
         else:
             self._mark_post_as_oc(monitored_sub, submission)
 
@@ -179,82 +167,6 @@ class SubMonitor:
             self._lock_comment(monitored_sub, reply_comment)
         self._mark_post_as_comment_left(post)
         self._create_checked_post(post)
-
-
-
-    # TODO - 1/12/2021 - This should be deleted. Checking is now done via celery.  This method is no longer used.
-    def _check_sub(self, monitored_sub: MonitoredSub):
-        log.info('Checking sub %s', monitored_sub.name)
-        start_time = perf_counter()
-        subreddit = self.reddit.subreddit(monitored_sub.name)
-        if not subreddit:
-            log.error('Failed to get Subreddit %s', monitored_sub.name)
-            return
-
-        submissions = subreddit.new(limit=monitored_sub.search_depth)
-        checked_posts = 0
-        for submission in submissions:
-            if not self.should_check_post(submission):
-                continue
-
-            with self.uowm.start() as uow:
-                post = uow.posts.get_by_post_id(submission.id)
-
-            if post.post_type == 'image' and post.dhash_h is None:
-                log.error('Post %s has no dhash', post.post_id)
-                continue
-            checked_posts += 1
-            try:
-                if post.post_type == 'image':
-                    search_results = self._check_for_repost(post, monitored_sub)
-                elif post.post_type == 'link':
-                    search_results = self._check_for_link_repost(post)
-            except NoIndexException:
-                log.error('No search index available.  Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
-                continue
-            except RedLockError:
-                log.error('New search index is being loaded. Cannot check post %s in %s', submission.id, submission.subreddit.display_name)
-                continue
-
-            if not search_results.matches and monitored_sub.only_comment_on_repost:
-                log.debug('No matches for post %s and comment OC is disabled',
-                         f'https://redd.it/{search_results.checked_post.post_id}')
-                self._create_checked_post(post)
-                continue
-
-            try:
-                comment = self._leave_comment(search_results, submission, monitored_sub)
-            except APIException as e:
-                error_type = None
-                if hasattr(e, 'error_type'):
-                    error_type = e.error_type
-                log.exception('Praw API Exception.  Error Type: %s', error_type, exc_info=True)
-                continue
-            except RateLimitException:
-                time.sleep(10)
-                continue
-            except Exception as e:
-                log.exception('Failed to leave comment on %s in %s', submission.id, submission.subreddit.display_name)
-                continue
-
-            msg_values = build_msg_values_from_search(search_results, self.uowm,
-                                                      target_days_old=monitored_sub.target_days_old)
-            if search_results.checked_post.post_type == 'image':
-                msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
-
-            self._sticky_reply(monitored_sub, comment)
-            self._lock_post(monitored_sub, submission)
-            self._remove_post(monitored_sub, submission)
-            self._mark_post_as_oc(monitored_sub, submission)
-            self._mark_post_as_comment_left(post)
-            self._create_checked_post(post)
-
-            if search_results.matches:
-                self._report_submission(monitored_sub, submission)
-
-        process_time = perf_counter() - start_time
-        if self.event_logger:
-            self.log_run(process_time, checked_posts, monitored_sub.name)
 
     def _mark_post_as_comment_left(self, post: Post):
         try:
@@ -275,13 +187,18 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
 
-    def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub):
-        return get_link_reposts(
+    def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub) -> SearchResults:
+        search_results = get_link_reposts(
             post.url,
             self.uowm,
             get_link_search_settings_for_monitored_sub(monitored_sub),
             post=post,
             get_total=False
+        )
+        return filter_search_results(
+            search_results,
+            reddit=self.reddit.reddit,
+            uitl_api=f'{self.config.util_api}/maintenance/removed'
         )
 
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageSearchResults:
@@ -332,17 +249,10 @@ class SubMonitor:
         @param submission: Submission to remove
         """
         if monitored_sub.remove_repost:
-            if not monitored_sub.removal_reason:
-                log.error('Sub %s does not have a removal reason set.  Cannot remove', monitored_sub.name)
-                return
             try:
                 removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
-                if not removal_reason_id:
-                    log.error('Failed to get Removal Reason ID from reason %s', monitored_sub.removal_reason)
-                    return
+                log.info('Attempting to remove post %s with removal ID %s', submission.id, removal_reason_id)
                 submission.mod.remove(reason_id=removal_reason_id)
-                log.error('[%s][%s] - Failed to remove post using reason ID %s.  Likely a bad reasons ID', monitored_sub.name, submission.id, monitored_sub.removal_reason_id)
-                submission.mod.remove()
             except Forbidden:
                 log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
             except Exception as e:
@@ -384,8 +294,19 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to report submission', exc_info=True)
 
-    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
+    def _send_mod_mail(self, monitored_sub: MonitoredSub, search_results: SearchResults) -> NoReturn:
+        """
+        Send a mod mail alerting to a repost
+        :param monitored_sub: Monitored sub
+        :param search_results: Search Results
+        """
+        if not monitored_sub.send_repost_modmail:
+            return
+        message_body = REPOST_MODMAIL.format(post_id=search_results.checked_post.post_id,
+                                             match_count=len(search_results.matches))
+        self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body)
 
+    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
         return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message)
 

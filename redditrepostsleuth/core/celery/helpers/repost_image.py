@@ -1,5 +1,7 @@
 from typing import List, NoReturn, Dict, Text
 
+from sqlalchemy.exc import IntegrityError
+
 from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, RepostWatch, MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
@@ -35,8 +37,8 @@ def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWo
 
                 uow.meme_template.add(meme_template)
                 uow.commit()
-            except Exception as e:
-                log.exception('Failed to create meme template', exc_info=True)
+            except IntegrityError as e:
+                log.exception(f'Failed to create meme template. Template already exists for post {search_results.checked_post.post_id}', exc_info=True)
                 meme_template = None
 
         if meme_template:

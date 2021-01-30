@@ -20,8 +20,6 @@ class Post(Base):
     __table_args__ = (
         Index('ingest_source', 'created_at', 'ingested_from'),
         Index('ingest_graph', 'ingested_at', 'post_type', unique=False),
-        Index('image_repost_check', 'post_type', 'checked_repost', 'crosspost_parent', 'dhash_h', unique=False),
-        Index('image_hash', 'post_type', 'dhash_h', unique=False),
     )
 
     id = Column(Integer, primary_key=True)
@@ -308,18 +306,17 @@ class MonitoredSub(Base):
     comment_on_oc = Column(Boolean, default=False)
     lock_response_comment = Column(Boolean, default=False)
     filter_removed_matches = Column(Boolean, default=False)
+    send_repost_modmail = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
             'active': self.active,
-            'repost_only': self.repost_only,
             'report_submission': self.report_submission,
             'report_msg': self.report_msg,
             'requestor': self.requestor,
             'added_at': str(self.added_at),
-            'target_hamming': self.target_hamming,
             'target_annoy': self.target_annoy,
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
@@ -342,7 +339,6 @@ class MonitoredSub(Base):
             'repost_response_template': self.repost_response_template,
             'oc_response_template': self.oc_response_template,
             'meme_filter': self.meme_filter,
-            'wiki_managed': self.wiki_managed,
             'check_image_posts': self.check_image_posts,
             'check_link_posts': self.check_link_posts,
             'check_video_posts': self.check_video_posts,
@@ -355,14 +351,14 @@ class MonitoredSub(Base):
             'is_mod': self.is_mod,
             'wiki_permission': self.wiki_permission,
             'post_permission': self.post_permission,
-            'only_comment_on_repost': self.only_comment_on_repost,
             'report_reposts': self.report_reposts,
             'failed_admin_check_count': self.failed_admin_check_count,
             'activation_notification_sent': self.activation_notification_sent,
             'comment_on_repost': self.comment_on_repost,
             'comment_on_oc': self.comment_on_oc,
             'lock_response_comment': self.lock_response_comment,
-            'filter_removed_matches': self.filter_removed_matches
+            'filter_removed_matches': self.filter_removed_matches,
+            'send_repost_modmail': self.send_repost_modmail
         }
 
 

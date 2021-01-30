@@ -76,3 +76,13 @@ TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_c
 IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filter_used} | **Target:** {effective_target_match_percent}% | **Check Title:** {check_title} | **Max Age:** {max_age}'
 GENERIC_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'
 REPORT_RESPONSE = 'Thank you for your report. \n\nIt has been documented and will be reviewed further'
+
+MONITORED_SUB_MOD_REMOVED_SUBJECT = 'RepostSleuthBot Settings Being Removed'
+MONITORED_SUB_MOD_REMOVED_CONTENT = 'We are in the process of cleaning up our database and removing any Subreddits that no longer use the bot. \n\n' \
+                                    'Since ReportSleuthBot is no longer a mod on r/{subreddit} we have scheduled removal to happen in {hours} hours. No action is required on your part\n\n' \
+                                    'We understand the bot is not for everyone.  However, if you have any feedback or feature suggestions we would love to hear them on r/RepostSleuthBot.\n\n' \
+                                    'If it\'s been awhile since you used the bot, we recommend taking a look at the [available admin features](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub).\n\n' \
+                                    'If you decide to use the bot again in the future, simply re-mod it and it will set itself back up.\n\n' \
+                                    'If you believe this message is an error, please message u/barrycarey'
+
+REPOST_MODMAIL = 'Post [https://redd.it/{post_id}](https://redd.it/{post_id}) looks like a repost. I found {match_count} matches'

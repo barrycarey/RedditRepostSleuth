@@ -146,7 +146,7 @@ services:
             - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 10
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 14
         volumes:
             - /opt/imageindex:/opt/imageindex
         networks:
@@ -172,7 +172,7 @@ services:
             - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks,redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q monitored_sub_update,config_update_check,monitored_sub_config_update -c 5
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q monitored_sub_update,config_update_check,monitored_sub_config_update,watch_remove_deleted -c 5
 
 
     ingest_pushshift_worker:

@@ -1,3 +1,4 @@
+import json
 from time import perf_counter
 from typing import Text
 
@@ -9,6 +10,10 @@ class SearchTimes:
         self._timers = []
         self.total_search_time: float = float(0)
         self.total_filter_time: float = float(0)
+        self.set_title_similarity_time: float = float(0)
+
+    def __repr__(self):
+        return json.dumps(self.to_dict())
 
     def start_timer(self, name: Text):
         self._timers.append({
@@ -26,5 +31,6 @@ class SearchTimes:
     def to_dict(self):
         return {
             'total_search_time': self.total_search_time,
-            'total_filter_time': self.total_filter_time
+            'total_filter_time': self.total_filter_time,
+            'set_title_similarity_time': self.set_title_similarity_time
         }

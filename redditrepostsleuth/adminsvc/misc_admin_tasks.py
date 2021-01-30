@@ -7,8 +7,8 @@ from praw import Reddit
 from prawcore import Forbidden, NotFound
 from sqlalchemy import func
 
-from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task
-from redditrepostsleuth.core.celery.maintenance_tasks import update_monitored_sub_stats
+from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
+    update_monitored_sub_stats, check_if_watched_post_is_active
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost, MemeTemplatePotential, \
     MemeTemplate
@@ -219,6 +219,12 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
             uow.commit()
 
 def queue_config_updates(uowm: UnitOfWorkManager, config: Config) -> NoReturn:
+    """
+    Send all monitored subs to celery queue to check for config updates
+    :param uowm: Unit of Work Manager
+    :param config: Config
+    :return: None
+    """
     print('[Scheduled Job] Queue config update check')
     redis = get_redis_client(config)
     if len(redis.lrange('config_update_check', 0, 20000)) > 0:
@@ -232,9 +238,26 @@ def queue_config_updates(uowm: UnitOfWorkManager, config: Config) -> NoReturn:
 
     print('[Scheduled Job Complete] Queue config update check')
 
+
+def queue_post_watch_cleanup(uowm: UnitOfWorkManager, config: Config) -> NoReturn:
+    """
+    Send all watches to celery to check if the post has been deleted
+    :param uowm: Unit of work manager
+    """
+    print('[Scheduled Job] Queue Deleted Watch Check')
+    redis = get_redis_client(config)
+    if len(redis.lrange('watch_remove_deleted', 0, 20000)) > 0:
+        log.info('Deleted watchqueue still has pending jobs.  Skipping update queueing ')
+        return
+
+    with uowm.start() as uow:
+        watches = uow.repostwatch.get_all()
+        for chunk in chunk_list(watches, 30):
+            check_if_watched_post_is_active.apply_async((chunk,))
+
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    queue_config_updates(uowm, config)
+    update_monitored_sub_data(uowm)
