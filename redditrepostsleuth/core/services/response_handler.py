@@ -183,6 +183,32 @@ class ResponseHandler:
             log.exception('Problem replying to private message', exc_info=True)
 
 
+    def send_mod_mail(self, subreddit_name: Text, subject: Text, body: Text, triggered_from: Text = None) -> NoReturn:
+        """
+        Send a modmail message
+        :rtype: NoReturn
+        :param subreddit_name: name of subreddit
+        :param subject: Message Subject
+        :param body: Message Body
+        """
+        subreddit = self.reddit.subreddit(subreddit_name)
+        if not subreddit:
+            log.error('Failed to get Subreddit %s when attempting to send modmail')
+            return
+
+        try:
+            subreddit.message(subject, body)
+            self._save_private_message(
+                BotPrivateMessage(
+                    subject=subject,
+                    body=body,
+                    triggered_from=triggered_from,
+                    recipient=subreddit_name
+                )
+            )
+        except RedditAPIException:
+            log.exception('Problem sending modmail message', exc_info=True)
+
     def _save_private_message(self, bot_message: BotPrivateMessage) -> NoReturn:
         """
         Save a private message to the database
