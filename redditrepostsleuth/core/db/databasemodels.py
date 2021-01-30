@@ -20,8 +20,6 @@ class Post(Base):
     __table_args__ = (
         Index('ingest_source', 'created_at', 'ingested_from'),
         Index('ingest_graph', 'ingested_at', 'post_type', unique=False),
-        Index('image_repost_check', 'post_type', 'checked_repost', 'crosspost_parent', 'dhash_h', unique=False),
-        Index('image_hash', 'post_type', 'dhash_h', unique=False),
     )
 
     id = Column(Integer, primary_key=True)
@@ -308,6 +306,7 @@ class MonitoredSub(Base):
     comment_on_oc = Column(Boolean, default=False)
     lock_response_comment = Column(Boolean, default=False)
     filter_removed_matches = Column(Boolean, default=False)
+    send_repost_modmail = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -358,7 +357,8 @@ class MonitoredSub(Base):
             'comment_on_repost': self.comment_on_repost,
             'comment_on_oc': self.comment_on_oc,
             'lock_response_comment': self.lock_response_comment,
-            'filter_removed_matches': self.filter_removed_matches
+            'filter_removed_matches': self.filter_removed_matches,
+            'send_repost_modmail': self.send_repost_modmail
         }
 
 
