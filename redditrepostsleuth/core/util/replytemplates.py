@@ -84,3 +84,5 @@ MONITORED_SUB_MOD_REMOVED_CONTENT = 'We are in the process of cleaning up our da
                                     'If it\'s been awhile since you used the bot, we recommend taking a look at the [available admin features](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub).\n\n' \
                                     'If you decide to use the bot again in the future, simply re-mod it and it will set itself back up.\n\n' \
                                     'If you believe this message is an error, please message u/barrycarey'
+
+REPOST_MODMAIL = 'Post [https://redd.it/{post_id}](https://redd.it/{post_id}) looks like a repost. I found {match_count} matches'
