@@ -40,7 +40,15 @@ def update_monitored_sub_stats(self, sub_name: Text) -> NoReturn:
         monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
         log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission, monitored_sub.wiki_permission)
 
+        if not monitored_sub.failed_admin_check_count:
+            monitored_sub.failed_admin_check_count = 0
+
         if monitored_sub.is_mod:
+            if monitored_sub.failed_admin_check_count > 0:
+                self.notification_svc.send_notification(
+                    f'Failed admin check for r/{monitored_sub.name} reset',
+                    subject='Failed Admin Check Reset'
+                )
             monitored_sub.failed_admin_check_count = 0
         else:
             monitored_sub.failed_admin_check_count += 1
@@ -56,7 +64,7 @@ def update_monitored_sub_stats(self, sub_name: Text) -> NoReturn:
                 MONITORED_SUB_MOD_REMOVED_SUBJECT,
                 message
             )
-        elif monitored_sub.failed_admin_check_count >= 4:
+        elif monitored_sub.failed_admin_check_count >= 4 and monitored_sub.name.lower() != 'dankmemes':
             self.notification_svc.send_notification(
                 f'Sub r/{monitored_sub.name} failed admin check 4 times.  Removing',
                 subject='Removing Monitored Subreddit'

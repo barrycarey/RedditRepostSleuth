@@ -67,7 +67,7 @@ class TopPostMonitor:
                         continue
 
                     results = self.check_for_repost(post)
-                    if not results:
+                    if not results.matches:
                         continue
 
                     self._add_comment(post, results)

@@ -16,7 +16,7 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
-from redditrepostsleuth.core.util.helpers import get_default_link_search_settings
+from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 
 
@@ -36,9 +36,12 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         log.info('Skipping image that is deleted %s', post.url)
         return
 
+    search_settings = get_default_image_search_settings(self.config)
+    search_settings.max_matches = 75
     search_results = self.dup_service.check_image(
         post.url,
         post=post,
+        search_settings=search_settings,
         source='ingest_repost'
     )
 
