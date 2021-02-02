@@ -10,7 +10,7 @@ config = Config('../sleuth_config.json')
 uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config=config))
 
 with uowm.start() as uow:
-    posts = uow.image_post.get_after_date(datetime(2020,12,31))
+    posts = uow.image_post.get_after_date(datetime(2021,1,30))
     batch = []
     chunks = chunk_list(posts, 500)
     for chunk in chunks:
