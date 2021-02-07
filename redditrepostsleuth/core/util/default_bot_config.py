@@ -20,7 +20,6 @@ DEFAULT_CONFIG_VALUES = {
               "target_title_match": 50,
               "filter_crossposts": True,
               "filter_same_author": True,
-              "wiki_managed": True,
               "check_image_posts": True,
               "check_link_posts": True,
               "target_image_match": 92,
