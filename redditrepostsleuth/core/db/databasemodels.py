@@ -130,14 +130,6 @@ class BotPrivateMessage(Base):
     message_sent_at = Column(DateTime, default=func.utc_timestamp())
 
 
-class Comment(Base):
-    __tablename__ = 'reddit_comments'
-
-    id = Column(Integer, primary_key=True)
-    comment_id = Column(String(100), nullable=False, unique=True)
-    body = Column(Text(collation='utf8mb4_general_ci'))
-    ingested_at = Column(DateTime, default=func.utc_timestamp())
-
 class RepostWatch(Base):
     __tablename__ = 'reddit_repost_watch'
 
@@ -307,6 +299,7 @@ class MonitoredSub(Base):
     lock_response_comment = Column(Boolean, default=False)
     filter_removed_matches = Column(Boolean, default=False)
     send_repost_modmail = Column(Boolean, default=False)
+    nsfw = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -316,7 +309,7 @@ class MonitoredSub(Base):
             'report_submission': self.report_submission,
             'report_msg': self.report_msg,
             'requestor': self.requestor,
-            'added_at': str(self.added_at),
+            'added_at': self.added_at.timestamp() if self.added_at else None,
             'target_annoy': self.target_annoy,
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
@@ -358,7 +351,8 @@ class MonitoredSub(Base):
             'comment_on_oc': self.comment_on_oc,
             'lock_response_comment': self.lock_response_comment,
             'filter_removed_matches': self.filter_removed_matches,
-            'send_repost_modmail': self.send_repost_modmail
+            'send_repost_modmail': self.send_repost_modmail,
+            'nsfw': self.nsfw
         }
 
 
@@ -456,11 +450,11 @@ class ImageSearch(Base):
     total_filter_time = Column(Float)
     matches_found = Column(Integer, nullable=False)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
-    search_results = Column(Text(75000, collation='utf8mb4_general_ci'))
     subreddit = Column(String(100), nullable=False)
     target_image_match = Column(Integer, default=92)
     target_image_meme_match = Column(Integer, default=97)
-
+    filter_same_author = Column(Boolean)
+    filter_crossposts = Column(Boolean)
 
     def to_dict(self):
         return {
@@ -473,6 +467,8 @@ class ImageSearch(Base):
             'same_sub': self.same_sub,
             'max_days_old': self.max_days_old,
             'filter_dead_matches': self.filter_dead_matches,
+            'filter_same_author': self.filter_same_author,
+            'filter_crossposts': self.filter_crossposts,
             'only_older_matches': self.only_older_matches,
             'meme_filter': self.meme_filter,
             'meme_template_used': self.meme_template_used,

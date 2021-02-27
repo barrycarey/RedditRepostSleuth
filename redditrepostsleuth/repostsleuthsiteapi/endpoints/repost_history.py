@@ -61,3 +61,15 @@ class RepostHistoryEndpoint:
                     'repost_of': repost_of.to_dict(),
                     'search_data': search_data.to_dict()})
         resp.body = json.dumps(results)
+
+    def on_get_count(self, res: Request, resp: Response):
+        subreddit = res.get_param('subreddit', required=False)
+        with self.uowm.start() as uow:
+            if subreddit:
+                image_count = uow.image_repost.get_count_by_subreddit(subreddit)[0]
+                link_count = uow.link_repost.get_count_by_subreddit(subreddit)[0]
+            else:
+                image_count = uow.image_repost.get_count()
+                link_count = uow.link_repost.get_count()
+
+        resp.body = json.dumps({'total_count': image_count + link_count, 'image_count': image_count, 'link_count': link_count})

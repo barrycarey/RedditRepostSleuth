@@ -48,7 +48,7 @@ class PostIngestor:
         seen_posts = []
         while True:
             try:
-                if len(seen_posts) > 10000:
+                if len(seen_posts) > 500000:
                     seen_posts = []
                 try:
                     submissions = [sub for sub in self.reddit.subreddit('all').new(limit=500)]
@@ -86,8 +86,6 @@ class PostIngestor:
             #url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
             url = 'https://beta.pushshift.io/search/reddit/submissions?size=1000&sort_type=created_utc&sort=desc'
             while True:
-
-
                 try:
                     r = requests.get(f'{self.config.util_api}/pushshift', params={'url': url})
                 except Exception as e:
@@ -116,15 +114,18 @@ class PostIngestor:
                     continue
 
                 data = response['payload']
-                oldest_id = data['data'][-1]['sid']
+                #oldest_id = data['data'][-1]['sid']
                 oldest_created_time = data['data'][-1]['created_utc']
                 log.debug('Oldest: %s | Newest: %s', datetime.utcfromtimestamp(data['data'][-1]['created_utc']), datetime.utcfromtimestamp(data['data'][0]['created_utc']))
 
                 if not start_time:
                     start_time = data['data'][0]['created_utc']
 
+                posts_to_save = [post for post in data['data'] if post['id'] not in self.existing_posts]
+                print(f'{len(posts_to_save)} posts to save')
+                self.existing_posts += posts_to_save
                 try:
-                    save_pushshift_results.apply_async((data['data'],), queue='pushshift')
+                    save_pushshift_results.apply_async((posts_to_save,), queue='pushshift')
                 except Exception as e:
                     log.exception('Failed to send to pushshift', exc_info=False)
                     time.sleep(5)
@@ -133,6 +134,8 @@ class PostIngestor:
                     except Exception:
                         pass
 
+                if len(self.existing_posts) > 500000:
+                    self.existing_posts = []
                 time.sleep(5)
 
 

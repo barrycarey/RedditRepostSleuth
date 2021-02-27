@@ -13,3 +13,7 @@ opencv-python
 imutils
 matplotlib
 pytesseract
+falcon_multipart
+redis
+redlock
+celery[redis]==4.4.7

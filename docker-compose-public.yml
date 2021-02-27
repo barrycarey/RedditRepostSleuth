@@ -6,10 +6,11 @@ services:
             context: .
             dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
         environment:
-            LOG_LEVEL: INFO
+            LOG_LEVEL: DEBUG
         restart: always
-        entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10
+        entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10 --access-logfile - --log-file - --log-level DEBUG
         volumes:
             - /opt/letsencrypt/etc/letsencrypt/live/www.repostsleuth.com:/config/keys
+            - /opt/imageuploads:/opt/imageuploads
         ports:
             - 8443:8443

@@ -332,9 +332,10 @@ class DuplicateImageService:
             matches_found=len(search_results.matches),
             source=source,
             subreddit=search_results.checked_post.subreddit if search_results.checked_post else 'url',
-            search_results=create_search_result_json(search_results),
             target_image_meme_match=search_results.search_settings.target_meme_match_percent,
-            target_image_match=search_results.search_settings.target_match_percent
+            target_image_match=search_results.search_settings.target_match_percent,
+            filter_crossposts=search_results.search_settings.filter_crossposts,
+            filter_same_author=search_results.search_settings.filter_same_author
         )
 
         with self.uowm.start() as uow:

@@ -1,7 +1,8 @@
 
 
 import json
-from typing import Dict, List, Text, TYPE_CHECKING
+import re
+from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
 from falcon import Request
@@ -286,7 +287,7 @@ def get_image_search_settings_from_request(req: Request, config: Config) -> Imag
         same_sub=req.get_param_as_bool('same_sub', required=False,
                               default=None) or config.default_image_same_sub_filter,
         max_days_old=req.get_param_as_int('max_days_old', required=False,
-                             default=None) or config.default_image_target_annoy_distance,
+                             default=None) or config.default_link_max_days_old_filter,
 
     )
 
@@ -388,3 +389,34 @@ def batch_check_urls(urls: List[Dict], util_api: Text) -> List[Dict]:
                 del urls[i]
         #del urls[next(i for i, x in enumerate(urls) if x['id'] == removed_id)]
     return urls
+
+def reddit_post_id_from_url(url: Text) -> Optional[Text]:
+    """
+    Take a given reddit URL and return the post ID
+    :param url: URL
+    :return: Post ID
+    """
+    if not url:
+        return
+
+    re_list = [
+        '(?<=comments\/)[^\\/]*',
+        '(?<=\.it\/)[^\/]*'
+    ]
+    match = None
+    for expression in re_list:
+        r = re.search(expression, url)
+        if r:
+            match = r.group()
+
+    return match
+
+def is_image_url(url: Text) -> bool:
+    """
+    Take a given URL and determin if it's an image
+    :param url: URL
+    :return: bool
+    """
+    if re.search('^.*\.(jpg|jpeg|gif|png)', url.lower()):
+        return True
+    return False
