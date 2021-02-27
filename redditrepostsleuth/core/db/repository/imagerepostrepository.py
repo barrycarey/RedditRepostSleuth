@@ -29,9 +29,18 @@ class ImageRepostRepository:
     def get_all_by_subreddit(self, subreddit: Text, source='sub_monitor', limit: int = None, offset: int = None) -> List[ImageRepost]:
         return self.db_session.query(ImageRepost).filter(ImageRepost.subreddit == subreddit, ImageRepost.source == source).order_by(ImageRepost.id.desc()).limit(limit).offset(offset).all()
 
-    def get_count(self):
-        r = self.db_session.query(func.count(ImageRepost.id)).first()
+    def get_count(self, hours: int = None):
+        query = self.db_session.query(func.count(ImageRepost.id))
+        if hours:
+            query = query.filter(ImageRepost.detected_at > (datetime.now() - timedelta(hours=hours)))
+        r = query.first()
         return r[0] if r else None
+
+    def get_count_by_subreddit(self, subreddit: Text, hours: int = None):
+        query = self.db_session.query(func.count(ImageRepost.id)).filter(ImageRepost.subreddit == subreddit)
+        if hours:
+            query = query.filter(ImageRepost.detected_at > (datetime.now() - timedelta(hours=hours)))
+        return query.first()
 
     def add(self, item):
         log.debug('Inserting: %s', item)

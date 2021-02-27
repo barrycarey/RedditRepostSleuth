@@ -1,5 +1,7 @@
 from typing import NoReturn, Dict, Text, List
 
+from praw.exceptions import PRAWException
+
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AdminTask, RedditTask, SqlAlchemyTask
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch
@@ -60,10 +62,13 @@ def update_monitored_sub_stats(self, sub_name: Text) -> NoReturn:
         if monitored_sub.failed_admin_check_count == 2:
             subreddit = self.reddit.subreddit(monitored_sub.name)
             message = MONITORED_SUB_MOD_REMOVED_CONTENT.format(hours='72', subreddit=monitored_sub.name)
-            subreddit.message(
-                MONITORED_SUB_MOD_REMOVED_SUBJECT,
-                message
-            )
+            try:
+                subreddit.message(
+                    MONITORED_SUB_MOD_REMOVED_SUBJECT,
+                    message
+                )
+            except PRAWException:
+                pass
         elif monitored_sub.failed_admin_check_count >= 4 and monitored_sub.name.lower() != 'dankmemes':
             self.notification_svc.send_notification(
                 f'Sub r/{monitored_sub.name} failed admin check 4 times.  Removing',

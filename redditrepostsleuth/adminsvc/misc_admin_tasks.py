@@ -202,7 +202,9 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                     meme_hashes = get_image_hashes(post.searched_url, hash_size=32)
                 except Exception as e:
                     log.error('Failed to get meme hash for %s', post.post_id)
-                    return
+                    uow.meme_template_potential.remove(potential_template)
+                    uow.commit()
+                    continue
 
                 meme_template = MemeTemplate(
                     dhash_h=post.dhash_h,
@@ -260,4 +262,4 @@ if __name__ == '__main__':
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_monitored_sub_data(uowm)
+    check_meme_template_potential_votes(uowm)

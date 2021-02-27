@@ -35,8 +35,7 @@ class MonitoredSub:
         with self.uowm.start() as uow:
             sub = uow.monitored_sub.get_by_sub(subreddit)
             if not sub:
-                resp.body = json.dumps({})
-                return
+                raise HTTPNotFound(title='Subreddit not found', description=f'{subreddit} is not registered')
             resp.body = json.dumps(sub.to_dict())
 
     def on_get_all(self, req: Request, resp: Response):
@@ -75,6 +74,10 @@ class MonitoredSub:
 
     def on_post(self, req: Request, resp: Response, subreddit: Text):
         log.info('Attempting to create monitored sub %s', subreddit)
+        token = req.get_param('token', required=True)
+        if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
+            raise HTTPUnauthorized(f'You are not a moderator on {subreddit}',
+                                   f'You\'re not a moderator on {subreddit}')
         try:
             self.reddit.subreddit(subreddit).mod.accept_invite()
         except APIException as e:

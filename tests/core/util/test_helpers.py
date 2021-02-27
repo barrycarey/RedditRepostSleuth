@@ -17,7 +17,7 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url, \
-    build_image_report_link, get_default_link_search_settings, batch_check_urls
+    build_image_report_link, get_default_link_search_settings, batch_check_urls, reddit_post_id_from_url, is_image_url
 
 
 class TestHelpers(TestCase):
@@ -285,6 +285,34 @@ class TestHelpers(TestCase):
             res = batch_check_urls(urls, 'test.com')
 
         self.assertEqual(5, len(res))
+
+
+    def test_reddit_post_id_from_url_long_url_return_post_id(self):
+        url = 'https://www.reddit.com/r/memes/comments/ln0sj7/you_guys_are_amazing_by_the_way/'
+        self.assertEqual('ln0sj7', reddit_post_id_from_url(url))
+
+    def test_reddit_post_id_from_url_short_url_return_post_id(self):
+        url = 'https://redd.it/ln0sj7'
+        self.assertEqual('ln0sj7', reddit_post_id_from_url(url))
+
+    def test_reddit_post_id_from_url_invalid_url_return_none(self):
+        url = 'https://somerandomdomain/ln0sj7'
+        self.assertIsNone(reddit_post_id_from_url(url))
+
+    def test_reddit_post_id_from_url_no_url_return_none(self):
+        self.assertIsNone(reddit_post_id_from_url(None))
+
+    def test_is_image_url_valid_url_return_true(self):
+        url = 'https://example.com/someimage.png'
+        self.assertTrue(is_image_url(url))
+
+    def test_is_image_url_invalid_url_return_false(self):
+        url = 'https://exxample.com/somerandompage'
+        self.assertFalse(is_image_url(url))
+
+    def test_is_image_url_invalid_image_type_return_false(self):
+        url = 'https://example.com/someimage.bmp'
+        self.assertFalse(is_image_url(url))
 
     def _get_image_search_settings(self):
         return ImageSearchSettings(

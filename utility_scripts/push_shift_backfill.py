@@ -18,7 +18,6 @@ oldest_timestamp = None
 config = Config()
 uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
 
-
 while True:
     oldest_id = None
     start_time = None
