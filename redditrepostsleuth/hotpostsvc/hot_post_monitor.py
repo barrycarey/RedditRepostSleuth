@@ -67,6 +67,8 @@ class TopPostMonitor:
                         continue
 
                     results = self.check_for_repost(post)
+                    if not results:
+                        continue
                     if not results.matches:
                         continue
 
@@ -113,7 +115,7 @@ class TopPostMonitor:
             )
             return filter_search_results(
                 search_results,
-                reddit=self.reddit,
+                reddit=self.reddit.reddit,
                 uitl_api=f'{self.config.util_api}/maintenance/removed'
             )
         else:

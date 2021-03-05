@@ -101,7 +101,7 @@ class PostIngestor:
                 try:
                     response = json.loads(r.text)
                 except Exception:
-                    oldest_id = oldest_id - 90
+                    #oldest_id = oldest_id - 90
                     log.exception('Error decoding json')
                     time.sleep(10)
                     continue
