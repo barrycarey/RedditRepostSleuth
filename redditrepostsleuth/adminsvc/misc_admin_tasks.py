@@ -94,7 +94,7 @@ def remove_expired_bans(uowm: UnitOfWorkManager, notification_svc: NotificationS
         bans = uow.banned_user.get_expired_bans()
         for ban in bans:
             if notification_svc:
-                notification_svc.send(
+                notification_svc.send_notification(
                     f'Removing expired ban for user {ban.name}',
                     subject='**Expired Ban Removed**'
                 )

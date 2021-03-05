@@ -3,10 +3,11 @@ from datetime import datetime, timedelta
 from typing import Dict, Text, Optional
 
 import requests
+from praw.reddit import Comment
 from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import BotComment, Comment
+from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
