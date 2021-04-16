@@ -66,7 +66,7 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, Redd
             raise InvalidImageUrlException(f'Unable to get preview image: {post.url}')
         """
         try: # Make sure URL is still valid
-            r = requests.head(post.url)
+            r = requests.head(post.url, {'referer': post.url})
         except ConnectionError as e:
             log.error('Post %s: Failed to verify image URL at %s', post.post_id, post.url)
             raise
