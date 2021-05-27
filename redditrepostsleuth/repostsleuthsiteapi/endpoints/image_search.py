@@ -76,6 +76,7 @@ class ImageSearch:
 
         search_settings = get_image_search_settings_from_request(req, self.config)
         search_results = check_image(search_settings, self.uowm, self.image_svc, url=f'http://localhost:8443/imageserve/{saved_file_name}')
+        os.remove(os.path.join('/opt/imageuploads', saved_file_name))
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
 
     def on_get_search_by_url(self, req: Request, resp: Response):

@@ -89,7 +89,7 @@ def searched_post_str(post: Post, count: int) -> str:
 def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -> Text:
     if not search_settings:
         return None
-    url = f'https://www.repostsleuth.com?postId={post_id}&'
+    url = f'https://www.repostsleuth.com/search?postId={post_id}&'
     url += f'sameSub={str(search_settings.same_sub).lower()}&'
     url += f'filterOnlyOlder={str(search_settings.only_older_matches).lower()}&'
     url += f'memeFilter={str(search_settings.meme_filter).lower()}&'

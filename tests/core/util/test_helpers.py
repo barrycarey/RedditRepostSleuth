@@ -190,7 +190,7 @@ class TestHelpers(TestCase):
             target_meme_match_percent=95
         )
         r = build_site_search_url('abc123', search_settings)
-        expected = 'https://www.repostsleuth.com?postId=abc123&sameSub=true&filterOnlyOlder=true&memeFilter=true&filterDeadMatches=true&targetImageMatch=90&targetImageMemeMatch=95'
+        expected = 'https://www.repostsleuth.com/search?postId=abc123&sameSub=true&filterOnlyOlder=true&memeFilter=true&filterDeadMatches=true&targetImageMatch=90&targetImageMemeMatch=95'
         self.assertEqual(expected, r)
 
     def test_build_image_report_link_negative(self):
