@@ -22,7 +22,7 @@ while True:
     oldest_id = None
     start_time = None
 #            base_url = 'https://api.pushshift.io/reddit/search/submission?size=2000&sort_type=created_utc&sort=desc'
-    base_url = 'https://beta.pushshift.io/search/reddit/submissions?size=1000&sort_type=created_utc&sort=desc'
+    #base_url = 'https://beta.pushshift.io/search/reddit/submissions?size=1000&sort_type=created_utc&sort=desc'
     while True:
 
         if oldest_id:
