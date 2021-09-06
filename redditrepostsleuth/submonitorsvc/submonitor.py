@@ -2,7 +2,7 @@ import time
 from time import perf_counter
 from typing import List, Text, NoReturn, Optional
 
-from praw.exceptions import APIException
+from praw.exceptions import APIException, RedditAPIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 from redlock import RedLockError
@@ -96,7 +96,7 @@ class SubMonitor:
 
         return True
 
-    def check_submission(self, monitored_sub: MonitoredSub, post: Post):
+    def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
         if post.post_type == 'image' and post.dhash_h is None:
             log.error('Post %s has no dhash', post.post_id)
@@ -124,7 +124,7 @@ class SubMonitor:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
-            return
+            return search_results
 
         reply_comment = None
         try:
@@ -138,6 +138,9 @@ class SubMonitor:
             return
         except RateLimitException:
             time.sleep(10)
+            return
+        except RedditAPIException:
+            log.error('Other API exception')
             return
         except Exception as e:
             log.exception('Failed to leave comment on %s in %s', post.post_id, post.subreddit)
@@ -304,7 +307,8 @@ class SubMonitor:
             return
         message_body = REPOST_MODMAIL.format(post_id=search_results.checked_post.post_id,
                                              match_count=len(search_results.matches))
-        self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body)
+        self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body,
+                                            triggered_from='Submonitor')
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)

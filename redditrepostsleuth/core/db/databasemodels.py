@@ -300,6 +300,7 @@ class MonitoredSub(Base):
     filter_removed_matches = Column(Boolean, default=False)
     send_repost_modmail = Column(Boolean, default=False)
     nsfw = Column(Boolean, default=False)
+    is_private = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -352,7 +353,8 @@ class MonitoredSub(Base):
             'lock_response_comment': self.lock_response_comment,
             'filter_removed_matches': self.filter_removed_matches,
             'send_repost_modmail': self.send_repost_modmail,
-            'nsfw': self.nsfw
+            'nsfw': self.nsfw,
+            'is_private': self.is_private
         }
 
 
