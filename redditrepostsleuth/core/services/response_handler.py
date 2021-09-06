@@ -62,6 +62,8 @@ class ResponseHandler:
             else:
                 log.exception('Unknown error type of APIException', exc_info=True)
                 raise
+        except RedditAPIException:
+            pass
         except Forbidden:
             self._save_banned_sub(submission.subreddit.display_name)
         except Exception:

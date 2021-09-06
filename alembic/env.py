@@ -1,22 +1,32 @@
 from __future__ import with_statement
 
 from logging.config import fileConfig
-import sys
+import sys, os
+from urllib.parse import quote_plus
+
 sys.path.append('/home/barry/PycharmProjects/RedditRepostSleuth')
 sys.path.append(r'C:\Users\barry\PycharmProjects\RedditRepostSleuth')
 from redditrepostsleuth.core.db.databasemodels import Base
+from redditrepostsleuth.core.config import Config
 
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, create_engine
 from sqlalchemy import pool
 
 
 from alembic import context
 
+# Load bot config
+if not os.getenv('bot_config', None):
+    print('No bot config provided, aborting')
+    sys.exit()
+
+
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
+bot_config = Config(os.getenv('bot_config'))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
@@ -26,6 +36,10 @@ fileConfig(config.config_file_name)
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
+
+def get_conn_string():
+    return f'mysql+pymysql://{bot_config.db_user}:{quote_plus(bot_config.db_password)}@{bot_config.db_host}/{bot_config.db_name}'
+
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -47,7 +61,7 @@ def run_migrations_offline():
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url, target_metadata=target_metadata, literal_binds=True
+        url=get_conn_string(), target_metadata=target_metadata, literal_binds=True
     )
 
     with context.begin_transaction():
@@ -61,11 +75,7 @@ def run_migrations_online():
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_engine(get_conn_string(), echo=False, )
 
     with connectable.connect() as connection:
         context.configure(

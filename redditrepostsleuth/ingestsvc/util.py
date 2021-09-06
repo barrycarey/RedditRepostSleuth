@@ -1,8 +1,9 @@
 import os
-from typing import Tuple
+from typing import Tuple, Text, Optional
 from urllib.parse import urlparse
 
 import requests
+from praw import Reddit
 from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
 
@@ -104,7 +105,7 @@ def create_image_posts(post: Post) -> Tuple[Post,RedditImagePost, RedditImagePos
     log.debug('Post %s: Created image_post and image_post_current', post.post_id)
     return post, image_post, image_post_current
 
-def save_unknown_post(post_id: str, uowm: UnitOfWorkManager, reddit: RedditManager) -> Post:
+def save_unknown_post(post_id: Text, uowm: UnitOfWorkManager, reddit: RedditManager) -> Post:
     """
     If we received a request on a post we haven't ingest save it
     :param submission: Reddit Submission
@@ -112,8 +113,10 @@ def save_unknown_post(post_id: str, uowm: UnitOfWorkManager, reddit: RedditManag
     """
     submission = reddit.submission(post_id)
     post = pre_process_post(submission_to_post(submission), uowm, None)
+    # TODO - Why TF are we doing this?
     if not post or post.post_type != 'image':
         log.error('Problem ingesting post.  Either failed to save or it is not an image')
         return
 
     return post
+

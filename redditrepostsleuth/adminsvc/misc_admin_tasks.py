@@ -52,6 +52,21 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             uow.commit()
     print('[Scheduled Job] Checking Mod Status End')
 
+def update_subreddit_access_level(uowm: UnitOfWorkManager, reddit: Reddit):
+    """
+    Go through all monitored subs and update their is_private status
+    :return:
+    """
+    log.info('Starting Job: Update subreddit is_private and nsfw')
+    with uowm.start() as uow:
+        monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
+        for monitored_sub in monitored_subs:
+            sub_data = reddit.subreddit(monitored_sub.name)
+            monitored_sub.is_private = True if sub_data.subreddit_type == 'private' else False
+            monitored_sub.nsfw = True if sub_data.over18 else False
+            log.debug('%s: is_private: %s | nsfw: %s', monitored_sub.name, monitored_sub.is_private, monitored_sub.nsfw)
+        uow.commit()
+
 def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None) -> NoReturn:
     """
     Go through banned subs and see if we're still banned
@@ -262,4 +277,4 @@ if __name__ == '__main__':
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    check_meme_template_potential_votes(uowm)
+    update_subreddit_access_level(uowm, reddit)
