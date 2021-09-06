@@ -2,6 +2,7 @@ from hashlib import md5
 import random
 import random
 from hashlib import md5
+from logging import LoggerAdapter
 from typing import List, Text
 
 import Levenshtein
@@ -10,7 +11,7 @@ from praw import Reddit
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.logging import log, get_configured_logger
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
@@ -87,7 +88,8 @@ def get_link_reposts(
 def filter_search_results(
         search_results: SearchResults,
         reddit: Reddit = None,
-        uitl_api: Text = None
+        uitl_api: Text = None,
+        log: LoggerAdapter = None
 ) -> SearchResults:
     """
     Filter a set of search results based on the image search settings
@@ -95,6 +97,7 @@ def filter_search_results(
     :param uitl_api: Used for filtering removed posts
     :param search_results: SearchResults obj
     """
+    log = log or get_configured_logger(__name__)
     log.debug('%s results pre-filter', len(search_results.matches))
     search_results.search_times.start_timer('total_filter_time')
     # Only run these if we are search for an existing post

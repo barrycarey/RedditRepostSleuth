@@ -18,6 +18,11 @@ def save_new_post(self, post):
         log.debug('Post %s: Ingesting', post.post_id)
         post = pre_process_post(post, self.uowm, self.config.image_hash_api)
         if post:
+            monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
+            if monitored_sub:
+                log.info('Sending ingested post to monitored sub queue')
+                celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post', args=[post.post_id, monitored_sub],
+                                 queue='submonitor')
             ingest_repost_check.apply_async((post,self.config), queue='repost')
             log.debug('Post %s: Sent post to repost queue', post.post_id)
 
