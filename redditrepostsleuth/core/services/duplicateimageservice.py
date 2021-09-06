@@ -1,4 +1,5 @@
 import json
+from logging import LoggerAdapter
 from typing import List, Text, Optional
 
 import requests
@@ -26,7 +27,13 @@ from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closes
 
 
 class DuplicateImageService:
-    def __init__(self, uowm: UnitOfWorkManager, event_logger: EventLogging, reddit: Reddit, config: Config = None):
+    def __init__(
+            self,
+            uowm: UnitOfWorkManager,
+            event_logger: EventLogging,
+            reddit: Reddit,
+            config: Config = None,
+            ):
         self.reddit = reddit
         self.uowm = uowm
         self.event_logger = event_logger
@@ -105,9 +112,19 @@ class DuplicateImageService:
             post: Post = None,
             source='unknown',
             sort_by='created',
-            search_settings: ImageSearchSettings = None
+            search_settings: ImageSearchSettings = None,
 
     ) -> ImageSearchResults:
+        """
+        Execute a search for a given image
+        :param url: URL of image to search for
+        :param post: Database post object
+        :param source: Source that triggered this search.  Used for logging
+        :param sort_by: Sort results by
+        :param search_settings: Search settings to use when searching
+        :return: Search Results
+        :rtype: ImageSearchResults
+        """
         log.info('Checking URL for matches: %s', url)
 
         if not search_settings:

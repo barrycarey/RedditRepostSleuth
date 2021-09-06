@@ -4,7 +4,7 @@ from typing import NoReturn, List
 
 import requests
 from praw import Reddit
-from prawcore import Forbidden, NotFound
+from prawcore import Forbidden, NotFound, Redirect
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
@@ -61,10 +61,13 @@ def update_subreddit_access_level(uowm: UnitOfWorkManager, reddit: Reddit):
     with uowm.start() as uow:
         monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
         for monitored_sub in monitored_subs:
-            sub_data = reddit.subreddit(monitored_sub.name)
-            monitored_sub.is_private = True if sub_data.subreddit_type == 'private' else False
-            monitored_sub.nsfw = True if sub_data.over18 else False
-            log.debug('%s: is_private: %s | nsfw: %s', monitored_sub.name, monitored_sub.is_private, monitored_sub.nsfw)
+            try:
+                sub_data = reddit.subreddit(monitored_sub.name)
+                monitored_sub.is_private = True if sub_data.subreddit_type == 'private' else False
+                monitored_sub.nsfw = True if sub_data.over18 else False
+                log.debug('%s: is_private: %s | nsfw: %s', monitored_sub.name, monitored_sub.is_private, monitored_sub.nsfw)
+            except (Redirect, Forbidden):
+                log.error('Error getting sub settings')
         uow.commit()
 
 def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None) -> NoReturn:

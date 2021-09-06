@@ -1,4 +1,7 @@
 import json
+import logging
+import os
+import sys
 import time
 from datetime import datetime
 from typing import Text
@@ -49,6 +52,11 @@ class SummonsHandlerTask(Task):
         self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit_manager, response_builder,
                                               self.response_handler, event_logger=self.event_logger,
                                               summons_disabled=False, notification_svc=notification_svc)
+
+
+
+    def _get_log_adaptor(self):
+        pass
 
 class SubMonitorTask(Task):
     def __init__(self):

@@ -9,7 +9,7 @@ from redditrepostsleuth.core.notification.notification_service import Notificati
 from redditrepostsleuth.adminsvc.misc_admin_tasks import remove_expired_bans, update_banned_sub_wiki, \
     send_reports_to_meme_voting, update_top_image_reposts, \
     update_monitored_sub_data, check_meme_template_potential_votes, update_ban_list, queue_config_updates, \
-    queue_post_watch_cleanup
+    queue_post_watch_cleanup, update_subreddit_access_level
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -140,6 +140,14 @@ if __name__ == '__main__':
         trigger='interval',
         days=3,
         name='queue_deleted_watch_check',
+        max_instances=1
+    )
+    scheduler.add_job(
+        func=update_subreddit_access_level,
+        args=(uowm, reddit),
+        trigger='interval',
+        hours=24,
+        name='update_sub_access_level',
         max_instances=1
     )
     scheduler.start()
