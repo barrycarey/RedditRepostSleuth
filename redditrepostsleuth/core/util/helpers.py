@@ -2,10 +2,12 @@
 
 import json
 import re
+from logging import Logger
 from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
 from falcon import Request
+from praw import Reddit
 from redis import Redis
 from redlock import RedLockFactory
 from sqlalchemy.exc import IntegrityError
@@ -420,3 +422,54 @@ def is_image_url(url: Text) -> bool:
     if re.search('^.*\.(jpg|jpeg|gif|png)', url.lower()):
         return True
     return False
+
+def update_log_context_data(logger: Logger, context_data: Dict):
+    for handler in logger.handlers:
+        for filt in handler.filters:
+            for key, value in context_data.items():
+                if hasattr(filt, key):
+                    setattr(filt, key, value)
+
+def base36encode(integer: int) -> str:
+    chars = '0123456789abcdefghijklmnopqrstuvwxyz'
+    sign = '-' if integer < 0 else ''
+    integer = abs(integer)
+    result = ''
+    while integer > 0:
+        integer, remainder = divmod(integer, 36)
+        result = chars[remainder] + result
+    return sign + result
+
+
+def base36decode(base36: str) -> int:
+    return int(base36, 36)
+
+
+def get_next_ids(start_id, count):
+    start_num = base36decode(start_id)
+    ids = []
+    id_num = -1
+    for id_num in range(start_num, start_num + count):
+        ids.append("t3_"+base36encode(id_num))
+    return ids, base36encode(id_num)
+
+def get_newest_praw_post_id(reddit: Reddit) -> int:
+    """
+    Grab the newest post available via Praw and return the decoded post_id
+
+    This is used to guage if the manual ingest of IDs is falling behind
+    :rtype: object
+    """
+    newest_submissions = list(reddit.subreddit('all').new(limit=10))[0]
+    return newest_submissions.id
+
+
+def build_ingest_query_params(starting_id: int, limit: int = 100) -> Dict[str, str]:
+    """
+    Take a starting ID and build the dict used as a param for the ingest request
+    :rtype: Dict
+    """
+    ids_to_get = get_next_ids(starting_id, limit)[0]
+    return {
+        'submission_ids': ','.join(ids_to_get)
+    }

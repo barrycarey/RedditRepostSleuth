@@ -123,7 +123,7 @@ services:
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
             #- HASH_API=http://157.230.64.152:8000/hash
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q postingest -c 14
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -c 14
 
     generic_repost_worker:
         restart: always

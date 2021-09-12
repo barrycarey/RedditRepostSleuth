@@ -39,7 +39,7 @@ if __name__ == '__main__':
     redis = get_redis_client(config)
     while True:
         while True:
-            queued_items = redis.lrange('submonitor', 0, 20000)
+            queued_items = redis.lrange('submonitor_private', 0, 20000)
             if len(queued_items) == 0:
                 log.info('Sub monitor queue empty.  Starting over')
                 break
@@ -51,14 +51,17 @@ if __name__ == '__main__':
                 if not monitored_sub.active:
                     log.debug('Sub %s is disabled', monitored_sub.name)
                     continue
+                if not monitored_sub.is_private:
+                    log.info('Skipping public subreddit %s', monitored_sub.name)
+                    continue
                 if not monitored_sub.check_all_submissions:
                     log.info('Sub %s does not have post checking enabled', monitored_sub.name)
                     continue
                 try:
-                    process_monitored_sub.apply_async((monitored_sub,), queue='submonitor')
+                    process_monitored_sub.apply_async((monitored_sub,), queue='submonitor_private')
                 except Exception:
                     log.error('Failed to submit job to Celery')
                 continue
-
+            time.sleep(300)
 
 

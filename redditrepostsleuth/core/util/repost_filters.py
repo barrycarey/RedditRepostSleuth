@@ -1,6 +1,6 @@
 import json
+import logging
 from datetime import datetime
-from logging import LoggerAdapter
 from typing import Text, List
 import random
 
@@ -8,14 +8,13 @@ import requests
 from praw import Reddit
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
-from redditrepostsleuth.core.logging import get_configured_logger, image_search_trace_format
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.helpers import batch_check_urls
 
-log = LoggerAdapter(get_configured_logger(name=__name__, format=image_search_trace_format),
-                    extra={'search_id': None})
+log = logging.getLogger(__name__)
+
 
 def cross_post_filter(match: SearchMatch) -> bool:
     if match.post.crosspost_parent:

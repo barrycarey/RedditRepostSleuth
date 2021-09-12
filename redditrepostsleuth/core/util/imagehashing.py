@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Dict, Text
 
@@ -13,9 +14,9 @@ from PIL import Image
 from PIL.Image import DecompressionBombError
 
 from redditrepostsleuth.core.exception import ImageConversioinException
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Post
 
+log = logging.getLogger(__name__)
 
 def generate_img_by_post(post: Post) -> Image:
     """
@@ -60,7 +61,7 @@ def generate_img_by_file(path: str) -> Image:
     return img if img else None
 
 def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
-    log.debug('%s - Hashing image post %s', os.getpid(), post.post_id)
+    log.debug('Hashing image post')
     try:
         img = generate_img_by_url(post.url)
     except ImageConversioinException as e:
@@ -110,7 +111,6 @@ def set_image_hashes_api(post: Post, api_url: str) -> Post:
     :param api_url: API URL to call
     :return: Dict of hashes
     """
-    log.debug('Hashing image post using api %s', post.post_id)
     r = requests.get(api_url, params={'url': post.url})
     if r.status_code != 200:
         log.error('Back statuscode from DO API %s', r.status_code)

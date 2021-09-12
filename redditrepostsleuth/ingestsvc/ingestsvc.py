@@ -1,26 +1,48 @@
-import threading
-
-# TODO - Mega hackery, figure this out.
+import json
+import logging
 import sys
-from time import sleep
+import time
+from datetime import datetime
+from json import JSONDecodeError
+
+import requests
 
 sys.path.append('./')
+from redditrepostsleuth.core.logfilters import ContextFilter
+from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids
+from redditrepostsleuth.core.celery.ingesttasks import save_pushshift_results, save_new_post
+from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 
-from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.util.helpers import get_reddit_instance
-from redditrepostsleuth.ingestsvc.postingestor import PostIngestor
+log = configure_logger(name='redditrepostsleuth')
 
 if __name__ == '__main__':
     log.info('Starting post ingestor')
-    print('Starting post ingestor')
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    ingestor = PostIngestor(get_reddit_instance(config), uowm, config)
-    threading.Thread(target=ingestor.ingest_without_stream, name='praw_ingest').start()
-    threading.Thread(target=ingestor.ingest_pushshift, name='pushshift_ingest').start()
+    reddit = get_reddit_instance(config)
+    newest_id = get_newest_praw_post_id(reddit)
 
     while True:
-        sleep(10)
+        ids_to_get = get_next_ids(newest_id, 100)[0]
+        r = requests.get(f'{config.util_api}/reddit/submissions', params={'submission_ids': ','.join(ids_to_get)})
+        try:
+            results = json.loads(r.text)
+        except JSONDecodeError:
+            log.error('Failed to decode results')
+            continue
+        if len(results) == 0:
+            log.info('No results')
+            time.sleep(60)
+            continue
+
+        for submission in results:
+            post = pushshift_to_post(submission)
+            save_new_post.apply_async((post,), queue='post_ingest')
+
+        log.info('%s sent to ingest queue', len(results))
+
+        ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(results[0]['created_utc'])
+        log.info('Current Delay: %s', ingest_delay)
+
+        newest_id = ids_to_get[-1].replace('t3_', '')

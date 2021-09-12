@@ -1,4 +1,5 @@
 import json
+import logging
 from logging import LoggerAdapter
 from typing import List, Text, Optional
 
@@ -11,7 +12,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
-from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
@@ -25,6 +26,7 @@ from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, h
 from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
     filter_search_results
 
+log = logging.getLogger(__name__)
 
 class DuplicateImageService:
     def __init__(
