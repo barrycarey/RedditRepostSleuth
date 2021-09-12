@@ -1,3 +1,4 @@
+import logging
 from functools import singledispatchmethod
 from typing import Dict, Text, Optional
 
@@ -19,7 +20,7 @@ from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COM
 
 DEFAULT_REPORT_MSG = 'RepostSleuthBot-Repost'
 
-
+log = logging.getLogger(__name__)
 class ResponseBuilder:
     """
     Construct bot responses from pre-defined message templates

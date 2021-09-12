@@ -1,3 +1,4 @@
+import logging
 import time
 from time import perf_counter
 from typing import List, Text, NoReturn, Optional
@@ -12,7 +13,6 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
@@ -28,6 +28,7 @@ from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
+log = logging.getLogger(__name__)
 
 class SubMonitor:
 
@@ -134,13 +135,13 @@ class SubMonitor:
             error_type = None
             if hasattr(e, 'error_type'):
                 error_type = e.error_type
-            log.exception('Praw API Exception.  Error Type: %s', error_type, exc_info=True)
+            log.exception('Praw API Exception.  Error Type=%s', error_type, exc_info=False)
             return
         except RateLimitException:
             time.sleep(10)
             return
         except RedditAPIException:
-            log.error('Other API exception')
+            log.exception('Other API exception')
             return
         except Exception as e:
             log.exception('Failed to leave comment on %s in %s', post.post_id, post.subreddit)

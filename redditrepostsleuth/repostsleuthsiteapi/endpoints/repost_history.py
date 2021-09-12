@@ -52,7 +52,7 @@ class RepostHistoryEndpoint:
             for rp in reposts:
                 post = uow.posts.get_by_post_id(rp.post_id)
                 repost_of = uow.posts.get_by_post_id(rp.repost_of)
-                search_data = uow.image_search.get_by_id(rp.search_id)
+                search_data = uow.image_search.get_by_id(rp.trace_id)
                 if not post or not repost_of:
                     continue
                 results.append({
