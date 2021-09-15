@@ -278,4 +278,4 @@ class ResponseHandler:
             uow.commit()
 
         if self.notification_svc:
-            self.notification_svc.send_notification(f'Subreddit r/{subreddit} added to ban list', subject='Added Banned Sub')
+            self.notification_svc.send_notification(f'Subreddit https://reddit.com/r/{subreddit} added to ban list', subject='Added Banned Sub')

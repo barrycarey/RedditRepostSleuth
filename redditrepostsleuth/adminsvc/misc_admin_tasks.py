@@ -93,7 +93,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
                 uow.banned_subreddit.remove(ban)
                 if notification_svc:
                     notification_svc.send_notification(
-                        f'Removed {ban.subreddit} from ban list',
+                        f'Removed https://reddit.com/r/{ban.subreddit} from ban list',
                         subject='Subreddit Removed From Ban List!'
                     )
             uow.commit()
@@ -280,4 +280,4 @@ if __name__ == '__main__':
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_subreddit_access_level(uowm, reddit)
+    update_ban_list(uowm, reddit, notification_svc)

@@ -79,7 +79,7 @@ class PostRepository:
         r = self.db_session.query(func.count(Post.id)).first()
         return r[0] if r else None
 
-    def get_newest_post(self):
+    def get_newest_post(self) -> Post:
         return self.db_session.query(Post).order_by(Post.id.desc()).limit(1).first()
 
     # Repost methods
