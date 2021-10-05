@@ -19,6 +19,8 @@ from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 #https://api.reddit.com/api/info?id=t3_7s62cf
 
+# TODO - this can be removed
+
 class PostIngestor:
     def __init__(self, reddit: Reddit, uowm: UnitOfWorkManager, config: Config) -> None:
         self.config = config
