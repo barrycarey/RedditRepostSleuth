@@ -44,7 +44,6 @@ log = configure_logger(
     filters=[ContextFilter()]
 )
 
-#configure_root_logger('%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [Search ID: %(search_id)s][Post ID: %(post_id)s][Subreddit: %(subreddit)s]- %(levelname)s: %(message)s', [SearchContextFilter()])
 
 class SummonsHandlerTask(Task):
     def __init__(self):
@@ -64,10 +63,6 @@ class SummonsHandlerTask(Task):
                                               self.response_handler, event_logger=self.event_logger,
                                               summons_disabled=False, notification_svc=notification_svc)
 
-
-
-    def _get_log_adaptor(self):
-        pass
 
 class SubMonitorTask(Task):
     def __init__(self):
@@ -167,7 +162,7 @@ def process_monitored_sub(self, monitored_sub):
 
 @celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True, )
 def process_summons(self, s: Summons):
-    update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': s.post_id,
+    update_log_context_data(log, {'trace_id': s.id, 'post_id': s.post_id,
                                   'subreddit': s.subreddit, 'service': 'Summons'})
     with self.uowm.start() as uow:
         log.info('Starting summons %s on sub %s', s.id, s.subreddit)
@@ -204,7 +199,6 @@ def process_summons(self, s: Summons):
                     if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
                         log.error('Hit API rate limit for summons %s on sub %s.', s.id, s.subreddit)
                         return
-                        #time.sleep(60)
 
                 # TODO - This sends completed summons events to influx even if they fail
                 summons_event = SummonsEvent(float((datetime.utcnow() - s.summons_received_at).seconds),

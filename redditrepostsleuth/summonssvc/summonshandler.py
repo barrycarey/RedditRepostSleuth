@@ -8,6 +8,7 @@ from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
+from redditrepostsleuth.core.celery.reddit_messaging_task import reply_to_summons
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -347,7 +348,7 @@ class SummonsHandler:
             return target_match_percent, target_meme_match_percent, target_annoy_distance
         return self.config.default_image_target_match, self.config.default_image_target_meme_match, self.config.default_image_target_annoy_distance
 
-    def _send_response(self, response: SummonsResponse) -> NoReturn:
+    def _send_response_old(self, response: SummonsResponse) -> NoReturn:
         """
         Take a response object and send a response to the summons.  If we're banned on the sub send a PM instead
         :param response: SummonsResponse Object
@@ -368,6 +369,14 @@ class SummonsHandler:
                 log.info('Banned on %s, sending PM', response.summons.subreddit)
                 self._send_private_message(response)
         self._save_response(response)
+
+    def _send_response(self, response: SummonsResponse) -> NoReturn:
+        """
+        Take a response object and send a response to the summons.  If we're banned on the sub send a PM instead
+        :param response: SummonsResponse Object
+        """
+
+        reply_to_summons.apply_async((response,), queue='bot_response')
 
     def _reply_to_comment(self, response: SummonsResponse) -> SummonsResponse:
         log.debug('Sending response to summons comment %s. MESSAGE: %s', response.summons.comment_id, response.message)

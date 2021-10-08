@@ -1,6 +1,6 @@
 import logging
 from time import perf_counter
-from typing import Text, NoReturn, Optional
+from typing import NoReturn, Optional
 
 from praw.exceptions import APIException, RedditAPIException
 from praw.models import Comment, Redditor, Message
@@ -78,7 +78,7 @@ class ResponseHandler:
         return Comment(self.reddit.reddit, id='1111')
 
 
-    def _reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
+    def _reply_to_comment(self, comment_id: str, comment_body: str, subreddit: str = None) -> Optional[Comment]:
         """
         Post a given reply to a given comment ID
         :rtype: Optional[Comment]
@@ -111,7 +111,7 @@ class ResponseHandler:
             log.exception('Problem leaving comment', exc_info=True)
             raise
 
-    def reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
+    def reply_to_comment(self, comment_id: str, comment_body: str, subreddit: str = None) -> Optional[Comment]:
         if self.live_response:
             return self._reply_to_comment(comment_id, comment_body, subreddit=subreddit)
         log.debug('Live response disabled')
@@ -122,15 +122,13 @@ class ResponseHandler:
             self,
             user: Redditor,
             message_body,
-            subject: Text = 'Repost Check',
-            source: Text = None,
-            post_id: Text = None,
-            comment_id: Text = None
+            subject: str = 'Repost Check',
+            source: str = None,
+            post_id: str = None,
+            comment_id: str = None
     ) -> NoReturn:
 
-        if not user:
-            log.error('No user provided to send private message')
-            return
+
         try:
             start_time = perf_counter()
             user.message(subject, message_body)
@@ -159,10 +157,10 @@ class ResponseHandler:
             self,
             user: Redditor,
             message_body,
-            subject: Text = 'Repost Check',
-            source: Text = None,
-            post_id: Text = None,
-            comment_id: Text = None
+            subject: str = 'Repost Check',
+            source: str = None,
+            post_id: str = None,
+            comment_id: str = None
     ) -> NoReturn:
 
         if self.live_response:
@@ -170,7 +168,7 @@ class ResponseHandler:
             return
         log.debug('Live resposne disabled')
 
-    def reply_to_private_message(self, message: Message, body: Text) -> NoReturn:
+    def reply_to_private_message(self, message: Message, body: str) -> NoReturn:
         log.debug('Replying to private message from %s with subject %s', message.dest.name, message.subject)
         try:
             message.reply(body)
@@ -186,7 +184,7 @@ class ResponseHandler:
             log.exception('Problem replying to private message', exc_info=True)
 
 
-    def send_mod_mail(self, subreddit_name: Text, subject: Text, body: Text, triggered_from: Text = None) -> NoReturn:
+    def send_mod_mail(self, subreddit_name: str, subject: str, body: str, triggered_from: str = None) -> NoReturn:
         """
         Send a modmail message
         :rtype: NoReturn
@@ -263,7 +261,7 @@ class ResponseHandler:
             except Exception as e:
                 log.exception('Failed to log comment to DB', exc_info=True)
 
-    def _save_banned_sub(self, subreddit: Text) -> NoReturn:
+    def _save_banned_sub(self, subreddit: str) -> NoReturn:
         with self.uowm.start() as uow:
             banned = uow.banned_subreddit.get_by_subreddit(subreddit)
             if banned:
