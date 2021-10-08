@@ -2,13 +2,14 @@ version: "3.7"
 services:
     ingest:
         restart: always
+        networks:
+            - sleuthnet
         build:
             context: .
             dockerfile: redditrepostsleuth/ingestsvc/Dockerfile
         environment:
             - LOG_LEVEL=WARN
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-
     admin_svc:
         restart: always
         build:
@@ -78,6 +79,8 @@ services:
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
+        networks:
+            - sleuthnet
         environment:
             - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
@@ -104,6 +107,8 @@ services:
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SubMonitorWorkerDockerFile
+        networks:
+            - sleuthnet
         environment:
             - LOG_LEVEL=WARN
             - SLEUTHCONFIG=testconfig.ini
@@ -154,6 +159,8 @@ services:
 
     deleted_post_cleanup_worker:
         restart: always
+        networks:
+            - sleuthnet
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
