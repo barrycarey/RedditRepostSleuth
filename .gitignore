@@ -2,3 +2,4 @@ temp_scratch
 venv
 .idea
 scratch_files
+__pycache__
