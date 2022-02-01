@@ -196,14 +196,14 @@ class TestHelpers(TestCase):
     def test_build_image_report_link_negative(self):
         search_results = ImageSearchResults('test.com', Mock(), checked_post=Post(post_id='abc123'))
         result = build_image_report_link(search_results)
-        expected = "*I'm not perfect, but you can help. Report [ [False Negative](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]*"
+        expected = "*I'm not perfect, but you can help. Report [ [False Negative](<https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Negative&message={\"post_id\": \"abc123\", \"meme_template\": null}>) ]*"
         self.assertEqual(expected, result)
 
     def test_build_image_report_link_positive(self):
         search_results = ImageSearchResults('test.com', Mock(), checked_post=Post(post_id='abc123'))
         search_results.matches.append(ImageSearchMatch('test.com', 123, Mock(), 1, 1, 32))
         result = build_image_report_link(search_results)
-        expected = "*I'm not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]*"
+        expected = "*I'm not perfect, but you can help. Report [ [False Positive](<https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={\"post_id\": \"abc123\", \"meme_template\": null}>) ]*"
         self.assertEqual(expected, result)
 
 
