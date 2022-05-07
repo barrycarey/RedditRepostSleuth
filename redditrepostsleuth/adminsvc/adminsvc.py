@@ -86,6 +86,7 @@ if __name__ == '__main__':
         name='remove_expired_bans',
         max_instances=1
     )
+    """
     scheduler.add_job(
         func=update_banned_sub_wiki,
         args=(uowm, reddit),
@@ -94,6 +95,7 @@ if __name__ == '__main__':
         name='updated_banned_subs',
         max_instances=1
     )
+    """
     scheduler.add_job(
         func=send_reports_to_meme_voting,
         args=(uowm,),
@@ -118,6 +120,7 @@ if __name__ == '__main__':
         name='check_meme_template_votes',
         max_instances=1
     )
+    """
     scheduler.add_job(
         func=update_ban_list,
         args=(uowm,notification_svc),
@@ -126,6 +129,7 @@ if __name__ == '__main__':
         name='check_banned_subs',
         max_instances=1
     )
+    """
     scheduler.add_job(
         func=queue_config_updates,
         args=(uowm, config),
@@ -142,6 +146,7 @@ if __name__ == '__main__':
         name='queue_deleted_watch_check',
         max_instances=1
     )
+    """
     scheduler.add_job(
         func=update_subreddit_access_level,
         args=(uowm, reddit),
@@ -150,6 +155,7 @@ if __name__ == '__main__':
         name='update_sub_access_level',
         max_instances=1
     )
+    """
     scheduler.start()
     try:
         # This is here to simulate application activity (which keeps the main thread alive).
