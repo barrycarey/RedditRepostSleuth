@@ -647,6 +647,7 @@ class MemeTemplatePotentialVote(Base):
             'voted_at': self.voted_at.timestamp() if self.voted_at else None,
         }
 
+
 class ImageIndexMap(Base):
     __tablename__ = 'image_index_map'
     __table_args__ = (
