@@ -656,4 +656,5 @@ class ImageIndexMap(Base):
     id = Column(Integer, primary_key=True)
     annoy_index_id = Column(Integer, nullable=False)
     reddit_post_db_id = Column(Integer, nullable=False)
+    reddit_image_post_db_id = Column(Integer, nullable=False)
     index_name = Column(String(10), nullable=False)
