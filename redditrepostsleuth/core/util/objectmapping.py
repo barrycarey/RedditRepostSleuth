@@ -67,7 +67,6 @@ def post_to_image_post(post: Post) -> RedditImagePost:
 def post_to_image_post_current(post: Post) -> RedditImagePostCurrent:
     return RedditImagePostCurrent(
         dhash_h=post.dhash_h,
-        dhash_v=post.dhash_v,
         post_id=post.post_id,
         created_at=post.created_at
     )
