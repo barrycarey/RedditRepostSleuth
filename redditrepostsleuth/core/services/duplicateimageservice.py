@@ -14,7 +14,7 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
-from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult
+from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult, APISearchResults, ImageMatch
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
@@ -168,7 +168,7 @@ class DuplicateImageService:
         )
         search_results.search_times.stop_timer('image_search_api_time')
 
-        search_results.search_times.index_search_time = api_search_results.index_search_time
+        search_results.search_times.index_search_time = api_search_results.total_search_time
         search_results.total_searched = api_search_results.total_searched
 
         search_results.search_times.start_timer('set_match_post_time')
@@ -228,7 +228,7 @@ class DuplicateImageService:
             target_annoy_distance: float,
             max_matches: int = 50,
             max_depth: int = 4000,
-    ) -> ImageIndexApiResult:
+    ) -> APISearchResults:
         """
         Take a given hash and search the image index API for matches
         :param hash: Hash of image to search
@@ -262,43 +262,49 @@ class DuplicateImageService:
         res_data = json.loads(r.text)
 
         try:
-            return ImageIndexApiResult(**res_data)
+            return APISearchResults(**res_data)
         except TypeError as e:
             raise NoIndexException(f'Failed to convert API result: {str(e)}')
 
     def _build_search_results(
             self,
-            index_matches: List[dict],
+            api_search_results: APISearchResults,
             url: Text,
             searched_hash: Text,
-            historical_index: bool = True
     ) -> List[ImageSearchMatch]:
         """
         Take a list of index matches and convert them to ImageSearchMatches
         :param index_matches: Dict of raw matches from index search
         :param url: URL of the image we searched
-        :param historical_index: If results are from the historical index
         :return:
         """
         results = []
-        log.debug('Building search results from %s index matches', len(index_matches))
-        for m in index_matches:
-            image_match = self._get_image_search_match_from_index_result(m, url, searched_hash,
-                                                                         historical_index=historical_index)
-            if image_match:
-                results.append(image_match)
+        log.info('Building search results from index matches')
+        with self.uowm.start() as uow:
+            for r in api_search_results.results:
+                for m in r:
+                    image_match = self._get_image_search_match_from_index_result(m, url, searched_hash)
+                    if image_match:
+                        results.append(image_match)
         log.debug('%s results built', len(results))
         return results
 
     def _get_image_search_match_from_index_result(
             self,
-            result: dict,
+            result: ImageMatch,
+            index_name: str,
             url: Text,
-            searched_hash: Text,
-            historical_index: bool = True
+            searched_hash: str,
     ) -> Optional[ImageSearchMatch]:
 
-        post = self._get_post_from_index_id(result['id'], historical_index=historical_index)
+        with self.uowm.start() as uow:
+            index_map = uow.image_index_map.get_by_id_and_index(result.id, index_name)
+
+            if not index_map:
+                log.error('Failed to find index map for id %s in index %s', result.id, index_name)
+                return
+
+            post = uow.posts.get_by_id(index_map.reddit_post_db_id)
 
         if not post:
             return
