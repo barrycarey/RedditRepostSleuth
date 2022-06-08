@@ -6,6 +6,7 @@ from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSu
 from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
 from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
 from redditrepostsleuth.core.db.repository.config_message_template_repo import ConfigMessageTemplateRepo
+from redditrepostsleuth.core.db.repository.image_index_map_rep import ImageIndexMapRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_repo import MemeTemplatePotentialRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_votes_repo import MemeTemplatePotentialVoteRepo
 from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
@@ -162,3 +163,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def meme_template_potential_votes(self) -> MemeTemplatePotentialVoteRepo:
         return MemeTemplatePotentialVoteRepo(self.session)
+
+    @property
+    def image_index_map(self) -> ImageIndexMapRepo:
+        return ImageIndexMapRepo(self.session)
