@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.engine import URL
+from sqlalchemy.engine.url import URL
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log

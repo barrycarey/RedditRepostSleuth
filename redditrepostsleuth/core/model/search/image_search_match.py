@@ -9,7 +9,7 @@ class ImageSearchMatch(SearchMatch):
     def __init__(
             self,
             searched_url: Text,
-            index_match_id: int,
+            match_id: int,
             post: Post,
             hamming_distance: int,
             annoy_distance: float,
@@ -30,7 +30,7 @@ class ImageSearchMatch(SearchMatch):
         self.hamming_distance = hamming_distance
         self.title_similarity = title_similarity
         self.post = post
-        self.index_match_id = index_match_id
+        self.match_id = match_id
         self.searched_url = searched_url
 
     @property

@@ -9,6 +9,8 @@ class ImageMatch(BaseModel):
 
 class IndexSearchResult(BaseModel):
     index_name: str
+    hamming_filtered = False
+    annoy_filtered = False
     index_search_time: float = 0
     total_time: float = 0
     total_searched = 0
