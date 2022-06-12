@@ -50,7 +50,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
             uow.posts.add(post)
             uow.commit()
             log.debug('Committed post to database')
-        except IntegrityError as e:
+        except Exception as e:
             log.exception('Database save failed: %s', str(e), exc_info=False)
             return
 
