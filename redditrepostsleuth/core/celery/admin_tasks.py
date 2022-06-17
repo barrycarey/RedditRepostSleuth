@@ -99,3 +99,7 @@ def check_if_watched_post_is_active(self, watches: List[RepostWatch]):
             uow.repostwatch.remove(watch)
 
     uow.commit()
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def save_image_index_map(self, map_data):
+    pass

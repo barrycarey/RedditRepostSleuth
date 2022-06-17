@@ -27,10 +27,10 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
     with uowm.start() as uow:
         if post.post_type == 'image':
             try:
-                post, image_post, image_post_current = process_image_post(post, hash_api)
+                post, image_post = process_image_post(post, hash_api)
             except (ImageRemovedException, ImageConversioinException, InvalidImageUrlException, ConnectionError):
                 return
-            if image_post is None or image_post_current is None:
+            if image_post is None:
                 log.error('Failed to save image post. One of the post objects is null', post.post_id)
                 return
 
@@ -39,7 +39,6 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
                 return
 
             uow.image_post.add(image_post)
-            uow.image_post_current.add(image_post_current)
         elif post.post_type == 'link':
             url_hash = md5(post.url.encode('utf-8'))
             post.url_hash = url_hash.hexdigest()
@@ -57,7 +56,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
     return post
 
 
-def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, RedditImagePostCurrent]:
+def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost]:
     if 'imgur' not in post.url: # TODO Why in the hell did I do this?
         """
         if 'preview.redd.it' in post.url:
@@ -94,15 +93,14 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost, Redd
     return create_image_posts(post)
 
 
-def create_image_posts(post: Post) -> Tuple[Post,RedditImagePost, RedditImagePostCurrent]:
+def create_image_posts(post: Post) -> Tuple[Post,RedditImagePost]:
     """
     Since we need to store multiple copies of an image post for the multiple indexes, this function creates all in one shot
     :param post: Post obj
     """
     image_post = post_to_image_post(post)
-    image_post_current = post_to_image_post_current(post)
     log.debug('Created image_post and image_post_current')
-    return post, image_post, image_post_current
+    return post, image_post
 
 def save_unknown_post(post_id: Text, uowm: UnitOfWorkManager, reddit: RedditManager) -> Post:
     """
