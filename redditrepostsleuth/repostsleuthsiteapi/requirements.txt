@@ -1,4 +1,4 @@
-falcon
+falcon==2.0.0
 gunicorn
 requests
 falcon_cors
@@ -17,3 +17,4 @@ falcon_multipart
 redis
 redlock
 celery[redis]==4.4.7
+pydantic

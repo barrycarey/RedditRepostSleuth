@@ -14,7 +14,7 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
-from redditrepostsleuth.core.model.image_index_api_result import ImageIndexApiResult
+from redditrepostsleuth.core.model.image_index_api_result import APISearchResults, ImageMatch
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
@@ -168,14 +168,12 @@ class DuplicateImageService:
         )
         search_results.search_times.stop_timer('image_search_api_time')
 
-        search_results.search_times.index_search_time = api_search_results.index_search_time
+        search_results.search_times.index_search_time = float(api_search_results.total_search_time)
         search_results.total_searched = api_search_results.total_searched
 
         search_results.search_times.start_timer('set_match_post_time')
-        search_results.matches = self._build_search_results(api_search_results.historical_matches, url,
-                                                            search_results.target_hash)
-        search_results.matches += self._build_search_results(api_search_results.current_matches, url,
-                                                             search_results.target_hash, historical_index=False)
+        search_results.matches = self._build_search_results(api_search_results, url, search_results.target_hash)
+
         search_results.search_times.stop_timer('set_match_post_time')
 
         search_results.search_times.start_timer('remove_duplicate_time')
@@ -197,8 +195,8 @@ class DuplicateImageService:
         search_results = self._log_search(
             search_results,
             source,
-            api_search_results.used_current_index,
-            api_search_results.used_historical_index,
+            False,  # TODO - Remove once DB column is removed
+            False, # TODO - Remove once DB column is removed
         )
 
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
@@ -228,7 +226,7 @@ class DuplicateImageService:
             target_annoy_distance: float,
             max_matches: int = 50,
             max_depth: int = 4000,
-    ) -> ImageIndexApiResult:
+    ) -> APISearchResults:
         """
         Take a given hash and search the image index API for matches
         :param hash: Hash of image to search
@@ -262,46 +260,54 @@ class DuplicateImageService:
         res_data = json.loads(r.text)
 
         try:
-            return ImageIndexApiResult(**res_data)
+            return APISearchResults(**res_data)
         except TypeError as e:
             raise NoIndexException(f'Failed to convert API result: {str(e)}')
 
     def _build_search_results(
             self,
-            index_matches: List[dict],
+            api_search_results: APISearchResults,
             url: Text,
             searched_hash: Text,
-            historical_index: bool = True
     ) -> List[ImageSearchMatch]:
         """
         Take a list of index matches and convert them to ImageSearchMatches
         :param index_matches: Dict of raw matches from index search
         :param url: URL of the image we searched
-        :param historical_index: If results are from the historical index
         :return:
         """
         results = []
-        log.debug('Building search results from %s index matches', len(index_matches))
-        for m in index_matches:
-            image_match = self._get_image_search_match_from_index_result(m, url, searched_hash,
-                                                                         historical_index=historical_index)
-            if image_match:
-                results.append(image_match)
+        log.info('Building search results from index matches')
+        with self.uowm.start() as uow:
+            for r in api_search_results.results:
+                for match in r.matches:
+                    image_match = self._get_image_search_match_from_index_result(match, r.index_name, url, searched_hash)
+                    if image_match:
+                        results.append(image_match)
         log.debug('%s results built', len(results))
         return results
 
     def _get_image_search_match_from_index_result(
             self,
-            result: dict,
+            result: ImageMatch,
+            index_name: str,
             url: Text,
-            searched_hash: Text,
-            historical_index: bool = True
+            searched_hash: str,
     ) -> Optional[ImageSearchMatch]:
 
-        post = self._get_post_from_index_id(result['id'], historical_index=historical_index)
+        with self.uowm.start() as uow:
+            index_map = uow.image_index_map.get_by_id_and_index(result.id, index_name)
+
+            if not index_map:
+                log.error('Failed to find index map for id %s in index %s', result.id, index_name)
+                return
+
+            post = uow.posts.get_by_id(index_map.reddit_post_db_id)
 
         if not post:
             return
+
+        log.debug(post.url)
 
         if not post.dhash_h:
             log.error('Post %s missing dhash', post.post_id)
@@ -309,10 +315,10 @@ class DuplicateImageService:
 
         return ImageSearchMatch(
             url,
-            result['id'],
+            index_map.reddit_post_db_id,
             post,
             hamming(searched_hash, post.dhash_h),
-            result['distance'],
+            result.distance,
             len(post.dhash_h)
         )
 
@@ -378,49 +384,6 @@ class DuplicateImageService:
         log.debug('%s matches after duplicate removal', len(results))
         return results
 
-    def _get_post_from_index_id(self, index_id: int, historical_index: bool = True) -> Optional[Post]:
-        with self.uowm.start() as uow:
-            # Hit the correct table if historical or current
-            if historical_index:
-                original_image_post = uow.image_post.get_by_id(index_id)
-            else:
-                original_image_post = uow.image_post_current.get_by_id(index_id)
-
-            if not original_image_post:
-                log.error('Failed to lookup original match post. ID %s - Historical: %s', index_id, historical_index)
-                return
-
-            post = uow.posts.get_by_post_id(original_image_post.post_id)
-            if not post:
-                log.error('Failed to find original reddit_post for match')
-                return
-            return post
-
-    # TODO - 1/17/2021 - Can be removed
-    def _set_match_post(self, match: ImageSearchMatch, historical: bool = True) -> Optional[ImageSearchMatch]:
-        """
-        Take a search match, lookup the Post object and attach to match
-        :param match: Match object
-        :param historical: Is the match from the historical index
-        """
-        with self.uowm.start() as uow:
-            # Hit the correct table if historical or current
-            if historical:
-                original_image_post = uow.image_post.get_by_id(match.index_match_id)
-            else:
-                original_image_post = uow.image_post_current.get_by_id(match.index_match_id)
-
-            if not original_image_post:
-                log.error('Failed to lookup original match post. ID %s - Historical: %s', match.index_match_id,
-                          historical)
-                return
-
-            match_post = uow.posts.get_by_post_id(original_image_post.post_id)
-            if not match_post:
-                log.error('Failed to find original reddit_post for match')
-                return
-            match.post = match_post
-            return match
 
     def _get_meme_template(self, image_hash: Text) -> Optional[MemeTemplate]:
         try:
@@ -430,7 +393,7 @@ class DuplicateImageService:
             return
 
         if r.status_code != 200:
-            log.error('Unexpected Index API status %s', r.status_code)
+            log.error('Unexpected Index API status %s. %s', r.status_code, r.text)
             return
 
         results = json.loads(r.text)

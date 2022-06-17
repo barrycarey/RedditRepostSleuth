@@ -1,14 +1,22 @@
-from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List
+
+from pydantic import BaseModel
 
 
-@dataclass
-class ImageIndexApiResult:
-    current_matches: List[dict]
-    historical_matches: List[dict]
-    index_search_time: float
-    total_searched: int
-    used_current_index: bool
-    used_historical_index: bool
-    target_result: dict
+class ImageMatch(BaseModel):
+    id: int
+    distance: float
 
+class IndexSearchResult(BaseModel):
+    index_name: str
+    hamming_filtered = False
+    annoy_filtered = False
+    index_search_time: float = 0
+    total_time: float = 0
+    total_searched = 0
+    matches: List[ImageMatch] = []
+
+class APISearchResults(BaseModel):
+    total_searched: int = 0
+    total_search_time: int = 0
+    results: List[IndexSearchResult] = []
