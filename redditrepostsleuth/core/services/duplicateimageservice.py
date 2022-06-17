@@ -168,7 +168,7 @@ class DuplicateImageService:
         )
         search_results.search_times.stop_timer('image_search_api_time')
 
-        search_results.search_times.index_search_time = api_search_results.total_search_time
+        search_results.search_times.index_search_time = float(api_search_results.total_search_time)
         search_results.total_searched = api_search_results.total_searched
 
         search_results.search_times.start_timer('set_match_post_time')
