@@ -12,13 +12,19 @@ from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repos
     repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
-from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.logfilters import ContextFilter
+from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 
+log = configure_logger(
+    name='redditrepostsleuth',
+    format='%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - Trace_ID=%(trace_id)s Post_ID=%(post_id)s Subreddit=%(subreddit)s Service=%(service)s Level=%(levelname)s Message=%(message)s',
+    filters=[ContextFilter()]
+)
 
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):

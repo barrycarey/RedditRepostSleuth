@@ -81,8 +81,9 @@ class RedditImagePostCurrent(Base):
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime)
     post_id = Column(String(100), nullable=False, unique=True)
-    dhash_v = Column(String(64))
     dhash_h = Column(String(64))
+    reddit_post_db_id = Column(Integer)
+    reddit_image_post_db_id = Column(Integer)
 
 
 class Summons(Base):
@@ -129,14 +130,6 @@ class BotPrivateMessage(Base):
     triggered_from = Column(String(50), nullable=False)
     message_sent_at = Column(DateTime, default=func.utc_timestamp())
 
-
-class Comment(Base):
-    __tablename__ = 'reddit_comments'
-
-    id = Column(Integer, primary_key=True)
-    comment_id = Column(String(100), nullable=False, unique=True)
-    body = Column(Text(collation='utf8mb4_general_ci'))
-    ingested_at = Column(DateTime, default=func.utc_timestamp())
 
 class RepostWatch(Base):
     __tablename__ = 'reddit_repost_watch'
@@ -286,9 +279,9 @@ class MonitoredSub(Base):
     check_title_similarity = Column(Boolean, default=False)
     target_title_match = Column(Integer)
     subscribers = Column(Integer, default=0)
-    is_mod = Column(Boolean, default=False)
-    post_permission = Column(Boolean, default=False)
-    wiki_permission = Column(Boolean, default=False)
+    is_mod = Column(Boolean, default=True)
+    post_permission = Column(Boolean, default=True)
+    wiki_permission = Column(Boolean, default=True)
     wiki_managed = Column(Boolean, default=True)
     check_image_posts = Column(Boolean, default=True)
     check_link_posts = Column(Boolean, default=False)
@@ -307,6 +300,8 @@ class MonitoredSub(Base):
     lock_response_comment = Column(Boolean, default=False)
     filter_removed_matches = Column(Boolean, default=False)
     send_repost_modmail = Column(Boolean, default=False)
+    nsfw = Column(Boolean, default=False)
+    is_private = Column(Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -316,7 +311,7 @@ class MonitoredSub(Base):
             'report_submission': self.report_submission,
             'report_msg': self.report_msg,
             'requestor': self.requestor,
-            'added_at': str(self.added_at),
+            'added_at': self.added_at.timestamp() if self.added_at else None,
             'target_annoy': self.target_annoy,
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
@@ -358,7 +353,9 @@ class MonitoredSub(Base):
             'comment_on_oc': self.comment_on_oc,
             'lock_response_comment': self.lock_response_comment,
             'filter_removed_matches': self.filter_removed_matches,
-            'send_repost_modmail': self.send_repost_modmail
+            'send_repost_modmail': self.send_repost_modmail,
+            'nsfw': self.nsfw,
+            'is_private': self.is_private
         }
 
 
@@ -456,11 +453,11 @@ class ImageSearch(Base):
     total_filter_time = Column(Float)
     matches_found = Column(Integer, nullable=False)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
-    search_results = Column(Text(75000, collation='utf8mb4_general_ci'))
     subreddit = Column(String(100), nullable=False)
     target_image_match = Column(Integer, default=92)
     target_image_meme_match = Column(Integer, default=97)
-
+    filter_same_author = Column(Boolean)
+    filter_crossposts = Column(Boolean)
 
     def to_dict(self):
         return {
@@ -473,6 +470,8 @@ class ImageSearch(Base):
             'same_sub': self.same_sub,
             'max_days_old': self.max_days_old,
             'filter_dead_matches': self.filter_dead_matches,
+            'filter_same_author': self.filter_same_author,
+            'filter_crossposts': self.filter_crossposts,
             'only_older_matches': self.only_older_matches,
             'meme_filter': self.meme_filter,
             'meme_template_used': self.meme_template_used,
@@ -648,3 +647,15 @@ class MemeTemplatePotentialVote(Base):
             'vote': self.vote,
             'voted_at': self.voted_at.timestamp() if self.voted_at else None,
         }
+
+
+class ImageIndexMap(Base):
+    __tablename__ = 'image_index_map'
+    __table_args__ = (
+        Index('id_map', 'annoy_index_id', 'index_name'),
+    )
+    id = Column(Integer, primary_key=True)
+    annoy_index_id = Column(Integer, nullable=False)
+    reddit_post_db_id = Column(Integer, nullable=False)
+    reddit_image_post_db_id = Column(Integer, nullable=False)
+    index_name = Column(String(10), nullable=False)

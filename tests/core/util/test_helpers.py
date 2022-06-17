@@ -17,7 +17,8 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, \
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url, \
-    build_image_report_link, get_default_link_search_settings, batch_check_urls
+    build_image_report_link, get_default_link_search_settings, batch_check_urls, reddit_post_id_from_url, is_image_url, \
+    base36encode, base36decode, get_next_ids, build_ingest_query_params
 
 
 class TestHelpers(TestCase):
@@ -190,7 +191,7 @@ class TestHelpers(TestCase):
             target_meme_match_percent=95
         )
         r = build_site_search_url('abc123', search_settings)
-        expected = 'https://www.repostsleuth.com?postId=abc123&sameSub=true&filterOnlyOlder=true&memeFilter=true&filterDeadMatches=true&targetImageMatch=90&targetImageMemeMatch=95'
+        expected = 'https://www.repostsleuth.com/search?postId=abc123&sameSub=true&filterOnlyOlder=true&memeFilter=true&filterDeadMatches=true&targetImageMatch=90&targetImageMemeMatch=95'
         self.assertEqual(expected, r)
 
     def test_build_image_report_link_negative(self):
@@ -285,6 +286,34 @@ class TestHelpers(TestCase):
             res = batch_check_urls(urls, 'test.com')
 
         self.assertEqual(5, len(res))
+
+
+    def test_reddit_post_id_from_url_long_url_return_post_id(self):
+        url = 'https://www.reddit.com/r/memes/comments/ln0sj7/you_guys_are_amazing_by_the_way/'
+        self.assertEqual('ln0sj7', reddit_post_id_from_url(url))
+
+    def test_reddit_post_id_from_url_short_url_return_post_id(self):
+        url = 'https://redd.it/ln0sj7'
+        self.assertEqual('ln0sj7', reddit_post_id_from_url(url))
+
+    def test_reddit_post_id_from_url_invalid_url_return_none(self):
+        url = 'https://somerandomdomain/ln0sj7'
+        self.assertIsNone(reddit_post_id_from_url(url))
+
+    def test_reddit_post_id_from_url_no_url_return_none(self):
+        self.assertIsNone(reddit_post_id_from_url(None))
+
+    def test_is_image_url_valid_url_return_true(self):
+        url = 'https://example.com/someimage.png'
+        self.assertTrue(is_image_url(url))
+
+    def test_is_image_url_invalid_url_return_false(self):
+        url = 'https://exxample.com/somerandompage'
+        self.assertFalse(is_image_url(url))
+
+    def test_is_image_url_invalid_image_type_return_false(self):
+        url = 'https://example.com/someimage.bmp'
+        self.assertFalse(is_image_url(url))
 
     def _get_image_search_settings(self):
         return ImageSearchSettings(
@@ -396,3 +425,36 @@ class TestHelpers(TestCase):
 
         return search_results
 
+    def test_base36decode_valid_int(self):
+        self.assertEqual(1546791610, base36decode('pkx41m'))
+
+    def test_base36decode_invalid_value(self):
+        with self.assertRaises(TypeError):
+            self.assertEqual(1546791610, base36decode(111111))
+
+    def test_base36encode_valid_int(self):
+        self.assertEqual('pkx41m', base36encode(1546791610))
+
+    def test_base36decode_invalid_value(self):
+        with self.assertRaises(TypeError):
+            self.assertEqual(1546791610, base36encode('pkx41m'))
+
+    def test_get_next_ids_valid_values(self):
+        expected = [
+            't3_pkx41m',
+            't3_pkx41n',
+            't3_pkx41o',
+            't3_pkx41p',
+            't3_pkx41q'
+
+        ]
+        self.assertListEqual(expected, get_next_ids('pkx41m', 5)[0])
+
+    def test_get_next_ids_invalid_id(self):
+        with self.assertRaises(TypeError):
+            get_next_ids(1111, 5)
+
+    def test_build_ingest_query_params(self):
+        expected = {'submission_ids': 't3_pmfkfs,t3_pmfkft,t3_pmfkfu,t3_pmfkfv,t3_pmfkfw'}
+        print(build_ingest_query_params('pmfkfs', limit=5))
+        self.assertDictEqual(expected, build_ingest_query_params('pmfkfs', limit=5))

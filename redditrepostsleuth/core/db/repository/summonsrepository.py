@@ -34,9 +34,18 @@ class SummonsRepository:
     def get_unreplied(self, limit: int = 10) -> Summons:
         return self.db_session.query(Summons).filter(Summons.summons_replied_at == None).order_by(Summons.summons_received_at.desc()).limit(limit).all()
 
-    def get_count(self):
-        r = self.db_session.query(func.count(Summons.id)).first()
+    def get_count(self, hours: int = None):
+        query = self.db_session.query(func.count(Summons.id))
+        if hours:
+            query = query.filter(Summons.summons_received_at > (datetime.now() - timedelta(hours=hours)))
+        r = query.first()
         return r[0] if r else None
+
+    def get_count_by_subreddit(self, subreddit: Text, hours: int = None):
+        query = self.db_session.query(func.count(Summons.id)).filter(Summons.subreddit == subreddit)
+        if hours:
+            query = query.filter(Summons.summons_received_at > (datetime.now() - timedelta(hours=hours)))
+        return query.first()
 
     def remove(self, item: Summons):
         self.db_session.delete(item)

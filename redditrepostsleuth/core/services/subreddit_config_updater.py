@@ -457,5 +457,5 @@ if __name__ == '__main__':
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config, notification_svc=notification_svc)
     with uowm.start() as uow:
-        sub = uow.monitored_sub.get_by_sub('RepostSleuthBot')
-    updater.update_configs(notify_missing_keys=False)
+        sub = uow.monitored_sub.get_by_sub('SelfAwarewolves')
+    updater.update_wiki_config_from_database(sub, notify=False)

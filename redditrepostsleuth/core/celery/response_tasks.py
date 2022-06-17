@@ -1,10 +1,15 @@
 import json
+import logging
+import os
+import sys
 import time
 from datetime import datetime
-from typing import Dict
+from random import randint
+from typing import Text
 
 import requests
 from celery import Task
+from celery.utils.log import get_task_logger
 from praw.exceptions import APIException
 from prawcore import ResponseException
 from redlock import RedLockError
@@ -12,11 +17,13 @@ from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Summons
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.exception import LoadSubredditException
-from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.logfilters import ContextFilter
+from redditrepostsleuth.core.logging import configure_logger, get_configured_logger
+
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import SummonsResponse
 from redditrepostsleuth.core.notification.notification_service import NotificationService
@@ -25,12 +32,19 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import get_redlock_factory
-from redditrepostsleuth.core.util.objectmapping import submission_to_post, pushshift_to_post
+from redditrepostsleuth.core.util.helpers import get_redlock_factory, update_log_context_data
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+from redditrepostsleuth.ingestsvc.util import save_unknown_post
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
+log = configure_logger(
+    name='redditrepostsleuth',
+    format='%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - Trace_ID=%(trace_id)s Post_ID=%(post_id)s Subreddit=%(subreddit)s Service=%(service)s Level=%(levelname)s Message=%(message)s',
+    filters=[ContextFilter()]
+)
+
+#configure_root_logger('%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [Search ID: %(search_id)s][Post ID: %(post_id)s][Subreddit: %(subreddit)s]- %(levelname)s: %(message)s', [SearchContextFilter()])
 
 class SummonsHandlerTask(Task):
     def __init__(self):
@@ -50,6 +64,11 @@ class SummonsHandlerTask(Task):
                                               self.response_handler, event_logger=self.event_logger,
                                               summons_disabled=False, notification_svc=notification_svc)
 
+
+
+    def _get_log_adaptor(self):
+        pass
+
 class SubMonitorTask(Task):
     def __init__(self):
         self.config = Config()
@@ -61,22 +80,30 @@ class SubMonitorTask(Task):
         dup_image_svc = DuplicateImageService(self.uowm, event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit_manager, response_builder, response_handler, event_logger=event_logger, config=self.config)
+        self.blacklisted_posts = []
 
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
-def sub_monitor_check_post(self, submission: Dict, monitored_sub: MonitoredSub):
-    if self.sub_monitor.has_post_been_checked(submission['id']):
-        log.debug('Post %s has already been checked', submission['id'])
+def sub_monitor_check_post(self, post_id: Text, monitored_sub: MonitoredSub):
+    update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': post_id,
+                                  'subreddit': monitored_sub.name, 'service': 'Subreddit_Monitor'})
+    if self.sub_monitor.has_post_been_checked(post_id):
+        log.debug('Post %s has already been checked', post_id)
         return
+    if post_id in self.blacklisted_posts:
+        log.debug('Skipping blacklisted post')
+        return
+
     start = time.perf_counter()
     with self.uowm.start() as uow:
-        post = uow.posts.get_by_post_id(submission['id'])
+        post = uow.posts.get_by_post_id(post_id)
         if not post:
-            log.info('Post %s does exist, sending to ingest queue', submission['id'])
-            post = pushshift_to_post(submission, source='reddit_json')
-            celery.send_task('redditrepostsleuth.core.celery.ingesttasks.save_new_post', args=[post],
-                             queue='postingest')
-            return
+            log.info('Post %s does exist, attempting to ingest', post_id)
+            post = save_unknown_post(post_id, self.uowm, self.reddit)
+            if not post:
+                log.error('Failed to save post during monitor sub check')
+                self.blacklisted_posts.append(post_id)
+                return
 
     title_keywords = []
     if monitored_sub.title_ignore_keywords:
@@ -90,80 +117,58 @@ def sub_monitor_check_post(self, submission: Dict, monitored_sub: MonitoredSub):
     ):
         return
 
-    self.sub_monitor.check_submission(monitored_sub, post)
-    print(f'Total time: {round(time.perf_counter() - start, 5)}')
+    results = self.sub_monitor.check_submission(monitored_sub, post)
+    total_check_time = round(time.perf_counter() - start, 5)
 
-@celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
-def sub_monitor_check_post_old(self, submission, monitored_sub):
-    if self.sub_monitor.has_post_been_checked(submission.id):
-        log.debug('Post %s has already been checked', submission.id)
-        return
+    if total_check_time > 20:
+        log.warning('Long Check.  Time: %s | Subreddit: %s | Post ID: %s | Type: %s', total_check_time, monitored_sub.name, post.post_id, post.post_type)
 
-    with self.uowm.start() as uow:
-        post = uow.posts.get_by_post_id(submission.id)
-        if not post:
-            log.info('Post %s does exist, sending to ingest queue', submission.id)
-            post = submission_to_post(submission)
-            celery.send_task('redditrepostsleuth.core.celery.ingesttasks.save_new_post', args=[post],
-                             queue='postingest')
-            return
-
-    title_keywords = []
-    if monitored_sub.title_ignore_keywords:
-        title_keywords = monitored_sub.title_ignore_keywords.split(',')
-
-    if not self.sub_monitor.should_check_post(post, title_keyword_filter=title_keywords):
-        return
-    self.sub_monitor.check_submission(submission, monitored_sub, post)
+    if len(self.blacklisted_posts) > 10000:
+        log.info('Resetting blacklisted posts')
+        self.blacklisted_posts = []
 
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True, autoretry_for=(LoadSubredditException,), retry_kwards={'max_retries': 3})
 def process_monitored_sub(self, monitored_sub):
-    try:
-        log.info('Loading all submissions from %s', monitored_sub.name)
-        r = requests.get(f'{self.config.util_api}/reddit/subreddit', params={'subreddit': monitored_sub.name, 'limit': 500})
-    except ConnectionError:
-        log.error('Connection error with util API')
-        return
-    except Exception as e:
-        log.error('Error getting new posts from util api', exc_info=True)
-        return
 
-    if r.status_code == 403:
-        log.error('Got forbidden for sub %s', monitored_sub.name)
-        raise LoadSubredditException('Failed to load subreddit')
+    submission_ids_to_check = []
 
-    if r.status_code != 200:
-        log.error('Bad status code from Util API %s for %s', r.status_code, monitored_sub.name)
-        return
+    if monitored_sub.is_private:
+        # Don't run through proxy if it's private
+        log.info('Loading all submissions from %s (PRIVATE)', monitored_sub.name)
+        submission_ids_to_check += [sub.id for sub in self.reddit.subreddit(monitored_sub.name).new(limit=500)]
+    else:
+        try:
+            log.info('Loading all submissions from %s', monitored_sub.name)
+            r = requests.get(f'{self.config.util_api}/reddit/subreddit', params={'subreddit': monitored_sub.name, 'limit': 500})
+        except ConnectionError:
+            log.error('Connection error with util API')
+            return
+        except Exception as e:
+            log.error('Error getting new posts from util api', exc_info=True)
+            return
 
-    response_data = json.loads(r.text)
+        if r.status_code == 403:
+            log.error('Monitored sub %s is private.  Skipping', monitored_sub.name)
+            return
 
-    for submission in response_data:
-        sub_monitor_check_post.apply_async((submission, monitored_sub), queue='submonitor')
+        if r.status_code != 200:
+            log.error('Bad status code from Util API %s for %s', r.status_code, monitored_sub.name)
+            return
+
+        response_data = json.loads(r.text)
+
+        submission_ids_to_check += [submission['id'] for submission in response_data]
+
+    for submission_id in submission_ids_to_check:
+        sub_monitor_check_post.apply_async((submission_id, monitored_sub), queue='submonitor_private')
 
     log.info('All submissions from %s sent to queue', monitored_sub.name)
 
-# TODO - Remove this when we're done
-@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True)
-def process_monitored_sub_old(self, monitored_sub):
-    try:
-        subreddit = self.reddit.subreddit(monitored_sub.name)
-        if not subreddit:
-            log.error('Failed to get Subreddit %s', monitored_sub.name)
-            return
-        log.info('Loading all submissions from %s', monitored_sub.name)
-        submissions = subreddit.new(limit=monitored_sub.search_depth)
-        for submission in submissions:
-            sub_monitor_check_post.apply_async((submission, monitored_sub), queue='submonitor')
-        log.info('All submissions from %s sent to queue', monitored_sub.name)
-    except ResponseException as e:
-        if e.response.status_code == 429:
-            log.error('IP Rate limit hit.  Waiting')
-            time.sleep(60)
-            return
 
 @celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True, )
-def process_summons(self, s):
+def process_summons(self, s: Summons):
+    update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': s.post_id,
+                                  'subreddit': s.subreddit, 'service': 'Summons'})
     with self.uowm.start() as uow:
         log.info('Starting summons %s on sub %s', s.id, s.subreddit)
         updated_summons = uow.summons.get_by_id(s.id)

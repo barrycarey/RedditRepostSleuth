@@ -1,4 +1,7 @@
+from datetime import datetime, timedelta
 from typing import Text
+
+from sqlalchemy import func
 
 from redditrepostsleuth.core.db.databasemodels import MonitoredSubChecks
 
@@ -18,3 +21,9 @@ class MonitoredSubCheckRepository:
 
     def remove(self, item: MonitoredSubChecks):
         self.db_session.delete(item)
+
+    def get_count_by_subreddit(self, subreddit: Text, hours: int = None):
+        query = self.db_session.query(func.count(MonitoredSubChecks.id)).filter(MonitoredSubChecks.subreddit == subreddit)
+        if hours:
+            query = query.filter(MonitoredSubChecks.checked_at > (datetime.now() - timedelta(hours=hours)))
+        return query.first()

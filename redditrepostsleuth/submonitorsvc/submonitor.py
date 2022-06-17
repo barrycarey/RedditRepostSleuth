@@ -1,8 +1,9 @@
+import logging
 import time
 from time import perf_counter
 from typing import List, Text, NoReturn, Optional
 
-from praw.exceptions import APIException
+from praw.exceptions import APIException, RedditAPIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 from redlock import RedLockError
@@ -12,7 +13,6 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
@@ -28,6 +28,7 @@ from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
+log = logging.getLogger(__name__)
 
 class SubMonitor:
 
@@ -96,7 +97,7 @@ class SubMonitor:
 
         return True
 
-    def check_submission(self, monitored_sub: MonitoredSub, post: Post):
+    def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
         if post.post_type == 'image' and post.dhash_h is None:
             log.error('Post %s has no dhash', post.post_id)
@@ -124,7 +125,7 @@ class SubMonitor:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
             self._create_checked_post(post)
-            return
+            return search_results
 
         reply_comment = None
         try:
@@ -134,10 +135,13 @@ class SubMonitor:
             error_type = None
             if hasattr(e, 'error_type'):
                 error_type = e.error_type
-            log.exception('Praw API Exception.  Error Type: %s', error_type, exc_info=True)
+            log.exception('Praw API Exception.  Error Type=%s', error_type, exc_info=False)
             return
         except RateLimitException:
             time.sleep(10)
+            return
+        except RedditAPIException:
+            log.exception('Other API exception')
             return
         except Exception as e:
             log.exception('Failed to leave comment on %s in %s', post.post_id, post.subreddit)
@@ -304,7 +308,8 @@ class SubMonitor:
             return
         message_body = REPOST_MODMAIL.format(post_id=search_results.checked_post.post_id,
                                              match_count=len(search_results.matches))
-        self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body)
+        self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body,
+                                            triggered_from='Submonitor')
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)

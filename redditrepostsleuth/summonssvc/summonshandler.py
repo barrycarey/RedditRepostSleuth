@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import datetime, timedelta
 from typing import Tuple, Text, NoReturn, Optional
@@ -11,7 +12,6 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException, InvalidImageUrlException
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
 from redditrepostsleuth.core.model.repostresponse import SummonsResponse
@@ -31,6 +31,7 @@ from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
+log = logging.getLogger(__name__)
 
 class SummonsHandler:
     def __init__(
@@ -65,7 +66,7 @@ class SummonsHandler:
                 with self.uowm.start() as uow:
                     summons = uow.summons.get_unreplied()
                     for s in summons:
-                        log.info('Starting summons %s', s.id)
+                        log.debug('Starting summons')
                         post = uow.posts.get_by_post_id(s.post_id)
                         if not post:
                             post = self.save_unknown_post(s.post_id)
@@ -73,7 +74,7 @@ class SummonsHandler:
                         if not post:
                             response = SummonsResponse(summons=summons)
                             response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
-                            log.info('Failed to ingest post %s.  Sending error response', s.post_id)
+                            log.info('Failed to ingest post.  Sending error response')
                             self._send_response(response)
                             continue
 
@@ -82,7 +83,7 @@ class SummonsHandler:
                         summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
                                                      s.summons_received_at, s.requestor, event_type='summons')
                         self._send_event(summons_event)
-                        log.info('Finished summons %s', s.id)
+                        log.debug('Finished summons')
                 time.sleep(2)
             except Exception:
                 log.exception('Exception in handle summons thread', exc_info=True)
@@ -158,7 +159,7 @@ class SummonsHandler:
             else:
                 base_command = self.command_parser.parse_root_command(stripped_comment)
         except InvalidCommandException:
-            log.error('Invalid command in summons: %s', summons.comment_body)
+            log.error('Invalid command. Body=%s', summons.comment_body)
             base_command = 'repost'
 
         if base_command == 'watch':
@@ -227,7 +228,7 @@ class SummonsHandler:
             try:
                 uow.commit()
                 response.message = WATCH_DISABLED
-                log.info('Disabled watch for post %s for user %s', summons.post_id, summons.requestor)
+                log.info('Disabled watch for user %s', summons.requestor)
             except Exception as e:
                 log.exception('Failed to disable watch %s', existing_watch.id, exc_info=True)
                 response.message = 'An error prevented me from removing your watch on this post.  Please try again'
@@ -371,7 +372,8 @@ class SummonsHandler:
     def _reply_to_comment(self, response: SummonsResponse) -> SummonsResponse:
         log.debug('Sending response to summons comment %s. MESSAGE: %s', response.summons.comment_id, response.message)
         try:
-            reply_comment = self.response_handler.reply_to_comment(response.summons.comment_id, response.message)
+            reply_comment = self.response_handler.reply_to_comment(response.summons.comment_id, response.message,
+                                                                   subreddit=response.summons.subreddit)
             response.comment_reply_id = reply_comment.id
         except APIException as e:
             if e.error_type == 'DELETED_COMMENT':
@@ -389,6 +391,8 @@ class SummonsHandler:
             else:
                 log.exception('APIException without error_type', exc_info=True)
                 raise
+        except Forbidden:
+            raise
         except Exception:
             log.exception('Problem leaving response', exc_info=True)
             raise
@@ -397,7 +401,7 @@ class SummonsHandler:
 
     def _send_private_message(self, response: SummonsResponse) -> SummonsResponse:
         redditor = self.reddit.redditor(response.summons.requestor)
-        log.info('Sending private message to %s for summons in sub %s', response.summons.requestor, response.summons.subreddit)
+        log.info('Sending private message to %s', response.summons.requestor)
         msg = BANNED_SUB_MSG.format(post_id=response.summons.post_id, subreddit=response.summons.subreddit)
         msg = msg + response.message
         self.response_handler.send_private_message(
@@ -441,7 +445,7 @@ class SummonsHandler:
         except InvalidImageUrlException:
             return
         except Forbidden:
-            log.error('Failed to download post %s, appears we are banned', post_id)
+            log.error('Failed to download post, appears we are banned')
             return
 
         if not post or post.post_type != 'image':

@@ -1,5 +1,7 @@
 from typing import List
 
+from sqlalchemy import func
+
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 
 
@@ -21,6 +23,10 @@ class MonitoredSubRepository:
 
     def get_by_sub(self, sub: str) -> MonitoredSub:
         return self.db_session.query(MonitoredSub).filter(MonitoredSub.name == sub).first()
+
+    def get_count(self):
+        r = self.db_session.query(func.count(MonitoredSub.id)).first()
+        return r[0] if r else None
 
     def update(self, item: MonitoredSub):
         self.db_session.merge(item)

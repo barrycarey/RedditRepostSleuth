@@ -4,7 +4,7 @@ from typing import NoReturn, List
 
 import requests
 from praw import Reddit
-from prawcore import Forbidden, NotFound
+from prawcore import Forbidden, NotFound, Redirect
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
@@ -52,6 +52,24 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
             uow.commit()
     print('[Scheduled Job] Checking Mod Status End')
 
+def update_subreddit_access_level(uowm: UnitOfWorkManager, reddit: Reddit):
+    """
+    Go through all monitored subs and update their is_private status
+    :return:
+    """
+    log.info('Starting Job: Update subreddit is_private and nsfw')
+    with uowm.start() as uow:
+        monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
+        for monitored_sub in monitored_subs:
+            try:
+                sub_data = reddit.subreddit(monitored_sub.name)
+                monitored_sub.is_private = True if sub_data.subreddit_type == 'private' else False
+                monitored_sub.nsfw = True if sub_data.over18 else False
+                log.debug('%s: is_private: %s | nsfw: %s', monitored_sub.name, monitored_sub.is_private, monitored_sub.nsfw)
+            except (Redirect, Forbidden):
+                log.error('Error getting sub settings')
+        uow.commit()
+
 def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None) -> NoReturn:
     """
     Go through banned subs and see if we're still banned
@@ -75,7 +93,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
                 uow.banned_subreddit.remove(ban)
                 if notification_svc:
                     notification_svc.send_notification(
-                        f'Removed {ban.subreddit} from ban list',
+                        f'Removed https://reddit.com/r/{ban.subreddit} from ban list',
                         subject='Subreddit Removed From Ban List!'
                     )
             uow.commit()
@@ -94,7 +112,7 @@ def remove_expired_bans(uowm: UnitOfWorkManager, notification_svc: NotificationS
         bans = uow.banned_user.get_expired_bans()
         for ban in bans:
             if notification_svc:
-                notification_svc.send(
+                notification_svc.send_notification(
                     f'Removing expired ban for user {ban.name}',
                     subject='**Expired Ban Removed**'
                 )
@@ -202,7 +220,9 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                     meme_hashes = get_image_hashes(post.searched_url, hash_size=32)
                 except Exception as e:
                     log.error('Failed to get meme hash for %s', post.post_id)
-                    return
+                    uow.meme_template_potential.remove(potential_template)
+                    uow.commit()
+                    continue
 
                 meme_template = MemeTemplate(
                     dhash_h=post.dhash_h,
@@ -260,4 +280,4 @@ if __name__ == '__main__':
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_monitored_sub_data(uowm)
+    update_ban_list(uowm, reddit, notification_svc)
