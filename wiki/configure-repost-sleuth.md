@@ -12,22 +12,19 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 ```
 {
-  "active": false,
-  "only_comment_on_repost": true,
-  "report_reposts": false,
+  "active": true,
   "report_msg": "RepostSleuthBot-Repost",
-  "match_percent_dif": 5,
-  "same_sub_only": true,
+  "same_sub_only": false,
   "sticky_comment": false,
-  "target_days_old": 180,
+  "target_days_old": None,
   "meme_filter": false,
-  "oc_response_template": null,
-  "repost_response_template": null,
+  "oc_response_template": None,
+  "repost_response_template": None,
   "lock_post": false,
   "mark_as_oc": false,
   "remove_repost": false,
-  "removal_reason": null,
-  "title_ignore_keywords": null,
+  "removal_reason": None,
+  "title_ignore_keywords": None,
   "disable_summons_after_auto_response": false,
   "only_allow_one_summons": false,
   "remove_additional_summons": false,
@@ -36,11 +33,16 @@ To change settings simply update the JSON and save.  The bot will load the new c
   "target_title_match": 50,
   "filter_crossposts": true,
   "filter_same_author": true,
-  "wiki_managed": true,
   "check_image_posts": true,
   "check_link_posts": true,
   "target_image_match": 92,
-  "target_image_meme_match": 97
+  "target_image_meme_match": 97,
+  "report_reposts": false,
+  "comment_on_repost": true,
+  "comment_on_oc": false,
+  "lock_response_comment": false,
+  "filter_removed_matches": false,
+  "send_repost_modmail": false
 }
 ```
 
@@ -61,6 +63,8 @@ To change settings simply update the JSON and save.  The bot will load the new c
 **report_msg:** The message it will use when reporting
 
 **same_sub_only:** Only check for matches within our sub
+
+**meme_filter:** Uses a larger hash size and additional logic on memes. Change target_image_meme_match to adjust hash match %
 
 **sticky_comment:** Comments left by the bot will be stickied
 
@@ -109,6 +113,16 @@ To change settings simply update the JSON and save.  The bot will load the new c
 **filter_removed_matches:** Checks all search results and drops any that are removed from Reddit
 
 **send_repost_modmail:** Send a modmail when a repost is found
+
+**comment_on_repost:** Leave a comment on reposts
+
+**comment_on_oc:** Leave a comment on OC
+
+**lock_response_comment**: Locks the bot's comment so people cannot reply 
+
+**filter_removed_matches:** Checks the search results and drops matches that are deleted from Reddit.  Slows down search
+
+**send_repost_modmail:** Sends a message to modmail when a repost is found
 
 ### Comment Templates
 ---

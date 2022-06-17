@@ -6,12 +6,12 @@ from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSu
 from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
 from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
 from redditrepostsleuth.core.db.repository.config_message_template_repo import ConfigMessageTemplateRepo
+from redditrepostsleuth.core.db.repository.image_index_map_rep import ImageIndexMapRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_repo import MemeTemplatePotentialRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_votes_repo import MemeTemplatePotentialVoteRepo
 from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
 from redditrepostsleuth.core.db.repository.stats_top_image_repost_repo import StatsTopImageRepostRepo
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
-from redditrepostsleuth.core.db.repository.commentrepository import CommentRepository
 from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
 from redditrepostsleuth.core.db.repository.image_search_repo import ImageSearchRepo
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
@@ -59,10 +59,6 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def summons(self) -> SummonsRepository:
         return SummonsRepository(self.session)
-
-    @property
-    def comments(self) -> CommentRepository:
-        return CommentRepository(self.session)
 
     @property
     def repostwatch(self) -> RepostWatchRepo:
@@ -167,3 +163,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def meme_template_potential_votes(self) -> MemeTemplatePotentialVoteRepo:
         return MemeTemplatePotentialVoteRepo(self.session)
+
+    @property
+    def image_index_map(self) -> ImageIndexMapRepo:
+        return ImageIndexMapRepo(self.session)

@@ -29,6 +29,9 @@ class PostRepository:
     def get_all(self, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id).offset(offset).limit(limit).all()
 
+    def get_newest(self, limit: int = 500):
+        return self.db_session.query(Post).order_by(Post.id.desc()).limit(limit).all()
+
     def get_newest_praw(self):
         return self.db_session.query(Post).filter(Post.ingested_from == 'praw').order_by(Post.id.desc()).first()
 
@@ -76,7 +79,7 @@ class PostRepository:
         r = self.db_session.query(func.count(Post.id)).first()
         return r[0] if r else None
 
-    def get_newest_post(self):
+    def get_newest_post(self) -> Post:
         return self.db_session.query(Post).order_by(Post.id.desc()).limit(1).first()
 
     # Repost methods

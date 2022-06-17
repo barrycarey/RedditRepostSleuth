@@ -1,10 +1,13 @@
 
 
 import json
-from typing import Dict, List, Text, TYPE_CHECKING
+import re
+from logging import Logger
+from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
 from falcon import Request
+from praw import Reddit
 from redis import Redis
 from redlock import RedLockFactory
 from sqlalchemy.exc import IntegrityError
@@ -88,7 +91,7 @@ def searched_post_str(post: Post, count: int) -> str:
 def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -> Text:
     if not search_settings:
         return None
-    url = f'https://www.repostsleuth.com?postId={post_id}&'
+    url = f'https://www.repostsleuth.com/search?postId={post_id}&'
     url += f'sameSub={str(search_settings.same_sub).lower()}&'
     url += f'filterOnlyOlder={str(search_settings.only_older_matches).lower()}&'
     url += f'memeFilter={str(search_settings.meme_filter).lower()}&'
@@ -286,7 +289,7 @@ def get_image_search_settings_from_request(req: Request, config: Config) -> Imag
         same_sub=req.get_param_as_bool('same_sub', required=False,
                               default=None) or config.default_image_same_sub_filter,
         max_days_old=req.get_param_as_int('max_days_old', required=False,
-                             default=None) or config.default_image_target_annoy_distance,
+                             default=None) or config.default_link_max_days_old_filter,
 
     )
 
@@ -388,3 +391,85 @@ def batch_check_urls(urls: List[Dict], util_api: Text) -> List[Dict]:
                 del urls[i]
         #del urls[next(i for i, x in enumerate(urls) if x['id'] == removed_id)]
     return urls
+
+def reddit_post_id_from_url(url: Text) -> Optional[Text]:
+    """
+    Take a given reddit URL and return the post ID
+    :param url: URL
+    :return: Post ID
+    """
+    if not url:
+        return
+
+    re_list = [
+        '(?<=comments\/)[^\\/]*',
+        '(?<=\.it\/)[^\/]*'
+    ]
+    match = None
+    for expression in re_list:
+        r = re.search(expression, url)
+        if r:
+            match = r.group()
+
+    return match
+
+def is_image_url(url: Text) -> bool:
+    """
+    Take a given URL and determin if it's an image
+    :param url: URL
+    :return: bool
+    """
+    if re.search('^.*\.(jpg|jpeg|gif|png)', url.lower()):
+        return True
+    return False
+
+def update_log_context_data(logger: Logger, context_data: Dict):
+    for handler in logger.handlers:
+        for filt in handler.filters:
+            for key, value in context_data.items():
+                if hasattr(filt, key):
+                    setattr(filt, key, value)
+
+def base36encode(integer: int) -> str:
+    chars = '0123456789abcdefghijklmnopqrstuvwxyz'
+    sign = '-' if integer < 0 else ''
+    integer = abs(integer)
+    result = ''
+    while integer > 0:
+        integer, remainder = divmod(integer, 36)
+        result = chars[remainder] + result
+    return sign + result
+
+
+def base36decode(base36: str) -> int:
+    return int(base36, 36)
+
+
+def get_next_ids(start_id, count):
+    start_num = base36decode(start_id)
+    ids = []
+    id_num = -1
+    for id_num in range(start_num, start_num + count):
+        ids.append("t3_"+base36encode(id_num))
+    return ids, base36encode(id_num)
+
+def get_newest_praw_post_id(reddit: Reddit) -> int:
+    """
+    Grab the newest post available via Praw and return the decoded post_id
+
+    This is used to guage if the manual ingest of IDs is falling behind
+    :rtype: object
+    """
+    newest_submissions = list(reddit.subreddit('all').new(limit=10))[0]
+    return newest_submissions.id
+
+
+def build_ingest_query_params(starting_id: int, limit: int = 100) -> Dict[str, str]:
+    """
+    Take a starting ID and build the dict used as a param for the ingest request
+    :rtype: Dict
+    """
+    ids_to_get = get_next_ids(starting_id, limit)[0]
+    return {
+        'submission_ids': ','.join(ids_to_get)
+    }

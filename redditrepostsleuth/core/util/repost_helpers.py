@@ -1,5 +1,4 @@
-from hashlib import md5
-import random
+import logging
 import random
 from hashlib import md5
 from typing import List, Text
@@ -10,7 +9,6 @@ from praw import Reddit
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
@@ -21,7 +19,9 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_dead_urls_remote, \
-    filter_removed_posts, filter_dead_urls
+    filter_removed_posts
+
+log = logging.getLogger(__name__)
 
 
 def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
@@ -87,7 +87,7 @@ def get_link_reposts(
 def filter_search_results(
         search_results: SearchResults,
         reddit: Reddit = None,
-        uitl_api: Text = None
+        uitl_api: Text = None,
 ) -> SearchResults:
     """
     Filter a set of search results based on the image search settings

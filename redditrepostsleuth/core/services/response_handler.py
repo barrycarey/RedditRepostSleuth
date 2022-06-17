@@ -1,3 +1,4 @@
+import logging
 from time import perf_counter
 from typing import Text, NoReturn, Optional
 
@@ -9,13 +10,14 @@ from sqlalchemy import func
 from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddit, BotPrivateMessage
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import RateLimitException
-from redditrepostsleuth.core.logging import log
+
 from redditrepostsleuth.core.model.events.reddit_api_event import RedditApiEvent
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 
+log = logging.getLogger(__name__)
 
 class ResponseHandler:
 
@@ -57,11 +59,12 @@ class ResponseHandler:
             return comment
         except APIException as e:
             if e.error_type == 'RATELIMIT':
-                log.exception('Reddit rate limit')
+                log.exception('Error Type=%s Message=Reddit rate limit', e.error_type, exc_info=False)
                 raise RateLimitException('Hit rate limit')
             else:
-                log.exception('Unknown error type of APIException', exc_info=True)
                 raise
+        except RedditAPIException:
+            pass
         except Forbidden:
             self._save_banned_sub(submission.subreddit.display_name)
         except Exception:
@@ -275,4 +278,4 @@ class ResponseHandler:
             uow.commit()
 
         if self.notification_svc:
-            self.notification_svc.send_notification(f'Subreddit r/{subreddit} added to ban list', subject='Added Banned Sub')
+            self.notification_svc.send_notification(f'Subreddit https://reddit.com/r/{subreddit} added to ban list', subject='Added Banned Sub')

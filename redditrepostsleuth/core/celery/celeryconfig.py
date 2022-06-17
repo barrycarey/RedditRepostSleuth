@@ -10,8 +10,11 @@ task_serializer = 'pickle'
 result_serializer='pickle'
 accept_content = ['pickle', 'json']
 result_expires = 60
+worker_hijack_root_logger = False
+worker_redirect_stdouts = False
+worker_log_color = None
 task_routes = {
-    'redditrepostsleuth.core.celery.ingesttasks.save_new_post': {'queue': 'postingest'},
+    'redditrepostsleuth.core.celery.ingesttasks.save_new_post': {'queue': 'post_ingest'},
     'redditrepostsleuth.core.celery.ingesttasks.ingest_repost_check': {'queue': 'repost2'},
     'redditrepostsleuth.core.celery.reposttasks.check_image_repost_save': {'queue': 'repost_image'},
     'redditrepostsleuth.core.celery.reposttasks.process_repost_annoy': {'queue': 'process_repost'},

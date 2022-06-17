@@ -91,12 +91,14 @@ def save_image_repost_result(
                                  )
 
         uow.image_repost.add(new_repost)
-    uow.posts.update(search_results.checked_post)
+        uow.posts.update(search_results.checked_post)
 
-    try:
-        uow.commit()
-    except Exception as e:
-        log.exception('Failed to save image repost', exc_info=True)
+        try:
+            uow.commit()
+        except Exception as e:
+            log.exception('Failed to save image repost', exc_info=True)
+
+        log.info(' Saved Repost')
 
 
 def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) -> List[Dict]:

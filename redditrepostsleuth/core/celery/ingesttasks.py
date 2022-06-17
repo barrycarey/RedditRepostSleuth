@@ -1,16 +1,32 @@
+import json
+import logging
+from random import randint
 from time import perf_counter
+
+import requests
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent
+from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent, Post
 from redditrepostsleuth.core.exception import InvalidImageUrlException
-from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.logfilters import IngestContextFilter
+from redditrepostsleuth.core.logging import configure_logger
+from redditrepostsleuth.core.util.helpers import update_log_context_data
 from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
+log = logging.getLogger('redditrepostsleuth')
+log = configure_logger(
+    name='redditrepostsleuth',
+    format='%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - Trace_ID=%(trace_id)s Post Type=%(post_type)s Post ID=%(post_id)s Subreddit=%(subreddit)s Service=%(service)s Level=%(levelname)s Message=%(message)s',
+    filters=[IngestContextFilter()]
+)
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
-def save_new_post(self, post):
+def save_new_post(self, post: Post):
+    update_log_context_data(log, {'post_type': post.post_type, 'post_id': post.post_id,
+                                  'subreddit': post.subreddit, 'service': 'Ingest',
+                                  'trace_id': str(randint(1000000, 9999999))})
     with self.uowm.start() as uow:
         existing = uow.posts.get_by_post_id(post.post_id)
         if existing:
@@ -18,8 +34,13 @@ def save_new_post(self, post):
         log.debug('Post %s: Ingesting', post.post_id)
         post = pre_process_post(post, self.uowm, self.config.image_hash_api)
         if post:
+            monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
+            if monitored_sub:
+                log.info('Sending ingested post to monitored sub queue')
+                celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post', args=[post.post_id, monitored_sub],
+                                 queue='submonitor')
             ingest_repost_check.apply_async((post,self.config), queue='repost')
-            log.debug('Post %s: Sent post to repost queue', post.post_id)
+            log.debug('Sent post to repost queue',)
 
 
 @celery.task(ignore_results=True)
@@ -91,3 +112,9 @@ def populate_image_post_current(self, data):
         uow.image_post_current.bulk_save(batch)
         uow.commit()
         print('Saved batch')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
+def ingest_id_batch(self, ids_to_get):
+    r = requests.get(f'{self.config.util_api}/reddit/submissions', params={'submission_ids': ','.join(ids_to_get)})
+    results = json.loads(r.text)
+    save_pushshift_results.apply_async((results,), queue='pushshift')
