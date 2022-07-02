@@ -1,5 +1,6 @@
 import json
 import logging
+from hashlib import md5
 from random import randint
 from time import perf_counter
 
@@ -7,7 +8,7 @@ import requests
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent, Post
+from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent, Post, PostHash
 from redditrepostsleuth.core.exception import InvalidImageUrlException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
 from redditrepostsleuth.core.logging import configure_logger
@@ -41,6 +42,13 @@ def save_new_post(self, post: Post):
                                  queue='submonitor')
             ingest_repost_check.apply_async((post,self.config), queue='repost')
             log.debug('Sent post to repost queue',)
+
+            post_hash = PostHash(
+                url_hash=md5(post.url.encode('utf-8'))
+            )
+
+            if post.post_type == 'image':
+                post_hash.hash_1
 
 
 @celery.task(ignore_results=True)

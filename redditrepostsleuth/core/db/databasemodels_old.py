@@ -12,17 +12,18 @@ class Post(Base):
         return self.image_hash < other.image_hash
 
     def __repr__(self) -> str:
-        return 'Post ID: {} - Type: {} - URL: {} - Created: {}'.format(self.post_id, self.post_type, self.url, self.created_at)
+        return 'Post ID: {} - Type: {} - URL: {} - Source: {} - Created: {}'.format(self.post_id, self.post_type, self.url, self.ingested_from, self.created_at)
 
     # TODO - Move to_dict methods into JSON encoders
 
-    __tablename__ = 'post'
+    __tablename__ = 'reddit_post'
     __table_args__ = (
+        Index('ingest_source', 'created_at', 'ingested_from'),
         Index('ingest_graph', 'ingested_at', 'post_type', unique=False),
     )
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(String(6), nullable=False, unique=True)
+    post_id = Column(String(100), nullable=False, unique=True)
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
     shortlink = Column(String(300))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
@@ -34,19 +35,19 @@ class Post(Base):
     subreddit = Column(String(100), nullable=False)
     title = Column(String(1000, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(200))
+    dhash_v = Column(String(64))
     dhash_h = Column(String(64))
+    ahash = Column(String(64))
+    checked_repost = Column(Boolean, default=False)
+    crosspost_checked = Column(Boolean, default=False)
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     url_hash = Column(String(32)) # Needed to index URLs for faster lookups
-    bad_url = Column(Boolean, default=False)
+    ingested_from = Column(String(40))
+    left_comment = Column(Boolean, default=False)
 
-    hashes = relationship('PostHash', back_populates='post')
-    image_post = relationship('magePost', back_populates='post')
-    summons = relationship('Summons', back_populates='post')
-    bot_comments = relationship('BotComment', back_populates='post')
-    repost_watch = relationship('RepostWatch', back_populates='post')
-    reposts = relationship('Repost', back_populates='post')
-    searches = relationship('RepostSearch', back_populates='post')
-    reports = relationship('UserReport', back_populates='post')
+    bad_url = Column(Boolean, default=False)
+    repost_count = Column(Integer, default=0)
+    #fullname = Column(String(30))
 
     def to_dict(self):
         return {
@@ -62,38 +63,27 @@ class Post(Base):
             'subreddit': self.subreddit
         }
 
-class PostHash(Base):
-    __tablename__ = 'post_hash'
-
-    id = Column(Integer, primary_key=True)
-    url_hash = Column(String(32))  # Needed to index URLs for faster lookups
-    hash_1 = Column(String(64))
-    hash_2 = Column(String(64))
-    hash_3 = Column(String(64))
-    post_id = Column(Integer, ForeignKey('post.id'))
-    post = relationship("Post", back_populates='hashes')
-
-class ImagePost(Base):
-    __tablename__ = 'image_post'
+class RedditImagePost(Base):
+    __tablename__ = 'reddit_image_post'
     __table_args__ = (
         Index('create_at_index', 'created_at', unique=False),
     )
+
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime)
-    post_id = Column(Integer, ForeignKey('post.id'))
-    dhash_h = Column(String(64))
+    post_id = Column(String(100), nullable=False, unique=True)
     dhash_v = Column(String(64))
-    post = relationship("Post", back_populates='image_post')
+    dhash_h = Column(String(64))
 
 
 class Summons(Base):
-    __tablename__ = 'bot_summons'
+    __tablename__ = 'reddit_bot_summons'
     __table_args__ = (
         Index('user_summons_check', 'requestor', 'summons_received_at', unique=False),
     )
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False)
     requestor = Column(String(100))
     comment_id = Column(String(100), unique=True)
     comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
@@ -101,26 +91,25 @@ class Summons(Base):
     comment_reply_id = Column(String(100))
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
-    post = relationship("Post", back_populates='summons')
-
+    subreddit = Column(String(100), nullable=False)
 
 class BotComment(Base):
-    __tablename__ = 'bot_comment'
+    __tablename__ = 'reddit_bot_comment'
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False)
     comment_body = Column(String(2000, collation='utf8mb4_general_ci'))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     comment_left_at = Column(DateTime, default=func.utc_timestamp())
     source = Column(String(20), nullable=False)
     comment_id = Column(String(20), nullable=False)
+    subreddit = Column(String(100), nullable=False)
     karma = Column(Integer)
     active = Column(Boolean, default=True)
     needs_review = Column(Boolean, default=False)
-    post = relationship("Post", back_populates='bot_comments')
 
 class BotPrivateMessage(Base):
-    __tablename__ = 'bot_private_message'
+    __tablename__ = 'reddit_bot_private_message'
 
     id = Column(Integer, primary_key=True)
     subject = Column(String(200), nullable=False)
@@ -133,10 +122,10 @@ class BotPrivateMessage(Base):
 
 
 class RepostWatch(Base):
-    __tablename__ = 'repost_watch'
+    __tablename__ = 'reddit_repost_watch'
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False)
     user = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp())
     last_detection = Column(DateTime)
@@ -144,7 +133,6 @@ class RepostWatch(Base):
     expire_after = Column(Integer)
     enabled = Column(Boolean, default=True)
     source = Column(String(100))
-    post = relationship("Post", back_populates='repost_watch')
 
     def to_dict(self):
         return {
@@ -158,30 +146,96 @@ class RepostWatch(Base):
             'source': self.source
         }
 
+class ImageRepost(Base):
 
-class RepostSearch(Base):
-    __tablename__ = 'repost_search'
-
+    __tablename__ = 'image_reposts'
+    __table_args__ = (
+        Index('Index 3', 'repost_of', unique=False),
+        Index('idx_author', 'author', unique=False),
+        Index('idx_detected_at', 'detected_at', unique=False),
+        Index('idx_repost_of_date', 'detected_at', 'author', unique=False)
+    )
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
-    source = Column(String(50), nullable=False)
-    search_params = Column(String(1000), nullable=False)
-
-class Repost(Base):
-    __tablename__ = 'repost'
-    id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
-    repost_of_id = Column(Integer, ForeignKey('post.id'))
-    search_id = Column(Integer, ForeignKey('repost_search.id'))
+    hamming_distance = Column(Integer)
+    annoy_distance = Column(Float)
+    post_id = Column(String(100), nullable=False)
+    repost_of = Column(String(100), nullable=False)
     detected_at = Column(DateTime, default=func.utc_timestamp())
+    author = Column(String(100))
+    subreddit = Column(String(100), nullable=False)
     source = Column(String(100))
-    post = relationship("Post", back_populates='reposts')
-    repost_of = relationship("Post")
-    search = relationship("RepostSearch")
+    search_id = Column(Integer)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'hamming_distance': self.hamming_distance,
+            'post_id': self.post_id,
+            'repost_of': self.repost_of,
+            'detected_at': self.detected_at.timestamp() if self.detected_at else None,
+            'author': self.author,
+            'subreddit': self.subreddit,
+            'source': self.source,
+            'search_id': self.search_id
+        }
+
+class LinkRepost(Base):
+
+    __tablename__ = 'link_reposts'
+    __table_args__ = (
+        Index('Index 3', 'repost_of', unique=False),
+        Index('idx_author', 'author', unique=False),
+        Index('idx_detected_at', 'detected_at', unique=False),
+        Index('idx_repost_of_date', 'detected_at', 'author', unique=False)
+    )
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    repost_of = Column(String(100), nullable=False)
+    detected_at = Column(DateTime, default=func.utc_timestamp())
+    author = Column(String(100))
+    subreddit = Column(String(100), nullable=False)
+    source = Column(String(100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'repost_of': self.repost_of,
+            'detected_at': self.detected_at.timestamp() if self.detected_at else None,
+            'author': self.author,
+            'subreddit': self.subreddit,
+            'source': self.source,
+        }
+
+class VideoHash(Base):
+    __tablename__ = 'reddit_video_hashes'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False, unique=True)
+    created_at = Column(DateTime, default=func.utc_timestamp())
+    hashes = Column(String(1300))
+    length = Column(Integer)
+
+class AudioFingerPrint(Base):
+    __tablename__ = 'audio_fingerprints'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    hash = Column(String(30), nullable=False)
+    offset = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=func.utc_timestamp())
+
+class IndexBuildTimes(Base):
+    __tablename__ = 'index_build_times'
+    id = Column(Integer, primary_key=True)
+    index_type = Column(String(50), nullable=False)
+    hostname = Column(String(200), nullable=False)
+    items = Column(Integer, nullable=False)
+    build_start = Column(DateTime, nullable=False)
+    build_end = Column(DateTime, nullable=False)
+    build_minutes = Column(Integer)
 
 class MonitoredSub(Base):
-    __tablename__ = 'monitored_sub'
+    __tablename__ = 'reddit_monitored_sub'
 
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False, unique=True)
@@ -238,9 +292,6 @@ class MonitoredSub(Base):
     send_repost_modmail = Column(Boolean, default=False)
     nsfw = Column(Boolean, default=False)
     is_private = Column(Boolean, default=False)
-
-    post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub')
-    config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub')
 
     def to_dict(self):
         return {
@@ -300,14 +351,15 @@ class MonitoredSub(Base):
 
 
 class MonitoredSubChecks(Base):
-    __tablename__ = 'monitored_sub_checked'
+    __tablename__ = 'reddit_monitored_sub_checked'
+    __table_args__ = (
+        Index('post_id', 'post_id'),
+    )
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False)
     checked_at = Column(DateTime, default=func.utc_timestamp())
-    monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
-
-    monitored_sub = relationship("RepostSearch", back_populates='post_checks')
+    subreddit = Column(String(100))
 
     def to_dict(self):
         return {
@@ -317,25 +369,8 @@ class MonitoredSubChecks(Base):
             'subreddit': self.subreddit
         }
 
-
-class MonitoredSubConfigChange(Base):
-    __tablename__ = 'monitored_sub_config_change'
-    __table_args__ = (
-        Index('idx_subreddit', 'monitored_sub_id', 'updated_at', unique=False),
-    )
-    id = Column(Integer, primary_key=True)
-    updated_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
-    updated_by = Column(String(100), nullable=False)
-    source = Column(String(10))
-    config_key = Column(String(100), nullable=False)
-    old_value = Column(String(2000))
-    new_value = Column(String(2000))
-    monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
-
-    monitored_sub = relationship("RepostSearch", back_populates='post_checks')
-
 class MonitoredSubConfigRevision(Base):
-    __tablename__ = 'monitored_sub_config_revision'
+    __tablename__ = 'reddit_monitored_sub_config_revision'
     id = Column(Integer, primary_key=True)
     revision_id = Column(String(36), nullable=False, unique=True)
     revised_by = Column(String(100), nullable=False)
@@ -343,9 +378,7 @@ class MonitoredSubConfigRevision(Base):
     config_loaded_at = Column(DateTime)
     is_valid = Column(Boolean, default=False)
     notified = Column(Boolean, default=False)
-    monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
-
-    monitored_sub = relationship("RepostSearch", back_populates='post_checks')
+    subreddit = Column(String(100), nullable=False)
 
 
 class MemeTemplate(Base):
@@ -353,9 +386,7 @@ class MemeTemplate(Base):
     id = Column(Integer, primary_key=True)
     dhash_h = Column(String(64))
     dhash_256 = Column(String(256))
-    post_id = Column(Integer, ForeignKey('post.id'))
-
-    post = relationship("Post")
+    post_id = Column(String(100), nullable=False, unique=True)
 
     def to_dict(self):
         return {
@@ -369,13 +400,11 @@ class InvestigatePost(Base):
     __tablename__ = 'investigate_post'
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False, unique=True)
     matches = Column(Integer)
     found_at = Column(DateTime, default=func.utc_timestamp())
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
     flag_reason = Column(String(20))
-
-    post = relationship("Post")
 
     def to_dict(self):
         return {
@@ -388,11 +417,68 @@ class InvestigatePost(Base):
             'flag_reason': self.flag_reason
         }
 
+class ImageSearch(Base):
+    __tablename__ = 'reddit_image_search'
+    __table_args__ = (
+        Index('subsearched', 'subreddit', 'source', 'matches_found', unique=False),
+        Index('Index 2', 'post_id', unique=False),
+        Index('idx_source', 'source', unique=False),
+    )
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    source = Column(String(50), nullable=False)
+    used_historical_index = Column(Boolean, nullable=False)
+    used_current_index = Column(Boolean, nullable=False)
+    target_hamming_distance = Column(Integer, nullable=False)
+    target_annoy_distance = Column(Float, nullable=False)
+    same_sub = Column(Boolean, nullable=False)
+    max_days_old = Column(Integer)
+    filter_dead_matches = Column(Boolean, nullable=False)
+    only_older_matches = Column(Boolean, nullable=False)
+    meme_filter = Column(Boolean, nullable=False)
+    target_title_match = Column(Integer, nullable=True)
+    meme_template_used = Column(Integer)
+    search_time = Column(Float, nullable=False)
+    index_search_time = Column(Float)
+    total_filter_time = Column(Float)
+    matches_found = Column(Integer, nullable=False)
+    searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=True)
+    subreddit = Column(String(100), nullable=False)
+    target_image_match = Column(Integer, default=92)
+    target_image_meme_match = Column(Integer, default=97)
+    filter_same_author = Column(Boolean)
+    filter_crossposts = Column(Boolean)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post_id': self.post_id,
+            'source': self.source,
+            'target_hamming_distance': self.target_hamming_distance,
+            'used_historical_index': self.used_historical_index,
+            'used_current_index': self.used_current_index,
+            'same_sub': self.same_sub,
+            'max_days_old': self.max_days_old,
+            'filter_dead_matches': self.filter_dead_matches,
+            'filter_same_author': self.filter_same_author,
+            'filter_crossposts': self.filter_crossposts,
+            'only_older_matches': self.only_older_matches,
+            'meme_filter': self.meme_filter,
+            'meme_template_used': self.meme_template_used,
+            'search_time': self.search_time,
+            'index_search_time': self.index_search_time,
+            'total_filter_time': self.total_filter_time,
+            'searched_at': self.searched_at.timestamp(),
+            'matches_found': self.matches_found,
+            'subreddit': self.subreddit,
+            'target_image_match': self.target_image_match,
+            'target_image_meme_match': self.target_image_meme_match
+        }
 
 class UserReport(Base):
-    __tablename__ = 'user_report'
+    __tablename__ = 'reddit_user_report'
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False)
     reported_by = Column(String(100), nullable=False)
     post_type = Column(String(15))
     report_type= Column(String(25), nullable=False)
@@ -402,8 +488,11 @@ class UserReport(Base):
     message_id = Column(String(20), nullable=False)
     sent_for_voting = Column(Boolean, default=False)
 
-    post = relationship("Post", back_populates='reports')
-
+class ToBeDeleted(Base):
+    __tablename__ = 'to_be_deleted'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    post_type = Column(String(20))
 
 class BannedSubreddit(Base):
     __tablename__ = 'banned_subreddit'
@@ -421,7 +510,38 @@ class BannedUser(Base):
     expires_at = Column(DateTime)
     notes = Column(String(500))
 
+class StatsGeneral(Base):
+    __tablename__ = 'stats_general'
+    id = Column(Integer, primary_key=True)
+    image_reposts_detected = Column(Integer)
+    link_reposts_detected = Column(Integer)
+    private_messages_sent = Column(Integer)
+    comments_left = Column(Integer)
+    summons_received = Column(Integer)
+    karma_gained = Column(Integer)
 
+class StatsTopImageRepost(Base):
+    __tablename__ = 'stats_top_image_repost'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(100), nullable=False)
+    repost_count = Column(Integer, nullable=False)
+    days = Column(Integer, nullable=False)
+    nsfw = Column(Boolean, nullable=False)
+
+
+class MonitoredSubConfigChange(Base):
+    __tablename__ = 'reddit_monitored_sub_config_change'
+    __table_args__ = (
+        Index('idx_subreddit', 'subreddit', 'updated_at', unique=False),
+    )
+    id = Column(Integer, primary_key=True)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    updated_by = Column(String(100), nullable=False)
+    source = Column(String(10))
+    subreddit = Column(String(200), nullable=False)
+    config_key = Column(String(100), nullable=False)
+    old_value = Column(String(2000))
+    new_value = Column(String(2000))
 
 class ConfigMessageTemplate(Base):
     __tablename__ = 'config_message_templates'
@@ -442,7 +562,22 @@ class ConfigMessageTemplate(Base):
             'updated_at': self.updated_at.timestamp() if self.created_at else None
         }
 
-
+class ConfigSettings(Base):
+    __tablename__ = 'config_settings'
+    id = Column(Integer, primary_key=True)
+    comment_karma_flag_threshold = Column(Integer)
+    comment_karma_remove_threshold = Column(Integer)
+    index_api = Column(String(150))
+    util_api = Column(String(150))
+    top_post_offer_watch = Column(Boolean, default=False)
+    repost_watch_enabled = Column(Boolean)
+    ingest_repost_check_image = Column(Boolean)
+    ingest_repost_check_link = Column(Boolean)
+    ingest_repost_check_text = Column(Boolean)
+    ingest_repost_check_video = Column(Boolean)
+    image_repost_target_image_match = Column(Integer)
+    image_repost_target_image_meme_match = Column(Integer)
+    image_repost_target_annoy_distance = Column(Float)
 
 class SiteAdmin(Base):
     __tablename__ = 'site_admin'
@@ -466,13 +601,12 @@ class MemeTemplatePotential(Base):
     __tablename__ = 'meme_template_potential'
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False, unique=True)
     submitted_by = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     vote_total = Column(Integer, nullable=False, default=0)
 
     votes = relationship('MemeTemplatePotentialVote', back_populates='potential_template', cascade="all, delete")
-    post = relationship("Post")
 
     def to_dict(self):
         return {
@@ -487,14 +621,13 @@ class MemeTemplatePotential(Base):
 class MemeTemplatePotentialVote(Base):
     __tablename__ = 'meme_template_potential_votes'
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    post_id = Column(String(100), nullable=False, unique=False)
     meme_template_potential_id = Column(Integer, ForeignKey('meme_template_potential.id'))
     user = Column(String(100), nullable=False)
     vote = Column(Integer, nullable=False)
     voted_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 
     potential_template = relationship("MemeTemplatePotential", back_populates='votes')
-    post = relationship("Post")
 
     def to_dict(self):
         return {
@@ -513,9 +646,6 @@ class ImageIndexMap(Base):
     )
     id = Column(Integer, primary_key=True)
     annoy_index_id = Column(Integer, nullable=False)
-    post_id = Column(Integer, ForeignKey('post.id'))
-    image_post_id = Column(Integer, ForeignKey('image_post.id'))
+    reddit_post_db_id = Column(Integer, nullable=False)
+    reddit_image_post_db_id = Column(Integer, nullable=False)
     index_name = Column(String(10), nullable=False)
-
-    post = relationship("Post")
-    image_post = relationship("ImagePost")
