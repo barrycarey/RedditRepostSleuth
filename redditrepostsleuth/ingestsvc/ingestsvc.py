@@ -52,7 +52,7 @@ def get_submissions(submission_ids: List[str]) -> Optional[List[Dict]]:
 def queue_posts_for_ingest(posts: List[Post]):
     log.info('Sending batch of %s posts to ingest queue', len(posts))
     for post in posts:
-        save_new_post.apply_async((post,), queue='post_ingest')
+        save_new_post.apply_async((post,), queue='post_ingest_dev')
 
 if __name__ == '__main__':
     log.info('Starting post ingestor')
@@ -62,9 +62,11 @@ if __name__ == '__main__':
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     with uowm.start() as uow:
         oldest_post = uow.posts.get_newest_post()
-        oldest_id = oldest_post.post_id
 
-    threading.Thread(target=startup_backfill, args=(newest_id, oldest_id), name='praw_ingest').start()
+    if oldest_post:
+        oldest_id = oldest_post.post_id
+        threading.Thread(target=startup_backfill, args=(newest_id, oldest_post.post_id), name='praw_ingest').start()
+
    # startup_backfill(newest_id, oldest_id)
 
     while True:

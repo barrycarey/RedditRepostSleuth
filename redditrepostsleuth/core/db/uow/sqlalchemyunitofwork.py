@@ -1,24 +1,16 @@
 from sqlalchemy.orm import scoped_session
 
-from redditrepostsleuth.core.db.databasemodels import InvestigatePost
-from redditrepostsleuth.core.db.repository.audiofingerprintrepo import AudioFingerPrintRepository
 from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSubredditRepo
 from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
 from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
+from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.config_message_template_repo import ConfigMessageTemplateRepo
 from redditrepostsleuth.core.db.repository.image_index_map_rep import ImageIndexMapRepo
-from redditrepostsleuth.core.db.repository.meme_template_potential_repo import MemeTemplatePotentialRepo
-from redditrepostsleuth.core.db.repository.meme_template_potential_votes_repo import MemeTemplatePotentialVoteRepo
-from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
-from redditrepostsleuth.core.db.repository.stats_top_image_repost_repo import StatsTopImageRepostRepo
-from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
-from redditrepostsleuth.core.db.repository.image_post_current_repo import ImagePostCurrentRepository
-from redditrepostsleuth.core.db.repository.image_search_repo import ImageSearchRepo
 from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
-from redditrepostsleuth.core.db.repository.imagerepostrepository import ImageRepostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
-from redditrepostsleuth.core.db.repository.link_repost_repo import LinkPostRepo
+from redditrepostsleuth.core.db.repository.meme_template_potential_repo import MemeTemplatePotentialRepo
+from redditrepostsleuth.core.db.repository.meme_template_potential_votes_repo import MemeTemplatePotentialVoteRepo
 from redditrepostsleuth.core.db.repository.memetemplaterepository import MemeTemplateRepository
 from redditrepostsleuth.core.db.repository.monitored_sub_config_change_repo import MonitoredSubConfigChangeRepo
 from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo import MonitoredSubConfigRevisionRepo
@@ -26,10 +18,9 @@ from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import Mo
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
 from redditrepostsleuth.core.db.repository.repost_watch_repo import RepostWatchRepo
+from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
-from redditrepostsleuth.core.db.repository.to_be_deleted_repo import ToBeDeletedRepo
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
-from redditrepostsleuth.core.db.repository.videohashrepository import VideoHashRepository
 
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 
@@ -65,28 +56,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         return RepostWatchRepo(self.session)
 
     @property
-    def image_repost(self) -> ImageRepostRepository:
-        return ImageRepostRepository(self.session)
-
-    @property
-    def link_repost(self) -> LinkPostRepo:
-        return LinkPostRepo(self.session)
-
-    @property
-    def video_hash(self) -> VideoHashRepository:
-        return VideoHashRepository(self.session)
-
-    @property
-    def audio_finger_print(self) -> AudioFingerPrintRepository:
-        return AudioFingerPrintRepository(self.session)
-
-    @property
     def image_post(self) -> ImagePostRepository:
         return ImagePostRepository(self.session)
-
-    @property
-    def image_post_current(self) -> ImagePostCurrentRepository:
-        return ImagePostCurrentRepository(self.session)
 
     @property
     def index_build_time(self) -> IndexBuildTimesRepository:
@@ -121,16 +92,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         return MonitoredSubConfigRevisionRepo(self.session)
 
     @property
-    def image_search(self) -> ImageSearchRepo:
-        return ImageSearchRepo(self.session)
-
-    @property
     def user_report(self) -> UserReportRepo:
         return UserReportRepo(self.session)
-
-    @property
-    def to_be_deleted(self) -> ToBeDeletedRepo:
-        return ToBeDeletedRepo(self.session)
 
     @property
     def banned_subreddit(self) -> BannedSubredditRepo:
@@ -144,9 +107,6 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     def monitored_sub_config_change(self) -> MonitoredSubConfigChangeRepo:
         return MonitoredSubConfigChangeRepo(self.session)
 
-    @property
-    def stats_top_image_repost(self) -> StatsTopImageRepostRepo:
-        return StatsTopImageRepostRepo(self.session)
 
     @property
     def config_message_template(self) -> ConfigMessageTemplateRepo:

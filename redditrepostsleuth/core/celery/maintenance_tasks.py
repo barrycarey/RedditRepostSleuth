@@ -8,7 +8,7 @@ from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import ToBeDeleted
+
 from redditrepostsleuth.core.logging import log
 
 BAD_DOMAINS = [

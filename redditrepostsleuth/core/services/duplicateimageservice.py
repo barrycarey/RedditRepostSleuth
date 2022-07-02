@@ -9,9 +9,9 @@ from praw import Reddit
 from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
+from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults, ImageMatch
@@ -212,7 +212,7 @@ class DuplicateImageService:
         try:
             meme_hashes = get_image_hashes(url, hash_size=self.config.default_meme_filter_hash_size)
             return meme_hashes['dhash_h']
-        except ImageConversioinException:
+        except ImageConversionException:
             log.error('Failed to get meme hash')
             return
         except Exception:
