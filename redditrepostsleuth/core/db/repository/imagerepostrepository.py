@@ -3,7 +3,7 @@ from typing import List, Text
 from sqlalchemy import func
 from datetime import timedelta, datetime
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.db.databasemodels import ImageRepost
+
 
 
 class ImageRepostRepository:

@@ -9,8 +9,8 @@ from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import ImageConversioinException, InvalidImageUrlException, ImageRemovedException
-from redditrepostsleuth.core.db.databasemodels import RedditImagePost, Post, RedditImagePostCurrent
+from redditrepostsleuth.core.exception import ImageConversionException, InvalidImageUrlException, ImageRemovedException
+from redditrepostsleuth.core.db.databasemodels import Post, ImagePost
 
 from hashlib import md5
 
@@ -18,7 +18,7 @@ from redditrepostsleuth.core.model.events.ingest_image_process_event import Inge
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes_api, set_image_hashes
-from redditrepostsleuth.core.util.objectmapping import post_to_image_post, post_to_image_post_current, \
+from redditrepostsleuth.core.util.objectmapping import post_to_image_post, \
     submission_to_post
 
 log = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
         if post.post_type == 'image':
             try:
                 post, image_post = process_image_post(post, hash_api)
-            except (ImageRemovedException, ImageConversioinException, InvalidImageUrlException, ConnectionError):
+            except (ImageRemovedException, ImageConversionException, InvalidImageUrlException, ConnectionError):
                 return
             if image_post is None:
                 log.error('Failed to save image post. One of the post objects is null', post.post_id)
@@ -53,7 +53,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
     return post
 
 
-def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost]:
+def process_image_post(post: Post, hash_api) -> Tuple[Post, ImagePost]:
     if 'imgur' not in post.url: # TODO Why in the hell did I do this?
         """
         if 'preview.redd.it' in post.url:
@@ -90,7 +90,7 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post,RedditImagePost]:
     return create_image_posts(post)
 
 
-def create_image_posts(post: Post) -> Tuple[Post,RedditImagePost]:
+def create_image_posts(post: Post) -> Tuple[Post, ImagePost]:
     """
     Since we need to store multiple copies of an image post for the multiple indexes, this function creates all in one shot
     :param post: Post obj

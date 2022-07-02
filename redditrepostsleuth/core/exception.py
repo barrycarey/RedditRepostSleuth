@@ -2,10 +2,10 @@
 class RepostSleuthException(Exception):
     pass
 
-class ImageConversioinException(RepostSleuthException):
+class ImageConversionException(RepostSleuthException):
 
     def __init__(self, message):
-        super(ImageConversioinException, self).__init__(message)
+        super(ImageConversionException, self).__init__(message)
 
 class FutureDataRepostCheckException(RepostSleuthException):
     def __init__(self, message):

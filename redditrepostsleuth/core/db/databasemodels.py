@@ -39,12 +39,12 @@ class Post(Base):
     url_hash = Column(String(32)) # Needed to index URLs for faster lookups
     bad_url = Column(Boolean, default=False)
 
-    hashes = relationship('PostHash', back_populates='post')
-    image_post = relationship('magePost', back_populates='post')
+    hashes = relationship('PostHash', back_populates='post', uselist=False)
+    image_post = relationship('ImagePost', back_populates='post', uselist=False)
     summons = relationship('Summons', back_populates='post')
     bot_comments = relationship('BotComment', back_populates='post')
     repost_watch = relationship('RepostWatch', back_populates='post')
-    reposts = relationship('Repost', back_populates='post')
+    reposts = relationship('Repost', back_populates='repost_of', primaryjoin="Post.id==Repost.repost_of_id")
     searches = relationship('RepostSearch', back_populates='post')
     reports = relationship('UserReport', back_populates='post')
 
@@ -167,6 +167,8 @@ class RepostSearch(Base):
     source = Column(String(50), nullable=False)
     search_params = Column(String(1000), nullable=False)
 
+    post = relationship("Post", back_populates='searches')
+
 class Repost(Base):
     __tablename__ = 'repost'
     id = Column(Integer, primary_key=True)
@@ -175,8 +177,8 @@ class Repost(Base):
     search_id = Column(Integer, ForeignKey('repost_search.id'))
     detected_at = Column(DateTime, default=func.utc_timestamp())
     source = Column(String(100))
-    post = relationship("Post", back_populates='reposts')
-    repost_of = relationship("Post")
+    post = relationship("Post", back_populates='reposts', foreign_keys=[post_id])
+    repost_of = relationship("Post", foreign_keys=[repost_of_id])
     search = relationship("RepostSearch")
 
 
@@ -307,7 +309,7 @@ class MonitoredSubChecks(Base):
     checked_at = Column(DateTime, default=func.utc_timestamp())
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
 
-    monitored_sub = relationship("RepostSearch", back_populates='post_checks')
+    monitored_sub = relationship("MonitoredSub", back_populates='post_checks')
 
     def to_dict(self):
         return {
@@ -332,7 +334,7 @@ class MonitoredSubConfigChange(Base):
     new_value = Column(String(2000))
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
 
-    monitored_sub = relationship("RepostSearch", back_populates='post_checks')
+    monitored_sub = relationship("MonitoredSub")
 
 class MonitoredSubConfigRevision(Base):
     __tablename__ = 'monitored_sub_config_revision'
@@ -345,7 +347,7 @@ class MonitoredSubConfigRevision(Base):
     notified = Column(Boolean, default=False)
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
 
-    monitored_sub = relationship("RepostSearch", back_populates='post_checks')
+    monitored_sub = relationship("MonitoredSub", back_populates='config_revisions')
 
 
 class MemeTemplate(Base):

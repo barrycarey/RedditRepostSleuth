@@ -2,7 +2,7 @@ from typing import List, NoReturn, Dict, Text
 
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.db.databasemodels import Post, ImageRepost, RepostWatch, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, MemeTemplate, Repost
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
@@ -80,7 +80,7 @@ def save_image_repost_result(
 
         log.info('Creating repost. Post %s is a repost of %s', search_results.checked_post.url,
                  search_results.matches[0].post.url)
-        new_repost = ImageRepost(post_id=search_results.checked_post.post_id,
+        new_repost = Repost(post_id=search_results.checked_post.post_id,
                                  repost_of=search_results.matches[0].post.post_id,
                                  hamming_distance=search_results.matches[0].hamming_distance,
                                  annoy_distance=search_results.matches[0].annoy_distance,

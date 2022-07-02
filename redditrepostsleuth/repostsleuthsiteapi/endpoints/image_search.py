@@ -10,7 +10,7 @@ from falcon import Response, Request, HTTPBadRequest, HTTPServiceUnavailable, fa
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
+from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
 from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request, reddit_post_id_from_url, \

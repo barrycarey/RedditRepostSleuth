@@ -1,7 +1,7 @@
 import json
 from typing import List, Text, Optional
 
-from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch, Post
+from redditrepostsleuth.core.db.databasemodels import MemeTemplate, Post, RepostSearch
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
@@ -21,11 +21,11 @@ class ImageSearchResults(SearchResults):
         self.checked_post = checked_post
         self._target_hash = None
         if self.checked_post:
-            self._target_hash = self.checked_post.dhash_h
+            self._target_hash = self.checked_post.hashes.hash_1
         self.meme_template: Optional[MemeTemplate] = None
         self.closest_match: Optional[ImageSearchMatch] = None
         self.matches: List[ImageSearchMatch] = []
-        self.logged_search: Optional[ImageSearch] = None
+        self.logged_search: Optional[RepostSearch] = None
         self.meme_hash: Optional[Text] = None
 
     @property

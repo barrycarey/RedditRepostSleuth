@@ -4,7 +4,7 @@ from typing import Dict
 from praw.models import Submission
 from prawcore import Forbidden
 
-from redditrepostsleuth.core.db.databasemodels import Post, RedditImagePost, RedditImagePostCurrent
+from redditrepostsleuth.core.db.databasemodels import Post, ImagePost
 from redditrepostsleuth.core.util.helpers import get_post_type_pushshift
 
 
@@ -54,17 +54,10 @@ def pushshift_to_post(submission: Dict) -> Post:
     return post
 
 
-def post_to_image_post(post: Post) -> RedditImagePost:
-    return RedditImagePost(
+def post_to_image_post(post: Post) -> ImagePost:
+    return ImagePost(
         dhash_h=post.dhash_h,
         dhash_v=post.dhash_v,
         post_id=post.id,
-        created_at=post.created_at
-    )
-
-def post_to_image_post_current(post: Post) -> RedditImagePostCurrent:
-    return RedditImagePostCurrent(
-        dhash_h=post.dhash_h,
-        post_id=post.post_id,
         created_at=post.created_at
     )

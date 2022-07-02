@@ -10,7 +10,7 @@ from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
