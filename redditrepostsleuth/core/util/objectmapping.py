@@ -37,7 +37,7 @@ def submission_to_post(submission: Submission, source: str = 'praw') -> Post:
 
     return post
 
-def pushshift_to_post(submission: Dict, source: str = 'pushshift') -> Post:
+def pushshift_to_post(submission: Dict) -> Post:
     post = Post()
     post.post_id = submission.get('id', None)
     post.url = submission.get('url', None)
@@ -49,8 +49,6 @@ def pushshift_to_post(submission: Dict, source: str = 'pushshift') -> Post:
     post.perma_link = submission.get('permalink', None)
     post.crosspost_parent = submission.get('crosspost_parent', None)
     post.selftext = submission.get('selftext', None)
-    post.crosspost_checked = True
-    post.ingested_from = source
     post.post_type = get_post_type_pushshift(submission)
 
     return post
@@ -60,7 +58,7 @@ def post_to_image_post(post: Post) -> RedditImagePost:
     return RedditImagePost(
         dhash_h=post.dhash_h,
         dhash_v=post.dhash_v,
-        post_id=post.post_id,
+        post_id=post.id,
         created_at=post.created_at
     )
 

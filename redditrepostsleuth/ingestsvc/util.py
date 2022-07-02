@@ -39,10 +39,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
                 return
 
             uow.image_post.add(image_post)
-        elif post.post_type == 'link':
-            url_hash = md5(post.url.encode('utf-8'))
-            post.url_hash = url_hash.hexdigest()
-            log.debug('Set URL hash')
+
         elif post.post_type == 'hosted:video':
             pass
         try:
