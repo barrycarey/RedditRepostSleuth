@@ -1,5 +1,6 @@
 import json
 import logging
+from collections import Counter
 from logging import LoggerAdapter
 from typing import List, Text, Optional
 
@@ -9,10 +10,11 @@ from distance import hamming
 from praw import Reddit
 from requests.exceptions import ConnectionError
 from celery.exceptions import TimeoutError
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery.reposttasks import get_meme_hash_task
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate, MemeHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
 from redditrepostsleuth.core.logging import get_configured_logger
@@ -205,22 +207,42 @@ class DuplicateImageService:
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
-    def _get_meme_hash(self, url: Text) -> Optional[Text]:
+    def _get_meme_hash(self, url: str, post_id=None) -> Optional[Text]:
         """
         Take a given URL and return the hash that will be used for the meme filter
         :param url: URL to hash
         :return: Hash of the image
         :rtype: Optional[Text]
         """
-        try:
-            meme_hashes = get_image_hashes(url, hash_size=self.config.default_meme_filter_hash_size)
-            return meme_hashes['dhash_h']
-        except ImageConversioinException:
-            log.error('Failed to get meme hash')
-            return
-        except Exception:
-            log.exception('Failed to get meme hash for %s', url, exc_info=True)
-            return
+        meme_hash = None
+        with self.uowm.start() as uowm:
+            if post_id:
+                meme_hash = uowm.meme_hash.get_by_post_id(post_id)
+                if meme_hash:
+                    log.info('Using cached meme hash')
+                    return meme_hash.hash
+
+            try:
+                meme_hashes = get_image_hashes(url, hash_size=self.config.default_meme_filter_hash_size)
+                meme_hash = meme_hashes['dhash_h']
+            except ImageConversioinException:
+                log.error('Failed to get meme hash. ')
+                return
+            except Exception:
+                log.exception('Failed to get meme hash for %s', url, exc_info=True)
+                return
+
+            if meme_hash and post_id:
+                log.debug('Saving meme hash')
+                uowm.meme_hash.add(MemeHash(post_id=post_id, hash=meme_hash))
+                try:
+                    uowm.commit()
+                except IntegrityError as e:
+                    log.error('Failed to save Meme hash, already exists. Post %s', post_id, exc_info=False)
+                except Exception as e:
+                    log.exception('')
+
+        return meme_hash
 
     def _get_matches(
             self,
@@ -413,38 +435,27 @@ class DuplicateImageService:
             matches: List[ImageSearchMatch],
             target_hamming
     ) -> List[ImageSearchMatch]:
+
         results = []
         log.debug('MEME FILTER - Filtering %s matches', len(matches))
         if len(matches) == 0:
             return matches
 
-        job = group([get_meme_hash_task.subtask((m, 32)) for m in matches], queue='meme_hash')
-        result = job.apply_async()
-        try:
-            result.join(timeout=30)
-        except TimeoutError:
-            log.exception('Async meme hash queue timed out')
-            return matches
-
-        for res in result.get():
-            print(res['match'].post.url)
-            if not res['pil_img']:
+        for match in matches:
+            match_hash = self._get_meme_hash(match.post.url, post_id=match.post.post_id)
+            if not match_hash:
                 continue
-
-            hashes = get_image_hashes_from_pil(res['pil_img'], 32)
-            if not hashes['dhash_h']:
-                log.error('Do Dhash H for post')
-            h_distance = hamming(searched_hash, hashes['dhash_h'])
+            h_distance = hamming(searched_hash, match_hash)
 
             if h_distance > target_hamming:
                 log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
-                         h_distance, f'https://redd.it/{res["match"].post.post_id}')
+                         h_distance, f'https://redd.it/{match.post.post_id}')
                 continue
-            log.debug('Match found: %s - H:%s', f'https://redd.it/{res["match"].post.post_id}',
+            log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                       h_distance)
-            res["match"].hamming_distance = h_distance
-            res["match"].hash_size = len(searched_hash)
-            results.append(res["match"])
+            match.hamming_distance = h_distance
+            match.hash_size = len(searched_hash)
+            results.append(match)
 
         return results
 
