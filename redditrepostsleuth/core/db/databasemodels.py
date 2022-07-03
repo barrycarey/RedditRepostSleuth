@@ -18,7 +18,11 @@ class Post(Base):
 
     __tablename__ = 'post'
     __table_args__ = (
-        Index('ingest_graph', 'ingested_at', 'post_type', unique=False),
+        Index('idx_ingest_graph', 'ingested_at', 'post_type', unique=False),
+        Index('idx_image_posts', 'post_type', 'created_at'),
+        Index('idx_url_hash', 'url_hash'),
+        Index('idx_last_delete_check', 'last_deleted_check', 'post_type'),
+
     )
 
     id = Column(Integer, primary_key=True)
@@ -36,10 +40,11 @@ class Post(Base):
     crosspost_parent = Column(String(200))
     dhash_h = Column(String(64))
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
-    url_hash = Column(String(32)) # Needed to index URLs for faster lookups
-    bad_url = Column(Boolean, default=False)
+    url_hash = Column(String(32))  # Needed to index URLs for faster lookups
+    hash_1 = Column(String(64))
+    hash_2 = Column(String(64))
+    hash_3 = Column(String(64))
 
-    hashes = relationship('PostHash', back_populates='post', uselist=False)
     image_post = relationship('ImagePost', back_populates='post', uselist=False)
     summons = relationship('Summons', back_populates='post')
     bot_comments = relationship('BotComment', back_populates='post')
@@ -71,7 +76,6 @@ class PostHash(Base):
     hash_2 = Column(String(64))
     hash_3 = Column(String(64))
     post_id = Column(Integer, ForeignKey('post.id'))
-    post = relationship("Post", back_populates='hashes')
 
 class ImagePost(Base):
     __tablename__ = 'image_post'
@@ -166,6 +170,8 @@ class RepostSearch(Base):
     post_id = Column(Integer, ForeignKey('post.id'))
     source = Column(String(50), nullable=False)
     search_params = Column(String(1000), nullable=False)
+    subreddit = Column(String(100), nullable=False)
+    searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 
     post = relationship("Post", back_populates='searches')
 
@@ -521,3 +527,9 @@ class ImageIndexMap(Base):
 
     post = relationship("Post")
     image_post = relationship("ImagePost")
+
+class MemeHash(Base):
+    __tablename__ = 'meme_hash'
+    id = Column(Integer, primary_key=True)
+    post_id = Column(String(6), nullable=False, unique=True)
+    hash = Column(String(256), nullable=False)
