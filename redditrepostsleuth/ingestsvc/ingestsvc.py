@@ -55,6 +55,9 @@ def queue_posts_for_ingest(posts: List[Post]):
         save_new_post.apply_async((post,), queue='post_ingest_dev')
 
 if __name__ == '__main__':
+    config = Config()
+    startup_backfill('vqooo5', 'vn1na6')
+    sys.exit()
     log.info('Starting post ingestor')
     config = Config()
     reddit = get_reddit_instance(config)

@@ -5,6 +5,7 @@ from praw.models import Submission
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.db.databasemodels import Post, ImagePost
+from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.util.helpers import get_post_type_pushshift
 
 
@@ -61,3 +62,4 @@ def post_to_image_post(post: Post) -> ImagePost:
         post_id=post.id,
         created_at=post.created_at
     )
+

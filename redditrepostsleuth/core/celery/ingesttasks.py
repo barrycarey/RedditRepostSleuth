@@ -49,17 +49,15 @@ def save_new_post(self, post: Post):
 
                 try:
                     url_hash = md5(post.url.encode('utf-8'))
-                    post.hashes = PostHash(
-                        url_hash=url_hash.hexdigest()
-                    )
+                    post.url_hash = url_hash.hexdigest()
                 except Exception as e:
                     return
 
                 if post.post_type == 'image':
                     try:
                         image_hashes = get_image_hashes(post.url)
-                        post.hashes.hash_1 = image_hashes['dhash_h']
-                        post.hashes.hash_2 = image_hashes['dhash_v']
+                        post.hash_1 = image_hashes['dhash_h']
+                        post.hash_2 = image_hashes['dhash_v']
                         post.image_post = ImagePost(dhash_h=image_hashes['dhash_h'], dhash_v=image_hashes['dhash_v'], created_at=post.created_at)
                     except ImageConversionException:
                         log.exception('Failed to convert image')
