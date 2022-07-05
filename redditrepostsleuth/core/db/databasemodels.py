@@ -110,6 +110,9 @@ class Summons(Base):
 
 class BotComment(Base):
     __tablename__ = 'bot_comment'
+    __table_args__ = (
+        Index('idx_comment_left_at', 'comment_left_at'),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
@@ -177,14 +180,21 @@ class RepostSearch(Base):
 
 class Repost(Base):
     __tablename__ = 'repost'
+    __table_args__ = (
+        Index('idx_repost_by_type', 'post_type', 'detected_at', unique=False),
+        Index('idx_repost_of_date', 'detected_at', 'author', unique=False),
+    )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
     repost_of_id = Column(Integer, ForeignKey('post.id'))
     search_id = Column(Integer, ForeignKey('repost_search.id'))
     detected_at = Column(DateTime, default=func.utc_timestamp())
     source = Column(String(100))
+    author = Column(String(100))
+    subreddit = Column(String(100), nullable=False)
     post = relationship("Post", back_populates='reposts', foreign_keys=[post_id])
     repost_of = relationship("Post", foreign_keys=[repost_of_id])
+    post_type = Column(String(20))
     search = relationship("RepostSearch")
 
 

@@ -290,8 +290,8 @@ class SubredditConfigUpdater:
     def _create_revision(
             self,
             wiki_page: WikiPage,
+            monitored_sub: MonitoredSub,
             valid: bool = False,
-            config_loaded_at = None
     ) -> MonitoredSubConfigRevision:
         """
         Take a wiki page and create a revision in the database
@@ -303,7 +303,7 @@ class SubredditConfigUpdater:
                 revision_id=wiki_page.revision_id,
                 revised_by=wiki_page.revision_by.name,
                 config=wiki_page.content_md,
-                subreddit=wiki_page.subreddit.display_name,
+                monitored_sub_id=monitored_sub.id,
                 is_valid=valid,
                 config_loaded_at=func.utc_timestamp()
             )
