@@ -227,7 +227,7 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                 meme_template = MemeTemplate(
                     dhash_h=post.dhash_h,
                     dhash_256=meme_hashes['dhash_h'],
-                    post_id=post.post_id
+                    post_id=post.id
                 )
                 uow.meme_template.add(meme_template)
                 uow.meme_template_potential.remove(potential_template)

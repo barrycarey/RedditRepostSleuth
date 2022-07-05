@@ -32,7 +32,7 @@ def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWo
                 meme_template = MemeTemplate(
                     dhash_h=search_results.checked_post.dhash_h,
                     dhash_256=meme_hashes['dhash_h'],
-                    post_id=search_results.checked_post.post_id
+                    post_id=search_results.checked_post.id
                 )
 
                 uow.meme_template.add(meme_template)
@@ -64,12 +64,8 @@ def save_image_repost_result(
     """
 
     with uowm.start() as uow:
-        search_results.checked_post.checked_repost = True
-
         if not search_results.matches:
             log.debug('Post %s has no matches', search_results.checked_post.post_id)
-            uow.posts.update(search_results.checked_post)
-            uow.commit()
             return
 
         # This is used for ingest repost checking.  If a meme template gets created, it intentionally throws a
@@ -80,10 +76,9 @@ def save_image_repost_result(
 
         log.info('Creating repost. Post %s is a repost of %s', search_results.checked_post.url,
                  search_results.matches[0].post.url)
-        new_repost = Repost(post_id=search_results.checked_post.post_id,
-                                 repost_of=search_results.matches[0].post.post_id,
-                                 hamming_distance=search_results.matches[0].hamming_distance,
-                                 annoy_distance=search_results.matches[0].annoy_distance,
+
+        new_repost = Repost(post_id=search_results.checked_post.id,
+                                 repost_of=search_results.matches[0].post.id,
                                  author=search_results.checked_post.author,
                                  search_id=search_results.logged_search.id if search_results.logged_search else None,
                                  subreddit=search_results.checked_post.subreddit,
@@ -105,7 +100,7 @@ def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) ->
     results = []
     with uowm.start() as uow:
         for match in matches:
-            watches = uow.repostwatch.get_all_active_by_post_id(match.post.post_id)
+            watches = uow.repostwatch.get_all_active_by_post_id(match.post.id)
             if watches:
                 log.info('Found %s active watch requests for post %s', len(watches), match.post.post_id)
                 for watch in watches:

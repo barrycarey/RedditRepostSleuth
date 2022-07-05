@@ -58,13 +58,18 @@ class InboxMonitor:
                 return
             post_id = post_id_search.group(1)
             with self.uowm.start() as uow:
-                existing_watch = uow.repostwatch.find_existing_watch(msg.dest.name, post_id)
+                post = uow.posts.get_by_post_id(post_id)
+                if not post:
+                    log.error('Failed to find post %s for watch activation', post_id)
+                    return
+
+                existing_watch = uow.repostwatch.find_existing_watch(msg.dest.name, post.id)
                 if existing_watch:
                     log.info('Existing watch found for post %s by user %s', post_id, msg.dest.name)
                     return
                 uow.repostwatch.add(
                     RepostWatch(
-                        post_id=post_id,
+                        post_id=post.id,
                         user=msg.dest.name,
                         source='Top Post'
                     )
@@ -80,26 +85,28 @@ class InboxMonitor:
                 log.debug('Report %s has already been saved', msg.id)
                 return
 
-        report_data = self._load_msg_body_data(msg.body)
-        if not report_data:
-            log.info('Failed to get report data from message %s.  Not saving', msg.id)
-            if len(self.failed_checks) > 10000:
-                self.failed_checks = []
-            if msg.id not in self.failed_checks:
-                self.failed_checks.append(msg.id)
-            return
+            report_data = self._load_msg_body_data(msg.body)
+            if not report_data:
+                log.info('Failed to get report data from message %s.  Not saving', msg.id)
+                if len(self.failed_checks) > 10000:
+                    self.failed_checks = []
+                if msg.id not in self.failed_checks:
+                    self.failed_checks.append(msg.id)
+                return
 
-        report = UserReport(
-            post_id=report_data['post_id'],
-            reported_by=msg.author.name,
-            report_type=msg.subject,
-            meme_template=report_data['meme_template'],
-            msg_body=msg.body,
-            message_id=msg.id,
-            sent_for_voting=False
-        )
+            post = uow.posts.get_by_post_id(report_data['post_id'])
+            if not post:
+                log.error('Failed to find post %s for report', report_data['post_id'])
+            report = UserReport(
+                post_id=post.id,
+                reported_by=msg.author.name,
+                report_type=msg.subject,
+                meme_template=report_data['meme_template'],
+                msg_body=msg.body,
+                message_id=msg.id,
+                sent_for_voting=False
+            )
 
-        with self.uowm.start() as uow:
             uow.user_report.add(report)
             uow.commit()
 
