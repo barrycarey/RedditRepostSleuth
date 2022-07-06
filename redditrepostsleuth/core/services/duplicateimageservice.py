@@ -194,9 +194,7 @@ class DuplicateImageService:
 
         search_results = self._log_search(
             search_results,
-            source,
-            False,  # TODO - Remove once DB column is removed
-            False, # TODO - Remove once DB column is removed
+            source
         )
 
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
@@ -302,24 +300,24 @@ class DuplicateImageService:
                 log.error('Failed to find index map for id %s in index %s', result.id, index_name)
                 return
 
-            post = uow.posts.get_by_id(index_map.reddit_post_db_id)
+            post = uow.posts.get_by_id(index_map.post_id)
 
         if not post:
             return
 
         log.debug(post.url)
 
-        if not post.dhash_h:
+        if not post.hash_1:
             log.error('Post %s missing dhash', post.post_id)
             return
 
         return ImageSearchMatch(
             url,
-            index_map.reddit_post_db_id,
+            index_map.post_id,
             post,
-            hamming(searched_hash, post.dhash_h),
+            hamming(searched_hash, post.hash_1),
             result.distance,
-            len(post.dhash_h)
+            len(post.hash_1)
         )
 
     def _log_search_time(self, search_results: ImageSearchResults, source: Text):
@@ -338,9 +336,13 @@ class DuplicateImageService:
     ) -> ImageSearchResults:
 
         logged_search = RepostSearch(
-            post_id=search_results.checked_post,
+            post_id=search_results.checked_post.id,
+            subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
             source=source,
-            search_params=json.dumps(search_results.search_settings.to_dict())
+            search_params=json.dumps(search_results.search_settings.to_dict()),
+            matches_found=len(search_results.matches),
+            search_time=search_results.search_times.total_search_time,
+            post_type='image'
         )
 
         with self.uowm.start() as uow:

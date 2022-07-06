@@ -17,6 +17,7 @@ from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo im
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
+from redditrepostsleuth.core.db.repository.repost_repo import RepostRepo
 from redditrepostsleuth.core.db.repository.repost_search_repo import RepostSearchRepo
 from redditrepostsleuth.core.db.repository.repost_watch_repo import RepostWatchRepo
 from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
@@ -132,3 +133,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def repost_search(self) -> RepostSearchRepo:
         return RepostSearchRepo(self.session)
+
+    @property
+    def repost(self) -> RepostRepo:
+        return RepostRepo(self.session)

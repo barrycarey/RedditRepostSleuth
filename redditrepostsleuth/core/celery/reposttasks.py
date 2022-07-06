@@ -1,3 +1,4 @@
+import json
 from time import perf_counter
 from typing import List, Dict, NoReturn
 
@@ -10,7 +11,7 @@ from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, RepostSearch, Repost
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
@@ -69,10 +70,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
 def link_repost_check(self, posts, ):
     with self.uowm.start() as uow:
         for post in posts:
-            """
-            if post.url_hash == '540f1167d27dcca2ea2772443beb5c79':
-                continue
-            """
+
             if post.url_hash in self.link_blacklist:
                 log.info('Skipping blacklisted URL hash %s', post.url_hash)
                 continue
@@ -92,21 +90,39 @@ def link_repost_check(self, posts, ):
             )
             search_results.search_times.stop_timer('total_search_time')
             log.info('Link Query Time: %s', search_results.search_times.query_time)
+
+            logged_search = RepostSearch(
+                post_id=search_results.checked_post.id,
+                subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
+                source='ingest',
+                search_params=json.dumps(search_results.search_settings.to_dict()),
+                matches_found=len(search_results.matches),
+                search_time=search_results.search_times.total_search_time,
+                post_type='link'
+            )
+
+            uow.repost_search.add(logged_search)
+
             if not search_results.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
-                post.checked_repost = True
-                uow.posts.update(post)
                 uow.commit()
                 continue
 
             log.info('Found %s matching links', len(search_results.matches))
             log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, search_results.matches[0].post.post_id)
             repost_of = search_results.matches[0].post
-            new_repost = LinkRepost(post_id=post.post_id, repost_of=repost_of.post_id, author=post.author, source='ingest', subreddit=post.subreddit)
-            repost_of.repost_count += 1
-            post.checked_repost = True
-            uow.posts.update(post)
-            uow.link_repost.add(new_repost)
+
+            new_repost = Repost(
+                post_id=post.id,
+                repost_of=repost_of,
+                author=post.author,
+                source='ingest',
+                subreddit=post.subreddit,
+                search=logged_search,
+                post_type='link'
+            )
+            uow.repost.add(new_repost)
+
 
             try:
                 uow.commit()
@@ -119,6 +135,7 @@ def link_repost_check(self, posts, ):
                 self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
                                                          repost_of=search_results.matches[0].post.post_id,
                                                          post_type=post.post_type))
+
         self.event_logger.save_event(
             BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
 

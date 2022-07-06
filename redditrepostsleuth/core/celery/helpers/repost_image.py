@@ -62,11 +62,11 @@ def save_image_repost_result(
     :param uowm: Unit of Work Manager
     :return:None
     """
+    if not search_results.matches:
+        log.debug('Post %s has no matches', search_results.checked_post.post_id)
+        return
 
     with uowm.start() as uow:
-        if not search_results.matches:
-            log.debug('Post %s has no matches', search_results.checked_post.post_id)
-            return
 
         # This is used for ingest repost checking.  If a meme template gets created, it intentionally throws a
         # IngestHighMatchMeme exception.  This will cause celery to retry the task so the newly created meme template
@@ -77,15 +77,20 @@ def save_image_repost_result(
         log.info('Creating repost. Post %s is a repost of %s', search_results.checked_post.url,
                  search_results.matches[0].post.url)
 
-        new_repost = Repost(post_id=search_results.checked_post.id,
-                                 repost_of=search_results.matches[0].post.id,
-                                 author=search_results.checked_post.author,
-                                 search_id=search_results.logged_search.id if search_results.logged_search else None,
-                                 subreddit=search_results.checked_post.subreddit,
-                                 source=source
-                                 )
+        new_repost = Repost(
+            post_id=search_results.checked_post.id,
+            repost_of=search_results.matches[0].post,
+            author=search_results.checked_post.author,
+            search_id=search_results.logged_search.id if search_results.logged_search else None,
+            subreddit=search_results.checked_post.subreddit,
+            source=source,
+            post_type='image'
+        )
 
-        uow.image_repost.add(new_repost)
+        try:
+            uow.repost.add(new_repost)
+        except Exception as e:
+            log.error('')
         uow.posts.update(search_results.checked_post)
 
         try:

@@ -131,6 +131,7 @@ class Config:
             'redis_host',
             'redis_password',
             'redis_port',
+            'redis_database',
             'db_host',
             'db_port',
             'db_user',

@@ -44,7 +44,7 @@ def save_new_post(self, post: Post):
                     celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post',
                                      args=[post.post_id, monitored_sub],
                                      queue='submonitor')
-                # ingest_repost_check.apply_async((post,self.config), queue='repost')
+
                 log.debug('Sent post to repost queue', )
 
                 try:
@@ -68,6 +68,7 @@ def save_new_post(self, post: Post):
                 uow.posts.add(post)
                 try:
                     uow.commit()
+                    ingest_repost_check.apply_async((post, self.config), queue='repost')
                 except (IntegrityError) as e:
                     log.error('Failed to save duplicate post')
                 except Exception as e:
