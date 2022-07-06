@@ -28,7 +28,6 @@ class Post(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(6), nullable=False, unique=True)
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
-    shortlink = Column(String(300))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type = Column(String(20))
     author = Column(String(100), nullable=False)
@@ -172,9 +171,13 @@ class RepostSearch(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
     source = Column(String(50), nullable=False)
+    post_type = Column(String(20))
     search_params = Column(String(1000), nullable=False)
-    subreddit = Column(String(100), nullable=False)
+    search_time = Column(Float, nullable=False)
+    matches_found = Column(Integer, nullable=False)
+    subreddit = Column(String(100), nullable=True)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+
 
     post = relationship("Post", back_populates='searches')
 

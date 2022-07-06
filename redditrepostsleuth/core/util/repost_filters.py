@@ -119,7 +119,7 @@ def filter_title_keywords(keywords: List[Text]):
 
 
 def filter_no_dhash(match: ImageSearchMatch):
-    if not match.post.dhash_h:
+    if not match.post.hash_1:
         log.debug('Dhash Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
         return False
     return True
