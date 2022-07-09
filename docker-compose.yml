@@ -87,18 +87,6 @@ services:
         volumes:
             - /opt/imageindex:/opt/imageindex
 
-    subreddit_monitor:
-        restart: always
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/submonitorsvc/Dockerfile
-        environment:
-            - LOG_LEVEL=WARN
-            - SLEUTHCONFIG=testconfig.ini
-        entrypoint: python -u /src/redditrepostsleuth/submonitorsvc/sub_monitor_svc_celery.py
-        volumes:
-            - /opt/imageindex:/opt/imageindex
-
     submonitor_worker:
         restart: always
         build:

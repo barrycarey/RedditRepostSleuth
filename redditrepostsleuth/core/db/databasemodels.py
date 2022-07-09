@@ -37,7 +37,6 @@ class Post(Base):
     subreddit = Column(String(100), nullable=False)
     title = Column(String(1000, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(200))
-    dhash_h = Column(String(64))
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     url_hash = Column(String(32))  # Needed to index URLs for faster lookups
     hash_1 = Column(String(64))
@@ -90,21 +89,25 @@ class ImagePost(Base):
 
 
 class Summons(Base):
-    __tablename__ = 'bot_summons'
+    __tablename__ = 'summons'
     __table_args__ = (
         Index('user_summons_check', 'requestor', 'summons_received_at', unique=False),
     )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
+    reply_comment_id = Column(Integer, ForeignKey('bot_comment.id'))
+    reply_pm_id = Column(Integer, ForeignKey('bot_private_message.id'))
+    reply_failure_reason = Column(String(20))
     requestor = Column(String(100))
     comment_id = Column(String(100), unique=True)
     comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
-    comment_reply = Column(String(5000))
-    comment_reply_id = Column(String(100))
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
+
     post = relationship("Post", back_populates='summons')
+    comment = relationship('BotComment', back_populates='summons', uselist=False)
+    private_message = relationship('BotPrivateMessage', back_populates='summons', uselist=False)
 
 
 class BotComment(Base):
@@ -114,7 +117,7 @@ class BotComment(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey('post.id'))
+    reddit_post_id = Column(String(6), ForeignKey('post.post_id'))
     comment_body = Column(String(2000, collation='utf8mb4_general_ci'))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     comment_left_at = Column(DateTime, default=func.utc_timestamp())
@@ -123,7 +126,9 @@ class BotComment(Base):
     karma = Column(Integer)
     active = Column(Boolean, default=True)
     needs_review = Column(Boolean, default=False)
+
     post = relationship("Post", back_populates='bot_comments')
+    summons = relationship('Summons', back_populates='comment')
 
 class BotPrivateMessage(Base):
     __tablename__ = 'bot_private_message'
@@ -132,10 +137,11 @@ class BotPrivateMessage(Base):
     subject = Column(String(200), nullable=False)
     body = Column(String(1000), nullable=False)
     in_response_to_comment = Column(String(20))
-    in_response_to_post = Column(String(100))
     recipient = Column(String(150), nullable=False)
     triggered_from = Column(String(50), nullable=False)
     message_sent_at = Column(DateTime, default=func.utc_timestamp())
+
+    summons = relationship('Summons', back_populates='private_message')
 
 
 class RepostWatch(Base):
@@ -325,10 +331,16 @@ class MonitoredSubChecks(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
+    post_type = Column(String(20), nullable=False)
     checked_at = Column(DateTime, default=func.utc_timestamp())
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
+    search_id = Column(Integer, ForeignKey('repost_search.id'))
 
     monitored_sub = relationship("MonitoredSub", back_populates='post_checks')
+    search = relationship("RepostSearch")
+    post = relationship("Post", foreign_keys=[post_id])
+
+
 
     def to_dict(self):
         return {

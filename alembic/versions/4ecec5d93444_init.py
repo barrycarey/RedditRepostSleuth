@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 0a37fbda21ef
+Revision ID: 4ecec5d93444
 Revises: 
-Create Date: 2022-07-03 15:14:46.037212
+Create Date: 2022-07-07 13:32:16.285496
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '0a37fbda21ef'
+revision = '4ecec5d93444'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -41,7 +41,6 @@ def upgrade():
     sa.Column('subject', sa.String(length=200), nullable=False),
     sa.Column('body', sa.String(length=1000), nullable=False),
     sa.Column('in_response_to_comment', sa.String(length=20), nullable=True),
-    sa.Column('in_response_to_post', sa.String(length=100), nullable=True),
     sa.Column('recipient', sa.String(length=150), nullable=False),
     sa.Column('triggered_from', sa.String(length=50), nullable=False),
     sa.Column('message_sent_at', sa.DateTime(), nullable=True),
@@ -128,7 +127,6 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('post_id', sa.String(length=6), nullable=False),
     sa.Column('url', sa.String(length=2000, collation='utf8mb4_general_ci'), nullable=False),
-    sa.Column('shortlink', sa.String(length=300), nullable=True),
     sa.Column('perma_link', sa.String(length=1000, collation='utf8mb4_general_ci'), nullable=True),
     sa.Column('post_type', sa.String(length=20), nullable=True),
     sa.Column('author', sa.String(length=100), nullable=False),
@@ -138,7 +136,6 @@ def upgrade():
     sa.Column('subreddit', sa.String(length=100), nullable=False),
     sa.Column('title', sa.String(length=1000, collation='utf8mb4_general_ci'), nullable=False),
     sa.Column('crosspost_parent', sa.String(length=200), nullable=True),
-    sa.Column('dhash_h', sa.String(length=64), nullable=True),
     sa.Column('last_deleted_check', sa.DateTime(), nullable=True),
     sa.Column('url_hash', sa.String(length=32), nullable=True),
     sa.Column('hash_1', sa.String(length=64), nullable=True),
@@ -162,7 +159,7 @@ def upgrade():
     )
     op.create_table('bot_comment',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('post_id', sa.Integer(), nullable=True),
+    sa.Column('reddit_post_id', sa.String(length=6), nullable=True),
     sa.Column('comment_body', sa.String(length=2000, collation='utf8mb4_general_ci'), nullable=True),
     sa.Column('perma_link', sa.String(length=1000, collation='utf8mb4_general_ci'), nullable=True),
     sa.Column('comment_left_at', sa.DateTime(), nullable=True),
@@ -171,24 +168,10 @@ def upgrade():
     sa.Column('karma', sa.Integer(), nullable=True),
     sa.Column('active', sa.Boolean(), nullable=True),
     sa.Column('needs_review', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
+    sa.ForeignKeyConstraint(['reddit_post_id'], ['post.post_id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('bot_summons',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('post_id', sa.Integer(), nullable=True),
-    sa.Column('requestor', sa.String(length=100), nullable=True),
-    sa.Column('comment_id', sa.String(length=100), nullable=True),
-    sa.Column('comment_body', sa.String(length=1000, collation='utf8mb4_general_ci'), nullable=True),
-    sa.Column('comment_reply', sa.String(length=5000), nullable=True),
-    sa.Column('comment_reply_id', sa.String(length=100), nullable=True),
-    sa.Column('summons_received_at', sa.DateTime(), nullable=True),
-    sa.Column('summons_replied_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('comment_id')
-    )
-    op.create_index('user_summons_check', 'bot_summons', ['requestor', 'summons_received_at'], unique=False)
+    op.create_index('idx_comment_left_at', 'bot_comment', ['comment_left_at'], unique=False)
     op.create_table('image_post',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
@@ -223,15 +206,6 @@ def upgrade():
     sa.Column('submitted_by', sa.String(length=100), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('vote_total', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('monitored_sub_checked',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('post_id', sa.Integer(), nullable=True),
-    sa.Column('checked_at', sa.DateTime(), nullable=True),
-    sa.Column('monitored_sub_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['monitored_sub_id'], ['monitored_sub.id'], ),
     sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -275,7 +249,12 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('post_id', sa.Integer(), nullable=True),
     sa.Column('source', sa.String(length=50), nullable=False),
+    sa.Column('post_type', sa.String(length=20), nullable=True),
     sa.Column('search_params', sa.String(length=1000), nullable=False),
+    sa.Column('search_time', sa.Float(), nullable=False),
+    sa.Column('matches_found', sa.Integer(), nullable=False),
+    sa.Column('subreddit', sa.String(length=100), nullable=True),
+    sa.Column('searched_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -328,6 +307,18 @@ def upgrade():
     sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('monitored_sub_checked',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('post_id', sa.Integer(), nullable=True),
+    sa.Column('post_type', sa.String(length=20), nullable=False),
+    sa.Column('checked_at', sa.DateTime(), nullable=True),
+    sa.Column('monitored_sub_id', sa.Integer(), nullable=True),
+    sa.Column('search_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['monitored_sub_id'], ['monitored_sub.id'], ),
+    sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
+    sa.ForeignKeyConstraint(['search_id'], ['repost_search.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('repost',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('post_id', sa.Integer(), nullable=True),
@@ -335,17 +326,45 @@ def upgrade():
     sa.Column('search_id', sa.Integer(), nullable=True),
     sa.Column('detected_at', sa.DateTime(), nullable=True),
     sa.Column('source', sa.String(length=100), nullable=True),
+    sa.Column('author', sa.String(length=100), nullable=True),
+    sa.Column('subreddit', sa.String(length=100), nullable=False),
+    sa.Column('post_type', sa.String(length=20), nullable=True),
     sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
     sa.ForeignKeyConstraint(['repost_of_id'], ['post.id'], ),
     sa.ForeignKeyConstraint(['search_id'], ['repost_search.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index('idx_repost_by_type', 'repost', ['post_type', 'detected_at'], unique=False)
+    op.create_index('idx_repost_of_date', 'repost', ['detected_at', 'author'], unique=False)
+    op.create_table('summons',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('post_id', sa.Integer(), nullable=True),
+    sa.Column('reply_comment_id', sa.Integer(), nullable=True),
+    sa.Column('reply_pm_id', sa.Integer(), nullable=True),
+    sa.Column('reply_failure_reason', sa.String(length=20), nullable=True),
+    sa.Column('requestor', sa.String(length=100), nullable=True),
+    sa.Column('comment_id', sa.String(length=100), nullable=True),
+    sa.Column('comment_body', sa.String(length=1000, collation='utf8mb4_general_ci'), nullable=True),
+    sa.Column('summons_received_at', sa.DateTime(), nullable=True),
+    sa.Column('summons_replied_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['post_id'], ['post.id'], ),
+    sa.ForeignKeyConstraint(['reply_comment_id'], ['bot_comment.id'], ),
+    sa.ForeignKeyConstraint(['reply_pm_id'], ['bot_private_message.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('comment_id')
+    )
+    op.create_index('user_summons_check', 'summons', ['requestor', 'summons_received_at'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index('user_summons_check', table_name='summons')
+    op.drop_table('summons')
+    op.drop_index('idx_repost_of_date', table_name='repost')
+    op.drop_index('idx_repost_by_type', table_name='repost')
     op.drop_table('repost')
+    op.drop_table('monitored_sub_checked')
     op.drop_table('meme_template_potential_votes')
     op.drop_index('id_map', table_name='image_index_map')
     op.drop_table('image_index_map')
@@ -356,14 +375,12 @@ def downgrade():
     op.drop_table('monitored_sub_config_revision')
     op.drop_index('idx_subreddit', table_name='monitored_sub_config_change')
     op.drop_table('monitored_sub_config_change')
-    op.drop_table('monitored_sub_checked')
     op.drop_table('meme_template_potential')
     op.drop_table('meme_template')
     op.drop_table('investigate_post')
     op.drop_index('create_at_index', table_name='image_post')
     op.drop_table('image_post')
-    op.drop_index('user_summons_check', table_name='bot_summons')
-    op.drop_table('bot_summons')
+    op.drop_index('idx_comment_left_at', table_name='bot_comment')
     op.drop_table('bot_comment')
     op.drop_table('site_admin')
     op.drop_index('idx_url_hash', table_name='post')

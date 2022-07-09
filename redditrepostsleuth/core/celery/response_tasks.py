@@ -65,11 +65,12 @@ class SummonsHandlerTask(Task):
                                               summons_disabled=False, notification_svc=notification_svc)
 
 
-
     def _get_log_adaptor(self):
         pass
 
 class SubMonitorTask(Task):
+
+
     def __init__(self):
         self.config = Config()
         self.reddit = get_reddit_instance(self.config)
@@ -109,14 +110,16 @@ def sub_monitor_check_post(self, post_id: Text, monitored_sub: MonitoredSub):
     if monitored_sub.title_ignore_keywords:
         title_keywords = monitored_sub.title_ignore_keywords.split(',')
 
-    if not self.sub_monitor.should_check_post(
-            post,
-            monitored_sub.check_image_posts,
-            monitored_sub.check_link_posts,
-            title_keyword_filter=title_keywords
-    ):
-        return
-
+    try:
+        if not self.sub_monitor.should_check_post(
+                post,
+                monitored_sub.check_image_posts,
+                monitored_sub.check_link_posts,
+                title_keyword_filter=title_keywords
+        ):
+            return
+    except Exception as e:
+        log.error('')
     results = self.sub_monitor.check_submission(monitored_sub, post)
     total_check_time = round(time.perf_counter() - start, 5)
 
@@ -166,51 +169,44 @@ def process_monitored_sub(self, monitored_sub):
 
 
 @celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True, )
-def process_summons(self, s: Summons):
-    update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': s.post_id,
-                                  'subreddit': s.subreddit, 'service': 'Summons'})
-    with self.uowm.start() as uow:
-        log.info('Starting summons %s on sub %s', s.id, s.subreddit)
-        updated_summons = uow.summons.get_by_id(s.id)
-        if updated_summons and updated_summons.summons_replied_at:
-            log.info('Summons %s already replied, skipping', s.id)
-            return
-        try:
-            with self.redlock.create_lock(f'summons_{s.id}', ttl=120000):
-                post = uow.posts.get_by_post_id(s.post_id)
-                if not post:
-                    post = self.summons_handler.save_unknown_post(s.post_id)
+def process_summons(self, summons: Summons):
+    try:
+        update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': summons.post.post_id, 'service': 'Summons'})
+        with self.uowm.start() as uow:
+            log.info('Starting summons %s ', summons.id)
+            updated_summons = uow.summons.get_by_id(summons.id)
+            if updated_summons and updated_summons.summons_replied_at:
+                log.info('Summons %s already replied, skipping', summons.id)
+                return
+            try:
+                with self.redlock.create_lock(f'summons_{summons.id}', ttl=120000):
 
-                if not post:
-                    response = SummonsResponse(summons=s)
-                    response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
-                    log.info('Failed to ingest post %s.  Sending error response', s.post_id)
-                    self.summons_handler._send_response(response)
-                    return
+                    try:
+                        self.summons_handler.process_summons(summons)
+                    except ResponseException as e:
+                        if e.response.status_code == 429:
+                            log.error('IP Rate limit hit.  Waiting')
+                            time.sleep(60)
+                            return
+                    except AssertionError as e:
+                        if 'code: 429' in str(e):
+                            log.error('Too many requests from IP.  Waiting')
+                            time.sleep(60)
+                            return
+                    except APIException as e:
+                        if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
+                            log.error('Hit API rate limit for summons %s on sub %s.', summons.id, summons.post.subreddit)
+                            return
+                    except Exception as e:
+                        log.exception('Unknown error')
 
-                try:
-                    self.summons_handler.process_summons(s, post)
-                except ResponseException as e:
-                    if e.response.status_code == 429:
-                        log.error('IP Rate limit hit.  Waiting')
-                        time.sleep(60)
-                        return
-                except AssertionError as e:
-                    if 'code: 429' in str(e):
-                        log.error('Too many requests from IP.  Waiting')
-                        time.sleep(60)
-                        return
-                except APIException as e:
-                    if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
-                        log.error('Hit API rate limit for summons %s on sub %s.', s.id, s.subreddit)
-                        return
-                        #time.sleep(60)
-
-                # TODO - This sends completed summons events to influx even if they fail
-                summons_event = SummonsEvent(float((datetime.utcnow() - s.summons_received_at).seconds),
-                                             s.summons_received_at, s.requestor, event_type='summons')
-                self.summons_handler._send_event(summons_event)
-                log.info('Finished summons %s', s.id)
-        except RedLockError:
-            log.error('Summons %s already in process', s.id)
-            time.sleep(3)
+                    # TODO - This sends completed summons events to influx even if they fail
+                    summons_event = SummonsEvent(float((datetime.utcnow() - summons.summons_received_at).seconds),
+                                                 summons.summons_received_at, summons.requestor, event_type='summons')
+                    self.summons_handler._send_event(summons_event)
+                    log.info('Finished summons %s', summons.id)
+            except RedLockError:
+                log.error('Summons %s already in process', summons.id)
+                time.sleep(3)
+    except Exception as e:
+        log.exception('')

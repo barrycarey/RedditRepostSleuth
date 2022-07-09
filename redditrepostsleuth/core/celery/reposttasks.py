@@ -77,7 +77,7 @@ def link_repost_check(self, posts, ):
 
             log.debug('Checking URL for repost: %s', post.url_hash)
             search_results = get_link_reposts(post.url, self.uowm, get_default_link_search_settings(self.config),
-                                              post=post)
+                                              post=post, source='ingest')
 
             if len(search_results.matches) > 10000:
                 log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(search_results.matches))
@@ -91,17 +91,6 @@ def link_repost_check(self, posts, ):
             search_results.search_times.stop_timer('total_search_time')
             log.info('Link Query Time: %s', search_results.search_times.query_time)
 
-            logged_search = RepostSearch(
-                post_id=search_results.checked_post.id,
-                subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
-                source='ingest',
-                search_params=json.dumps(search_results.search_settings.to_dict()),
-                matches_found=len(search_results.matches),
-                search_time=search_results.search_times.total_search_time,
-                post_type='link'
-            )
-
-            uow.repost_search.add(logged_search)
 
             if not search_results.matches:
                 log.debug('Not matching linkes for post %s', post.post_id)
@@ -118,7 +107,7 @@ def link_repost_check(self, posts, ):
                 author=post.author,
                 source='ingest',
                 subreddit=post.subreddit,
-                search=logged_search,
+                search=search_results.logged_search,
                 post_type='link'
             )
             uow.repost.add(new_repost)
