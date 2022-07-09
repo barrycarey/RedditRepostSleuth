@@ -3,6 +3,7 @@ import logging
 from hashlib import md5
 from random import randint
 from time import perf_counter
+from typing import List
 
 import requests
 from sqlalchemy.exc import IntegrityError
@@ -24,6 +25,81 @@ log = configure_logger(
     format='%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - Trace_ID=%(trace_id)s Post Type=%(post_type)s Post ID=%(post_id)s Subreddit=%(subreddit)s Service=%(service)s Level=%(levelname)s Message=%(message)s',
     filters=[IngestContextFilter()]
 )
+
+def post_from_row(row: dict):
+    return Post(
+            post_id=row['post_id'],
+            url=row['url'],
+            perma_link=row['perma_link'],
+            post_type=row['post_type'],
+            author=row['author'],
+            selftext=row['selftext'],
+            created_at=row['created_at'],
+            ingested_at=row['ingested_at'],
+            subreddit=row['subreddit'],
+            title=row['title'],
+            crosspost_parent=row['crosspost_parent'],
+            hash_1=row['dhash_h'],
+            hash_2=row['dhash_v'],
+            url_hash=row['url_hash']
+        )
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_post(self, rows: List[dict]):
+    try:
+        posts_to_import = []
+
+        for row in rows:
+
+            if row['selftext']:
+                if '[deleted]' in row['selftext']:
+                    continue
+                if '[removed]' in row['selftext']:
+                    continue
+            post = post_from_row(row)
+            if not post.url_hash:
+                url_hash = md5(post.url.encode('utf-8'))
+                post.url_hash = url_hash.hexdigest()
+            if post.post_type == 'image':
+                if not post.hash_1 or not post.hash_2:
+                    log.info('Skipping post wtih no hash')
+                    continue
+                post.image_post = ImagePost(
+                    created_at=post.created_at,
+                    dhash_h=post.hash_1,
+                    dhash_v=post.hash_2
+                )
+            posts_to_import.append(post)
+    except Exception as e:
+        log.exception('')
+        return
+    with self.uowm.start() as uow:
+        uow.session.add_all(posts_to_import)
+        try:
+            uow.commit()
+            log.info('Batch saved')
+        except Exception as e:
+            log.error('duplicate')
+        """
+        if not post.url_hash:
+            url_hash = md5(post.url.encode('utf-8'))
+            post.url_hash = url_hash.hexdigest()
+        if post.post_type == 'image':
+            post.image_post = ImagePost(
+                created_at=post.created_at,
+                dhash_h=post.hash_1,
+                dhash_v=post.hash_2
+            )
+        uow.posts.add(post)
+        try:
+            uow.commit()
+        except IntegrityError:
+            log.error('Skipping duplicate')
+            return
+        except Exception as e:
+            log.exception('')
+        """
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post: Post):
@@ -64,15 +140,16 @@ def save_new_post(self, post: Post):
                         return
                     except Exception as e:
                         log.exception('Failed to hash images')
+                        return
 
                 uow.posts.add(post)
                 try:
                     uow.commit()
                     ingest_repost_check.apply_async((post, self.config), queue='repost')
                 except (IntegrityError) as e:
-                    log.error('Failed to save duplicate post')
+                    log.exception('Failed to save duplicate post')
                 except Exception as e:
-                    print(e)
+                    log.exception('')
     except Exception as e:
         print('')
 

@@ -1,7 +1,7 @@
 import json
 from typing import Text, List, Optional
 
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, RepostSearch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.model.search_times import SearchTimes
@@ -21,6 +21,7 @@ class SearchResults:
         self.total_searched: int = 0
         self.matches: List[SearchMatch] = []
         self.search_times: SearchTimes = search_times or SearchTimes()
+        self.logged_search: Optional[RepostSearch] = None
 
     @property
     def report_data(self) -> Optional[Text]:

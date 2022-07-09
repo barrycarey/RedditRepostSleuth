@@ -86,3 +86,5 @@ MONITORED_SUB_MOD_REMOVED_CONTENT = 'We are in the process of cleaning up our da
                                     'If you believe this message is an error, please message u/barrycarey'
 
 REPOST_MODMAIL = 'Post [https://redd.it/{post_id}](https://redd.it/{post_id}) looks like a repost. I found {match_count} matches'
+
+REPLY_TEST_MODE = 'THIS MESSAGE WAS GENERATED FROM A TESTING INSTANCE OF REPOST SLEUTH. RESULTS ARE NOT ACCURATE. A RESPONSE FROM THE PRODUCTION INSTANCE SHOULD ALSO COME \n\n'

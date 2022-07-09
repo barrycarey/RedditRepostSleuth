@@ -57,36 +57,6 @@ class SummonsHandler:
         self.config = config or Config()
         self.command_parser = CommandParser(config=self.config)
 
-    def handle_summons(self):
-        """
-        Continually check the summons table for new requests.  Handle them as they are found
-        """
-        while True:
-            try:
-                with self.uowm.start() as uow:
-                    summons = uow.summons.get_unreplied()
-                    for s in summons:
-                        log.debug('Starting summons')
-                        post = uow.posts.get_by_post_id(s.post_id)
-                        if not post:
-                            post = self.save_unknown_post(s.post_id)
-
-                        if not post:
-                            response = SummonsResponse(summons=summons)
-                            response.message = 'Sorry, I\'m having trouble with this post. Please try again later'
-                            log.info('Failed to ingest post.  Sending error response')
-                            self._send_response(response)
-                            continue
-
-                        self.process_summons(s, post)
-                        # TODO - This sends completed summons events to influx even if they fail
-                        summons_event = SummonsEvent((datetime.utcnow() - s.summons_received_at).seconds,
-                                                     s.summons_received_at, s.requestor, event_type='summons')
-                        self._send_event(summons_event)
-                        log.debug('Finished summons')
-                time.sleep(2)
-            except Exception:
-                log.exception('Exception in handle summons thread', exc_info=True)
 
     @staticmethod
     def _strip_summons_flags(comment_body: Text) -> Optional[Text]:
@@ -109,13 +79,13 @@ class SummonsHandler:
             log.error('Unable to find summons tag in: %s', comment_body)
             return
 
-    def process_summons(self, summons: Summons, post: Post):
+    def process_summons(self, summons: Summons):
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
 
-        if post.post_type is None or post.post_type not in self.config.supported_post_types:
-            log.error('Post %s: Type %s not support', f'https://redd.it/{post.post_id}', post.post_type)
-            self._send_unsupported_msg(summons, post.post_type)
+        if summons.post.post_type is None or summons.post.post_type not in self.config.supported_post_types:
+            log.error('Post %s: Type %s not support', f'https://redd.it/{summons.post.post_id}', summons.post.post_type)
+            self._send_unsupported_msg(summons)
             return
 
         if self._is_banned(summons.requestor):
@@ -130,12 +100,11 @@ class SummonsHandler:
             return
 
         with self.uowm.start() as uow:
-            monitored_sub = uow.monitored_sub.get_by_sub(summons.subreddit)
-
+            monitored_sub = uow.monitored_sub.get_by_sub(summons.post.subreddit)
             if monitored_sub:
                 if monitored_sub.disable_summons_after_auto_response:
-                    log.info('Sub %s has summons disabled after auto response', summons.subreddit)
-                    auto_response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'submonitor')
+                    log.info('Sub %s has summons disabled after auto response', summons.post.subreddit)
+                    auto_response = uow.bot_comment.get_by_post_id_and_type(summons.post.id, 'submonitor')
                     if auto_response:
                         self._send_already_responded_msg(summons, f'https://reddit.com{auto_response.perma_link}')
                         if monitored_sub.remove_additional_summons:
@@ -143,7 +112,7 @@ class SummonsHandler:
                         return
 
                 if monitored_sub.only_allow_one_summons and summons.requestor != 'barrycarey':
-                    response = uow.bot_comment.get_by_post_id_and_type(summons.post_id, 'summons')
+                    response = uow.bot_comment.get_by_post_id_and_type(summons.post.id, 'summons')
                     if response:
                         log.info('Sub %s only allows one summons.  Existing response found at %s',
                                  summons.subreddit, response.perma_link)
@@ -169,7 +138,7 @@ class SummonsHandler:
             self._disable_watch(summons)
             return
         else:
-            self.process_repost_request(summons, post, monitored_sub=monitored_sub)
+            self.process_repost_request(summons, monitored_sub=monitored_sub)
             return
 
     def _delete_mention(self, comment_id: Text) -> NoReturn:
@@ -194,7 +163,6 @@ class SummonsHandler:
             self.response_handler.send_private_message(
                 redditor,
                 response.message,
-                post_id=summons.post_id,
                 comment_id=summons.comment_id,
                 source='summons'
             )
@@ -203,10 +171,10 @@ class SummonsHandler:
                 response.message = 'NOT_WHITELISTED_BY_USER_MESSAGE'
         self._save_response(response)
 
-    def _send_unsupported_msg(self, summons: Summons, post_type: Text):
+    def _send_unsupported_msg(self, summons: Summons):
         response = SummonsResponse(summons=summons)
         response.status = 'error'
-        response.message = UNSUPPORTED_POST_TYPE.format(post_type=post_type)
+        response.message = UNSUPPORTED_POST_TYPE.format(post_type=summons.post.post_type)
         self._send_response(response)
 
     def _send_summons_disable_msg(self, summons: Summons):
@@ -219,7 +187,7 @@ class SummonsHandler:
     def _disable_watch(self, summons: Summons) -> NoReturn:
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
-            existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
+            existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post.id)
             if not existing_watch or (existing_watch and not existing_watch.enabled):
                 response.message = WATCH_DISABLED_NOT_FOUND
                 self._send_response(response)
@@ -238,7 +206,7 @@ class SummonsHandler:
 
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
-            existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post_id)
+            existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post.id)
             if existing_watch:
                 if not existing_watch.enabled:
                     log.info('Found existing watch that is disabled.  Enabling watch %s', existing_watch.id)
@@ -253,7 +221,7 @@ class SummonsHandler:
                     return
 
         repost_watch = RepostWatch(
-            post_id=summons.post_id,
+            post_id=summons.post.id,
             user=summons.requestor,
             enabled=True
         )
@@ -269,11 +237,11 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def process_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
-        if post.post_type == 'image':
-            self.process_image_repost_request(summons, post, monitored_sub=monitored_sub)
-        elif post.post_type == 'link':
-            self.process_link_repost_request(summons, post)
+    def process_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None):
+        if summons.post.post_type == 'image':
+            self.process_image_repost_request(summons, monitored_sub=monitored_sub)
+        elif summons.post.post_type == 'link':
+            self.process_link_repost_request(summons)
 
     def process_link_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
         response = SummonsResponse(summons=summons)
@@ -301,9 +269,10 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def process_image_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
+    def process_image_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None):
 
         response = SummonsResponse(summons=summons)
+        # TODO - THis doesn't honor monitored sub settings
         search_settings = get_default_image_search_settings(self.config)
         target_image_match, target_meme_match, target_annoy_distance = self._get_target_distances(
             monitored_sub
@@ -313,8 +282,8 @@ class SummonsHandler:
 
         try:
             search_results = self.image_service.check_image(
-                post.url,
-                post=post,
+                summons.post.url,
+                post=summons.post,
                 search_settings=search_settings,
                 source='summons'
             )
@@ -354,8 +323,8 @@ class SummonsHandler:
         """
 
         with self.uowm.start() as uow:
-            banned = uow.banned_subreddit.get_by_subreddit(response.summons.subreddit)
-        if banned or (self.config.summons_send_pm_subs and response.summons.subreddit in self.config.summons_send_pm_subs):
+            banned = uow.banned_subreddit.get_by_subreddit(response.summons.post.subreddit)
+        if banned:
             try:
                 self._send_private_message(response)
             except APIException as e:
@@ -365,7 +334,7 @@ class SummonsHandler:
             try:
                 self._reply_to_comment(response)
             except Forbidden:
-                log.info('Banned on %s, sending PM', response.summons.subreddit)
+                log.info('Banned on %s, sending PM', response.summons.post.subreddit)
                 self._send_private_message(response)
         self._save_response(response)
 
@@ -373,18 +342,19 @@ class SummonsHandler:
         log.debug('Sending response to summons comment %s. MESSAGE: %s', response.summons.comment_id, response.message)
         try:
             reply_comment = self.response_handler.reply_to_comment(response.summons.comment_id, response.message,
-                                                                   subreddit=response.summons.subreddit)
-            response.comment_reply_id = reply_comment.id
+                                                                   subreddit=response.summons.post.subreddit)
+            if reply_comment:
+                response.comment_reply_id = reply_comment.id
         except APIException as e:
             if e.error_type == 'DELETED_COMMENT':
                 log.debug('Comment %s has been deleted', response.summons.comment_id)
-                response.message = 'DELETED COMMENT'
+                response.reply_failure_reason = 'DELETED COMMENT'
             elif e.error_type == 'THREAD_LOCKED':
                 log.info('Comment %s is in a locked thread', response.summons.comment_id)
-                response.message = 'THREAD LOCKED'
+                response.reply_failure_reason = 'THREAD LOCKED'
             elif e.error_type == 'TOO_OLD':
                 log.info('Comment %s is too old to reply to', response.summons.comment_id)
-                response.message = 'TOO OLD'
+                response.reply_failure_reason = 'TOO OLD'
             elif e.error_type == 'RATELIMIT':
                 log.exception('PRAW Ratelimit exception', exc_info=False)
                 raise
@@ -402,57 +372,32 @@ class SummonsHandler:
     def _send_private_message(self, response: SummonsResponse) -> SummonsResponse:
         redditor = self.reddit.redditor(response.summons.requestor)
         log.info('Sending private message to %s', response.summons.requestor)
-        msg = BANNED_SUB_MSG.format(post_id=response.summons.post_id, subreddit=response.summons.subreddit)
+        msg = BANNED_SUB_MSG.format(post_id=response.summons.post.post_id, subreddit=response.summons.post.subreddit)
         msg = msg + response.message
-        self.response_handler.send_private_message(
+        reply_pm = self.response_handler.send_private_message(
             redditor,
             msg,
-            post_id=response.summons.post_id,
             comment_id=response.summons.comment_id,
             source='summons'
         )
         response.message = msg
+        if reply_pm:
+            response.pm_reply_id = reply_pm.id
         return response
 
     def _save_response(self, response: SummonsResponse):
         with self.uowm.start() as uow:
             summons = uow.summons.get_by_id(response.summons.id)
             if summons:
-                summons.comment_reply = response.message
+                summons.reply_comment_id = response.comment_reply_id,
+                summons.reply_pm_id = response.pm_reply_id
+                summons.reply_failure_reason = response.reply_failure_reason
                 summons.summons_replied_at = datetime.utcnow()
-                summons.comment_reply_id = response.comment_reply_id
                 try:
                     uow.commit()
                     log.debug('Committed summons response to database')
                 except InternalError:
                     log.exception('Failed to save response to summons', exc_info=True)
-
-    def _save_post(self, post: Post):
-        with self.uowm.start() as uow:
-            uow.posts.update(post)
-            uow.commit()
-
-    def save_unknown_post(self, post_id: Text) -> Optional[Post]:
-        """
-        If we received a request on a post we haven't ingest save it
-        :rtype: Optional[Post]
-        :param post_id: Submission ID
-        :return: Post object
-        """
-        submission = self.reddit.submission(post_id)
-        try:
-            post = pre_process_post(submission_to_post(submission), self.uowm, None)
-        except InvalidImageUrlException:
-            return
-        except Forbidden:
-            log.error('Failed to download post, appears we are banned')
-            return
-
-        if not post or post.post_type != 'image':
-            log.error('Problem ingesting post.  Either failed to save or it is not an image')
-            return
-
-        return post
 
     def _send_event(self, event: InfluxEvent):
         if self.event_logger:
@@ -463,8 +408,8 @@ class SummonsHandler:
         response.status = 'success'
         response.message = OVER_LIMIT_BAN.format(ban_expires=datetime.utcnow() + timedelta(hours=1))
         redditor = self.reddit.redditor(summons.requestor)
-        self.response_handler.send_private_message(redditor, response.message, subject='Temporary RepostSleuth Ban')
-        self._save_response(response)
+        reply_message = self.response_handler.send_private_message(redditor, response.message, subject='Temporary RepostSleuth Ban')
+        self._save_response(response, bot_pm_id=reply_message.id if reply_message else None)
 
     def _ban_user(self, requestor: Text) -> NoReturn:
         ban_expires = datetime.utcnow() + timedelta(hours=1)

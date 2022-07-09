@@ -17,8 +17,9 @@ def log_queue_size(event_logger):
             client = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_database, password=config.redis_password)
 
             for queue in client.scan_iter():
-                queue_name = queue.decode('utf-8')
-                if queue_name[0:1] == '_' or len(queue_name) > 20 or queue_name in skip_keys:
+                queue_name = queue.decode('utf-8').replace('_kombu.binding.', '')
+                print(queue_name)
+                if len(queue_name) > 30 or queue_name in skip_keys or 'celery' in queue_name:
                     continue
                 event_logger.save_event(
                     CeleryQueueSize(queue_name, client.llen(queue_name), event_type='queue_update_dev'))

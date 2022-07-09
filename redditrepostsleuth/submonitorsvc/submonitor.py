@@ -72,9 +72,6 @@ class SubMonitor:
         :param title_keyword_filter: Optional list of keywords to skip if in title
         :return: bool
         """
-        if post.left_comment:
-            return False
-
         if post.post_type not in self.config.supported_post_types:
             return False
 
@@ -99,7 +96,7 @@ class SubMonitor:
 
     def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
-        if post.post_type == 'image' and post.dhash_h is None:
+        if post.post_type == 'image' and post.hash_1 is None:
             log.error('Post %s has no dhash', post.post_id)
             return
 
@@ -124,7 +121,7 @@ class SubMonitor:
         if not search_results.matches and not monitored_sub.comment_on_oc:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
-            self._create_checked_post(post)
+            self._create_checked_post(search_results, monitored_sub)
             return search_results
 
         reply_comment = None
@@ -170,7 +167,7 @@ class SubMonitor:
             self._sticky_reply(monitored_sub, reply_comment)
             self._lock_comment(monitored_sub, reply_comment)
         self._mark_post_as_comment_left(post)
-        self._create_checked_post(post)
+        self._create_checked_post(search_results, monitored_sub)
 
     def _mark_post_as_comment_left(self, post: Post):
         try:
@@ -181,15 +178,20 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to mark post %s as checked', post.id, exc_info=True)
 
-    def _create_checked_post(self, post: Post):
+    def _create_checked_post(self, results: SearchResults, monitored_sub: MonitoredSub):
         try:
             with self.uowm.start() as uow:
                 uow.monitored_sub_checked.add(
-                    MonitoredSubChecks(post_id=post.post_id, subreddit=post.subreddit)
+                    MonitoredSubChecks(
+                        post_id=results.checked_post.id,
+                        post_type=results.checked_post.post_type,
+                        monitored_sub=monitored_sub,
+                        search=results.logged_search
+                    )
                 )
                 uow.commit()
         except Exception as e:
-            log.exception('Failed to create checked post for submission %s', post.post_id, exc_info=True)
+            log.exception('Failed to create checked post for submission %s', results.checked_post.post_id, exc_info=True)
 
     def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub) -> SearchResults:
         search_results = get_link_reposts(
@@ -197,7 +199,8 @@ class SubMonitor:
             self.uowm,
             get_link_search_settings_for_monitored_sub(monitored_sub),
             post=post,
-            get_total=False
+            get_total=False,
+            source='submonitor'
         )
         return filter_search_results(
             search_results,
@@ -311,7 +314,7 @@ class SubMonitor:
         self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body,
                                             triggered_from='Submonitor')
 
-    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> Comment:
+    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
         return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message)
 
