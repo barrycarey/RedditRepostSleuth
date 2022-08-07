@@ -42,6 +42,20 @@ def chunk_list(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
+def get_post_type_id(post_type: str) -> int:
+    if post_type == 'text':
+        return 1
+    elif post_type == 'image':
+        return 2
+    elif post_type == 'link':
+        return 3
+    elif post_type == 'hosted:video':
+        return 4
+    elif post_type == 'rich:video':
+        return 5
+    elif post_type == 'gallery':
+        return 6
+
 def get_post_type_pushshift(submission: Dict) -> str:
     # TODO - Go over this whole function
     if submission.get('is_self', None):
@@ -50,6 +64,9 @@ def get_post_type_pushshift(submission: Dict) -> str:
     post_hint = submission.get('post_hint', None)
     if post_hint:
         return post_hint
+
+    if 'gallery' in submission['url']:
+        return 'gallery'
 
     image_exts = ['.jpg', '.png', '.jpeg', '.gif']
     for ext in image_exts:

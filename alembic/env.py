@@ -38,8 +38,8 @@ fileConfig(config.config_file_name)
 target_metadata = Base.metadata
 
 def get_conn_string():
-    conn_str = r'mysql+pymysql://root:Tovalu88!@localhost/reddit_dev'
-    return r'mysql+pymysql://root:Tovalu88!@localhost/reddit_dev'
+    conn_str = r'mysql+pymysql://root:Tovalu88!@prd-mysql-01.ho.me/reddit_dev'
+    return conn_str
     #return f'mysql+pymysql://{bot_config.db_user}:{quote_plus(bot_config.db_password)}@{bot_config.db_host}/{bot_config.db_name}'
 
 

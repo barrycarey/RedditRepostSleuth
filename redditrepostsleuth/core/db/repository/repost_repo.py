@@ -31,15 +31,17 @@ class RepostRepo:
     def get_all_by_subreddit(self, subreddit: Text, source='sub_monitor', limit: int = None, offset: int = None) -> List[Repost]:
         return self.db_session.query(Repost).filter(Repost.subreddit == subreddit, Repost.source == source).order_by(Repost.id.desc()).limit(limit).offset(offset).all()
 
-    def get_count(self, hours: int = None):
+    def get_count(self, hours: int = None, post_type: int = None):
         query = self.db_session.query(func.count(Repost.id))
+        if post_type:
+            query = query.filter(Repost.post_type == post_type)
         if hours:
             query = query.filter(Repost.detected_at > (datetime.now() - timedelta(hours=hours)))
         r = query.first()
         return r[0] if r else None
 
-    def get_count_by_subreddit(self, subreddit: Text, hours: int = None):
-        query = self.db_session.query(func.count(Repost.id)).filter(Repost.subreddit == subreddit)
+    def get_count_by_subreddit(self, subreddit: str, post_type: str, hours: int = None):
+        query = self.db_session.query(func.count(Repost.id)).filter(Repost.subreddit == subreddit, Repost.post_type == post_type)
         if hours:
             query = query.filter(Repost.detected_at > (datetime.now() - timedelta(hours=hours)))
         return query.first()

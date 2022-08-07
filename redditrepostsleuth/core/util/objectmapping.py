@@ -6,7 +6,7 @@ from prawcore import Forbidden
 
 from redditrepostsleuth.core.db.databasemodels import Post, ImagePost
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
-from redditrepostsleuth.core.util.helpers import get_post_type_pushshift
+from redditrepostsleuth.core.util.helpers import get_post_type_pushshift, get_post_type_id
 
 
 def submission_to_post(submission: Submission, source: str = 'praw') -> Post:
@@ -51,6 +51,10 @@ def pushshift_to_post(submission: Dict) -> Post:
     post.crosspost_parent = submission.get('crosspost_parent', None)
     post.selftext = submission.get('selftext', None)
     post.post_type = get_post_type_pushshift(submission)
+    post.post_type_int = get_post_type_id(post.post_type)
+    post.created_at_year = post.created_at.year
+    post.created_at_month = post.created_at.month
+    post.created_at_timestamp = post.created_at.timestamp()
 
     return post
 

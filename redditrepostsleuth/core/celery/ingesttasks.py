@@ -6,15 +6,17 @@ from time import perf_counter
 from typing import List
 
 import requests
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
+from videohash import VideoHash
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import Post, PostHash, ImagePost
+from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask, PyMySQLTask
+from redditrepostsleuth.core.db.databasemodels import Post, PostHash, ImagePost, Repost, BotComment, Summons, \
+    BotPrivateMessage, MonitoredSubChecks, MonitoredSubConfigRevision, MonitoredSubConfigChange, RepostWatch
 from redditrepostsleuth.core.exception import InvalidImageUrlException, ImageConversionException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
 from redditrepostsleuth.core.logging import configure_logger
-from redditrepostsleuth.core.util.helpers import update_log_context_data
+from redditrepostsleuth.core.util.helpers import update_log_context_data, get_post_type_pushshift
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 from redditrepostsleuth.ingestsvc.util import pre_process_post
@@ -26,8 +28,23 @@ log = configure_logger(
     filters=[IngestContextFilter()]
 )
 
+def get_type_id(post_type: str) -> int:
+    if post_type == 'text':
+        return 1
+    elif post_type == 'image':
+        return 2
+    elif post_type == 'link':
+        return 3
+    elif post_type == 'hosted:video':
+        return 4
+    elif post_type == 'rich:video':
+        return 5
+    elif post_type == 'gallery':
+        return 6
+
+
 def post_from_row(row: dict):
-    return Post(
+    post =  Post(
             post_id=row['post_id'],
             url=row['url'],
             perma_link=row['perma_link'],
@@ -43,7 +60,46 @@ def post_from_row(row: dict):
             hash_2=row['dhash_v'],
             url_hash=row['url_hash']
         )
+    if not post.post_type:
+        post.post_type = get_post_type_pushshift(row)
 
+    post.created_at_timestamp = post.created_at.timestamp()
+    post.post_type_int = get_type_id(post.post_type)
+    post.created_at_year = post.created_at.year
+    post.created_at_month = post.created_at.month
+    return post
+
+
+@celery.task(bind=True, base=PyMySQLTask, ignore_reseults=True, utoretry_for=(OperationalError), serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_post_new(self, rows: List[dict]):
+    try:
+        posts_to_import = []
+        image_posts_to_import = []
+        for row in rows:
+            if row['selftext']:
+                if '[deleted]' in row['selftext']:
+                    continue
+                if '[removed]' in row['selftext']:
+                    continue
+
+            if not row['url_hash']:
+                url_hash = md5(row['url'].encode('utf-8'))
+                row['url_hash'] = url_hash.hexdigest()
+            if row['post_type'] == 'image':
+                if not row['dhash_h'] or not row['dhash_v']:
+                    log.info('Skipping post wtih no hash')
+                    continue
+                image_posts_to_import.append(ImagePost(
+                    created_at=row['created_at'],
+                    dhash_h=row['dhash_h'],
+                    dhash_v=row['dhash_v']
+                ))
+            posts_to_import.append(row)
+    except Exception as e:
+        log.exception('')
+        return
+    self.bulk_insert_post(posts_to_import)
+    log.info('batch saved')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_post(self, rows: List[dict]):
@@ -57,7 +113,12 @@ def import_post(self, rows: List[dict]):
                     continue
                 if '[removed]' in row['selftext']:
                     continue
+
             post = post_from_row(row)
+            """
+            if not post.post_type:
+                log.error(f'Failed to get post on %s. https://reddit.com%s', post.post_id, post.perma_link)
+            """
             if not post.url_hash:
                 url_hash = md5(post.url.encode('utf-8'))
                 post.url_hash = url_hash.hexdigest()
@@ -65,22 +126,30 @@ def import_post(self, rows: List[dict]):
                 if not post.hash_1 or not post.hash_2:
                     log.info('Skipping post wtih no hash')
                     continue
+                """
                 post.image_post = ImagePost(
                     created_at=post.created_at,
                     dhash_h=post.hash_1,
                     dhash_v=post.hash_2
                 )
+                """
             posts_to_import.append(post)
+
     except Exception as e:
         log.exception('')
         return
     with self.uowm.start() as uow:
-        uow.session.add_all(posts_to_import)
+        try:
+            uow.session.bulk_save_objects(posts_to_import)
+        except Exception as e:
+            print('')
         try:
             uow.commit()
             log.info('Batch saved')
-        except Exception as e:
+        except IntegrityError as e:
             log.error('duplicate')
+        except Exception as e:
+            log.exception('')
         """
         if not post.url_hash:
             url_hash = md5(post.url.encode('utf-8'))
@@ -101,11 +170,20 @@ def import_post(self, rows: List[dict]):
             log.exception('')
         """
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException, OperationalError), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post: Post):
     update_log_context_data(log, {'post_type': post.post_type, 'post_id': post.post_id,
                                   'subreddit': post.subreddit, 'service': 'Ingest',
                                   'trace_id': str(randint(1000000, 9999999))})
+
+    if '[removed]' in post.selftext or '[deleted]' in post.selftext:
+        log.info('Skipping deleted post')
+        return
+
+    if post.author == '[deleted]':
+        log.info('Skipping deleted author')
+        return
+
     try:
         with self.uowm.start() as uow:
             existing = uow.posts.get_by_post_id(post.post_id)
@@ -134,20 +212,28 @@ def save_new_post(self, post: Post):
                         image_hashes = get_image_hashes(post.url)
                         post.hash_1 = image_hashes['dhash_h']
                         post.hash_2 = image_hashes['dhash_v']
-                        post.image_post = ImagePost(dhash_h=image_hashes['dhash_h'], dhash_v=image_hashes['dhash_v'], created_at=post.created_at)
+                        #post.image_post = ImagePost(dhash_h=image_hashes['dhash_h'], dhash_v=image_hashes['dhash_v'], created_at=post.created_at)
                     except ImageConversionException:
-                        log.exception('Failed to convert image')
+                        log.exception('Failed to convert image', exc_info=False)
                         return
                     except Exception as e:
                         log.exception('Failed to hash images')
                         return
+                """
+                if post.post_type in ['rich:video', 'hosted:video']:
+                    try:
+                        vid = VideoHash(url=post.url)
+                        post.hash_1 = vid.hash[2:]
+                    except Exception as e:
+                        log.exception('')
+                """
 
                 uow.posts.add(post)
                 try:
                     uow.commit()
                     ingest_repost_check.apply_async((post, self.config), queue='repost')
                 except (IntegrityError) as e:
-                    log.exception('Failed to save duplicate post')
+                    log.exception('Failed to save duplicate post', exc_info=False)
                 except Exception as e:
                     log.exception('')
     except Exception as e:
@@ -211,3 +297,290 @@ def ingest_id_batch(self, ids_to_get):
     r = requests.get(f'{self.config.util_api}/reddit/submissions', params={'submission_ids': ','.join(ids_to_get)})
     results = json.loads(r.text)
     save_pushshift_results.apply_async((results,), queue='pushshift')
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_image_repost(self, rows: List[dict]):
+    reposts_to_save = []
+    try:
+        with self.uowm.start() as uow:
+            for row in rows:
+                post = uow.posts.get_by_post_id(row['post_id'])
+                repost_of = uow.posts.get_by_post_id(row['repost_of'])
+                if not post:
+                    continue
+                if not repost_of:
+                    continue
+                repost = Repost(
+                    post_id=post.id,
+                    repost_of_id=repost_of.id,
+                    search_id=1,
+                    detected_at=row['detected_at'],
+                    source=row['source'],
+                    author=row['author'],
+                    subreddit=row['subreddit'],
+                    post_type=get_type_id(post.post_type)
+                )
+                reposts_to_save.append(repost)
+    except Exception as e:
+        log.exception('')
+        return
+    log.info('Saving %s reposts', len(reposts_to_save))
+    with self.uowm.start() as uow:
+        try:
+            uow.session.bulk_save_objects(reposts_to_save)
+        except Exception as e:
+            print('')
+        try:
+            uow.commit()
+            log.info('Batch saved')
+        except IntegrityError as e:
+            log.error('duplicate')
+        except Exception as e:
+            log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_bot_comment_task(self, rows: List[dict]):
+    comments_to_save = []
+    try:
+        with self.uowm.start() as uow:
+            for row in rows:
+                post = uow.posts.get_by_post_id(row['post_id'])
+                if not post:
+                    continue
+
+                comment = BotComment(
+                    reddit_post_id=post.post_id,
+                    comment_body=row['comment_body'],
+                    perma_link=f'https://reddit.com{row["perma_link"]}',
+                    comment_left_at=row['comment_left_at'],
+                    source=row['source'],
+                    comment_id=row['comment_id']
+                )
+                comments_to_save.append(comment)
+
+            try:
+                uow.session.bulk_save_objects(comments_to_save)
+            except Exception as e:
+                print('')
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.error('duplicate')
+            except Exception as e:
+                log.exception('')
+    except Exception as e:
+        log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_bot_summons_task(self, rows: List[dict]):
+    items = []
+    try:
+        with self.uowm.start() as uow:
+            for row in rows:
+                post = uow.posts.get_by_post_id(row['post_id'])
+                if not post:
+                    continue
+
+                summons = Summons(
+                    post_id=post.id,
+                    requestor=row['requestor'],
+                    comment_id=row['comment_reply_id'],
+                    comment_body=row['comment_body'],
+                    summons_received_at=row['summons_received_at'],
+                    summons_replied_at=row['summons_replied_at']
+
+                )
+                items.append(summons)
+
+            try:
+                uow.session.bulk_save_objects(items)
+            except Exception as e:
+                print('')
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.error('duplicate')
+            except Exception as e:
+                log.exception('')
+    except Exception as e:
+        log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_bot_pm_task(self, rows: List[dict]):
+    items = []
+    try:
+        with self.uowm.start() as uow:
+            for row in rows:
+
+                item = BotPrivateMessage(
+                    subject=row['subject'],
+                    body=row['body'],
+                    in_response_to_comment=row['in_response_to_comment'],
+                    recipient=row['recipient'],
+                    triggered_from=row['triggered_from'],
+                    message_sent_at=row['message_sent_at']
+
+                )
+                items.append(item)
+
+            try:
+                uow.session.bulk_save_objects(items)
+            except Exception as e:
+                print('')
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.error('duplicate')
+            except Exception as e:
+                log.exception('')
+    except Exception as e:
+        log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_mon_sub_checks_task(self, rows: List[dict]):
+    items = []
+    try:
+        with self.uowm.start() as uow:
+            for row in rows:
+                post = uow.posts.get_by_post_id(row['post_id'])
+                if not post:
+                    continue
+                mon_sub = uow.monitored_sub.get_by_sub(row['subreddit'])
+                if not mon_sub:
+                    log.error('Did not find monitor sub %s', row['subreddit'])
+                    return
+                item = MonitoredSubChecks(
+                    post_id=post.id,
+                    post_type=get_type_id(post.post_type),
+                    checked_at=row['checked_at'],
+                    monitored_sub_id=mon_sub.id,
+
+
+                )
+                items.append(item)
+
+            try:
+                uow.session.bulk_save_objects(items)
+            except Exception as e:
+                print('')
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.error('duplicate')
+            except Exception as e:
+                log.exception('')
+    except Exception as e:
+        log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_mon_sub_config_change_task(self, row: dict):
+
+    try:
+        with self.uowm.start() as uow:
+
+            mon_sub = uow.monitored_sub.get_by_sub(row['subreddit'])
+            if not mon_sub:
+                log.error('Did not find monitor sub %s', row['subreddit'])
+                return
+
+            item = MonitoredSubConfigChange(
+                updated_at=row['updated_at'],
+                updated_by=row['updated_by'],
+                source=row['source'],
+                config_key=row['config_key'],
+                old_value=row['old_value'],
+                new_value=row['new_value'],
+                monitored_sub_id=mon_sub.id
+            )
+
+            try:
+                uow.session.bulk_save_objects([item])
+            except Exception as e:
+                print('')
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.error('duplicate')
+            except Exception as e:
+                log.exception('')
+    except Exception as e:
+        log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_mon_sub_config_revision_task(self, row: dict):
+
+    try:
+        with self.uowm.start() as uow:
+
+            mon_sub = uow.monitored_sub.get_by_sub(row['subreddit'])
+            if not mon_sub:
+                log.error('Did not find monitor sub %s', row['subreddit'])
+                return
+
+            item = MonitoredSubConfigRevision(
+                revised_by=row['revised_by'],
+                revision_id=row['revision_id'],
+                config=row['config'],
+                config_loaded_at=row['config_loaded_at'],
+                is_valid=row['is_valid'],
+                notified=row['notified'],
+                monitored_sub_id=mon_sub.id
+            )
+
+            try:
+                uow.session.bulk_save_objects([item])
+            except Exception as e:
+                print('')
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.error('duplicate')
+            except Exception as e:
+                log.exception('')
+    except Exception as e:
+        log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_repost_watch_task(self, rows: List[dict]):
+    items = []
+    try:
+        with self.uowm.start() as uow:
+
+            for row in rows:
+                post = uow.posts.get_by_post_id(row['post_id'])
+                if not post:
+                    continue
+
+                item = RepostWatch(
+                    post_id=post.id,
+                    user=row['user'],
+                    created_at=row['created_at'],
+                    last_detection=row['last_detection'],
+                    same_sub=row['same_sub'],
+                    expire_after=row['expire_after'],
+                    enabled=row['enabled'],
+                    source=row['source']
+
+                )
+                items.append(item)
+
+            try:
+                uow.session.bulk_save_objects(items)
+            except Exception as e:
+                print('')
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.error('duplicate')
+            except Exception as e:
+                log.exception('')
+    except Exception as e:
+        log.exception('')

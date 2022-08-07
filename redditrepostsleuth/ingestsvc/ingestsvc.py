@@ -18,7 +18,7 @@ from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
-    base36decode, chunk_list
+    base36decode, chunk_list, base36encode
 from redditrepostsleuth.core.celery.ingesttasks import save_pushshift_results, save_new_post
 from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 
@@ -33,6 +33,22 @@ def startup_backfill(newest_post_id: str, oldest_post_id: str) -> None:
         if not results:
             continue
         queue_posts_for_ingest([pushshift_to_post(submission) for submission in results])
+    log.info('Finished backfill ')
+
+def startup_backfill_new(newest_post_id: str, oldest_post_id: str) -> None:
+
+    newest_id = base36decode(newest_post_id)
+    oldest_id = base36decode(oldest_post_id)
+    batch = []
+    for id in range(oldest_id, newest_id):
+        batch.append("t3_"+base36encode(id))
+        if len(batch) >= 100:
+            results = get_submissions(batch)
+            batch = []
+            if not results:
+                continue
+            queue_posts_for_ingest([pushshift_to_post(submission) for submission in results])
+
     log.info('Finished backfill ')
 
 def get_submissions(submission_ids: List[str]) -> Optional[List[Dict]]:
@@ -61,12 +77,16 @@ if __name__ == '__main__':
     reddit = get_reddit_instance(config)
     newest_id = get_newest_praw_post_id(reddit)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+
+    #startup_backfill_new('w5pe01', 'vompr6')
+    #sys.exit()
+
     with uowm.start() as uow:
         oldest_post = uow.posts.get_newest_post()
 
     if oldest_post:
         oldest_id = oldest_post.post_id
-        threading.Thread(target=startup_backfill, args=(newest_id, oldest_post.post_id), name='praw_ingest').start()
+        #threading.Thread(target=startup_backfill, args=(newest_id, oldest_post.post_id), name='praw_ingest').start()
 
    # startup_backfill(newest_id, oldest_id)
 
