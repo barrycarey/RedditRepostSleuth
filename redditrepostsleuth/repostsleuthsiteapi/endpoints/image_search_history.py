@@ -1,6 +1,6 @@
 import json
 
-from falcon import Request, Response
+from falcon import Request, Response, HTTPBadRequest
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
@@ -12,7 +12,10 @@ class ImageSearchHistory:
 
     def on_get_search_history(self, req: Request, resp: Response):
         with self.uowm.start() as uow:
-            results = uow.image_search.get_by_post_id(req.get_param('post_id', required=True))
+            post = uow.post.get_by_post_id(req.get_param('post_id'))
+            if not post:
+                raise HTTPBadRequest(title='Unable to find post', description=f'Cannot locate post with ID {req.get_param("post_id")}')
+            results = uow.repost_search.get_by_post_id(post.id)
             resp.body = json.dumps([r.to_dict() for r in results])
 
     def on_get_monitored_sub_with_history(self, req: Request, resp: Response):

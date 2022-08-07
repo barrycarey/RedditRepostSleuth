@@ -11,7 +11,7 @@ class RepostSearchRepo:
     def get_by_id(self, id: int) -> RepostSearch:
         return self.db_session.query(RepostSearch).filter(RepostSearch.id == id).first()
 
-    def get_by_post_id(self, post_id: Text) -> List[RepostSearch]:
+    def get_by_post_id(self, post_id: int) -> List[RepostSearch]:
         return self.db_session.query(RepostSearch).filter(RepostSearch.post_id == post_id).all()
 
     def add(self, search: RepostSearch):

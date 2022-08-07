@@ -21,6 +21,8 @@ from redditrepostsleuth.core.db.repository.repost_repo import RepostRepo
 from redditrepostsleuth.core.db.repository.repost_search_repo import RepostSearchRepo
 from redditrepostsleuth.core.db.repository.repost_watch_repo import RepostWatchRepo
 from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
+from redditrepostsleuth.core.db.repository.stat_daily_count_repo import StatDailyCountRepo
+from redditrepostsleuth.core.db.repository.stat_top_repost_repo import StatTopRepostRepo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
 
@@ -137,3 +139,11 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def repost(self) -> RepostRepo:
         return RepostRepo(self.session)
+
+    @property
+    def stat_daily_count(self) -> StatDailyCountRepo:
+        return StatDailyCountRepo(self.session)
+
+    @property
+    def stat_top_repost(self) -> StatTopRepostRepo:
+        return StatTopRepostRepo(self.session)

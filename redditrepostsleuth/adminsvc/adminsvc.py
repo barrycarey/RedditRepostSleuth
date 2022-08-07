@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 sys.path.append('./')
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.adminsvc.misc_admin_tasks import remove_expired_bans, update_banned_sub_wiki, \
-    send_reports_to_meme_voting, update_top_image_reposts, \
+    send_reports_to_meme_voting, update_stat_top_image_repost, \
     update_monitored_sub_data, check_meme_template_potential_votes, update_ban_list, queue_config_updates, \
     queue_post_watch_cleanup, update_subreddit_access_level
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -105,7 +105,7 @@ if __name__ == '__main__':
         max_instances=1
     )
     scheduler.add_job(
-        func=update_top_image_reposts,
+        func=update_stat_top_image_repost,
         args=(uowm,reddit),
         trigger='interval',
         days=1,

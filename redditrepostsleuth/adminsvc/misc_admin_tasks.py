@@ -10,8 +10,8 @@ from sqlalchemy import func
 from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
     update_monitored_sub_stats, check_if_watched_post_is_active
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost, MemeTemplatePotential, \
-    MemeTemplate
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MemeTemplatePotential, \
+    MemeTemplate, StatsTopImageRepost
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -22,7 +22,6 @@ from redditrepostsleuth.core.util.helpers import build_markdown_table, \
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, is_sub_mod_praw, is_bot_banned, \
     bot_has_permission
-
 
 def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     """
@@ -145,10 +144,10 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     log.info('[Banned Sub Wiki Update] Fished update')
     print('[Scheduled Job] Update Ban Wiki End')
 
-def update_top_image_reposts(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+def update_stat_top_image_repost(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     days = [1,7,30,365]
     with uowm.start() as uow:
-        uow.session.execute('TRUNCATE `stats_top_image_repost`')
+        uow.session.execute('TRUNCATE `stat_top_image_repost`')
         for day in days:
             result = uow.session.execute(
                 'SELECT repost_of, COUNT(*) c FROM image_reposts WHERE detected_at > NOW() - INTERVAL :days DAY GROUP BY repost_of HAVING c > 1 ORDER BY c DESC LIMIT 2000',
@@ -174,6 +173,7 @@ def update_top_image_reposts(uowm: UnitOfWorkManager, reddit: Reddit) -> NoRetur
                         )
                     )
             uow.commit()
+
 
 def send_reports_to_meme_voting(uowm: UnitOfWorkManager) -> NoReturn:
     with uowm.start() as uow:
@@ -276,8 +276,8 @@ def queue_post_watch_cleanup(uowm: UnitOfWorkManager, config: Config) -> NoRetur
             check_if_watched_post_is_active.apply_async((chunk,))
 
 if __name__ == '__main__':
-    config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config_dev.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-    update_ban_list(uowm, reddit, notification_svc)
+    update_stat_daily_count(uowm, reddit)

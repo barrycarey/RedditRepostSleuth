@@ -43,7 +43,7 @@ config_updater = SubredditConfigUpdater(
 
 
 
-cors = CORS(allow_origins_list=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
+cors = CORS(allow_origins_list=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
 
 api = application = falcon.API(middleware=[cors.middleware, MultipartMiddleware()])
 api.req_options.auto_parse_form_urlencoded = True

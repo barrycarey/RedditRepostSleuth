@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index
+from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer
+from sqlalchemy.dialects.mysql import YEAR, INTEGER, TINYINT
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -18,8 +19,8 @@ class Post(Base):
 
     __tablename__ = 'post'
     __table_args__ = (
-        Index('idx_ingest_graph', 'ingested_at', 'post_type', unique=False),
-        Index('idx_image_posts', 'post_type', 'created_at'),
+        Index('idx_ingest_graph', 'ingested_at', 'post_type_int', unique=False),
+        Index('idx_post_type', 'post_type_int', 'created_at'),
         Index('idx_url_hash', 'url_hash'),
         Index('idx_last_delete_check', 'last_deleted_check', 'post_type'),
 
@@ -29,19 +30,24 @@ class Post(Base):
     post_id = Column(String(6), nullable=False, unique=True)
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
-    post_type = Column(String(20))
-    author = Column(String(100), nullable=False)
+    post_type = Column(String(20, collation='latin1_bin'))
+    post_type_int = Column(TINYINT())
+    author = Column(String(25), nullable=False)
     selftext = Column(Text(75000, collation='utf8mb4_general_ci'))
     created_at = Column(DateTime)
+    created_at_timestamp = Column(INTEGER(unsigned=True), nullable=True)
+    created_at_year = Column(YEAR(), nullable=False)
+    created_at_month = Column(TINYINT(unsigned=True))
     ingested_at = Column(DateTime, default=func.utc_timestamp())
-    subreddit = Column(String(100), nullable=False)
-    title = Column(String(1000, collation='utf8mb4_general_ci'), nullable=False)
-    crosspost_parent = Column(String(200))
+    subreddit = Column(String(25), nullable=False)
+    title = Column(String(400, collation='utf8mb4_general_ci'), nullable=False)
+    crosspost_parent = Column(String(9))
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     url_hash = Column(String(32))  # Needed to index URLs for faster lookups
     hash_1 = Column(String(64))
     hash_2 = Column(String(64))
     hash_3 = Column(String(64))
+    nsfw = Column(Boolean, default=False)
 
     image_post = relationship('ImagePost', back_populates='post', uselist=False)
     summons = relationship('Summons', back_populates='post')
@@ -99,7 +105,7 @@ class Summons(Base):
     reply_comment_id = Column(Integer, ForeignKey('bot_comment.id'))
     reply_pm_id = Column(Integer, ForeignKey('bot_private_message.id'))
     reply_failure_reason = Column(String(20))
-    requestor = Column(String(100))
+    requestor = Column(String(25))
     comment_id = Column(String(100), unique=True)
     comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
     summons_received_at = Column(DateTime)
@@ -117,6 +123,7 @@ class BotComment(Base):
     )
 
     id = Column(Integer, primary_key=True)
+    # TODO - why did I do post_id instead of post.id
     reddit_post_id = Column(String(6), ForeignKey('post.post_id'))
     comment_body = Column(String(2000, collation='utf8mb4_general_ci'))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
@@ -137,8 +144,8 @@ class BotPrivateMessage(Base):
     subject = Column(String(200), nullable=False)
     body = Column(String(1000), nullable=False)
     in_response_to_comment = Column(String(20))
-    recipient = Column(String(150), nullable=False)
-    triggered_from = Column(String(50), nullable=False)
+    recipient = Column(String(25), nullable=False)
+    triggered_from = Column(String(20), nullable=False)
     message_sent_at = Column(DateTime, default=func.utc_timestamp())
 
     summons = relationship('Summons', back_populates='private_message')
@@ -149,13 +156,13 @@ class RepostWatch(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
-    user = Column(String(100), nullable=False)
+    user = Column(String(25), nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp())
     last_detection = Column(DateTime)
     same_sub = Column(Boolean, default=False, nullable=False)
     expire_after = Column(Integer)
     enabled = Column(Boolean, default=True)
-    source = Column(String(100))
+    source = Column(String(25))
     post = relationship("Post", back_populates='repost_watch')
 
     def to_dict(self):
@@ -176,8 +183,8 @@ class RepostSearch(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
-    source = Column(String(50), nullable=False)
-    post_type = Column(String(20))
+    source = Column(String(20), nullable=False)
+    post_type = Column(TINYINT())
     search_params = Column(String(1000), nullable=False)
     search_time = Column(Float, nullable=False)
     matches_found = Column(Integer, nullable=False)
@@ -191,19 +198,20 @@ class Repost(Base):
     __tablename__ = 'repost'
     __table_args__ = (
         Index('idx_repost_by_type', 'post_type', 'detected_at', unique=False),
-        Index('idx_repost_of_date', 'detected_at', 'author', unique=False),
+        Index('idx_repost_of_date',  'author', 'detected_at',unique=False),
+        Index('idx_repost_by_subreddit', 'subreddit', 'post_type', 'detected_at', unique=False),
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
     repost_of_id = Column(Integer, ForeignKey('post.id'))
     search_id = Column(Integer, ForeignKey('repost_search.id'))
     detected_at = Column(DateTime, default=func.utc_timestamp())
-    source = Column(String(100))
-    author = Column(String(100))
-    subreddit = Column(String(100), nullable=False)
+    source = Column(String(25))
+    author = Column(String(25))
+    subreddit = Column(String(25), nullable=False)
+    post_type = Column(TINYINT())
     post = relationship("Post", back_populates='reposts', foreign_keys=[post_id])
     repost_of = relationship("Post", foreign_keys=[repost_of_id])
-    post_type = Column(String(20))
     search = relationship("RepostSearch")
 
 
@@ -211,18 +219,18 @@ class MonitoredSub(Base):
     __tablename__ = 'monitored_sub'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(200), nullable=False, unique=True)
+    name = Column(String(25), nullable=False, unique=True)
     active = Column(Boolean, default=False)
     repost_only = Column(Boolean, default=True)
     report_submission = Column(Boolean, default=False)
     report_msg = Column(String(200), default='RepostSleuthBot-Repost')
-    requestor = Column(String(150))
+    requestor = Column(String(25))
     added_at = Column(DateTime, default=func.utc_timestamp())
     target_hamming = Column(Integer)
     target_annoy = Column(Float)
     target_days_old = Column(Integer)
     same_sub_only = Column(Boolean, default=False)
-    notes = Column(String(500))
+    notes = Column(String(250))
     filter_crossposts = Column(Boolean, default=True)
     filter_same_author = Column(Boolean, default=True)
     sticky_comment = Column(Boolean, default=False)
@@ -358,7 +366,7 @@ class MonitoredSubConfigChange(Base):
     )
     id = Column(Integer, primary_key=True)
     updated_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
-    updated_by = Column(String(100), nullable=False)
+    updated_by = Column(String(25), nullable=False)
     source = Column(String(10))
     config_key = Column(String(100), nullable=False)
     old_value = Column(String(2000))
@@ -371,7 +379,7 @@ class MonitoredSubConfigRevision(Base):
     __tablename__ = 'monitored_sub_config_revision'
     id = Column(Integer, primary_key=True)
     revision_id = Column(String(36), nullable=False, unique=True)
-    revised_by = Column(String(100), nullable=False)
+    revised_by = Column(String(25), nullable=False)
     config = Column(String(1000), nullable=False)
     config_loaded_at = Column(DateTime)
     is_valid = Column(Boolean, default=False)
@@ -426,7 +434,7 @@ class UserReport(Base):
     __tablename__ = 'user_report'
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
-    reported_by = Column(String(100), nullable=False)
+    reported_by = Column(String(25), nullable=False)
     post_type = Column(String(15))
     report_type= Column(String(25), nullable=False)
     meme_template = Column(Integer)
@@ -441,7 +449,7 @@ class UserReport(Base):
 class BannedSubreddit(Base):
     __tablename__ = 'banned_subreddit'
     id = Column(Integer, primary_key=True)
-    subreddit = Column(String(100), nullable=False, unique=True)
+    subreddit = Column(String(25), nullable=False, unique=True)
     detected_at = Column(DateTime, default=func.utc_timestamp())
     last_checked = Column(DateTime, default=func.utc_timestamp())
 
@@ -500,7 +508,7 @@ class MemeTemplatePotential(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
-    submitted_by = Column(String(100), nullable=False)
+    submitted_by = Column(String(25), nullable=False)
     created_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     vote_total = Column(Integer, nullable=False, default=0)
 
@@ -558,3 +566,44 @@ class MemeHash(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(6), nullable=False, unique=True)
     hash = Column(String(256), nullable=False)
+
+class StatsDailyCount(Base):
+    __tablename__ = 'stat_daily_count'
+    date = Column(String(10), nullable=False, unique=True, primary_key=True)
+    summons = Column(Integer)
+    comments = Column(Integer)
+    comment_karma = Column(Integer)
+    image_reposts = Column(Integer)
+    link_reposts = Column(Integer)
+    video_reposts = Column(Integer)
+    text_reposts = Column(Integer)
+
+class StatsTopReposters(Base):
+    __tablename__ = 'stat_top_reposters'
+    author = Column(String(25), nullable=False, unique=True, primary_key=True)
+    image_1_day = Column(Integer)
+    image_7_day = Column(Integer)
+    image_30_day = Column(Integer)
+    image_90_day = Column(Integer)
+    image_all = Column(Integer)
+    link_1_day = Column(Integer)
+    link_7_day = Column(Integer)
+    link_30_day = Column(Integer)
+    link_90_day = Column(Integer)
+    link_all = Column(Integer)
+
+class StatsTopRepost(Base):
+    __tablename__ = 'stat_top_repost'
+    __table_args__ = (
+        Index('idx_post_type', 'post_type', 'nsfw'),
+    )
+    post_db_id = Column(Integer, primary_key=True)
+    post_reddit_id = Column(String(6), nullable=False)
+    post_type = Column(TINYINT())
+    day_count_1 = Column(Integer, nullable=False)
+    day_count_7 = Column(Integer, nullable=False)
+    day_count_30 = Column(Integer, nullable=False)
+    day_count_365 = Column(Integer, nullable=False)
+    total_count = Column(Integer, nullable=False)
+    days = Column(Integer, nullable=False)
+    nsfw = Column(Boolean, nullable=False)
