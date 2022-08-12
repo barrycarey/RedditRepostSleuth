@@ -19,8 +19,8 @@ class Post(Base):
 
     __tablename__ = 'post'
     __table_args__ = (
-        Index('idx_ingest_graph', 'ingested_at', 'post_type_int', unique=False),
-        Index('idx_post_type', 'post_type_int', 'created_at'),
+        Index('idx_post_type_created_at', 'created_at', 'post_type_int'),
+        #Index('idx_post_type_timestamp', 'created_at_timestamp', 'post_type_int'),
         Index('idx_url_hash', 'url_hash'),
         Index('idx_last_delete_check', 'last_deleted_check', 'post_type'),
 
@@ -36,14 +36,12 @@ class Post(Base):
     selftext = Column(Text(75000, collation='utf8mb4_general_ci'))
     created_at = Column(DateTime)
     created_at_timestamp = Column(INTEGER(unsigned=True), nullable=True)
-    created_at_year = Column(YEAR(), nullable=False)
-    created_at_month = Column(TINYINT(unsigned=True))
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(25), nullable=False)
     title = Column(String(400, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(9))
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
-    url_hash = Column(String(32))  # Needed to index URLs for faster lookups
+    url_hash = Column(String(32))
     hash_1 = Column(String(64))
     hash_2 = Column(String(64))
     hash_3 = Column(String(64))
