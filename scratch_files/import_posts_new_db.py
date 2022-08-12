@@ -36,14 +36,8 @@ def post_from_row(row: dict):
 def load_posts(start_date: datetime, end_date: datetime):
     with conn.cursor() as cur:
         #query = f"SELECT * FROM reddit_post WHERE (created_at BETWEEN '{start_date.year}-{start_date.month}-{start_date.day}' AND '{end_date.year}-{end_date.month}-{end_date.day}')"
-        # 2022 -
-        # 2021 -
-        # 2020 - 502039661
-        # 2019 -
-        # - 266467461
-        # 2022 start = 992929904
-        # July 18th - 1220131958
-        query = f"SELECT * FROM reddit_post WHERE id > 776966210"
+        # 1057531194
+        query = f"SELECT * FROM reddit_post WHERE id > 0"
         cur.execute(query)
         batch = []
         count = 0
@@ -57,7 +51,7 @@ def load_posts(start_date: datetime, end_date: datetime):
                 batch = []
                 queued_items = redis_client.lrange('post_import', 0, 20000)
                 print(f'{len(queued_items)} queued items')
-                if len(queued_items) > 350:
+                if len(queued_items) > 500:
                     batch_delay = 5
                     print('Setting batch delay to 5')
                 else:
