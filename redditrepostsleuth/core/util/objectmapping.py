@@ -1,10 +1,9 @@
 from datetime import datetime
-from typing import Dict
 
 from praw.models import Submission
 from prawcore import Forbidden
 
-from redditrepostsleuth.core.db.databasemodels import Post, ImagePost
+from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.util.helpers import get_post_type_pushshift, get_post_type_id
 
@@ -38,7 +37,7 @@ def submission_to_post(submission: Submission, source: str = 'praw') -> Post:
 
     return post
 
-def pushshift_to_post(submission: Dict) -> Post:
+def pushshift_to_post(submission: dict) -> Post:
     post = Post()
     post.post_id = submission.get('id', None)
     post.url = submission.get('url', None)
@@ -52,18 +51,7 @@ def pushshift_to_post(submission: Dict) -> Post:
     post.selftext = submission.get('selftext', None)
     post.post_type = get_post_type_pushshift(submission)
     post.post_type_int = get_post_type_id(post.post_type)
-    post.created_at_year = post.created_at.year
-    post.created_at_month = post.created_at.month
-    post.created_at_timestamp = post.created_at.timestamp()
+    post.nsfw = submission.get('over_18', None)
 
     return post
-
-
-def post_to_image_post(post: Post) -> ImagePost:
-    return ImagePost(
-        dhash_h=post.dhash_h,
-        dhash_v=post.dhash_v,
-        post_id=post.id,
-        created_at=post.created_at
-    )
 

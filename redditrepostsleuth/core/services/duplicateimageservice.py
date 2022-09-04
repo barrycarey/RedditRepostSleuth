@@ -19,7 +19,8 @@ from redditrepostsleuth.core.model.image_search_settings import ImageSearchSetti
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import create_search_result_json, get_default_image_search_settings
+from redditrepostsleuth.core.util.helpers import create_search_result_json, get_default_image_search_settings, \
+    get_post_type_id
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter, \
     filter_no_dhash
@@ -342,7 +343,7 @@ class DuplicateImageService:
             search_params=json.dumps(search_results.search_settings.to_dict()),
             matches_found=len(search_results.matches),
             search_time=search_results.search_times.total_search_time,
-            post_type='image'
+            post_type=search_results.checked_post.post_type_int
         )
 
         with self.uowm.start() as uow:

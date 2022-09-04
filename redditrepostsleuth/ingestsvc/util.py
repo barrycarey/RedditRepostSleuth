@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversionException, InvalidImageUrlException, ImageRemovedException
-from redditrepostsleuth.core.db.databasemodels import Post, ImagePost
+from redditrepostsleuth.core.db.databasemodels import Post
 
 from hashlib import md5
 
@@ -18,8 +18,7 @@ from redditrepostsleuth.core.model.events.ingest_image_process_event import Inge
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.imagehashing import set_image_hashes_api, set_image_hashes
-from redditrepostsleuth.core.util.objectmapping import post_to_image_post, \
-    submission_to_post
+from redditrepostsleuth.core.util.objectmapping import submission_to_post
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +52,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
     return post
 
 
-def process_image_post(post: Post, hash_api) -> Tuple[Post, ImagePost]:
+def process_image_post(post: Post, hash_api) -> Post:
     if 'imgur' not in post.url: # TODO Why in the hell did I do this?
         """
         if 'preview.redd.it' in post.url:
@@ -87,17 +86,7 @@ def process_image_post(post: Post, hash_api) -> Tuple[Post, ImagePost]:
         log.debug('Using local hashing')
         set_image_hashes(post)
 
-    return create_image_posts(post)
-
-
-def create_image_posts(post: Post) -> Tuple[Post, ImagePost]:
-    """
-    Since we need to store multiple copies of an image post for the multiple indexes, this function creates all in one shot
-    :param post: Post obj
-    """
-    image_post = post_to_image_post(post)
-    log.debug('Created image_post and image_post_current')
-    return post, image_post
+    return post
 
 def save_unknown_post(post_id: Text, uowm: UnitOfWorkManager, reddit: RedditManager) -> Post:
     """

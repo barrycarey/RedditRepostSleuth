@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-from typing import Text, List
+from typing import Text
 
 from redditrepostsleuth.core.logfilters import SingleLevelFilter
 
@@ -28,7 +28,7 @@ def get_configured_logger(name: Text = None, format: Text = None) -> logging.Log
     log.propagate = False
     return log
 
-def configure_logger(name: Text = None, format: Text = None, filters: List[logging.Filter] = []) -> logging.Logger:
+def configure_logger(name: Text = None, format: Text = None, filters: list[logging.Filter] = []) -> logging.Logger:
     log = logging.getLogger(name or '')
     log.setLevel(os.getenv('LOG_LEVEL', 'DEBUG'))
     log.handlers = []

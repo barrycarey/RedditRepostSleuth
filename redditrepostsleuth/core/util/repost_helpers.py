@@ -89,7 +89,7 @@ def get_link_reposts(
             search_params=json.dumps(search_results.search_settings.to_dict()),
             matches_found=len(search_results.matches),
             search_time=search_results.search_times.total_search_time,
-            post_type='link'
+            post_type=search_results.checked_post.post_type_int
         )
         uow.repost_search.add(logged_search)
         uow.commit()

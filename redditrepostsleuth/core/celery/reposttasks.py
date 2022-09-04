@@ -49,7 +49,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         post.url,
         post=post,
         search_settings=search_settings,
-        source='ingest_repost'
+        source='ingest'
     )
 
     save_image_repost_result(search_results, self.uowm, source='ingest', high_match_check=True)
@@ -70,65 +70,66 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
 def link_repost_check(self, posts, ):
     with self.uowm.start() as uow:
         for post in posts:
-
-            if post.url_hash in self.link_blacklist:
-                log.info('Skipping blacklisted URL hash %s', post.url_hash)
-                continue
-
-            log.debug('Checking URL for repost: %s', post.url_hash)
-            search_results = get_link_reposts(post.url, self.uowm, get_default_link_search_settings(self.config),
-                                              post=post, source='ingest')
-
-            if len(search_results.matches) > 10000:
-                log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(search_results.matches))
-                self.link_blacklist.append(post.url_hash)
-                self.notification_svc.send_notification(f'URL has been shared {len(search_results.matches)} times. Adding to blacklist. \n\n {post.url}')
-
-            search_results = filter_search_results(
-                search_results,
-                uitl_api=f'{self.config.util_api}/maintenance/removed'
-            )
-            search_results.search_times.stop_timer('total_search_time')
-            log.info('Link Query Time: %s', search_results.search_times.query_time)
-
-
-            if not search_results.matches:
-                log.debug('Not matching linkes for post %s', post.post_id)
-                uow.commit()
-                continue
-
-            log.info('Found %s matching links', len(search_results.matches))
-            log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, search_results.matches[0].post.post_id)
-            repost_of = search_results.matches[0].post
-
-            new_repost = Repost(
-                post_id=post.id,
-                repost_of=repost_of,
-                author=post.author,
-                source='ingest',
-                subreddit=post.subreddit,
-                search=search_results.logged_search,
-                post_type='link'
-            )
-            uow.repost.add(new_repost)
-
-
             try:
-                uow.commit()
-                self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
-                                                         repost_of=search_results.matches[0].post.post_id,
-                                                         post_type=post.post_type))
-            except IntegrityError as e:
-                uow.rollback()
-                log.exception('Error saving link repost', exc_info=True)
-                self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
-                                                         repost_of=search_results.matches[0].post.post_id,
-                                                         post_type=post.post_type))
+                if post.url_hash in self.link_blacklist:
+                    log.info('Skipping blacklisted URL hash %s', post.url_hash)
+                    continue
 
-        self.event_logger.save_event(
-            BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
+                log.debug('Checking URL for repost: %s', post.url_hash)
+                search_results = get_link_reposts(post.url, self.uowm, get_default_link_search_settings(self.config),
+                                                  post=post, source='ingest')
+
+                if len(search_results.matches) > 10000:
+                    log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(search_results.matches))
+                    self.link_blacklist.append(post.url_hash)
+                    self.notification_svc.send_notification(f'URL has been shared {len(search_results.matches)} times. Adding to blacklist. \n\n {post.url}')
+
+                search_results = filter_search_results(
+                    search_results,
+                    uitl_api=f'{self.config.util_api}/maintenance/removed'
+                )
+                search_results.search_times.stop_timer('total_search_time')
+                log.info('Link Query Time: %s', search_results.search_times.query_time)
 
 
+                if not search_results.matches:
+                    log.debug('Not matching links for post %s', post.post_id)
+                    uow.commit()
+                    continue
+
+                log.info('Found %s matching links', len(search_results.matches))
+                log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, search_results.matches[0].post.post_id)
+                repost_of = search_results.matches[0].post
+
+                new_repost = Repost(
+                    post_id=post.id,
+                    repost_of=repost_of,
+                    author=post.author,
+                    source='ingest',
+                    subreddit=post.subreddit,
+                    search=search_results.logged_search,
+                    post_type=search_results.checked_post.post_type_int
+                )
+                uow.repost.add(new_repost)
+
+
+                try:
+                    uow.commit()
+                    self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
+                                                             repost_of=search_results.matches[0].post.post_id,
+                                                             post_type=post.post_type))
+                except IntegrityError as e:
+                    uow.rollback()
+                    log.exception('Error saving link repost', exc_info=True)
+                    self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
+                                                             repost_of=search_results.matches[0].post.post_id,
+                                                             post_type=post.post_type))
+
+            except Exception as e:
+                log.exception('')
+
+            self.event_logger.save_event(
+                BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
