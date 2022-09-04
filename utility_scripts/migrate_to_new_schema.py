@@ -1,4 +1,5 @@
 import os
+import sys
 
 import pymysql
 
@@ -113,5 +114,19 @@ def run_batched_query(query, celery_task, batch_size=3000):
                 celery_task.apply_async((batch,), queue='misc_import')
 
                 batch = []
+def run_query(query, celery_task):
+    with conn.cursor() as cur:
+        cur.execute(query)
+        for row in cur:
+            celery_task.apply_async((row,), queue='misc_import')
 
+run_batched_query('SELECT * from link_reposts', import_image_repost)
+run_batched_query('SELECT * from image_reposts', import_image_repost)
+run_batched_query('SELECT * from reddit_bot_comment', import_bot_comment_task)
+run_batched_query('SELECT * from reddit_bot_summons', import_bot_summons_task)
+run_batched_query('SELECT * from reddit_bot_private_message ', import_bot_pm_task)
+#sys.exit()
+run_query('SELECT * from reddit_monitored_sub_config_change', import_mon_sub_config_change_task)
+run_query('SELECT * from reddit_monitored_sub_config_revision ', import_mon_sub_config_revision_task)
+run_batched_query('SELECT * from reddit_repost_watch', import_repost_watch_task)
 run_batched_query('SELECT * FROM reddit_monitored_sub_checked', import_mon_sub_checks_task)

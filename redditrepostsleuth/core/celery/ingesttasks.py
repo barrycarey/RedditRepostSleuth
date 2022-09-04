@@ -7,11 +7,10 @@ from typing import List
 
 import requests
 from sqlalchemy.exc import IntegrityError, OperationalError
-from videohash import VideoHash
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask, PyMySQLTask
-from redditrepostsleuth.core.db.databasemodels import Post, PostHash, ImagePost, Repost, BotComment, Summons, \
+from redditrepostsleuth.core.db.databasemodels import Post, Repost, BotComment, Summons, \
     BotPrivateMessage, MonitoredSubChecks, MonitoredSubConfigRevision, MonitoredSubConfigChange, RepostWatch
 from redditrepostsleuth.core.exception import InvalidImageUrlException, ImageConversionException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
@@ -331,6 +330,7 @@ def import_image_repost(self, rows: List[dict]):
             uow.session.bulk_save_objects(reposts_to_save)
         except Exception as e:
             print('')
+            log.exception('')
         try:
             uow.commit()
             log.info('Batch saved')
@@ -584,3 +584,17 @@ def import_repost_watch_task(self, rows: List[dict]):
                 log.exception('')
     except Exception as e:
         log.exception('')
+
+@celery.task(bind=True, base=PyMySQLTask, ignore_reseults=True, utoretry_for=(OperationalError), serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def delete_map_by_id(self, rows: List[dict]):
+    try:
+        for row in rows:
+            conn = self.get_conn()
+            with conn.cursor() as cur:
+                cur.execute(f'DELETE FROM image_index_map where id={row}')
+                conn.commit()
+    except Exception as e:
+        log.exception('')
+        return
+
+    log.info('batch saved')

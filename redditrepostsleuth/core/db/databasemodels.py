@@ -47,7 +47,6 @@ class Post(Base):
     hash_3 = Column(String(64))
     nsfw = Column(Boolean, default=False)
 
-    image_post = relationship('ImagePost', back_populates='post', uselist=False)
     summons = relationship('Summons', back_populates='post')
     bot_comments = relationship('BotComment', back_populates='post')
     repost_watch = relationship('RepostWatch', back_populates='post')
@@ -69,28 +68,28 @@ class Post(Base):
             'subreddit': self.subreddit
         }
 
+class PostType(Base):
+    __tablename__ = 'post_type'
+
+    id = Column(TINYINT(), primary_key=True)
+    name = Column(String(12, collation='latin1_bin'))
+
 class PostHash(Base):
     __tablename__ = 'post_hash'
-
-    id = Column(Integer, primary_key=True)
-    url_hash = Column(String(32))  # Needed to index URLs for faster lookups
-    hash_1 = Column(String(64))
-    hash_2 = Column(String(64))
-    hash_3 = Column(String(64))
-    post_id = Column(Integer, ForeignKey('post.id'))
-
-class ImagePost(Base):
-    __tablename__ = 'image_post'
     __table_args__ = (
-        Index('create_at_index', 'created_at', unique=False),
+        Index('idx_hash_type', 'hash_type_id'),
     )
-    id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime)
-    post_id = Column(Integer, ForeignKey('post.id'))
-    dhash_h = Column(String(64))
-    dhash_v = Column(String(64))
-    post = relationship("Post", back_populates='image_post')
 
+    id = Column(Integer, primary_key=True)
+    hash = Column(String(64))
+    post_id = Column(Integer, ForeignKey('post.id'))
+    hash_type_id = Column(Integer, ForeignKey('hash_type.id'))
+
+class HashType(Base):
+    __tablename__ = 'hash_type'
+
+    id = Column(TINYINT(), primary_key=True)
+    name = Column(String(12, collation='latin1_bin'))
 
 class Summons(Base):
     __tablename__ = 'summons'
@@ -553,11 +552,9 @@ class ImageIndexMap(Base):
     id = Column(Integer, primary_key=True)
     annoy_index_id = Column(Integer, nullable=False)
     post_id = Column(Integer, ForeignKey('post.id'))
-    image_post_id = Column(Integer, ForeignKey('image_post.id'))
     index_name = Column(String(10), nullable=False)
 
     post = relationship("Post")
-    image_post = relationship("ImagePost")
 
 class MemeHash(Base):
     __tablename__ = 'meme_hash'

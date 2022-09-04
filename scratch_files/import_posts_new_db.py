@@ -37,7 +37,7 @@ def load_posts(start_date: datetime, end_date: datetime):
     with conn.cursor() as cur:
         #query = f"SELECT * FROM reddit_post WHERE (created_at BETWEEN '{start_date.year}-{start_date.month}-{start_date.day}' AND '{end_date.year}-{end_date.month}-{end_date.day}')"
         # 1057531194
-        query = f"SELECT * FROM reddit_post WHERE id > 0"
+        query = f"SELECT * FROM reddit_post WHERE id > 1281745213"
         cur.execute(query)
         batch = []
         count = 0

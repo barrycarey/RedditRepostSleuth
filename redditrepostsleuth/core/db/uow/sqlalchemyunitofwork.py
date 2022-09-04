@@ -6,7 +6,6 @@ from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPr
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.config_message_template_repo import ConfigMessageTemplateRepo
 from redditrepostsleuth.core.db.repository.image_index_map_rep import ImageIndexMapRepo
-from redditrepostsleuth.core.db.repository.imagepostrepository import ImagePostRepository
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_repo import MemeTemplatePotentialRepo
@@ -59,9 +58,6 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     def repostwatch(self) -> RepostWatchRepo:
         return RepostWatchRepo(self.session)
 
-    @property
-    def image_post(self) -> ImagePostRepository:
-        return ImagePostRepository(self.session)
 
     @property
     def index_build_time(self) -> IndexBuildTimesRepository:

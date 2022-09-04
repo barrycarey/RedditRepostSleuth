@@ -84,14 +84,14 @@ def save_image_repost_result(
             search_id=search_results.logged_search.id if search_results.logged_search else None,
             subreddit=search_results.checked_post.subreddit,
             source=source,
-            post_type='image'
+            post_type=search_results.checked_post.post_type_int
         )
 
         try:
             uow.repost.add(new_repost)
         except Exception as e:
             log.error('')
-        uow.posts.update(search_results.checked_post)
+
 
         try:
             uow.commit()
