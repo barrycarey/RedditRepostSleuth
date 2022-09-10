@@ -1,7 +1,7 @@
 import json
 import time
 from json import JSONDecodeError
-from typing import Text, List, NoReturn, Dict
+from typing import Text, List, NoReturn
 
 from praw import Reddit
 from praw.models import WikiPage, Subreddit
@@ -114,7 +114,7 @@ class SubredditConfigUpdater:
         if self._notify_config_created(subreddit):
             self._set_config_notified(wiki_page.revision_id)
 
-    def get_wiki_config(self, wiki_page: WikiPage) -> Dict:
+    def get_wiki_config(self, wiki_page: WikiPage) -> dict:
         """
         Take a config wiki  page and attempt to load and decode the JSON from it
         :rtype: dict
@@ -186,7 +186,7 @@ class SubredditConfigUpdater:
             except Exception as e:
                 pass
 
-    def compare_configs(self, config_one: Dict, config_two: Dict) -> List[Dict]:
+    def compare_configs(self, config_one: dict, config_two: dict) -> List[dict]:
         results = []
         for k,v in config_one.items():
             if k in config_two:
@@ -235,13 +235,13 @@ class SubredditConfigUpdater:
             self._notify_successful_load(subreddit)
         return True
 
-    def _update_wiki_page(self, wiki_page: WikiPage, new_config: Dict) -> NoReturn:
+    def _update_wiki_page(self, wiki_page: WikiPage, new_config: dict) -> NoReturn:
         log.info('Writing new config to %s', wiki_page.subreddit.display_name)
         log.debug('New Config For %s: %s', wiki_page.subreddit.display_name, new_config)
         # TODO - Check what exceptions can be thrown here
         wiki_page.edit(json.dumps(new_config))
 
-    def _create_wiki_config_from_database(self, monitored_sub: MonitoredSub) -> Dict:
+    def _create_wiki_config_from_database(self, monitored_sub: MonitoredSub) -> dict:
         """
         Create a new dict config from a Monitored sub object
 
@@ -255,7 +255,7 @@ class SubredditConfigUpdater:
 
         return new_config
 
-    def _update_monitored_sub_from_wiki(self, monitored_sub: MonitoredSub, wiki_config: Dict) -> MonitoredSub:
+    def _update_monitored_sub_from_wiki(self, monitored_sub: MonitoredSub, wiki_config: dict) -> MonitoredSub:
         """
         Write the current wiki config to the database config.
 
@@ -273,7 +273,7 @@ class SubredditConfigUpdater:
 
         return monitored_sub
 
-    def _get_missing_config_values(self, config: Dict) -> List[Text]:
+    def _get_missing_config_values(self, config: dict) -> List[Text]:
         """
         Take a config, and check if it's missing any of the exposed keys.
         Exposed keys are set in the bot's config json

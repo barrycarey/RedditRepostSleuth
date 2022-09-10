@@ -1,7 +1,7 @@
 import json
 import re
 from json import JSONDecodeError
-from typing import Text, Dict, NoReturn
+from typing import Text, NoReturn
 
 from praw import Reddit
 from praw.models import Message
@@ -112,12 +112,12 @@ class InboxMonitor:
 
         self.response_handler.reply_to_private_message(msg, REPORT_RESPONSE)
 
-    def _load_msg_body_data(self, body: Text) -> Dict:
+    def _load_msg_body_data(self, body: Text) -> dict:
         """
         Attempt to load JSON data from provided message body
-        :rtype: Dict
+        :rtype: dict
         :param body: String of data to load
-        :return: Dict
+        :return: dict
         """
         try:
             return json.loads(body)

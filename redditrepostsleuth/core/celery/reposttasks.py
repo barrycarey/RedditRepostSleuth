@@ -1,6 +1,6 @@
 import json
 from time import perf_counter
-from typing import List, Dict, NoReturn
+from typing import List, NoReturn
 
 import requests
 from redlock import RedLockError
@@ -133,7 +133,7 @@ def link_repost_check(self, posts, ):
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def notify_watch(self, watches: List[Dict[SearchMatch, RepostWatch]], repost: Post):
+def notify_watch(self, watches: List[dict[SearchMatch, RepostWatch]], repost: Post):
     repost_watch_notify(watches, self.reddit, self.response_handler, repost)
     with self.uowm.start() as uow:
         for w in watches:

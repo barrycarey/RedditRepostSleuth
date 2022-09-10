@@ -1,4 +1,4 @@
-from typing import List, NoReturn, Dict, Text
+from typing import List, NoReturn, Text
 
 from sqlalchemy.exc import IntegrityError
 
@@ -101,7 +101,7 @@ def save_image_repost_result(
         log.info(' Saved Repost')
 
 
-def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) -> List[Dict]:
+def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) -> List[dict]:
     results = []
     with uowm.start() as uow:
         for match in matches:
@@ -113,7 +113,7 @@ def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) ->
     return results
 
 
-def repost_watch_notify(watches: List[Dict[SearchMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
+def repost_watch_notify(watches: List[dict[SearchMatch, RepostWatch]], reddit: RedditManager, response_handler: ResponseHandler, repost: Post):
     for watch in watches:
         # TODO - What happens if we don't get redditor back?
         redditor = reddit.redditor(watch['watch'].user)

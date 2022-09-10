@@ -1,4 +1,4 @@
-from typing import Dict, Text
+from typing import Text
 
 from falcon import HTTPBadRequest, Request, HTTPServiceUnavailable
 
@@ -11,7 +11,7 @@ from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImag
 from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request
 
 
-def is_site_admin(user_data: Dict, uowm: UnitOfWorkManager) -> bool:
+def is_site_admin(user_data: dict, uowm: UnitOfWorkManager) -> bool:
     if not user_data:
         return False;
     if 'name' not in user_data:

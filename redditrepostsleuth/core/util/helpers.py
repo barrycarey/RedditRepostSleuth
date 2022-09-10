@@ -1,12 +1,11 @@
-
-
+from __future__ import annotations
 import json
 import re
 from logging import Logger
-from typing import Dict, List, Text, TYPE_CHECKING, Optional
+from typing import List, Text, Optional
 
 import requests
-from falcon import Request
+
 from praw import Reddit
 from redis import Redis
 from redlock import RedLockFactory
@@ -16,9 +15,6 @@ from requests.exceptions import ConnectionError
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
-
-if TYPE_CHECKING:
-    from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
@@ -56,7 +52,7 @@ def get_post_type_id(post_type: str) -> int:
     elif post_type == 'gallery':
         return 6
 
-def get_post_type_pushshift(submission: Dict) -> str:
+def get_post_type_pushshift(submission: dict) -> str:
     # TODO - Go over this whole function
     if submission.get('is_self', None):
         return 'text'
@@ -118,7 +114,7 @@ def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -
     return url
 
 
-def build_image_report_link(search_results: 'SearchResults') -> Text:
+def build_image_report_link(search_results: SearchResults) -> Text:
     """
     Take a set of search results and construct the report message.  Either a positive or negative report
     will be created from the provided search results
@@ -133,7 +129,7 @@ def build_image_report_link(search_results: 'SearchResults') -> Text:
     return IMAGE_REPORT_TEXT.format(pos_neg_text=pos_neg_text, report_data=search_results.report_data)
 
 
-def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
+def build_msg_values_from_search(search_results: SearchResults, uowm: UnitOfWorkManager = None, **kwargs) -> dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -178,7 +174,7 @@ def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWo
 
 
 def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None,
-                                       **kwargs) -> Dict:
+                                       **kwargs) -> dict:
 
     base_values = {
         'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
@@ -283,7 +279,7 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 
     )
 
-def get_image_search_settings_from_request(req: Request, config: Config) -> ImageSearchSettings:
+def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
         req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
         config.default_image_target_annoy_distance,
@@ -368,7 +364,7 @@ def get_redis_client(config: Config) -> Redis:
         password=config.redis_password
     )
 
-def batch_check_urls(urls: List[Dict], util_api: Text) -> List[Dict]:
+def batch_check_urls(urls: List[dict], util_api: Text) -> List[dict]:
     """
     Batch checking a list of URLs and Post ID pairs to see if the associated links have been removed.
     This function is using our utility API that runs on a Pool of VMs so we can check matches at high volume
@@ -383,7 +379,7 @@ def batch_check_urls(urls: List[Dict], util_api: Text) -> List[Dict]:
 
     Several actions can be returned.  However, we're only interested in the remove since that results from the post's
     URL returning a 404
-    :rtype: List[Dict]
+    :rtype: List[dict]
     :param urls: List of URLs and Post ID pairs: {'url': 'example.com', 'id': '124abc}
     :param util_api: API call to make
     """
@@ -440,7 +436,7 @@ def is_image_url(url: Text) -> bool:
         return True
     return False
 
-def update_log_context_data(logger: Logger, context_data: Dict):
+def update_log_context_data(logger: Logger, context_data: dict):
     for handler in logger.handlers:
         for filt in handler.filters:
             for key, value in context_data.items():
@@ -481,10 +477,10 @@ def get_newest_praw_post_id(reddit: Reddit) -> int:
     return newest_submissions.id
 
 
-def build_ingest_query_params(starting_id: int, limit: int = 100) -> Dict[str, str]:
+def build_ingest_query_params(starting_id: int, limit: int = 100) -> dict[str, str]:
     """
     Take a starting ID and build the dict used as a param for the ingest request
-    :rtype: Dict
+    :rtype: dict
     """
     ids_to_get = get_next_ids(starting_id, limit)[0]
     return {
