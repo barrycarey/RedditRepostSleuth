@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Dict, Text
+from typing import Text
 
 import requests
 from collections import Counter
@@ -81,7 +81,7 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
 
     return post
 
-def get_image_hashes(url: str, hash_size: int = 16) -> Dict:
+def get_image_hashes(url: str, hash_size: int = 16) -> dict:
     result = {
         'dhash_h': None,
         'dhash_v': None,

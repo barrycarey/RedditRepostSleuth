@@ -1,6 +1,6 @@
 import logging
 from functools import singledispatchmethod
-from typing import Dict, Text, Optional
+from typing import Text, Optional
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
@@ -192,7 +192,7 @@ class ResponseBuilder:
         log.debug('Final Message: %s', message)
         return message
 
-    def build_report_msg(self, subreddit: Text, values: Dict) -> Text:
+    def build_report_msg(self, subreddit: Text, values: dict) -> Text:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
             if not monitored_sub:

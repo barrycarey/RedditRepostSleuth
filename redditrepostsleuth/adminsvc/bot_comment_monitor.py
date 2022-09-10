@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import Dict, Text, Optional
+from typing import Text, Optional
 
 import requests
 from praw.reddit import Comment
@@ -67,7 +67,7 @@ class BotCommentMonitor:
             bot_comment.needs_review = True
 
 
-    def _get_comment_data(self, permalink: Text) -> Optional[Dict]:
+    def _get_comment_data(self, permalink: Text) -> Optional[dict]:
         try:
             log.debug('Fetching Comment https://reddit.com%s', permalink)
             r = requests.get(f'{self.config.util_api}/reddit/comment', params={'permalink': permalink})

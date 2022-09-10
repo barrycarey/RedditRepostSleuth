@@ -3,7 +3,6 @@ import logging
 from hashlib import md5
 from random import randint
 from time import perf_counter
-from typing import List
 
 import requests
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -70,7 +69,7 @@ def post_from_row(row: dict):
 
 
 @celery.task(bind=True, base=PyMySQLTask, ignore_reseults=True, utoretry_for=(OperationalError), serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_post_new(self, rows: List[dict]):
+def import_post_new(self, rows: list[dict]):
     try:
         posts_to_import = []
         image_posts_to_import = []
@@ -101,7 +100,7 @@ def import_post_new(self, rows: List[dict]):
     log.info('batch saved')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_post(self, rows: List[dict]):
+def import_post(self, rows: list[dict]):
     try:
         posts_to_import = []
 
@@ -299,7 +298,7 @@ def ingest_id_batch(self, ids_to_get):
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_image_repost(self, rows: List[dict]):
+def import_image_repost(self, rows: list[dict]):
     reposts_to_save = []
     try:
         with self.uowm.start() as uow:
@@ -340,7 +339,7 @@ def import_image_repost(self, rows: List[dict]):
             log.exception('')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_bot_comment_task(self, rows: List[dict]):
+def import_bot_comment_task(self, rows: list[dict]):
     comments_to_save = []
     try:
         with self.uowm.start() as uow:
@@ -374,7 +373,7 @@ def import_bot_comment_task(self, rows: List[dict]):
         log.exception('')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_bot_summons_task(self, rows: List[dict]):
+def import_bot_summons_task(self, rows: list[dict]):
     items = []
     try:
         with self.uowm.start() as uow:
@@ -409,7 +408,7 @@ def import_bot_summons_task(self, rows: List[dict]):
         log.exception('')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_bot_pm_task(self, rows: List[dict]):
+def import_bot_pm_task(self, rows: list[dict]):
     items = []
     try:
         with self.uowm.start() as uow:
@@ -441,7 +440,7 @@ def import_bot_pm_task(self, rows: List[dict]):
         log.exception('')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_mon_sub_checks_task(self, rows: List[dict]):
+def import_mon_sub_checks_task(self, rows: list[dict]):
     items = []
     try:
         with self.uowm.start() as uow:
@@ -548,7 +547,7 @@ def import_mon_sub_config_revision_task(self, row: dict):
         log.exception('')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_repost_watch_task(self, rows: List[dict]):
+def import_repost_watch_task(self, rows: list[dict]):
     items = []
     try:
         with self.uowm.start() as uow:
@@ -586,7 +585,7 @@ def import_repost_watch_task(self, rows: List[dict]):
         log.exception('')
 
 @celery.task(bind=True, base=PyMySQLTask, ignore_reseults=True, utoretry_for=(OperationalError), serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def delete_map_by_id(self, rows: List[dict]):
+def delete_map_by_id(self, rows: list[dict]):
     try:
         for row in rows:
             conn = self.get_conn()

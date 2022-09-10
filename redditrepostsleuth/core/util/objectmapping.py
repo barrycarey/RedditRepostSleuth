@@ -4,7 +4,7 @@ from praw.models import Submission
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
+
 from redditrepostsleuth.core.util.helpers import get_post_type_pushshift, get_post_type_id
 
 
