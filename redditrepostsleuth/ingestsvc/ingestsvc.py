@@ -1,9 +1,11 @@
 import json
+import logging
 import sys
+import threading
 import time
 from datetime import datetime
 from json import JSONDecodeError
-from typing import List, Optional
+from typing import List, Dict, Optional
 
 import requests
 from requests.exceptions import ConnectionError
@@ -17,7 +19,7 @@ from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
     base36decode, chunk_list, base36encode
-from redditrepostsleuth.core.celery.ingesttasks import save_new_post
+from redditrepostsleuth.core.celery.ingesttasks import save_pushshift_results, save_new_post
 from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
 
 log = configure_logger(name='redditrepostsleuth')
@@ -49,7 +51,7 @@ def startup_backfill_new(newest_post_id: str, oldest_post_id: str) -> None:
 
     log.info('Finished backfill ')
 
-def get_submissions(submission_ids: List[str]) -> Optional[list[dict]]:
+def get_submissions(submission_ids: List[str]) -> Optional[List[Dict]]:
     try:
         r = requests.get(f'{config.util_api}/reddit/submissions', params={'submission_ids': ','.join(submission_ids)})
     except ConnectionError:

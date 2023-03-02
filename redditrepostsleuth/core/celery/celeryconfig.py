@@ -5,6 +5,7 @@ from redditrepostsleuth.core.config import Config
 config = Config()
 
 broker_url = f'redis://:{config.redis_password}@{config.redis_host}:{config.redis_port}/{config.redis_database}'
+redis_socket_connect_timeout = 10
 result_backend = broker_url
 task_serializer = 'pickle'
 result_serializer='pickle'

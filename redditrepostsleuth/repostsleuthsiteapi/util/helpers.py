@@ -8,7 +8,6 @@ from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request
 
 
 def is_site_admin(user_data: dict, uowm: UnitOfWorkManager) -> bool:

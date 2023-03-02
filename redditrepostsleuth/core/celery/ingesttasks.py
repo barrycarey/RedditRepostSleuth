@@ -10,7 +10,8 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask, PyMySQLTask
 from redditrepostsleuth.core.db.databasemodels import Post, Repost, BotComment, Summons, \
-    BotPrivateMessage, MonitoredSubChecks, MonitoredSubConfigRevision, MonitoredSubConfigChange, RepostWatch
+    BotPrivateMessage, MonitoredSubChecks, MonitoredSubConfigRevision, MonitoredSubConfigChange, RepostWatch, HashType, \
+    PostHash
 from redditrepostsleuth.core.exception import InvalidImageUrlException, ImageConversionException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
 from redditrepostsleuth.core.logging import configure_logger
@@ -46,7 +47,6 @@ def post_from_row(row: dict):
             post_id=row['post_id'],
             url=row['url'],
             perma_link=row['perma_link'],
-            post_type=row['post_type'],
             author=row['author'],
             selftext=row['selftext'],
             created_at=row['created_at'],
@@ -54,119 +54,71 @@ def post_from_row(row: dict):
             subreddit=row['subreddit'],
             title=row['title'],
             crosspost_parent=row['crosspost_parent'],
-            hash_1=row['dhash_h'],
-            hash_2=row['dhash_v'],
             url_hash=row['url_hash']
         )
     if not post.post_type:
-        post.post_type = get_post_type_pushshift(row)
+        post_type = get_post_type_pushshift(row)
+        post.post_type_id = get_type_id(post_type)
+    else:
+        post.post_type_id = get_type_id(row['post_type'])
 
-    post.created_at_timestamp = post.created_at.timestamp()
-    post.post_type_int = get_type_id(post.post_type)
-    post.created_at_year = post.created_at.year
-    post.created_at_month = post.created_at.month
+    if post.post_type_id == 2:
+        post.hashes.append(PostHash(hash=row['dhash_h'], post_created_at=row['created_at'], hash_type_id=1))
+
+
     return post
 
 
-@celery.task(bind=True, base=PyMySQLTask, ignore_reseults=True, utoretry_for=(OperationalError), serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
-def import_post_new(self, rows: list[dict]):
-    try:
-        posts_to_import = []
-        image_posts_to_import = []
-        for row in rows:
-            if row['selftext']:
-                if '[deleted]' in row['selftext']:
-                    continue
-                if '[removed]' in row['selftext']:
-                    continue
-
-            if not row['url_hash']:
-                url_hash = md5(row['url'].encode('utf-8'))
-                row['url_hash'] = url_hash.hexdigest()
-            if row['post_type'] == 'image':
-                if not row['dhash_h'] or not row['dhash_v']:
-                    log.info('Skipping post wtih no hash')
-                    continue
-                image_posts_to_import.append(ImagePost(
-                    created_at=row['created_at'],
-                    dhash_h=row['dhash_h'],
-                    dhash_v=row['dhash_v']
-                ))
-            posts_to_import.append(row)
-    except Exception as e:
-        log.exception('')
-        return
-    self.bulk_insert_post(posts_to_import)
-    log.info('batch saved')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_post(self, rows: list[dict]):
+    print('running')
     try:
-        posts_to_import = []
+        with self.uowm.start() as uow:
+            for row in rows:
 
-        for row in rows:
+                if row['selftext']:
+                    if '[deleted]' in row['selftext']:
+                        continue
+                    if '[removed]' in row['selftext']:
+                        continue
 
-            if row['selftext']:
-                if '[deleted]' in row['selftext']:
+                if row['post_type'] == 'image' and not row['dhash_h']:
+                    log.info('Skipping image without hash')
                     continue
-                if '[removed]' in row['selftext']:
-                    continue
+                post = post_from_row(row)
 
-            post = post_from_row(row)
-            """
-            if not post.post_type:
-                log.error(f'Failed to get post on %s. https://reddit.com%s', post.post_id, post.perma_link)
-            """
-            if not post.url_hash:
-                url_hash = md5(post.url.encode('utf-8'))
-                post.url_hash = url_hash.hexdigest()
-            if post.post_type == 'image':
-                if not post.hash_1 or not post.hash_2:
-                    log.info('Skipping post wtih no hash')
-                    continue
                 """
-                post.image_post = ImagePost(
-                    created_at=post.created_at,
-                    dhash_h=post.hash_1,
-                    dhash_v=post.hash_2
-                )
+                if not post.post_type:
+                    log.error(f'Failed to get post on %s. https://reddit.com%s', post.post_id, post.perma_link)
                 """
-            posts_to_import.append(post)
+                if not post.url_hash:
+                    url_hash = md5(post.url.encode('utf-8'))
+                    post.url_hash = url_hash.hexdigest()
+
+                if post.post_type_id == 2 and not post.hashes[0].hash:
+                        log.info('Skipping missing hash')
+                        continue
+                try:
+                    uow.posts.add(post)
+
+                except Exception as e:
+                    log.exception('')
+
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.exception('duplicate')
+            except Exception as e:
+                log.exception('')
 
     except Exception as e:
         log.exception('')
         return
-    with self.uowm.start() as uow:
-        try:
-            uow.session.bulk_save_objects(posts_to_import)
-        except Exception as e:
-            print('')
-        try:
-            uow.commit()
-            log.info('Batch saved')
-        except IntegrityError as e:
-            log.error('duplicate')
-        except Exception as e:
-            log.exception('')
-        """
-        if not post.url_hash:
-            url_hash = md5(post.url.encode('utf-8'))
-            post.url_hash = url_hash.hexdigest()
-        if post.post_type == 'image':
-            post.image_post = ImagePost(
-                created_at=post.created_at,
-                dhash_h=post.hash_1,
-                dhash_v=post.hash_2
-            )
-        uow.posts.add(post)
-        try:
-            uow.commit()
-        except IntegrityError:
-            log.error('Skipping duplicate')
-            return
-        except Exception as e:
-            log.exception('')
-        """
+
+
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException, OperationalError), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post: Post):
@@ -235,7 +187,7 @@ def save_new_post(self, post: Post):
                 except Exception as e:
                     log.exception('')
     except Exception as e:
-        print('')
+        log.exception('')
 
 
 
