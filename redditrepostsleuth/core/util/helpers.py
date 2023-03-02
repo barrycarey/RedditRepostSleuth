@@ -61,33 +61,26 @@ def get_post_type_pushshift(submission: dict) -> str:
     if post_hint:
         return post_hint
 
+    post_type = submission.get('post_type', None)
+    if post_type:
+        return post_type
+
+    is_video = submission.get('is_video', None)
+    if is_video:
+        return 'video'
+
+    if not submission['url']:
+        log.debug('No URL, skipping remaining type checks')
+        return
+
     if 'gallery' in submission['url']:
         return 'gallery'
 
     image_exts = ['.jpg', '.png', '.jpeg', '.gif']
     for ext in image_exts:
         if ext in submission['url']:
-            #log.debug('Post URL %s is an image', submission['url'])
             return 'image'
 
-    reddit = get_reddit_instance(config=Config())
-    is_video = submission.get('is_video', None)
-    if is_video:
-        #log.debug('Post %s has is_video value of %s. It is a video', submission['id'], is_video)
-        # Since the push push obj didn't have a post hint, we need to query reddit
-        print('Hitting Reddit API')
-        reddit_sub = reddit.submission(id=submission['id'])
-        post_hint = reddit_sub.__dict__.get('post_hint', None)
-        if post_hint:
-            #log.debug('Returning post hintg %s for post %s', post_hint, reddit_sub.id)
-            return post_hint
-        else:
-            #log.debug('Unable to determine video type for post %s', reddit_sub.id)
-            return 'video'
-
-    # Last ditch to get post_hint
-    reddit_sub = reddit.submission(id=submission['id'])
-    return reddit_sub.__dict__.get('post_hint', None)
 
 def searched_post_str(post: Post, count: int) -> str:
     output = '**Searched'

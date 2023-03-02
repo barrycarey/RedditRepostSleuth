@@ -19,10 +19,10 @@ class Post(Base):
 
     __tablename__ = 'post'
     __table_args__ = (
-        Index('idx_post_type_created_at', 'created_at', 'post_type_int'),
+        Index('idx_post_type_created_at', 'post_type_id', 'created_at'),
         #Index('idx_post_type_timestamp', 'created_at_timestamp', 'post_type_int'),
         Index('idx_url_hash', 'url_hash'),
-        Index('idx_last_delete_check', 'last_deleted_check', 'post_type'),
+        Index('idx_last_delete_check', 'last_deleted_check', 'post_type_id'),
 
     )
 
@@ -31,20 +31,16 @@ class Post(Base):
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type = Column(String(20, collation='latin1_bin'))
-    post_type_int = Column(TINYINT())
+    post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
     author = Column(String(25), nullable=False)
     selftext = Column(Text(75000, collation='utf8mb4_general_ci'))
     created_at = Column(DateTime)
-    created_at_timestamp = Column(INTEGER(unsigned=True), nullable=True)
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(25), nullable=False)
     title = Column(String(400, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(9))
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     url_hash = Column(String(32))
-    hash_1 = Column(String(64))
-    hash_2 = Column(String(64))
-    hash_3 = Column(String(64))
     nsfw = Column(Boolean, default=False)
 
     summons = relationship('Summons', back_populates='post')
@@ -53,6 +49,8 @@ class Post(Base):
     reposts = relationship('Repost', back_populates='repost_of', primaryjoin="Post.id==Repost.repost_of_id")
     searches = relationship('RepostSearch', back_populates='post')
     reports = relationship('UserReport', back_populates='post')
+    hashes = relationship('PostHash', back_populates='post')
+    post_type = relationship('PostType')
 
     def to_dict(self):
         return {
@@ -72,24 +70,29 @@ class PostType(Base):
     __tablename__ = 'post_type'
 
     id = Column(TINYINT(), primary_key=True)
-    name = Column(String(12, collation='latin1_bin'))
+    name = Column(String(12, collation='latin1_bin'), nullable=False)
 
 class PostHash(Base):
     __tablename__ = 'post_hash'
     __table_args__ = (
-        Index('idx_hash_type', 'hash_type_id'),
+        Index('idx_hash_type', 'hash_type_id', 'post_created_at'),
     )
 
+    def __repr__(self) -> str:
+        return f'Post ID: {self.post_id} - Hash: {self.hash}'
     id = Column(Integer, primary_key=True)
-    hash = Column(String(64))
+    hash = Column(String(64), nullable=False)
     post_id = Column(Integer, ForeignKey('post.id'))
-    hash_type_id = Column(Integer, ForeignKey('hash_type.id'))
+    post_created_at = Column(DateTime, nullable=False)
+    hash_type_id = Column(TINYINT(), ForeignKey('hash_type.id'), nullable=False)
+
+    post = relationship("Post", back_populates='hashes')
 
 class HashType(Base):
     __tablename__ = 'hash_type'
 
     id = Column(TINYINT(), primary_key=True)
-    name = Column(String(12, collation='latin1_bin'))
+    name = Column(String(12, collation='latin1_bin'), nullable=False)
 
 class Summons(Base):
     __tablename__ = 'summons'
