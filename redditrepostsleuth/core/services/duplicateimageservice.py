@@ -2,6 +2,7 @@ import json
 import logging
 from collections import Counter
 from logging import LoggerAdapter
+from time import perf_counter
 from typing import List, Text, Optional
 
 import requests
@@ -217,7 +218,9 @@ class DuplicateImageService:
         meme_hash = None
         with self.uowm.start() as uowm:
             if post_id:
+                start = perf_counter()
                 meme_hash = uowm.meme_hash.get_by_post_id(post_id)
+                log.debug('Meme cache query: %s', round(perf_counter() - start, 5))
                 if meme_hash:
                     log.info('Using cached meme hash')
                     return meme_hash.hash
