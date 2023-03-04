@@ -27,7 +27,7 @@ class Post(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(String(6), nullable=False, unique=True)
+    post_id = Column(String(9), nullable=False, unique=True)
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type = Column(String(20, collation='latin1_bin'))
@@ -124,7 +124,7 @@ class BotComment(Base):
 
     id = Column(Integer, primary_key=True)
     # TODO - why did I do post_id instead of post.id
-    reddit_post_id = Column(String(6), ForeignKey('post.post_id'))
+    reddit_post_id = Column(String(9), ForeignKey('post.post_id'))
     comment_body = Column(String(2000, collation='utf8mb4_general_ci'))
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     comment_left_at = Column(DateTime, default=func.utc_timestamp())
