@@ -178,7 +178,7 @@ class DuplicateImageService:
         search_results.total_searched = api_search_results.total_searched
 
         search_results.search_times.start_timer('set_match_post_time')
-        search_results.matches = self._build_search_results(api_search_results, url, search_results.target_hash)
+        search_results.matches = self._build_search_results_refactor(api_search_results, url, search_results.target_hash)
 
         search_results.search_times.stop_timer('set_match_post_time')
 
