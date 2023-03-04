@@ -12,3 +12,6 @@ class MemeHashRepo:
 
     def get_by_post_id(self, post_id: str) -> MemeHash:
         return self.db_session.query(MemeHash).filter(MemeHash.post_id == post_id).first()
+
+    def get_by_post_ids(self, post_ids: list[str]) -> list[MemeHash]:
+        return self.db_session.query(MemeHash).filter(MemeHash.post_id.in_(post_ids)).all()

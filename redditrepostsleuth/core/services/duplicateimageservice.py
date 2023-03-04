@@ -13,7 +13,7 @@ from requests.exceptions import ConnectionError
 from celery.exceptions import TimeoutError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.celery.reposttasks import get_meme_hash_task
+from redditrepostsleuth.core.celery.admin_tasks import delete_post_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate, MemeHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -154,7 +154,7 @@ class DuplicateImageService:
             if search_results.meme_template:
                 search_settings.target_match_percent = 100  # Keep only 100% matches on default hash size
                 search_results.search_times.start_timer('set_meme_hash_time')
-                search_results.meme_hash = self._get_meme_hash(url)
+                search_results.meme_hash = self._get_meme_hash(url, post_id=post.post_id if post else None)
                 search_results.search_times.stop_timer('set_meme_hash_time')
                 if not search_results.meme_hash:
                     log.error('No meme hash, disabled meme filter')
@@ -222,7 +222,7 @@ class DuplicateImageService:
                 meme_hash = uowm.meme_hash.get_by_post_id(post_id)
                 log.debug('Meme cache query: %s', round(perf_counter() - start, 5))
                 if meme_hash:
-                    log.info('Using cached meme hash')
+                    log.debug('Using cached meme hash')
                     return meme_hash.hash
 
             try:
@@ -230,6 +230,8 @@ class DuplicateImageService:
                 meme_hash = meme_hashes['dhash_h']
             except ImageConversioinException:
                 log.error('Failed to get meme hash. ')
+                if post_id:
+                    delete_post_task.apply_async((post_id,))
                 return
             except Exception:
                 log.exception('Failed to get meme hash for %s', url, exc_info=True)
@@ -315,6 +317,53 @@ class DuplicateImageService:
         log.debug('%s results built', len(results))
         return results
 
+    def _build_search_results_refactor(
+            self,
+            api_search_results: APISearchResults,
+            url: Text,
+            searched_hash: Text,
+    ) -> List[ImageSearchMatch]:
+        """
+        Take a list of index matches and convert them to ImageSearchMatches
+        :param index_matches: Dict of raw matches from index search
+        :param url: URL of the image we searched
+        :return:
+        """
+        results = []
+        log.info('Building search results from index matches')
+        with self.uowm.start() as uow:
+            result_map = {}
+            for r in api_search_results.results:
+                index_matches = uow.image_index_map.get_all_in_by_ids_and_index([m.id for m in r.matches], r.index_name)
+                posts = uow.posts.get_all_by_ids(im.reddit_post_db_id for im in index_matches)
+                for im in index_matches:
+                    search_result = next((x for x in r.matches if x.id == im.annoy_index_id), None)
+                    result_map[im.reddit_post_db_id] = {'image_match': im, 'distance': search_result.distance}
+
+                for post in posts:
+                    sr = result_map[post.id]
+                    if not search_result:
+                        log.error('Failed to match search result to post ID %s', post.id)
+                        continue
+                    results.append(
+                        ImageSearchMatch(
+                            url,
+                            post.id,
+                            post,
+                            hamming(searched_hash, post.dhash_h),
+                            sr['distance'],
+                            len(post.dhash_h)
+                        )
+                    )
+                """
+                for match in r.matches:
+                    image_match = self._get_image_search_match_from_index_result(match, r.index_name, url, searched_hash)
+                    if image_match:
+                        results.append(image_match)
+                """
+        log.debug('%s results built', len(results))
+        return results
+
     def _get_image_search_match_from_index_result(
             self,
             result: ImageMatch,
@@ -335,7 +384,38 @@ class DuplicateImageService:
         if not post:
             return
 
-        log.debug(post.url)
+        if not post.dhash_h:
+            log.error('Post %s missing dhash', post.post_id)
+            return
+
+        return ImageSearchMatch(
+            url,
+            index_map.reddit_post_db_id,
+            post,
+            hamming(searched_hash, post.dhash_h),
+            result.distance,
+            len(post.dhash_h)
+        )
+
+    def _get_image_search_match_from_index_result_refactor(
+            self,
+            result: ImageMatch,
+            index_name: str,
+            url: Text,
+            searched_hash: str,
+    ) -> Optional[ImageSearchMatch]:
+
+        with self.uowm.start() as uow:
+            index_map = uow.image_index_map.get_by_id_and_index(result.id, index_name)
+
+            if not index_map:
+                log.error('Failed to find index map for id %s in index %s', result.id, index_name)
+                return
+
+            post = uow.posts.get_by_id(index_map.reddit_post_db_id)
+
+        if not post:
+            return
 
         if not post.dhash_h:
             log.error('Post %s missing dhash', post.post_id)
@@ -349,6 +429,7 @@ class DuplicateImageService:
             result.distance,
             len(post.dhash_h)
         )
+
 
     def _log_search_time(self, search_results: ImageSearchResults, source: Text):
         self.event_logger.save_event(
@@ -431,6 +512,53 @@ class DuplicateImageService:
 
         with self.uowm.start() as uow:
             return uow.meme_template.get_by_id(results['meme_template_id'])
+
+    def _get_cached_meme_hashes(self,post_ids: list[str]) -> dict[str, str]:
+        results = {}
+        with self.uowm.start() as uow:
+            res = uow.meme_hash.get_by_post_ids(post_ids)
+            for meme_hash in res:
+                results[meme_hash.post_id] = meme_hash.hash
+            return results
+
+    def _final_meme_filter_refactor(self,
+            searched_hash: Text,
+            matches: List[ImageSearchMatch],
+            target_hamming
+    ) -> List[ImageSearchMatch]:
+        results = []
+        log.debug('MEME FILTER - Filtering %s matches', len(matches))
+        if len(matches) == 0:
+            return matches
+        cached_meme_hashes = self._get_cached_meme_hashes([m.post.post_id for m in matches])
+
+        for match in matches:
+            match_hash = cached_meme_hashes.get(match.post.post_id)
+            if not match_hash:
+                try:
+                    meme_hashes = get_image_hashes(match.post.url, hash_size=self.config.default_meme_filter_hash_size)
+                    match_hash = meme_hashes['dhash_h']
+                except ImageConversioinException:
+                    log.error('Failed to get meme hash. ')
+                    continue
+                except Exception:
+                    log.exception('Failed to get meme hash for %s', match.post.url, exc_info=True)
+                    continue
+            if not match_hash:
+                continue
+            h_distance = hamming(searched_hash, match_hash)
+
+            if h_distance > target_hamming:
+                log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
+                         h_distance, f'https://redd.it/{match.post.post_id}')
+                continue
+            log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
+                      h_distance)
+            match.hamming_distance = h_distance
+            match.hash_size = len(searched_hash)
+            results.append(match)
+
+        return results
 
     def _final_meme_filter(
             self,

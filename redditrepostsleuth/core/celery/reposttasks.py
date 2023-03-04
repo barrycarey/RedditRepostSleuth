@@ -35,19 +35,6 @@ def ingest_repost_check(post):
     elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
 
-@celery.task()
-def get_meme_hash_task(match: ImageSearchMatch, hash_size: int):
-    result = {'match': match, 'pil_img': None}
-    try:
-        result['pil_img'] = generate_img_by_url(match.post.url)
-    except ImageConversioinException:
-        log.error('Failed to get meme hash')
-    except Exception:
-        log.exception('Failed to get meme hash for %s', match.post.url, exc_info=True)
-
-    return result
-
-
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
 
