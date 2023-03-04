@@ -23,26 +23,20 @@ services:
         environment:
             - LOG_LEVEL=WARN
 
-    deleted_post_cleanup:
+    delete_post_worker:
         restart: always
         build:
             context: .
-            dockerfile: redditrepostsleuth/adminsvc/Dockerfile
-        entrypoint: python -u /src/redditrepostsleuth/adminsvc/deleted_post_cleanup.py
+            dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
         environment:
             - LOG_LEVEL=WARN
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.maintenance_tasks
-
-    hot_post:
-        restart: always
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/hotpostsvc/Dockerfile
-        environment:
-            - LOG_LEVEL=WARN
-        entrypoint: python -u /src/redditrepostsleuth/hotpostsvc/hotpostsvc.py
+            - SLEUTHCONFIG=testconfig.ini
+            - C_FORCE_ROOT=True
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 3
         volumes:
             - /opt/imageindex:/opt/imageindex
+
 
     summons_svc:
         restart: always
@@ -135,7 +129,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link,watch_notify -c 2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link,watch_notify --autoscale=6,2
 
     image_repost_worker:
         restart: always
@@ -146,22 +140,13 @@ services:
             - LOG_LEVEL=WARN
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -c 14
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image --autoscale=14,5
         volumes:
             - /opt/imageindex:/opt/imageindex
         networks:
             - sleuthnet
 
-    deleted_post_cleanup_worker:
-        restart: always
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
-        environment:
-            - LOG_LEVEL=WARN
-            - C_FORCE_ROOT=True
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q deleted_post_cleanup -c 5
+
 
     misc_task_worker:
         restart: always

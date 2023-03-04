@@ -12,6 +12,18 @@ from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVE
     MONITORED_SUB_MOD_REMOVED_SUBJECT
 
 
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def delete_post_task(self, post_id: str) -> None:
+    with self.uowm.start() as uow:
+        post = uow.posts.get_by_post_id(post_id)
+        image_post = uow.image_post.get_by_post_id(post_id)
+        if post:
+            uow.posts.remove(post)
+        if image_post:
+            uow.image_post.remove(image_post)
+        uow.commit()
+        log.info('Deleted post %s', post_id)
 @celery.task(bind=True, base=AdminTask)
 def check_for_subreddit_config_update_task(self, monitored_sub: MonitoredSub) -> NoReturn:
     self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)
