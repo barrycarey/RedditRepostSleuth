@@ -92,10 +92,8 @@ class PostRepository:
     def get_with_self_text(self, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext != None).with_entities(Post.id, Post.selftext).offset(offset).limit(limit).all()
 
-    def yield_test(self, limit: int = None):
-        return self.db_session.query(Post).filter(Post.post_type == 'image', Post.dhash_h != None).yield_per(
-            10000).with_entities(
-            Post.id, Post.dhash_h).limit(limit)
+    def get_all_by_ids(self, ids: list[int]) -> list[Post]:
+        return self.db_session.query(Post).filter(Post.id.in_(ids)).all()
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)
