@@ -81,6 +81,24 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
 
     return post
 
+def get_image_hashes_from_pil(img, hash_size: int = 16) -> Dict:
+    result = {
+        'dhash_h': None,
+        'dhash_v': None,
+    }
+
+    try:
+        dhash_h = imagehash.dhash(img, hash_size=hash_size)
+        dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
+        result['dhash_h'] = str(dhash_h)
+        result['dhash_v'] = str(dhash_v)
+    except Exception as e:
+        # TODO: Specific exception
+        log.exception('Error creating hash', exc_info=True)
+        raise
+
+    return result
+
 def get_image_hashes(url: Text, hash_size: int = 16) -> Dict:
     result = {
         'dhash_h': None,
