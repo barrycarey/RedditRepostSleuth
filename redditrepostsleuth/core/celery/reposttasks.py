@@ -11,13 +11,15 @@ from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, Repo
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
-from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
+from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, ImageConversioinException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes, generate_img_by_url
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 
 log = configure_logger(
@@ -33,7 +35,6 @@ def ingest_repost_check(post):
     elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
 
-
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
 
@@ -43,6 +44,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         return
 
     search_settings = get_default_image_search_settings(self.config)
+    search_settings.meme_filter = True
     search_settings.max_matches = 75
     search_results = self.dup_service.check_image(
         post.url,
