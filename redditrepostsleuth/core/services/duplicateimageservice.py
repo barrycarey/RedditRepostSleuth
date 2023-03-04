@@ -103,7 +103,7 @@ class DuplicateImageService:
         if search_results.meme_template:
             search_results.search_times.start_timer('meme_filter_time')
             search_results.matches = self._final_meme_filter(search_results.meme_hash, search_results.matches,
-                                              search_results.target_meme_hamming_distance)
+                                                             search_results.target_meme_hamming_distance)
             search_results.search_times.stop_timer('meme_filter_time')
 
         search_results.matches = sort_reposts(search_results.matches, sort_by=sort_by)
@@ -178,7 +178,7 @@ class DuplicateImageService:
         search_results.total_searched = api_search_results.total_searched
 
         search_results.search_times.start_timer('set_match_post_time')
-        search_results.matches = self._build_search_results_refactor(api_search_results, url, search_results.target_hash)
+        search_results.matches = self._build_search_results(api_search_results, url, search_results.target_hash)
 
         search_results.search_times.stop_timer('set_match_post_time')
 
@@ -309,29 +309,6 @@ class DuplicateImageService:
         results = []
         log.info('Building search results from index matches')
         with self.uowm.start() as uow:
-            for r in api_search_results.results:
-                for match in r.matches:
-                    image_match = self._get_image_search_match_from_index_result(match, r.index_name, url, searched_hash)
-                    if image_match:
-                        results.append(image_match)
-        log.debug('%s results built', len(results))
-        return results
-
-    def _build_search_results_refactor(
-            self,
-            api_search_results: APISearchResults,
-            url: Text,
-            searched_hash: Text,
-    ) -> List[ImageSearchMatch]:
-        """
-        Take a list of index matches and convert them to ImageSearchMatches
-        :param index_matches: Dict of raw matches from index search
-        :param url: URL of the image we searched
-        :return:
-        """
-        results = []
-        log.info('Building search results from index matches')
-        with self.uowm.start() as uow:
             result_map = {}
             for r in api_search_results.results:
                 index_matches = uow.image_index_map.get_all_in_by_ids_and_index([m.id for m in r.matches], r.index_name)
@@ -363,73 +340,6 @@ class DuplicateImageService:
                 """
         log.debug('%s results built', len(results))
         return results
-
-    def _get_image_search_match_from_index_result(
-            self,
-            result: ImageMatch,
-            index_name: str,
-            url: Text,
-            searched_hash: str,
-    ) -> Optional[ImageSearchMatch]:
-
-        with self.uowm.start() as uow:
-            index_map = uow.image_index_map.get_by_id_and_index(result.id, index_name)
-
-            if not index_map:
-                log.error('Failed to find index map for id %s in index %s', result.id, index_name)
-                return
-
-            post = uow.posts.get_by_id(index_map.reddit_post_db_id)
-
-        if not post:
-            return
-
-        if not post.dhash_h:
-            log.error('Post %s missing dhash', post.post_id)
-            return
-
-        return ImageSearchMatch(
-            url,
-            index_map.reddit_post_db_id,
-            post,
-            hamming(searched_hash, post.dhash_h),
-            result.distance,
-            len(post.dhash_h)
-        )
-
-    def _get_image_search_match_from_index_result_refactor(
-            self,
-            result: ImageMatch,
-            index_name: str,
-            url: Text,
-            searched_hash: str,
-    ) -> Optional[ImageSearchMatch]:
-
-        with self.uowm.start() as uow:
-            index_map = uow.image_index_map.get_by_id_and_index(result.id, index_name)
-
-            if not index_map:
-                log.error('Failed to find index map for id %s in index %s', result.id, index_name)
-                return
-
-            post = uow.posts.get_by_id(index_map.reddit_post_db_id)
-
-        if not post:
-            return
-
-        if not post.dhash_h:
-            log.error('Post %s missing dhash', post.post_id)
-            return
-
-        return ImageSearchMatch(
-            url,
-            index_map.reddit_post_db_id,
-            post,
-            hamming(searched_hash, post.dhash_h),
-            result.distance,
-            len(post.dhash_h)
-        )
-
 
     def _log_search_time(self, search_results: ImageSearchResults, source: Text):
         self.event_logger.save_event(
@@ -521,11 +431,11 @@ class DuplicateImageService:
                 results[meme_hash.post_id] = meme_hash.hash
             return results
 
-    def _final_meme_filter_refactor(self,
-            searched_hash: Text,
-            matches: List[ImageSearchMatch],
-            target_hamming
-    ) -> List[ImageSearchMatch]:
+    def _final_meme_filter(self,
+                           searched_hash: Text,
+                           matches: List[ImageSearchMatch],
+                           target_hamming
+                           ) -> List[ImageSearchMatch]:
         results = []
         log.debug('MEME FILTER - Filtering %s matches', len(matches))
         if len(matches) == 0:
@@ -544,36 +454,6 @@ class DuplicateImageService:
                 except Exception:
                     log.exception('Failed to get meme hash for %s', match.post.url, exc_info=True)
                     continue
-            if not match_hash:
-                continue
-            h_distance = hamming(searched_hash, match_hash)
-
-            if h_distance > target_hamming:
-                log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
-                         h_distance, f'https://redd.it/{match.post.post_id}')
-                continue
-            log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
-                      h_distance)
-            match.hamming_distance = h_distance
-            match.hash_size = len(searched_hash)
-            results.append(match)
-
-        return results
-
-    def _final_meme_filter(
-            self,
-            searched_hash: Text,
-            matches: List[ImageSearchMatch],
-            target_hamming
-    ) -> List[ImageSearchMatch]:
-
-        results = []
-        log.debug('MEME FILTER - Filtering %s matches', len(matches))
-        if len(matches) == 0:
-            return matches
-
-        for match in matches:
-            match_hash = self._get_meme_hash(match.post.url, post_id=match.post.post_id)
             if not match_hash:
                 continue
             h_distance = hamming(searched_hash, match_hash)
