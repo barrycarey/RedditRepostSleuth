@@ -21,3 +21,6 @@ class InvestigatePostRepo:
 
     def remove(self, item: InvestigatePost):
         self.db_session.delete(item)
+
+    def remove_by_post_id(self, post_id: str) -> None:
+        self.db_session.query(InvestigatePost).filter(InvestigatePost.post_id == post_id).delete()

@@ -29,11 +29,11 @@ services:
             context: .
             dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=DEBUG
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 3
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 20
         volumes:
             - /opt/imageindex:/opt/imageindex
 
@@ -129,7 +129,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link,watch_notify --autoscale=6,2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link,watch_notify --autoscale=10,2
 
     image_repost_worker:
         restart: always

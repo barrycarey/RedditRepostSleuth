@@ -49,3 +49,5 @@ class SummonsRepository:
 
     def remove(self, item: Summons):
         self.db_session.delete(item)
+    def remove_by_post_id(self, post_id: str) -> None:
+        self.db_session.query(Summons).filter(Summons.post_id == post_id).delete()
