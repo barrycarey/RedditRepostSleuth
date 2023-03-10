@@ -51,15 +51,18 @@ class Post(Base):
 
     def to_dict(self):
         return {
+            'id': self.id,
             'post_id': self.post_id,
             'url': self.url,
             'shortlink': self.shortlink,
             'perma_link': self.perma_link,
+            'author': self.author,
+            'selftext': self.selftext,
             'title': self.title,
             'dhash_v': self.dhash_v,
             'dhash_h': self.dhash_h,
             'created_at': self.created_at.timestamp(),
-            'author': self.author,
+
             'subreddit': self.subreddit
         }
 
