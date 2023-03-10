@@ -1,4 +1,5 @@
 import json
+import os
 import random
 from asyncio import ensure_future, gather, run
 from enum import Enum, auto
@@ -31,8 +32,8 @@ GENERIC_REQ_HEADERS = {
 	'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36"
 }
 
-#config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
-config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
+#config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
 
 event_logger = EventLogging(config=config)
 uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
@@ -42,7 +43,6 @@ with open('proxies.txt', 'r') as f:
 	for l in f:
 		proxies.append({'address': l.replace('\n', '')})
 
-print('')
 
 class JobStatus(Enum):
 	STARTED = auto()
@@ -101,8 +101,9 @@ async def fetch_page(job: Job):
 			else:
 				print(f'Unexpected Status {resp.status} - {job.post.post_id} - {job.post.url}')
 	except TimeoutError:
+		print(f'Timeout - {job.post.post_id} - {job.post.url}')
 		job.result = JobStatus.TIMEOUT
-	except InvalidURL:
+	except InvalidURL as e:
 		pass
 	except ClientHttpProxyError:
 		print(f'Proxy error {job.proxy}')
@@ -129,10 +130,12 @@ def update_delete(post_ids, uowm):
 		print(f'Save Time: {round(perf_counter() - start, 5)}')
 
 async def main():
+	query_limit = int(os.getenv('QUERY_LIMIT', 25000))
+	processed_count = 0
 	while True:
 		with uowm.start() as uow:
-			posts = uow.posts.find_all_for_delete_check(60, limit=100000)
-
+			posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
+			processed_count += query_limit
 			celery_jobs = []
 			for chunk in chunk_list(posts, 2000):
 				to_update = []
@@ -153,13 +156,8 @@ async def main():
 			job = group(celery_jobs)
 			result = job.apply_async()
 			log.info('Waiting for all last delete check timestamp updates to complete')
+			log.info(f'Total Processed: {processed_count}')
 			result.join()
-			#uow.commit()
-
-			print('')
-				#posts_to_update_timestamp = [j.post.post_id for j in results if j.result != JobStatus.BAD]
-				#update_last_deleted_check.apply_async((posts_to_update_timestamp,))
-				#update_last_deleted_check.apply_async((text_posts,))
 
 
 
