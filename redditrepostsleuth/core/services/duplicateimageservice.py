@@ -231,6 +231,8 @@ class DuplicateImageService:
             except ImageConversioinException:
                 log.error('Failed to get meme hash. ')
                 if post_id:
+                    # TODO - This can potentially start deleting images if we drop internet connection
+                    log.info('Sending post % to delete queue', post_id)
                     delete_post_task.apply_async((post_id,))
                 return
             except Exception:
@@ -449,7 +451,8 @@ class DuplicateImageService:
                     meme_hashes = get_image_hashes(match.post.url, hash_size=self.config.default_meme_filter_hash_size)
                     match_hash = meme_hashes['dhash_h']
                 except ImageConversioinException:
-                    log.error('Failed to get meme hash. ')
+                    log.error('Failed to get meme hash for %s.  Sending to delete queue', match.post.post_id)
+                    delete_post_task.apply_async((match.post.post_id,))
                     continue
                 except Exception:
                     log.exception('Failed to get meme hash for %s', match.post.url, exc_info=True)

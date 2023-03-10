@@ -31,10 +31,18 @@ GENERIC_REQ_HEADERS = {
 	'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36"
 }
 
-config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
+#config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
+config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+
 event_logger = EventLogging(config=config)
 uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
 
+proxies = []
+with open('proxies.txt', 'r') as f:
+	for l in f:
+		proxies.append({'address': l.replace('\n', '')})
+
+print('')
 
 class JobStatus(Enum):
 	STARTED = auto()
