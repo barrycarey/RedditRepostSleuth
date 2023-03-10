@@ -41,6 +41,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
     r = requests.head(post.url)
     if r.status_code != 200:
         log.info('Skipping image that is deleted %s', post.url)
+        celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
         return
 
     search_settings = get_default_image_search_settings(self.config)
