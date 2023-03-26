@@ -4,11 +4,13 @@ from logging.config import fileConfig
 import sys, os
 from urllib.parse import quote_plus
 
-sys.path.append('/home/barry/PycharmProjects/RedditRepostSleuth')
-sys.path.append(r'C:\Users\barry\PycharmProjects\RedditRepostSleuth')
-from redditrepostsleuth.core.db.databasemodels import Base
-from redditrepostsleuth.core.config import Config
 
+
+sys.path.append('/home/barry/PycharmProjects/RedditRepostSleuth')
+sys.path.append(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth')
+
+from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import Base
 
 from sqlalchemy import engine_from_config, create_engine
 from sqlalchemy import pool
