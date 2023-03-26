@@ -93,6 +93,7 @@ class Summons(Base):
     __tablename__ = 'reddit_bot_summons'
     __table_args__ = (
         Index('user_summons_check', 'requestor', 'summons_received_at', unique=False),
+        Index('idx_post_id', 'post_id', unique=False),
     )
 
     id = Column(Integer, primary_key=True)
@@ -108,6 +109,10 @@ class Summons(Base):
 
 class BotComment(Base):
     __tablename__ = 'reddit_bot_comment'
+
+    __table_args__ = (
+        Index('idx_post_id', 'post_id', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
@@ -136,6 +141,10 @@ class BotPrivateMessage(Base):
 
 class RepostWatch(Base):
     __tablename__ = 'reddit_repost_watch'
+
+    __table_args__ = (
+        Index('idx_post_id', 'post_id', unique=False),
+    )
 
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
@@ -490,6 +499,11 @@ class ImageSearch(Base):
 
 class UserReport(Base):
     __tablename__ = 'reddit_user_report'
+
+    __table_args__ = (
+        Index('idx_post_id', 'post_id', unique=False),
+    )
+
     id = Column(Integer, primary_key=True)
     post_id = Column(String(100), nullable=False)
     reported_by = Column(String(100), nullable=False)
@@ -669,3 +683,12 @@ class MemeHash(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(String(6), nullable=False, unique=True)
     hash = Column(String(256), nullable=False)
+class HttpProxy(Base):
+    __tablename__ = 'http_proxy'
+    id = Column(Integer, primary_key=True)
+    address = Column(String(23), nullable=False)
+    enabled = Column(Boolean, default=True)
+    provider = Column(String(50), nullable=False)
+    cooldown_expire = Column(DateTime)
+    times_used = Column(Integer, default=0, nullable=False)
+    successive_failures = Column(Integer, default=0, nullable=False)

@@ -60,11 +60,14 @@ def update_last_delete_check(ids: list[int], uowm) -> None:
         uow.commit()
 @celery.task(bind=True, base=SqlAlchemyTask)
 def update_last_deleted_check(self, post_ids: list[int]) -> None:
+    try:
+        log.info('Updating last deleted check timestamp for %s posts', len(post_ids))
+        start = perf_counter()
+        update_last_delete_check(post_ids, self.uowm)
+        print(f'Save Time: {round(perf_counter() - start, 5)}')
+    except Exception as e:
+        log.exception()
 
-    log.info('Updating last deleted check timestamp for %s posts', len(post_ids))
-    start = perf_counter()
-    update_last_delete_check(post_ids, self.uowm)
-    print(f'Save Time: {round(perf_counter() - start, 5)}')
 @celery.task(bind=True, base=SqlAlchemyTask)
 def update_last_deleted_check_old(self, post_ids: list[str]) -> None:
     with self.uowm.start() as uow:
@@ -75,6 +78,7 @@ def update_last_deleted_check_old(self, post_ids: list[str]) -> None:
             post.last_deleted_check = func.utc_timestamp()
         uow.commit()
         print(f'Save Time: {round(perf_counter() - start, 5)}')
+
 @celery.task(bind=True, base=AdminTask)
 def check_for_subreddit_config_update_task(self, monitored_sub: MonitoredSub) -> NoReturn:
     self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)

@@ -30,3 +30,5 @@ google-cloud-vision
 opencv-python
 imutils
 pydantic
+aiohttp
+pytest-asyncio

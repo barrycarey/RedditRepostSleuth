@@ -23,6 +23,16 @@ services:
         environment:
             - LOG_LEVEL=WARN
 
+    delete_post_svc:
+        restart: always
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
+            - QUERY_LIMIT=500000
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
+
     delete_post_worker:
         restart: always
         build:
@@ -33,7 +43,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 20
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 7
         volumes:
             - /opt/imageindex:/opt/imageindex
 

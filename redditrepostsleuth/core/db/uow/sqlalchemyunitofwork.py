@@ -6,6 +6,7 @@ from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSu
 from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
 from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
 from redditrepostsleuth.core.db.repository.config_message_template_repo import ConfigMessageTemplateRepo
+from redditrepostsleuth.core.db.repository.http_proxy_repo import HttpProxyRepo
 from redditrepostsleuth.core.db.repository.image_index_map_rep import ImageIndexMapRepo
 from redditrepostsleuth.core.db.repository.meme_hash_repo import MemeHashRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_repo import MemeTemplatePotentialRepo
@@ -172,3 +173,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def meme_hash(self) -> MemeHashRepo:
         return MemeHashRepo(self.session)
+
+    @property
+    def http_proxy(self) -> HttpProxyRepo:
+        return HttpProxyRepo(self.session)

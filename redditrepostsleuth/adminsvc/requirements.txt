@@ -5,6 +5,8 @@ influxdb
 imagehash
 apscheduler
 redis
-celery[redis]==4.4.7
+celery[redis]
 falcon
 redlock
+aiohttp
+Brotli
