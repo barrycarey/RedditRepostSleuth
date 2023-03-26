@@ -51,3 +51,7 @@ class ReplyFailedException(RepostSleuthException):
 class LoadSubredditException(RepostSleuthException):
     def __init__(self, message):
         super(LoadSubredditException, self).__init__(message)
+
+class NoProxyException(RepostSleuthException):
+    def __init__(self, message):
+        super(NoProxyException, self).__init__(message)
