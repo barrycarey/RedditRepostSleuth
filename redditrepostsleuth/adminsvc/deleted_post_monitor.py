@@ -1,165 +1,169 @@
 import json
 import os
-import random
-from asyncio import ensure_future, gather, run
-from enum import Enum, auto
-from time import perf_counter
+from asyncio import run, ensure_future, gather
+from urllib.parse import urlparse
 
-import requests
-from aiohttp import request, ClientTimeout, InvalidURL, ClientHttpProxyError, ClientConnectorCertificateError, \
-	ClientConnectorSSLError, ClientConnectorError
-from dataclasses import dataclass
-from asyncio import TimeoutError
-
+from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError, ClientConnectorError, TCPConnector
 from celery import group
-from sqlalchemy import func
 
-from redditrepostsleuth.core.celery.admin_tasks import delete_post_task, cleanup_post, update_last_deleted_check, \
-	post_to_dict, update_last_delete_check
+from redditrepostsleuth.core.celery.admin_tasks import delete_post_task, update_last_deleted_check
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.logging import get_configured_logger
-from redditrepostsleuth.core.services.eventlogging import EventLogging
+from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, JobStatus, RedditRemovalCheck
+from redditrepostsleuth.core.proxy_manager import ProxyManager
+from redditrepostsleuth.core.util.constants import GENERIC_REQ_HEADERS
 from redditrepostsleuth.core.util.helpers import chunk_list
-
-GENERIC_REQ_HEADERS = {
-	'Accept': '*/*',
-	'Accept-Encoding': 'gzip, deflate, br',
-	'Accept-Language': 'en-US,en;q=0.5',
-	'Connection': 'keep-alive',
-	'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36"
-}
-
-config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
-#config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
-
-event_logger = EventLogging(config=config)
-uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
-
-proxies = []
-with open('proxies.txt', 'r') as f:
-	for l in f:
-		proxies.append({'address': l.replace('\n', '')})
-
-
-class JobStatus(Enum):
-	STARTED = auto()
-	GOOD = auto()
-	BAD = auto()
-	TIMEOUT = auto()
-
-
-@dataclass
-class Job:
-	post: Post
-	result: JobStatus
-	proxy: str
-
-
-
 
 log = get_configured_logger(__name__)
 
-def check_reddit_removed():
-	with uowm.start() as uow:
-		posts = uow.posts.get_all(limit=1000)
 
-	for chunk in chunk_list(posts, 100):
-		posts_to_check = [f't3_{p.post_id}' for p in chunk]
+async def fetch_page(job: RedditRemovalCheck, session: ClientSession) -> RedditRemovalCheck:
+    proxy = f'http://{job.proxy.address}'
 
-		r = requests.get(f'https://api.reddit.com/api/info?id={",".join(posts_to_check)}', headers={
-			'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'})
-		data = json.loads(r.text)
-		for p in [p['data'] for p in data['data']['children'] if p['data']['removed_by_category']]:
-			print(p['name'])
-			print(p['url'])
+    try:
+        async with session.get(job.url, proxy=proxy,
+                               headers=GENERIC_REQ_HEADERS, timeout=ClientTimeout(total=10)) as resp:
+            if resp.status == 200:
+                log.debug('Successful fetch')
+                job.status = JobStatus.SUCCESS
+                job.resp_data = await resp.text()
+            else:
+                log.error('Unexpected request status %s - %s', resp.status, job.url)
+                job.status = JobStatus.ERROR
+    except TimeoutError as e:
+        log.error('Request Timeout')
+        job.status = JobStatus.TIMEOUT
+    except ClientHttpProxyError as e:
+        log.error('Proxy Error - %s: %s - %s', e.message, job.proxy.address, job.url)
+        job.status = JobStatus.PROXYERROR
+    except ClientConnectorError:
+        job.status = JobStatus.ERROR
+        log.error('Timeout: %s', job.url)
+    except Exception as e:
+        job.status = JobStatus.ERROR
+        log.exception('')
 
-		checked_posts = [{'id': p['data']['name'], 'reason': p['data']['removed_by_category']} for p in
-						 data['data']['children'] if p['data']['removed_by_category']]
+    return job
 
-		dif = list(set(posts_to_check).symmetric_difference(set(checked_posts)))
+def build_reddit_req_url(post_ids: list[str]) -> str:
+    t3_ids = [f't3_{p}' for p in post_ids]
+    return f'https://api.reddit.com/api/info?id={",".join(t3_ids)}'
 
-		for i in dif:
-			print(f'https://redd.it/{i.replace("t3_", "")}')
+def get_post_ids_from_reddit_req_url(url: str) -> list[str]:
+    parsed_url = urlparse(url)
+    t3_ids = parsed_url.query.replace('id=', '').split(',')
+    return [id.replace('t3_', '') for id in t3_ids]
 
-async def send_to_delete(post: Post) -> None:
-	print(f'Sending {post.post_id} to delete queue - https://redd.it/{post.post_id} - {post.url}')
-	delete_post_task.apply_async((post.post_id,))
 
-async def fetch_page(job: Job):
-	try:
-		async with request('HEAD', job.post.url, proxy=f'http://{job.proxy}',
-						   headers=GENERIC_REQ_HEADERS, timeout=ClientTimeout(total=3)) as resp:
-			#print(f'{job.post.url} - {resp.status}')
-			if resp.status == 200:
-				job.result = JobStatus.GOOD
-			elif resp.status == 404:
-				job.result = JobStatus.BAD
-				await send_to_delete(job.post)
-			else:
-				print(f'Unexpected Status {resp.status} - {job.post.post_id} - {job.post.url}')
-	except TimeoutError:
-		print(f'Timeout - {job.post.post_id} - {job.post.url}')
-		job.result = JobStatus.TIMEOUT
-	except InvalidURL as e:
-		pass
-	except ClientHttpProxyError:
-		print(f'Proxy error {job.proxy}')
-		job.result = JobStatus.TIMEOUT
-	except ClientConnectorError:
-		job.result = JobStatus.BAD
-		print(f'Timeout - {job.post.post_id} - {job.post.url}')
-		await send_to_delete(job.post)
-	except (ClientConnectorCertificateError, ClientConnectorSSLError):
-		pass
-	except Exception as e:
-		print(e)
+def check_reddit_batch(job: RedditRemovalCheck) -> DeleteCheckResult:
+    result = DeleteCheckResult()
 
-	return job
+    removal_reasons_to_flag = ['deleted', 'author', 'reddit', 'copyright_takedown']
+    ignore_reasons = ['automod_filtered', 'community_ops', 'moderator']
 
-def update_delete(post_ids, uowm):
-	with uowm.start() as uow:
-		posts = uow.posts.get_all_by_post_ids(post_ids)
-		log.info('Updating last deleted check timestamp for %s posts', len(posts))
-		start = perf_counter()
-		for post in posts:
-			post.last_deleted_check = func.utc_timestamp()
-		uow.commit()
-		print(f'Save Time: {round(perf_counter() - start, 5)}')
+    if job.status != JobStatus.SUCCESS:
+        result.to_recheck = [p.post_id for p in job.posts]
+        return result
+
+    res_data = json.loads(job.resp_data)
+    for p in res_data['data']['children']:
+        if p['data']['removed_by_category'] in removal_reasons_to_flag:
+            result.to_delete.append(p['data']['name'].replace('t3_', ''))
+            log.debug('Flagging For Deletion: https://redd.it/%s - Removal Reason: %s',
+                      p['data']['name'].replace('t3_', ''), p['data']['removed_by_category'])
+        else:
+            if p['data']['removed_by_category'] and p['data']['removed_by_category'] not in ignore_reasons:
+                log.info('https://redd.it/%s - %s', p['data']['name'].replace('t3_', ''),
+                         p['data']['removed_by_category'])
+            result.to_update.append(p['data']['name'].replace('t3_', ''))
+
+    # Handle IDs not returned from reddit.  This means they're fully gone
+    checked_post_ids = [p.post_id for p in job.posts]
+    returned_post_ids = [p['data']['name'].replace('t3_', '') for p in res_data['data']['children']]
+    dif = list(set(checked_post_ids).symmetric_difference(set(returned_post_ids)))
+    result.to_delete += dif
+
+    result.to_update = db_ids_from_post_ids(result.to_update, job.posts)
+
+    return result
+
+
+def merge_results(results: list[DeleteCheckResult]) -> DeleteCheckResult:
+    final_result = DeleteCheckResult()
+    for r in results:
+        final_result.to_delete += r.to_delete
+        final_result.to_update += r.to_update
+        final_result.to_recheck += r.to_recheck
+
+    return final_result
+
+
+def db_ids_from_post_ids(post_ids: list[str], posts: list[Post]) -> list[int]:
+    results = []
+    for post_id in post_ids:
+        post = next((x for x in posts if x.post_id == post_id), None)
+        if not post:
+            log.error('Failed to find posts with ID %s', post_id)
+            continue
+        results.append(post.id)
+    log.debug('DB IDs: %s', results)
+    return results
+
 
 async def main():
-	query_limit = int(os.getenv('QUERY_LIMIT', 25000))
-	processed_count = 0
-	while True:
-		with uowm.start() as uow:
-			posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
-			processed_count += query_limit
-			celery_jobs = []
-			for chunk in chunk_list(posts, 2000):
-				to_update = []
-				print(f'First: {chunk[0].post_id} {chunk[0].created_at} - Last: {chunk[-1].post_id} {chunk[-1].created_at}')
-				tasks = []
-				for post in chunk:
-					if post.post_type == 'text' or not post.post_type:
-						#text_posts.append(post.post_id)
-						to_update.append(post.id)
-						continue
-					proxy = random.choice(proxies)['address']
-					tasks.append(ensure_future(fetch_page(Job(post, JobStatus.STARTED, proxy))))
-				results: list[Job] = await gather(*tasks)
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(Config()))
+    proxy_manager = ProxyManager(uowm, 600)
+    query_limit = int(os.getenv('QUERY_LIMIT', 25000))
 
-				to_update += [j.post.id for j in results if j.result != JobStatus.BAD]
+    processed_count = 0
+    while True:
+        with uowm.start() as uow:
+            proxy_manager.enabled_expired_cooldowns()
+            posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
+            processed_count += query_limit
+            log.info('First: %s %s - Last: %s %s', posts[0].post_id, posts[0].created_at, posts[-1].post_id,
+                     posts[-1].created_at)
+            tasks = []
+            conn = TCPConnector(limit=0)
+            async with ClientSession(connector=conn) as session:
+                for chunk in chunk_list(posts, 100):
+                    url = build_reddit_req_url([p.post_id for p in chunk])
+                    job = RedditRemovalCheck(url, chunk, JobStatus.STARTED, proxy_manager.get_proxy())
+                    tasks.append(ensure_future(fetch_page(job, session)))
 
-				celery_jobs.append(update_last_deleted_check.s(to_update,))
-			job = group(celery_jobs)
-			result = job.apply_async()
-			log.info('Waiting for all last delete check timestamp updates to complete')
-			log.info(f'Total Processed: {processed_count}')
-			result.join()
+                results: list[RedditRemovalCheck] = await gather(*tasks)
+
+                log.debug('Merging job results')
+                processed_results = list(map(check_reddit_batch, results))
+                merged_results = merge_results(processed_results)
+                log.info('Results: To Delete: %s - To Update: %s - To Recheck %s',
+                         len(merged_results.to_delete), len(merged_results.to_update),
+                         len(merged_results.to_recheck))
+
+                log.info('Sending to deleted queue')
+                for p in merged_results.to_delete:
+                    log.debug('Sending %s to delete queue - https://redd.it/%s', p, p)
+                    delete_post_task.apply_async((p,))
+
+                celery_jobs = []
+
+                log.info('Sending update jobs to Celery')
+                for batch in chunk_list(merged_results.to_update, 2000):
+                    celery_jobs.append(update_last_deleted_check.s(batch, ))
+
+                log.info('Starting Celery Jobs')
+                job = group(celery_jobs)
+                result = job.apply_async()
+                log.info(f'Total Processed: {processed_count}')
+                try:
+                    log.info('Waiting for celery jobs to complete')
+                    result.join()
+                except Exception as e:
+                    continue
 
 
-
-
-run(main())
+if __name__ == '__main__':
+    run(main())
