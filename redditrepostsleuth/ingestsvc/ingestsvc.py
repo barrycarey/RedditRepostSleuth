@@ -1,7 +1,5 @@
 import json
-import logging
 import sys
-import threading
 import time
 from datetime import datetime
 from json import JSONDecodeError
@@ -54,17 +52,20 @@ def queue_posts_for_ingest(posts: List[Post]):
     for post in posts:
         save_new_post.apply_async((post,), queue='post_ingest')
 
+
+
 if __name__ == '__main__':
     log.info('Starting post ingestor')
     config = Config()
     reddit = get_reddit_instance(config)
     newest_id = get_newest_praw_post_id(reddit)
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+
     with uowm.start() as uow:
         oldest_post = uow.posts.get_newest_post()
         oldest_id = oldest_post.post_id
 
-    threading.Thread(target=startup_backfill, args=(newest_id, oldest_id), name='praw_ingest').start()
+    #threading.Thread(target=startup_backfill, args=(newest_id, oldest_id), name='praw_ingest').start()
    # startup_backfill(newest_id, oldest_id)
 
     while True:
