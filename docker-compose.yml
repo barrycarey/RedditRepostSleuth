@@ -30,7 +30,7 @@ services:
             dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - QUERY_LIMIT=500000
+            - QUERY_LIMIT=25000
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
 
     delete_post_worker:

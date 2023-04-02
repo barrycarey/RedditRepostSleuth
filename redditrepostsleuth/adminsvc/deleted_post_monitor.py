@@ -1,11 +1,12 @@
 import json
 import os
+import sys
 from asyncio import run, ensure_future, gather
 from urllib.parse import urlparse
 
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError, ClientConnectorError, TCPConnector
 from celery import group
-
+sys.path.append('./')
 from redditrepostsleuth.core.celery.admin_tasks import delete_post_task, update_last_deleted_check
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
@@ -129,9 +130,9 @@ async def main():
             tasks = []
             conn = TCPConnector(limit=0)
             async with ClientSession(connector=conn) as session:
-                for chunk in chunk_list(posts, 100):
-                    url = build_reddit_req_url([p.post_id for p in chunk])
-                    job = RedditRemovalCheck(url, chunk, JobStatus.STARTED, proxy_manager.get_proxy())
+                for req_chunk in chunk_list(posts, 100):
+                    url = build_reddit_req_url([p.post_id for p in req_chunk])
+                    job = RedditRemovalCheck(url, req_chunk, JobStatus.STARTED, proxy_manager.get_proxy())
                     tasks.append(ensure_future(fetch_page(job, session)))
 
                 results: list[RedditRemovalCheck] = await gather(*tasks)
@@ -151,7 +152,7 @@ async def main():
                 celery_jobs = []
 
                 log.info('Sending update jobs to Celery')
-                for batch in chunk_list(merged_results.to_update, 2000):
+                for batch in chunk_list(merged_results.to_update, 1500):
                     celery_jobs.append(update_last_deleted_check.s(batch, ))
 
                 log.info('Starting Celery Jobs')
