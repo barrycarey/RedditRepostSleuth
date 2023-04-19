@@ -1,13 +1,14 @@
 import json
 import os
 import sys
+import time
 from asyncio import run, ensure_future, gather
 from urllib.parse import urlparse
 
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError, ClientConnectorError, TCPConnector
 from celery import group
 sys.path.append('./')
-from redditrepostsleuth.core.celery.admin_tasks import delete_post_task, update_last_deleted_check
+from redditrepostsleuth.core.celery.admin_tasks import delete_post_task, update_last_deleted_check, bulk_delete
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -123,7 +124,8 @@ async def main():
     while True:
         with uowm.start() as uow:
             proxy_manager.enabled_expired_cooldowns()
-            posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
+            log.info('Getting posts that need to be checked')
+            posts = uow.posts.find_all_for_delete_check(120, limit=query_limit)
             processed_count += query_limit
             log.info('First: %s %s - Last: %s %s', posts[0].post_id, posts[0].created_at, posts[-1].post_id,
                      posts[-1].created_at)
@@ -164,7 +166,113 @@ async def main():
                     result.join()
                 except Exception as e:
                     continue
+async def main_temp():
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(Config()))
+    proxy_manager = ProxyManager(uowm, 600)
+    query_limit = int(os.getenv('QUERY_LIMIT', 20000))
+
+    processed_count = 0
+    total_deleted = 0
+    while True:
+        with uowm.start() as uow:
+            proxy_manager.enabled_expired_cooldowns()
+            posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
+            processed_count += query_limit
+            celery_jobs = []
+            for batch in chunk_list(posts, 20000):
+                log.info('First: %s %s - Last: %s %s', posts[0].post_id, posts[0].created_at, posts[-1].post_id,
+                         posts[-1].created_at)
+                tasks = []
+                conn = TCPConnector(limit=0)
+
+                async with ClientSession(connector=conn) as session:
+                    for req_chunk in chunk_list(batch, 100):
+                        url = build_reddit_req_url([p.post_id for p in req_chunk])
+                        job = RedditRemovalCheck(url, req_chunk, JobStatus.STARTED, proxy_manager.get_proxy())
+                        tasks.append(ensure_future(fetch_page(job, session)))
+
+                    results: list[RedditRemovalCheck] = await gather(*tasks)
+
+                    log.debug('Merging job results')
+                    processed_results = list(map(check_reddit_batch, results))
+                    merged_results = merge_results(processed_results)
+                    log.info('Results: To Delete: %s - To Update: %s - To Recheck %s',
+                             len(merged_results.to_delete), len(merged_results.to_update),
+                             len(merged_results.to_recheck))
+
+                    log.info('Sending to deleted queue')
+                    total_deleted += len(merged_results.to_delete)
+                    # for p in merged_results.to_delete:
+                    #     log.debug('Sending %s to delete queue - https://redd.it/%s', p, p)
+                    #     delete_post_task.apply_async((p,))
+                    celery_jobs.append(bulk_delete.apply_async((merged_results.to_delete,), queue='post_delete'))
+
+                    log.info('Sending update jobs to Celery')
+                    for update_batch in chunk_list(merged_results.to_update, 2000):
+                        celery_jobs.append(update_last_deleted_check.apply_async((update_batch, )))
+
+            log.info('Starting Celery Jobs')
+            for j in celery_jobs:
+                j.get(timeout=150)
+                log.info('Job Completel')
+async def main_batch():
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(Config()))
+    proxy_manager = ProxyManager(uowm, 600)
+    query_limit = int(os.getenv('QUERY_LIMIT', 20000))
+
+    processed_count = 0
+    total_deleted = 0
+    while True:
+        with uowm.start() as uow:
+            proxy_manager.enabled_expired_cooldowns()
+            posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
+            processed_count += query_limit
+            celery_jobs = []
+            for batch in chunk_list(posts, 20000):
+                log.info('First: %s %s - Last: %s %s', posts[0].post_id, posts[0].created_at, posts[-1].post_id,
+                         posts[-1].created_at)
+                tasks = []
+                conn = TCPConnector(limit=0)
+
+                async with ClientSession(connector=conn) as session:
+                    for req_chunk in chunk_list(batch, 100):
+                        url = build_reddit_req_url([p.post_id for p in req_chunk])
+                        job = RedditRemovalCheck(url, req_chunk, JobStatus.STARTED, proxy_manager.get_proxy())
+                        tasks.append(ensure_future(fetch_page(job, session)))
+
+                    results: list[RedditRemovalCheck] = await gather(*tasks)
+
+                    log.debug('Merging job results')
+                    processed_results = list(map(check_reddit_batch, results))
+                    merged_results = merge_results(processed_results)
+                    log.info('Results: To Delete: %s - To Update: %s - To Recheck %s',
+                             len(merged_results.to_delete), len(merged_results.to_update),
+                             len(merged_results.to_recheck))
+
+                    log.info('Sending to deleted queue')
+                    total_deleted += len(merged_results.to_delete)
+                    for p in merged_results.to_delete:
+                        log.debug('Sending %s to delete queue - https://redd.it/%s', p, p)
+                        delete_post_task.apply_async((p,))
+
+
+
+                    log.info('Sending update jobs to Celery')
+                    for update_batch in chunk_list(merged_results.to_update, 2000):
+                        celery_jobs.append(update_last_deleted_check.s(update_batch, ))
+
+            log.info('Starting Celery Jobs')
+            job = group(celery_jobs)
+            result = job.apply_async()
+            log.info(f'Total Processed: {processed_count}')
+            log.info(f'Total Deleted: {total_deleted}')
+            log.info(f'Delete Percent: {round(total_deleted / processed_count * 100, 2)}')
+            try:
+                log.info('Waiting for celery jobs to complete')
+                result.join(timeout=3600)
+            except Exception as e:
+                continue
 
 
 if __name__ == '__main__':
-    run(main())
+    run(main_temp())

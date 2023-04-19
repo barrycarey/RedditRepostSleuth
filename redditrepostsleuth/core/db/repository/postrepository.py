@@ -59,7 +59,7 @@ class PostRepository:
 
     def find_all_for_delete_check(self, days: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(days=days)
-        return self.db_session.query(Post).filter(Post.id > 996910147, Post.last_deleted_check < since).offset(offset).limit(limit).all()
+        return self.db_session.query(Post).filter(Post.last_deleted_check < since).offset(offset).limit(limit).all()
 
     def get_all_by_days_old(self, days: int, limit: int = None, offset: int = None) -> list[Post]:
         since = datetime.now() - timedelta(days=days)
