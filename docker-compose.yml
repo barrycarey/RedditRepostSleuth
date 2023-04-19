@@ -30,7 +30,7 @@ services:
             dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - QUERY_LIMIT=25000
+            - QUERY_LIMIT=1000000
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
 
     delete_post_worker:
@@ -43,7 +43,7 @@ services:
             - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 7
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 16
         volumes:
             - /opt/imageindex:/opt/imageindex
 

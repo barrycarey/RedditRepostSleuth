@@ -25,6 +25,7 @@ task_routes = {
     'redditrepostsleuth.core.celery.admin_tasks.check_if_watched_post_is_active': {'queue': 'watch_remove_deleted'},
     'redditrepostsleuth.core.celery.admin_tasks.delete_post_task': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.admin_tasks.update_last_deleted_check': {'queue': 'post_delete'},
+    'redditrepostsleuth.core.celery.admin_tasks.bulk_delete': {'queue': 'post_delete'},
 
 }
 

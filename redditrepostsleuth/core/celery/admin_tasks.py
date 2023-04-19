@@ -1,12 +1,15 @@
+import os
 from datetime import datetime
 from time import perf_counter
 from typing import NoReturn, Dict, Text, List
 
+import pymysql
 from praw.exceptions import PRAWException
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AdminTask, RedditTask, SqlAlchemyTask
+from redditrepostsleuth.core.celery.basetasks import AdminTask, RedditTask, SqlAlchemyTask, PyMysqlTask
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch, Post
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
@@ -20,6 +23,38 @@ log = configure_logger(
     format='%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - Trace_ID=%(trace_id)s Post_ID=%(post_id)s Subreddit=%(subreddit)s Service=%(service)s Level=%(levelname)s Message=%(message)s',
     filters=[ContextFilter()]
 )
+
+config = Config()
+
+def get_conn():
+    return pymysql.connect(host=os.getenv('DB_HOST'),
+                           user=os.getenv('DB_USER'),
+                           password=os.getenv('DB_PASSWORD'),
+                           db=os.getenv('DB_NAME'),
+                           cursorclass=pymysql.cursors.SSDictCursor)
+
+def bulk_delete_old(post_ids: list[str]):
+    if not post_ids:
+        return
+    conn = get_conn()
+    in_params = ','.join(['%s'] * len(post_ids))
+    queries = [
+        'DELETE FROM reddit_post where post_id IN (%s)' % in_params,
+        'DELETE FROM reddit_image_post WHERE post_id in (%s)'  % in_params,
+        'DELETE FROM investigate_post WHERE post_id in (%s)' % in_params,
+        'DELETE FROM reddit_bot_comment WHERE post_id in (%s)' % in_params,
+        'DELETE FROM reddit_bot_summons WHERE post_id in (%s)' % in_params,
+        'DELETE FROM reddit_image_search WHERE post_id in (%s)' % in_params,
+        'DELETE FROM reddit_user_report WHERE post_id in (%s)' % in_params,
+        'DELETE FROM reddit_repost_watch WHERE post_id in (%s)' % in_params,
+        ]
+
+    with conn.cursor() as cur:
+        for q in queries:
+            res = cur.execute(q, post_ids)
+        conn.commit()
+
+    log.info('Deleted Batch')
 
 def cleanup_post(post_id: str, uowm) -> None:
     try:
@@ -38,6 +73,35 @@ def cleanup_post(post_id: str, uowm) -> None:
     except Exception as e:
         log.exception('')
 
+@celery.task(bind=True, base=PyMysqlTask)
+def bulk_delete(self, post_ids: list[str]):
+    if not post_ids:
+        return
+    db_conn = self.get_conn()
+    try:
+        log.debug('Deleting Batch')
+        in_params = ','.join(['%s'] * len(post_ids))
+        queries = [
+            'DELETE FROM reddit_post where post_id IN (%s)' % in_params,
+            'DELETE FROM reddit_image_post WHERE post_id in (%s)' % in_params,
+            'DELETE FROM investigate_post WHERE post_id in (%s)' % in_params,
+            'DELETE FROM reddit_bot_comment WHERE post_id in (%s)' % in_params,
+            'DELETE FROM reddit_bot_summons WHERE post_id in (%s)' % in_params,
+            'DELETE FROM reddit_image_search WHERE post_id in (%s)' % in_params,
+            'DELETE FROM reddit_user_report WHERE post_id in (%s)' % in_params,
+            'DELETE FROM reddit_repost_watch WHERE post_id in (%s)' % in_params,
+        ]
+
+        with db_conn.cursor() as cur:
+            for q in queries:
+                log.info(q)
+                res = cur.execute(q, post_ids)
+                print(res)
+            db_conn.commit()
+    except Exception as e:
+        log.exception('')
+    finally:
+        db_conn.close()
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 def delete_post_task(self, post_id: str) -> None:
