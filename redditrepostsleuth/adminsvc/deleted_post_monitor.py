@@ -174,6 +174,7 @@ async def main_temp():
     processed_count = 0
     total_deleted = 0
     while True:
+        start = time.perf_counter()
         with uowm.start() as uow:
             proxy_manager.enabled_expired_cooldowns()
             posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
@@ -211,10 +212,14 @@ async def main_temp():
                     for update_batch in chunk_list(merged_results.to_update, 2000):
                         celery_jobs.append(update_last_deleted_check.apply_async((update_batch, )))
 
-            log.info('Starting Celery Jobs')
+            log.info('Waiting For Celery Jobs to Complete')
+            log.info(f'Total Processed: {processed_count}')
+            log.info(f'Total Deleted: {total_deleted}')
+            log.info(f'Delete Percent: {round(total_deleted / processed_count * 100, 2)}')
             for j in celery_jobs:
-                j.get(timeout=150)
-                log.info('Job Completel')
+                j.get()
+                log.info('Job Complete: %s', j.id)
+            log.info('Batch time: %s', round(time.perf_counter() - start, 5))
 async def main_batch():
     uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(Config()))
     proxy_manager = ProxyManager(uowm, 600)
@@ -223,6 +228,7 @@ async def main_batch():
     processed_count = 0
     total_deleted = 0
     while True:
+        start = time.perf_counter()
         with uowm.start() as uow:
             proxy_manager.enabled_expired_cooldowns()
             posts = uow.posts.find_all_for_delete_check(60, limit=query_limit)
@@ -272,6 +278,7 @@ async def main_batch():
                 result.join(timeout=3600)
             except Exception as e:
                 continue
+            log.info('Batch time: %s', round(time.perf_counter() - start, 5))
 
 
 if __name__ == '__main__':
