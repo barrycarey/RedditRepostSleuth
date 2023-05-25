@@ -95,7 +95,6 @@ def bulk_delete(self, post_ids: list[str]):
         with db_conn.cursor() as cur:
             for q in queries:
                 res = cur.execute(q, post_ids)
-                print(res)
             db_conn.commit()
     except Exception as e:
         log.exception('')
