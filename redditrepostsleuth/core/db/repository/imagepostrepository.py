@@ -43,5 +43,8 @@ class ImagePostRepository:
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
 
+    def remove_by_post_id(self, post_id: str) -> None:
+        self.db_session.query(RedditImagePost).filter(RedditImagePost.post_id == post_id).delete()
+
     def find_all_images_with_hash_return_id_hash(self, limit: int = None, id: int = 0):
         return self.db_session.query(RedditImagePost).filter(RedditImagePost.id > id).with_entities(RedditImagePost.id, RedditImagePost.dhash_h).limit(limit).all()

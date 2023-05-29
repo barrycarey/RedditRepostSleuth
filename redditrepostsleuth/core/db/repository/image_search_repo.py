@@ -39,3 +39,6 @@ class ImageSearchRepo:
 
     def remove(self, item: ImageSearch):
         self.db_session.delete(item)
+
+    def remove_by_post_id(self, post_id: str) -> None:
+        self.db_session.query(ImageSearch).filter(ImageSearch.post_id == post_id).delete()

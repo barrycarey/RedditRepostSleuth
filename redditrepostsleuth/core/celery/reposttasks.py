@@ -41,6 +41,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
     r = requests.head(post.url)
     if r.status_code != 200:
         log.info('Skipping image that is deleted %s', post.url)
+        celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
         return
 
     search_settings = get_default_image_search_settings(self.config)
@@ -86,7 +87,7 @@ def link_repost_check(self, posts, ):
             if len(search_results.matches) > 10000:
                 log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(search_results.matches))
                 self.link_blacklist.append(post.url_hash)
-                self.notification_svc.send_notification(f'URL has been shared {len(search_results.matches)} times. Adding to blacklist. \n\n {post.url}')
+                self.notification_svc.send_notification(f'URL has been shared {len(search_results.matches)} times. Adding to blacklist. \n\n {post.url_hash}\n\n {post.url}')
 
             search_results = filter_search_results(
                 search_results,

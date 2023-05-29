@@ -5,7 +5,7 @@ pymysql
 pillow
 requests
 distance
-celery[redis]==5.2.7
+celery[redis]
 dataclasses
 flower
 eventlet
@@ -30,3 +30,5 @@ google-cloud-vision
 opencv-python
 imutils
 pydantic
+aiohttp
+pytest-asyncio

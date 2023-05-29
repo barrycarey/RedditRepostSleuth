@@ -3,7 +3,7 @@ MAINTAINER Barry Carey <mcarey66@gmail.com>
 
 VOLUME /src/
 COPY sleuth_config.json /src/
-COPY /redditrepostsleuth/workers/ingest/requirements.txt /src/
+COPY redditrepostsleuth/adminsvc/requirements.txt /src/
 ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src
 
@@ -13,4 +13,4 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     python-dev && pip install -r requirements.txt
 
-ENTRYPOINT celery -A redditrepostsleuth.common worker -Q postingest,repost -c 6
+CMD ["python", "-u", "/src/redditrepostsleuth/adminsvc/deleted_post_monitor.py"]
