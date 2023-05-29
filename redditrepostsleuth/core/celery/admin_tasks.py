@@ -33,29 +33,6 @@ def get_conn():
                            db=os.getenv('DB_NAME'),
                            cursorclass=pymysql.cursors.SSDictCursor)
 
-def bulk_delete_old(post_ids: list[str]):
-    if not post_ids:
-        return
-    conn = get_conn()
-    in_params = ','.join(['%s'] * len(post_ids))
-    queries = [
-        'DELETE FROM reddit_post where post_id IN (%s)' % in_params,
-        'DELETE FROM reddit_image_post WHERE post_id in (%s)'  % in_params,
-        'DELETE FROM investigate_post WHERE post_id in (%s)' % in_params,
-        'DELETE FROM reddit_bot_comment WHERE post_id in (%s)' % in_params,
-        'DELETE FROM reddit_bot_summons WHERE post_id in (%s)' % in_params,
-        'DELETE FROM reddit_image_search WHERE post_id in (%s)' % in_params,
-        'DELETE FROM reddit_user_report WHERE post_id in (%s)' % in_params,
-        'DELETE FROM reddit_repost_watch WHERE post_id in (%s)' % in_params,
-        ]
-
-    with conn.cursor() as cur:
-        for q in queries:
-            res = cur.execute(q, post_ids)
-        conn.commit()
-
-    log.info('Deleted Batch')
-
 def cleanup_post(post_id: str, uowm) -> None:
     try:
         with uowm.start() as uow:
@@ -105,14 +82,6 @@ def bulk_delete(self, post_ids: list[str]):
 def delete_post_task(self, post_id: str) -> None:
     cleanup_post(post_id, self.uowm)
 
-def post_to_dict(post: Post):
-    print('')
-    return {
-        'id': post.id,
-        'last_deleted_check': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
-
-    }
-
 def update_last_delete_check(ids: list[int], uowm) -> None:
     with uowm.start() as uow:
         batch = []
@@ -120,6 +89,7 @@ def update_last_delete_check(ids: list[int], uowm) -> None:
             batch.append({'id': id, 'last_deleted_check': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')})
         uow.session.bulk_update_mappings(Post, batch)
         uow.commit()
+
 @celery.task(bind=True, base=SqlAlchemyTask)
 def update_last_deleted_check(self, post_ids: list[int]) -> None:
     try:
@@ -129,17 +99,6 @@ def update_last_deleted_check(self, post_ids: list[int]) -> None:
         print(f'Save Time: {round(perf_counter() - start, 5)}')
     except Exception as e:
         log.exception()
-
-@celery.task(bind=True, base=SqlAlchemyTask)
-def update_last_deleted_check_old(self, post_ids: list[str]) -> None:
-    with self.uowm.start() as uow:
-        posts = uow.posts.get_all_by_post_ids(post_ids)
-        log.info('Updating last deleted check timestamp for %s posts', len(posts))
-        start = perf_counter()
-        for post in posts:
-            post.last_deleted_check = func.utc_timestamp()
-        uow.commit()
-        print(f'Save Time: {round(perf_counter() - start, 5)}')
 
 @celery.task(bind=True, base=AdminTask)
 def check_for_subreddit_config_update_task(self, monitored_sub: MonitoredSub) -> NoReturn:
