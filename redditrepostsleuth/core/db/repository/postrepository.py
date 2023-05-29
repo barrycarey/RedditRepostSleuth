@@ -57,10 +57,16 @@ class PostRepository:
     def find_all_by_repost_check(self, repost_check: bool, limit: int = None, offset: int = None):
         return self.db_session.query(Post).filter(Post.post_type == 'image', Post.checked_repost == repost_check, Post.crosspost_parent == None, Post.dhash_h != None).order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
-    def find_all_for_delete_check(self, hours: int, limit: int = None, offset: int = None) -> List[Post]:
-        since = datetime.now() - timedelta(hours=hours)
+    def find_all_for_delete_check(self, days: int, limit: int = None, offset: int = None) -> List[Post]:
+        since = datetime.now() - timedelta(days=days)
         return self.db_session.query(Post).filter(Post.last_deleted_check < since).offset(offset).limit(limit).all()
 
+    def find_all_by_id_for_delete_check(self, id: int, limit: int = None, offset: int = None) -> List[Post]:
+        return self.db_session.query(Post).filter(Post.id > id).offset(offset).limit(limit).all()
+
+    def get_all_by_days_old(self, days: int, limit: int = None, offset: int = None) -> list[Post]:
+        since = datetime.now() - timedelta(days=days)
+        return self.db_session.query(Post).filter(Post.created_at > since).offset(offset).limit(limit).all()
     def no_selftext(self, limit: int, offset: int):
         return self.db_session.query(Post).filter(Post.post_type == 'text', Post.selftext == None).offset(offset).limit(limit).all()
 
@@ -94,6 +100,15 @@ class PostRepository:
 
     def get_all_by_ids(self, ids: list[int]) -> list[Post]:
         return self.db_session.query(Post).filter(Post.id.in_(ids)).all()
+
+    def get_all_by_post_ids(self, ids: list[int]) -> list[Post]:
+        return self.db_session.query(Post).filter(Post.post_id.in_(ids)).all()
+
+    def remove_by_post_id(self, post_id: str) -> None:
+        self.db_session.query(Post).filter(Post.post_id == post_id).delete()
+
+    def remove_by_post_ids(self, post_ids: str) -> None:
+        self.db_session.query(Post).filter(Post.post_id.in_(post_ids)).delete()
 
     def remove(self, item: Post):
         log.debug('Deleting post %s', item.id)

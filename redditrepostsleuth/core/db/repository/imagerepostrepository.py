@@ -59,3 +59,6 @@ class ImageRepostRepository:
     def remove(self, item: ImageRepost):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
+
+    def remove_by_post_id(self, post_id: str) -> None:
+        self.db_session.query(ImageRepost).filter(ImageRepost.post_id == post_id).delete()

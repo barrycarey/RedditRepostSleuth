@@ -1,3 +1,4 @@
+import pymysql
 from celery import Task
 
 from redditrepostsleuth.core import logging
@@ -24,6 +25,17 @@ class SqlAlchemyTask(Task):
         self.config = Config()
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging()
+
+class PyMysqlTask(Task):
+    def __init__(self):
+        self.config = Config()
+
+    def get_conn(self):
+        return pymysql.connect(host=self.config.db_host,
+                        user=self.config.db_user,
+                        password=self.config.db_password,
+                        db=self.config.db_name,
+                        cursorclass=pymysql.cursors.SSDictCursor)
 
 class RepostTask(SqlAlchemyTask):
     def __init__(self):

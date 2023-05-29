@@ -453,6 +453,12 @@ def get_next_ids(start_id, count):
         ids.append("t3_"+base36encode(id_num))
     return ids, base36encode(id_num)
 
+def generate_next_ids(start_id, count):
+    start_num = base36decode(start_id)
+    for id_num in range(start_num, start_num + count):
+        yield base36encode(id_num)
+
+
 def get_newest_praw_post_id(reddit: Reddit) -> int:
     """
     Grab the newest post available via Praw and return the decoded post_id
