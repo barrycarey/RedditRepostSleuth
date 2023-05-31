@@ -29,6 +29,25 @@ task_routes = {
 
 }
 
+beat_schedule = {
+    'update-proxy-list': {
+        'task': 'redditrepostsleuth.core.celery.admin_tasks.update_proxies_job',
+        'schedule': 3600
+    },
+    'update-subreddit-stats': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_subreddit_stats',
+        'schedule': 21600
+    },
+    'check-inbox': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_inbox',
+        'schedule': 300
+    },
+    'check-downvote-comments': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_comments_for_downvotes',
+        'schedule': 1800
+    }
+}
+
 # TODO - I don't like this solution but had to do it to reduce dependancies per service
 # It allows us to only import the tasks we need for a specific worker
 if os.getenv('CELERY_IMPORTS', None):
