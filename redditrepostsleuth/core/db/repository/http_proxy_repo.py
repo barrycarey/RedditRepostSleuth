@@ -6,7 +6,7 @@ class HttpProxyRepo:
     def __init__(self, db_session):
         self.db_session = db_session
 
-    def add(self, item):
+    def add(self, item: HttpProxy):
         self.db_session.add(item)
 
     def get_by_id(self, id: int) -> HttpProxy:
@@ -17,3 +17,6 @@ class HttpProxyRepo:
 
     def get_all_disabled(self) -> list[HttpProxy]:
         return self.db_session.query(HttpProxy).filter(HttpProxy.enabled == False).all()
+
+    def delete_all(self) -> None:
+        self.db_session.query(HttpProxy).delete()
