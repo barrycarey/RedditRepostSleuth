@@ -10,3 +10,4 @@ falcon
 redlock
 aiohttp
 Brotli
+influxdb-client

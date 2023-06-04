@@ -1,12 +1,13 @@
 version: "3.7"
 services:
     ingest:
+        container_name: ingest-svc
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/ingestsvc/Dockerfile
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
 
     admin_svc:
@@ -120,14 +121,14 @@ services:
 
     ingest_worker:
         restart: always
+        container_name: ingest-worker
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-            #- HASH_API=http://157.230.64.152:8000/hash
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -c 20
 
     generic_repost_worker:

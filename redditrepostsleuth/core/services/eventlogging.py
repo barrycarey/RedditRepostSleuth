@@ -2,8 +2,6 @@ from datetime import datetime, timedelta
 from time import sleep
 from typing import NoReturn
 
-
-from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 
@@ -71,7 +69,7 @@ class EventLogging:
             log.debug('Wrote to Influx: %s', event.get_influx_event())
             self._successive_failures = 0
             return True
-        except (InfluxDBClientError, ConnectionError, InfluxDBServerError, ReadTimeout) as e:
+        except Exception as e:
             if hasattr(e, 'code') and e.code == 404:
                 #log.error('Database %s Does Not Exist.  Attempting To Create', config.influx_database)
                 self._influx_client.create_database(self._config.influx_database)

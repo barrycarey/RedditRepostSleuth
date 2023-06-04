@@ -64,6 +64,7 @@ if __name__ == '__main__':
     with uowm.start() as uow:
         oldest_post = uow.posts.get_newest_post()
         oldest_id = oldest_post.post_id
+        oldest_id = "13yc2l1"
 
     #threading.Thread(target=startup_backfill, args=(newest_id, oldest_id), name='praw_ingest').start()
    # startup_backfill(newest_id, oldest_id)
