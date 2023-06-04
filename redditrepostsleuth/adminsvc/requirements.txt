@@ -1,7 +1,7 @@
 pymysql
 praw
 sqlalchemy
-influxdb
+influxdb-client
 imagehash
 apscheduler
 redis

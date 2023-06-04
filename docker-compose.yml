@@ -58,6 +58,7 @@ services:
         entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
 
     stat_monitor_svc:
+        container_name: stat_monitor
         restart: always
         build:
             context: .
@@ -153,8 +154,7 @@ services:
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image --autoscale=14,5
         volumes:
             - /opt/imageindex:/opt/imageindex
-        networks:
-            - sleuthnet
+
 
 
 
@@ -211,12 +211,7 @@ services:
         environment:
             LOG_LEVEL: INFO
         restart: always
-        networks:
-            - sleuthnet
         entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:7777 --workers 10
         ports:
             - 7777:7777
 
-networks:
-  sleuthnet:
-    external: true

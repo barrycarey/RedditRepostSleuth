@@ -1,0 +1,66 @@
+version: "3.7"
+services:
+    grafana:
+      image: grafana/grafana:latest
+      container_name: grafana
+      restart: unless-stopped
+      ports:
+        - "3000:3000"
+      volumes:
+        - /config/grafana:/var/lib/grafana
+      user: '1001'
+
+    loki:
+      image: grafana/loki:latest
+      container_name: loki
+      restart: unless-stopped
+      ports:
+        - "3100:3100"
+      user: '1001'
+      command: -config.file=/etc/loki/loki-config.yaml
+      volumes:
+        - /config/loki/loki-config.yaml:/etc/loki/loki-config.yaml
+        - /config/loki/data:/loki
+        - /config/loki/wal:/wal
+
+    redis:
+      image: redis:7.0.11
+      container_name: redis
+      user: '1001'
+      ports:
+        - '6379:6379'
+      volumes:
+        - /config/redis:/data
+      command: redis-server --save 60 1
+
+    influxdb:
+      image: influxdb:latest
+      container_name: influxdb
+      restart: unless-stopped
+      user: '1001'
+      ports:
+        - '8086:8086'
+      volumes:
+        - /config/influxdb/data:/var/lib/influxdb2
+        - /config/influxdb/config.yml:/etc/influxdb2/config.yml
+
+    telegraf:
+      image: telegraf-collectd:1.1
+      container_name: telegraf
+      user: '1001'
+      environment:
+        - HOST_ETC=/hostfs/etc
+        - HOST_PROC=/hostfs/proc
+        - HOST_SYS=/hostfs/sys
+        - HOST_VAR=/hostfs/var
+        - HOST_RUN=/hostfs/run
+        - HOST_MOUNT_PREFIX=/hostfs
+      ports:
+        - '8125:8125'
+        - '8092:8092'
+        - '8094:8094'
+        - '25826:25826/udp'
+      volumes:
+        - /config/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+        - /config/telegraf/types.db:/data/types.db
+        - /:/hostfs:ro

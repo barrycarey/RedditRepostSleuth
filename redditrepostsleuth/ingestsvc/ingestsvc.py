@@ -69,7 +69,7 @@ if __name__ == '__main__':
    # startup_backfill(newest_id, oldest_id)
 
     while True:
-        ids_to_get = get_next_ids(oldest_id, 100)[0]
+        ids_to_get = get_next_ids(newest_id, 100)[0]
         results = get_submissions(ids_to_get)
         if not results:
             continue

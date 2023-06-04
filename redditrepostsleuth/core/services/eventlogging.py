@@ -2,8 +2,10 @@ from datetime import datetime, timedelta
 from time import sleep
 from typing import NoReturn
 
-from influxdb import InfluxDBClient
+
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
+from influxdb_client import InfluxDBClient
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 from requests.exceptions import ConnectionError, ReadTimeout
 
@@ -19,17 +21,13 @@ class EventLogging:
         else:
             self._config = Config()
 
-        self._influx_client = InfluxDBClient(
-            self._config.influx_host,
-            self._config.influx_port,
-            database=self._config.influx_database,
-            ssl=self._config.influx_verify_ssl,
-            verify_ssl=self._config.influx_verify_ssl,
-            username=self._config.influx_user,
-            password=self._config.influx_password,
-            timeout=5,
-            pool_size=50
+        client = InfluxDBClient(
+            url=f'http://{self._config.influx_host}:{self._config.influx_port}',
+            token=self._config.influx_token,
+            org=self._config.influx_org,
         )
+
+        self._influx_client = client.write_api(write_options=SYNCHRONOUS)
 
         self._retry_time = None
         self._successive_failures = 0
@@ -47,6 +45,7 @@ class EventLogging:
         return True
 
     def save_event(self, event: InfluxEvent):
+
         log.debug('Unsaved events %s', len(self._unsaved_events))
         if not self.can_save():
             log.info('Event logging disabled until %s', self._retry_time)
@@ -68,7 +67,7 @@ class EventLogging:
 
     def _write_to_influx(self, event: InfluxEvent) -> bool:
         try:
-            self._influx_client.write_points(event.get_influx_event())
+            self._influx_client.write(bucket=self._config.influx_bucket, record=event.get_influx_event())
             log.debug('Wrote to Influx: %s', event.get_influx_event())
             self._successive_failures = 0
             return True
