@@ -3,7 +3,7 @@ pymysql
 sqlalchemy
 redlock
 imagehash
-influxdb
+influxdb-client
 annoy
 distance
 celery[redis]

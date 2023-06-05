@@ -63,4 +63,5 @@ services:
       volumes:
         - /config/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
         - /config/telegraf/types.db:/data/types.db
+        - /var/run/docker.sock:/var/run/docker.sock
         - /:/hostfs:ro

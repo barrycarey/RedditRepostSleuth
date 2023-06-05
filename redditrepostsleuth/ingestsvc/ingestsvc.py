@@ -87,3 +87,5 @@ if __name__ == '__main__':
         log.info('Current Delay: %s', ingest_delay)
 
         newest_id = results[-1]['id']
+        if len(results) < 75:
+            time.sleep(5)

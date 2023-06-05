@@ -24,23 +24,27 @@ log = configure_logger(
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post: Post):
-    update_log_context_data(log, {'post_type': post.post_type, 'post_id': post.post_id,
-                                  'subreddit': post.subreddit, 'service': 'Ingest',
-                                  'trace_id': str(randint(1000000, 9999999))})
-    with self.uowm.start() as uow:
-        existing = uow.posts.get_by_post_id(post.post_id)
-        if existing:
-            return
-        log.debug('Post %s: Ingesting', post.post_id)
-        post = pre_process_post(post, self.uowm, self.config.image_hash_api)
-        if post:
-            monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
-            if monitored_sub:
-                log.info('Sending ingested post to monitored sub queue')
-                celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post', args=[post.post_id, monitored_sub],
-                                 queue='submonitor')
-            ingest_repost_check.apply_async((post,self.config), queue='repost')
-            log.debug('Sent post to repost queue',)
+    try:
+        update_log_context_data(log, {'post_type': post.post_type, 'post_id': post.post_id,
+                                      'subreddit': post.subreddit, 'service': 'Ingest',
+                                      'trace_id': str(randint(1000000, 9999999))})
+        with self.uowm.start() as uow:
+            existing = uow.posts.get_by_post_id(post.post_id)
+            if existing:
+                return
+            log.debug('Post %s: Ingesting', post.post_id)
+            post = pre_process_post(post, self.uowm, self.config.image_hash_api)
+            if post:
+                monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
+                if monitored_sub:
+                    log.info('Sending ingested post to monitored sub queue')
+                    celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post',
+                                     args=[post.post_id, monitored_sub],
+                                     queue='submonitor')
+                ingest_repost_check.apply_async((post, self.config), queue='repost')
+                log.debug('Sent post to repost queue', )
+    except Exception as e:
+        log.exception('')
 
 
 @celery.task(ignore_results=True)

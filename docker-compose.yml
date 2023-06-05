@@ -11,16 +11,11 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
 
     admin_svc:
+        container_name: admin-svc
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/adminsvc/Dockerfile
-        deploy:
-            restart_policy:
-                condition: on-failure
-                delay: 5s
-                max_attempts: 3
-                window: 120s
         environment:
             - LOG_LEVEL=WARN
 
@@ -48,16 +43,6 @@ services:
         volumes:
             - /opt/imageindex:/opt/imageindex
 
-
-    summons_svc:
-        restart: always
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/summonssvc/Dockerfile
-        environment:
-            - LOG_LEVEL=WARN
-        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
-
     stat_monitor_svc:
         container_name: stat_monitor
         restart: always
@@ -68,30 +53,37 @@ services:
             - LOG_LEVEL=WARN
         entrypoint: python -u /src/redditrepostsleuth/monitorsvc/monitorsvc.py
 
-    summons_handler:
+    summons_svc:
+        container_name: summons-svc
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/summonssvc/Dockerfile
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=DEBUG
+        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
+
+    summons_handler:
+        container_name: summons-handler
+        restart: always
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/summonssvc/Dockerfile
+        environment:
+            - LOG_LEVEL=INFO
         entrypoint: python -u /src/redditrepostsleuth/summonssvc/summons_handler_svc_celery.py
-        volumes:
-            - /opt/imageindex:/opt/imageindex
 
     summons_worker:
+        container_name: summons-worker
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
         environment:
-            - LOG_LEVEL=WARN
-            - SLEUTHCONFIG=testconfig.ini
+            - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q summons -c 3
-        volumes:
-            - /opt/imageindex:/opt/imageindex
 
     subreddit_monitor:
         restart: always
@@ -106,18 +98,16 @@ services:
             - /opt/imageindex:/opt/imageindex
 
     submonitor_worker:
+        container_name: submonitor-worker
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SubMonitorWorkerDockerFile
         environment:
-            - LOG_LEVEL=WARN
-            - SLEUTHCONFIG=testconfig.ini
+            - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 6
-        volumes:
-            - /opt/imageindex:/opt/imageindex
 
     ingest_worker:
         restart: always
@@ -132,40 +122,37 @@ services:
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -c 20
 
     generic_repost_worker:
+        container_name: generic-repost-worker
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=WARN
-            - SLEUTHCONFIG=testconfig.ini
+            - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost,repost_link,watch_notify --autoscale=10,2
 
     image_repost_worker:
+        container_name: image-repost-worker
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image --autoscale=14,5
-        volumes:
-            - /opt/imageindex:/opt/imageindex
-
-
-
 
     misc_task_worker:
+        container_name: misc-task-worker
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks,redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q monitored_sub_update,config_update_check,monitored_sub_config_update,watch_remove_deleted -c 5
@@ -206,6 +193,7 @@ services:
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_ingest -c 1
 
     frontend_api:
+        container_name: frontend-api
         build:
             context: .
             dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
