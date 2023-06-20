@@ -2,13 +2,14 @@ version: "3.7"
 services:
     ingest:
         container_name: ingest-svc
-        restart: always
+        restart: unless-stopped
         build:
-            context: .
+            context: ./
             dockerfile: redditrepostsleuth/ingestsvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
+        entrypoint: python -u ingestsvc.py
 
     admin_svc:
         container_name: admin-svc
@@ -30,13 +31,13 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
 
     delete_post_worker:
+        container_name: delete-post-worker
         restart: always
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
         environment:
             - LOG_LEVEL=DEBUG
-            - SLEUTHCONFIG=testconfig.ini
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -c 16

@@ -5,5 +5,5 @@ sqlalchemy
 pymysql
 imagehash
 falcon
-redlock
 influxdb-client
+aiohttp

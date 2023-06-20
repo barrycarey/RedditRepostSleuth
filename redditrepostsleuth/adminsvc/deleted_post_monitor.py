@@ -6,15 +6,15 @@ from asyncio import run, ensure_future, gather
 from urllib.parse import urlparse
 
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError, ClientConnectorError, TCPConnector
-from celery import group
+
 sys.path.append('./')
-from redditrepostsleuth.core.celery.admin_tasks import delete_post_task, update_last_deleted_check, bulk_delete
+from redditrepostsleuth.core.celery.admin_tasks import update_last_deleted_check, bulk_delete
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.logging import get_configured_logger
-from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, JobStatus, RedditRemovalCheck
+from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, JobStatus, BatchedPostRequestJob
 from redditrepostsleuth.core.proxy_manager import ProxyManager
 from redditrepostsleuth.core.util.constants import GENERIC_REQ_HEADERS
 from redditrepostsleuth.core.util.helpers import chunk_list
@@ -22,7 +22,7 @@ from redditrepostsleuth.core.util.helpers import chunk_list
 log = get_configured_logger(__name__)
 
 
-async def fetch_page(job: RedditRemovalCheck, session: ClientSession) -> RedditRemovalCheck:
+async def fetch_page(job: BatchedPostRequestJob, session: ClientSession) -> BatchedPostRequestJob:
     proxy = f'http://{job.proxy.address}'
 
     try:
@@ -54,13 +54,17 @@ def build_reddit_req_url(post_ids: list[str]) -> str:
     t3_ids = [f't3_{p}' for p in post_ids]
     return f'https://api.reddit.com/api/info?id={",".join(t3_ids)}'
 
+def build_reddit_query_string(post_ids: list[str]) -> str:
+    t3_ids = [f't3_{p}' for p in post_ids]
+    return f'{",".join(t3_ids)}'
+
 def get_post_ids_from_reddit_req_url(url: str) -> list[str]:
     parsed_url = urlparse(url)
     t3_ids = parsed_url.query.replace('id=', '').split(',')
     return [id.replace('t3_', '') for id in t3_ids]
 
 
-def check_reddit_batch(job: RedditRemovalCheck) -> DeleteCheckResult:
+def check_reddit_batch(job: BatchedPostRequestJob) -> DeleteCheckResult:
     result = DeleteCheckResult()
 
     removal_reasons_to_flag = ['deleted', 'author', 'reddit', 'copyright_takedown', 'content_takedown']
@@ -141,10 +145,10 @@ async def main():
                 async with ClientSession(connector=conn) as session:
                     for req_chunk in chunk_list(batch, 100):
                         url = build_reddit_req_url([p.post_id for p in req_chunk])
-                        job = RedditRemovalCheck(url, req_chunk, JobStatus.STARTED, proxy_manager.get_proxy())
+                        job = BatchedPostRequestJob(url, req_chunk, JobStatus.STARTED, proxy_manager.get_proxy())
                         tasks.append(ensure_future(fetch_page(job, session)))
 
-                    results: list[RedditRemovalCheck] = await gather(*tasks)
+                    results: list[BatchedPostRequestJob] = await gather(*tasks)
 
                     log.debug('Merging job results')
                     processed_results = list(map(check_reddit_batch, results))
@@ -170,7 +174,7 @@ async def main():
             log.info(f'Delete Percent: {round(total_deleted / processed_count * 100, 2)}')
             for j in celery_jobs:
                 j.get()
-                log.info('Job Complete: %s', j.id)
+                #log.info('Job Complete: %s', j.id)
             log.info('Batch time: %s', round(time.perf_counter() - start, 5))
 
 

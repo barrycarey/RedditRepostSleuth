@@ -103,15 +103,20 @@ class MonitoredSub:
 
     def on_patch(self, req: Request, resp: Response, subreddit: Text):
         token = req.get_param('token', required=True)
+        log.info('Saving settings for subreddit %s', subreddit)
         user_data = get_user_data(token)
+        log.info('%s Save: Got user data', subreddit)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}', f'You\'re not a moderator on {subreddit}')
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
+            log.info('%s Save: Got sub data from database', subreddit)
             if not monitored_sub:
                 raise HTTPNotFound(title=f'Subreddit {subreddit} Not Found', description=f'Subreddit {subreddit} Not Found')
             raw = json.load(req.bounded_stream)
+            log.info('%s Save: Parsing config values', subreddit)
             for k,v in raw.items():
+                log.info('%s Save: Key: %s | Value: %s', subreddit, k, v)
                 if k not in self.config.sub_monitor_exposed_config_options:
                     continue
                 if hasattr(monitored_sub, k):
@@ -129,6 +134,7 @@ class MonitoredSub:
                         )
                         setattr(monitored_sub, k, v)
             try:
+                log.info('%s Save: Saving config to DB', subreddit)
                 uow.commit()
             except Exception as e:
                 log.exception('Problem saving config', exc_info=True)

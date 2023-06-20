@@ -60,8 +60,19 @@ services:
         - '8092:8092'
         - '8094:8094'
         - '25826:25826/udp'
+        - '2003:2003'
       volumes:
         - /config/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
         - /config/telegraf/types.db:/data/types.db
         - /var/run/docker.sock:/var/run/docker.sock
         - /:/hostfs:ro
+
+    promtail:
+      image: grafana/promtail:latest
+      container_name: promtail
+      restart: unless-stopped
+      user: '1001'
+      volumes:
+        - /config/promtail/promtail.yaml:/etc/promtail/promtail.yaml
+        - /config/swag/log/nginx:/logs
+      command: -config.file=/etc/promtail/promtail.yaml

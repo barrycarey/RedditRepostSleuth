@@ -57,7 +57,6 @@ def get_post_type_pushshift(submission: Dict) -> str:
             #log.debug('Post URL %s is an image', submission['url'])
             return 'image'
 
-    # TODO - This should be removed and mark a post as video if it has is_video
     if submission.get('is_video', None):
         return 'video'
 
@@ -445,10 +444,9 @@ def base36decode(base36: str) -> int:
 def get_next_ids(start_id, count):
     start_num = base36decode(start_id)
     ids = []
-    id_num = -1
     for id_num in range(start_num, start_num + count):
-        ids.append("t3_"+base36encode(id_num))
-    return ids, base36encode(id_num)
+        ids.append(base36encode(id_num))
+    return ids
 
 def generate_next_ids(start_id, count):
     start_num = base36decode(start_id)
@@ -456,9 +454,9 @@ def generate_next_ids(start_id, count):
         yield base36encode(id_num)
 
 
-def get_newest_praw_post_id(reddit: Reddit) -> int:
+def get_newest_praw_post_id(reddit: Reddit) -> str:
     """
-    Grab the newest post available via Praw and return the decoded post_id
+    Grab the newest post available via Praw and return the ID
 
     This is used to guage if the manual ingest of IDs is falling behind
     :rtype: object
