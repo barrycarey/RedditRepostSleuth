@@ -12,5 +12,4 @@ services:
         volumes:
             - /opt/letsencrypt/etc/letsencrypt/live/www.repostsleuth.com:/config/keys
             - /opt/imageuploads:/opt/imageuploads
-        ports:
-            - 8443:8443
+

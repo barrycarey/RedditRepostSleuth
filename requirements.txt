@@ -11,7 +11,7 @@ flower
 eventlet
 ImageHash
 RedLock
-influxdb
+influxdb-client
 gensim
 ffmpeg-python
 wavio
