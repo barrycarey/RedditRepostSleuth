@@ -6,7 +6,7 @@ sqlalchemy
 pymysql
 python-Levenshtein
 distance
-influxdb
+influxdb-client
 imagehash
 praw
 opencv-python
@@ -16,5 +16,5 @@ pytesseract
 falcon_multipart
 redis
 redlock
-celery[redis]==4.4.7
+celery[redis]
 pydantic

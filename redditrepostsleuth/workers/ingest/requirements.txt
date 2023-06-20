@@ -4,6 +4,6 @@ redlock
 sqlalchemy
 pymysql
 imagehash
-influxdb
+influxdb-client
 falcon
 redlock

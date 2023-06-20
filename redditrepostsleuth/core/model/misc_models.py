@@ -13,11 +13,11 @@ class JobStatus(Enum):
 	ERROR = auto()
 
 @dataclass
-class RedditRemovalCheck:
+class BatchedPostRequestJob:
 	url: str
 	posts: list[Post]
 	status: JobStatus
-	proxy: HttpProxy
+	proxy: HttpProxy = None
 	resp_data: str = None
 
 @dataclass

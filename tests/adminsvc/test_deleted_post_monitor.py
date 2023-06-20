@@ -5,7 +5,7 @@ import pytest
 from redditrepostsleuth.adminsvc.deleted_post_monitor import build_reddit_req_url, get_post_ids_from_reddit_req_url, \
     db_ids_from_post_ids, merge_results
 from redditrepostsleuth.core.db.databasemodels import Post
-from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, RedditRemovalCheck, JobStatus
+from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, BatchedPostRequestJob, JobStatus
 
 
 @pytest.mark.asyncio
