@@ -45,6 +45,18 @@ beat_schedule = {
     'check-downvote-comments': {
         'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_comments_for_downvotes',
         'schedule': 1800
+    },
+    'check-monitored-sub-access-level': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_subreddit_access_level',
+        'schedule': 21600
+    },
+    'update-subreddit-ban-list': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_ban_list',
+        'schedule': 86400
+    },
+    'update-mod-status': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_mod_status',
+        'schedule': 86400
     }
 }
 
