@@ -41,7 +41,6 @@ class Post(Base):
     bad_url = Column(Boolean, default=False)
 
     hashes = relationship('RedditPostHash', back_populates='post')
-    image_post = relationship('RedditImagePost', back_populates='post')
     summons = relationship('Summons', back_populates='post')
     bot_comments = relationship('BotComment', back_populates='post')
     repost_watch = relationship('RepostWatch', back_populates='post')
@@ -67,12 +66,18 @@ class RedditPostHash(Base):
     __tablename__ = 'post_hash'
 
     id = Column(Integer, primary_key=True)
-    url_hash = Column(String(32))  # Needed to index URLs for faster lookups
-    hash_1 = Column(String(64))
-    hash_2 = Column(String(64))
-    hash_3 = Column(String(64))
+    hash = Column(String(64))
     post_id = Column(Integer, ForeignKey('reddit_post.id'))
     post = relationship("Post", back_populates='hashes')
+    hash_type_id = Column(Integer, ForeignKey('hash_type.id'))
+
+    hash_type = relationship("HashType")
+
+class HashType(Base):
+    __tablename__ = 'hash_type'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(30), nullable=False)
+
 
 class RedditImagePost(Base):
     __tablename__ = 'image_post'

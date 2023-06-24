@@ -38,7 +38,7 @@ def load_posts(start_date: datetime, end_date: datetime):
         # was at 650gb last schema
         #query = f"SELECT * FROM reddit_post WHERE (created_at BETWEEN '{start_date.year}-{start_date.month}-{start_date.day}' AND '{end_date.year}-{end_date.month}-{end_date.day}')"
         # 1057531194
-        query = f"SELECT * FROM reddit_post WHERE id > 0"
+        query = f"SELECT * FROM reddit_post WHERE id > {int(os.getenv('START_ID', 0))}"
         cur.execute(query)
         batch = []
         count = 0
@@ -66,6 +66,6 @@ def load_posts(start_date: datetime, end_date: datetime):
 
 
 
-config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config_dev.json')
+config = Config('/sleuth_config_dev.json')
 redis_client = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_database, password=config.redis_password)
 load_posts(datetime(2022, 1, 1), datetime.utcnow())

@@ -40,6 +40,8 @@ def get_type_id(post_type: str) -> int:
         return 5
     elif post_type == 'gallery':
         return 6
+    elif post_type == 'video':
+        return 7
 
 
 def post_from_row(row: dict):
@@ -54,17 +56,16 @@ def post_from_row(row: dict):
             subreddit=row['subreddit'],
             title=row['title'],
             crosspost_parent=row['crosspost_parent'],
-            url_hash=row['url_hash']
+            last_deleted_check=row['last_deleted_check']
         )
-    if not post.post_type:
-        post_type = get_post_type_pushshift(row)
-        post.post_type_id = get_type_id(post_type)
-    else:
-        post.post_type_id = get_type_id(row['post_type'])
+
+    post.post_type_id = get_type_id(row['post_type'])
+
 
     if post.post_type_id == 2:
-        post.hashes.append(PostHash(hash=row['dhash_h'], post_created_at=row['created_at'], hash_type_id=1))
-
+        post.hashes.append(
+            PostHash(hash=row['dhash_h'], hash_type_id=1, post_created_at=row['created_at'])
+        )
 
     return post
 
@@ -92,11 +93,16 @@ def import_post(self, rows: list[dict]):
                 if not post.post_type:
                     log.error(f'Failed to get post on %s. https://reddit.com%s', post.post_id, post.perma_link)
                 """
-                if not post.url_hash:
-                    url_hash = md5(post.url.encode('utf-8'))
-                    post.url_hash = url_hash.hexdigest()
 
-                if post.post_type_id == 2 and not post.hashes[0].hash:
+                if row['url_hash']:
+                    url_hash = row['url_hash']
+                else:
+                    temp_hash = md5(post.url.encode('utf-8'))
+                    url_hash = temp_hash.hexdigest()
+                post.hashes.append(PostHash(hash=url_hash, hash_type_id=2, post_created_at=row['created_at']))
+
+
+                if post.post_type_id == 2 and not row['dhash_h']:
                         log.info('Skipping missing hash')
                         continue
                 try:
