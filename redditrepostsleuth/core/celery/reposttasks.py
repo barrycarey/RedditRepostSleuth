@@ -72,10 +72,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
 def link_repost_check(self, posts, ):
     with self.uowm.start() as uow:
         for post in posts:
-            """
-            if post.url_hash == '540f1167d27dcca2ea2772443beb5c79':
-                continue
-            """
+
             if post.url_hash in self.link_blacklist:
                 log.info('Skipping blacklisted URL hash %s', post.url_hash)
                 continue
