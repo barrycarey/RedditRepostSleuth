@@ -21,7 +21,6 @@ class Post(Base):
     __table_args__ = (
         Index('idx_post_type_created_at', 'post_type_id', 'created_at'),
         #Index('idx_post_type_timestamp', 'created_at_timestamp', 'post_type_int'),
-        Index('idx_url_hash', 'url_hash'),
         Index('idx_last_delete_check', 'last_deleted_check', 'post_type_id'),
 
     )
@@ -40,7 +39,6 @@ class Post(Base):
     title = Column(String(400, collation='utf8mb4_general_ci'), nullable=False)
     crosspost_parent = Column(String(9))
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
-    url_hash = Column(String(32))
     nsfw = Column(Boolean, default=False)
 
     summons = relationship('Summons', back_populates='post')
@@ -75,7 +73,7 @@ class PostType(Base):
 class PostHash(Base):
     __tablename__ = 'post_hash'
     __table_args__ = (
-        Index('idx_hash_type', 'hash_type_id', 'post_created_at'),
+        Index('idx_hash_type', 'hash_type_id'),
     )
 
     def __repr__(self) -> str:
@@ -83,8 +81,8 @@ class PostHash(Base):
     id = Column(Integer, primary_key=True)
     hash = Column(String(64), nullable=False)
     post_id = Column(Integer, ForeignKey('post.id'))
-    post_created_at = Column(DateTime, nullable=False)
     hash_type_id = Column(TINYINT(), ForeignKey('hash_type.id'), nullable=False)
+    post_created_at = Column(DateTime, nullable=False)  # TODO: change to default timestamp
 
     post = relationship("Post", back_populates='hashes')
 
