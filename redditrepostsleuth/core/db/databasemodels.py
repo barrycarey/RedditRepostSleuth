@@ -73,7 +73,7 @@ class PostType(Base):
 class PostHash(Base):
     __tablename__ = 'post_hash'
     __table_args__ = (
-        Index('idx_hash_type', 'hash_type_id'),
+        Index('idx_hash_type', 'hash_type_id', 'hash'),
     )
 
     def __repr__(self) -> str:
