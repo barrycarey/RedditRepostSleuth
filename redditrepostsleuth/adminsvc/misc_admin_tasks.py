@@ -8,7 +8,7 @@ from prawcore import Forbidden, NotFound, Redirect
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
-    update_monitored_sub_stats, check_if_watched_post_is_active
+    check_if_watched_post_is_active
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsTopImageRepost, MemeTemplatePotential, \
     MemeTemplate
@@ -30,11 +30,7 @@ def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
     :param uowm: UnitOfWorkManager
     :param reddit: Rreddit
     """
-    ignore_no_mod = [
-        'CouldYouDeleteThat',
-        'CouldYouDeleteThat',
 
-    ]
     print('[Scheduled Job] Checking Mod Status Start')
     with uowm.start() as uow:
         monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
