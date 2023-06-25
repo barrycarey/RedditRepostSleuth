@@ -24,7 +24,7 @@ from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, is_s
     bot_has_permission
 
 
-def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
     """
     Go through all registered subs and check if their a mod and what level of permissions they have
     :param uowm: UnitOfWorkManager
@@ -99,12 +99,7 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
             uow.commit()
 
 
-def update_monitored_sub_data(uowm: UnitOfWorkManager) -> NoReturn:
-    print('[Scheduled Job] Update Monitored Sub Data')
-    with uowm.start() as uow:
-        subs = uow.monitored_sub.get_all_active()
-        for sub in subs:
-            update_monitored_sub_stats.apply_async((sub.name,))
+
 
 def remove_expired_bans(uowm: UnitOfWorkManager, notification_svc: NotificationService = None) -> NoReturn:
     print('[Scheduled Job] Removed Expired Bans Start')

@@ -11,5 +11,3 @@ ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src
 
 RUN pip install -r requirements.txt
-
-CMD ["python", "-u", "/src/redditrepostsleuth/adminsvc/adminsvc.py"]
