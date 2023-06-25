@@ -31,12 +31,14 @@ class NewActivationMonitor:
             log.info('Checking for new mod invites')
             for msg in self.reddit.inbox.messages(limit=1000):
                 if 'invitation to moderate' in msg.subject:
+                    log.info('Found invitation for %s', msg.subreddit.display_name)
                     self.activate_sub(msg)
         except Exception as e:
             log.exception('Activation thread died', exc_info=True)
 
 
     def activate_sub(self, msg: Message):
+        # TODO: API Reduction - No need to call Reddit API after seeing int exists in DB
         try:
             monitored_sub = self._create_monitored_sub_in_db(msg)
         except Exception as e:
