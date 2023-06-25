@@ -81,10 +81,12 @@ def link_repost_check(self, posts, ):
             search_results = get_link_reposts(post.url, self.uowm, get_default_link_search_settings(self.config),
                                               post=post)
 
+            """
             if len(search_results.matches) > 10000:
                 log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(search_results.matches))
                 self.link_blacklist.append(post.url_hash)
                 self.notification_svc.send_notification(f'URL has been shared {len(search_results.matches)} times. Adding to blacklist. \n\n {post.url_hash}\n\n {post.url}')
+            """
 
             search_results = filter_search_results(
                 search_results,
