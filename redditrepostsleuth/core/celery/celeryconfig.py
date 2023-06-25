@@ -60,10 +60,6 @@ beat_schedule = {
         'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_ban_list_task',
         'schedule': 86400
     },
-    'update-mod-status': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_mod_status_task',
-        'schedule': 86400
-    },
     'update-monitored-sub-data': {
         'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_monitored_sub_data_task',
         'schedule': 86400
