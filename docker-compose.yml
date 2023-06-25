@@ -11,14 +11,33 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
         entrypoint: python -u ingestsvc.py
 
-    admin_svc:
-        container_name: admin-svc
+    scheduled_task_svc:
+        container_name: scheduled_task_svc
         restart: always
+        user: "1001:1001"
         build:
             context: .
             dockerfile: redditrepostsleuth/adminsvc/Dockerfile
         environment:
-            - LOG_LEVEL=WARN
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.maintenance_tasks
+            - C_FORCE_ROOT=True
+
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q scheduled_tasks --autoscale=10,2
+
+    scheduler:
+        container_name: scheduler
+        restart: always
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/adminsvc/Dockerfile
+        volumes:
+            - /config/repostsleuth-celery:/config/repostsleuth-celery
+        environment:
+            - LOG_LEVEL=INFO
+            - C_FORCE_ROOT=True
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.maintenance_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery beat
 
     delete_post_svc:
         restart: always

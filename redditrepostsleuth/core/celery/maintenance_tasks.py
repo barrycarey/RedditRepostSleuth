@@ -1,20 +1,19 @@
 import logging
-from datetime import datetime
-
-from prawcore import Redirect, Forbidden
-from sqlalchemy import func
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_top_image_reposts, send_reports_to_meme_voting, \
+    check_meme_template_potential_votes, queue_config_updates, queue_post_watch_cleanup, update_mod_status, \
+    update_subreddit_access_level, update_ban_list, remove_expired_bans
+from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
 from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
 from redditrepostsleuth.core.celery import celery
+from redditrepostsleuth.core.celery.admin_tasks import update_monitored_sub_stats
 from redditrepostsleuth.core.celery.basetasks import RedditTask
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub
-from redditrepostsleuth.core.util.reddithelpers import is_bot_banned, is_sub_mod_praw, bot_has_permission
 
 log = logging.getLogger(__name__)
 @celery.task(bind=True, base=RedditTask)
-def update_subreddit_stats(self) -> None:
+def update_subreddit_stats_task(self) -> None:
     log.info('Scheduled Task: Update Subreddit Stats')
     stats_updater = StatsUpdater(config=self.config)
     try:
@@ -22,8 +21,14 @@ def update_subreddit_stats(self) -> None:
     except Exception as e:
         log.exception('Failed to update subreddit stats')
 
+
 @celery.task(bind=True, base=RedditTask)
-def check_inbox(self) -> None:
+def test_task(self) -> None:
+    print('Scheduled Task: Test')
+
+
+@celery.task(bind=True, base=RedditTask)
+def check_inbox_task(self) -> None:
     log.info('Scheduled Task: Check Inbox')
     inbox_monitor = InboxMonitor(self.uowm, self.reddit.reddit.reddit, self.response_handler)
     try:
@@ -32,7 +37,17 @@ def check_inbox(self) -> None:
         log.exception('Failed to update subreddit stats')
 
 @celery.task(bind=True, base=RedditTask)
-def check_comments_for_downvotes(self) -> None:
+def check_new_activations_task(self) -> None:
+    log.info('Scheduled Task: Checking For Activations')
+    activation_monitor = NewActivationMonitor(self.uowm, self.reddit.reddit, notification_svc=self.notification_svc)
+    try:
+        activation_monitor.check_for_new_invites()
+    except Exception as e:
+        log.exception('Failed to update subreddit stats')
+
+
+@celery.task(bind=True, base=RedditTask)
+def check_comments_for_downvotes_task(self) -> None:
     log.info('Scheduled Task: Check Comment Downvotes')
     comment_monitor = BotCommentMonitor(self.reddit, self.uowm, self.config, notification_svc=self.notification_svc)
     try:
@@ -42,79 +57,100 @@ def check_comments_for_downvotes(self) -> None:
 
 
 @celery.task(bind=True, base=RedditTask)
-def update_subreddit_access_level(self) -> None:
+def update_subreddit_access_level_task(self) -> None:
     """
         Go through all monitored subs and update their is_private status
         :return:
         """
-    log.info('Scheduled Task: Check Monitored Sub Access Level')
+    log.info('Starting Job: Post watch cleanup')
     try:
-        with self.uowm.start() as uow:
-            monitored_subs: list[MonitoredSub] = uow.monitored_sub.get_all()
-            for monitored_sub in monitored_subs:
-                try:
-                    sub_data = self.reddit.reddit.subreddit(monitored_sub.name)
-                    monitored_sub.is_private = True if sub_data.subreddit_type == 'private' else False
-                    monitored_sub.nsfw = True if sub_data.over18 else False
-                    log.debug('%s: is_private: %s | nsfw: %s', monitored_sub.name, monitored_sub.is_private,
-                              monitored_sub.nsfw)
-                except (Redirect, Forbidden):
-                    log.error('Error getting sub settings')
-            uow.commit()
+        update_subreddit_access_level(self.uowm, self.reddit.reddit)
     except Exception as e:
-        log.exception('Scheduled Task Failed: Check Monitored Sub Access Level')
+        log.exception('Problem in scheduled task')
+
 
 
 @celery.task(bind=True, base=RedditTask)
-def update_ban_list(self) -> None:
+def update_ban_list_task(self) -> None:
     """
     Go through banned subs and see if we're still banned
     """
     log.info('Starting Job: Update Subreddit Bans')
     try:
-        with self.uowm.start() as uow:
-            bans = uow.banned_subreddit.get_all()
-            for ban in bans:
-                last_checked_delta = (datetime.utcnow() - ban.last_checked).days
-                if last_checked_delta < 1:
-                    log.debug('Banned sub %s last checked %s days ago.  Skipping', ban.subreddit, last_checked_delta)
-                    continue
-                if is_bot_banned(ban.subreddit, self.reddit.reddit):
-                    log.info('[Subreddit Ban Check] Still banned on %s', ban.subreddit)
-                    ban.last_checked = func.utc_timestamp()
-                else:
-                    log.info('[Subreddit Ban Check] No longer banned on %s', ban.subreddit)
-                    uow.banned_subreddit.remove(ban)
-                    if self.notification_svc:
-                        self.notification_svc.send_notification(
-                            f'Removed https://reddit.com/r/{ban.subreddit} from ban list',
-                            subject='Subreddit Removed From Ban List!'
-                        )
-                uow.commit()
+        update_ban_list(self.uowm, self.reddit.reddit, self.notification_svc)
     except Exception as e:
-        log.exception('Schedule Task Failed: Update Ban List')
+        log.exception('Problem in scheduled task')
 
 @celery.task(bind=True, base=RedditTask)
-def update_mod_status(self) -> None:
+def update_mod_status_task(self) -> None:
     """
     Go through all registered subs and check if their a mod and what level of permissions they have
     """
     print('Scheduled Task: Checking Mod Status')
     try:
-
-        with self.uowm.start() as uow:
-            monitored_subs: list[MonitoredSub] = uow.monitored_sub.get_all()
-            for sub in monitored_subs:
-                if not is_sub_mod_praw(sub.name, 'RepostSleuthBot', self.reddit.reddit):
-                    log.info('[Mod Check] Bot is not a mod on %s', sub.name)
-                    sub.is_mod = False
-                    uow.commit()
-                    continue
-
-                sub.is_mod = True
-                sub.post_permission = bot_has_permission(sub.name, 'posts', self.reddit.reddit)
-                sub.wiki_permission = bot_has_permission(sub.name, 'wiki', self.reddit.reddit)
-                log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
-                uow.commit()
+        update_mod_status(self.uowm, self.reddit.reddit)
     except Exception as e:
         log.exception('Scheduled Task Failed: Update Mod Status')
+
+
+@celery.task(bind=True, base=RedditTask)
+def update_monitored_sub_data_task(self) -> None:
+    log.info('Starting Job: Update Subreddit Data')
+    try:
+        with self.uowm.start() as uow:
+            subs = uow.monitored_sub.get_all_active()
+            for sub in subs:
+                update_monitored_sub_stats.apply_async((sub.name,))
+    except Exception as e:
+        log.exception('Problem with scheduled task')
+
+@celery.task(bind=True, base=RedditTask)
+def remove_expired_bans_task(self) -> None:
+    log.info('Starting Job: Remove Expired Bans')
+    try:
+        remove_expired_bans(self.uowm, self.notification_svc)
+    except Exception as e:
+        log.exception('Scheduled Task Failed: Update Mod Status')
+
+@celery.task(bind=True, base=RedditTask)
+def update_top_image_reposts_task(self) -> None:
+    log.info('Starting Job: Remove Expired Bans')
+    try:
+        update_top_image_reposts(self.uowm, self.reddit.reddit)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+@celery.task(bind=True, base=RedditTask)
+def send_reports_to_meme_voting_task(self):
+    log.info('Starting Job: Reports to meme voting')
+    try:
+        send_reports_to_meme_voting(self.uowm)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+@celery.task(bind=True, base=RedditTask)
+def check_meme_template_potential_votes_task(self):
+    log.info('Starting Job: Meme Template Vote')
+    try:
+        check_meme_template_potential_votes(self.uowm)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+@celery.task(bind=True, base=RedditTask)
+def queue_config_updates_task(self):
+    log.info('Starting Job: Config Update Check')
+    try:
+        queue_config_updates(self.uowm, self.config)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+@celery.task(bind=True, base=RedditTask)
+def queue_post_watch_cleanup_task(self):
+    log.info('Starting Job: Post watch cleanup')
+    try:
+        queue_post_watch_cleanup(self.uowm, self.config)
+    except Exception as e:
+        log.exception('Problem in scheduled task')

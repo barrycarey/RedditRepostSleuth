@@ -26,8 +26,10 @@ task_routes = {
     'redditrepostsleuth.core.celery.admin_tasks.delete_post_task': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.admin_tasks.update_last_deleted_check': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.admin_tasks.bulk_delete': {'queue': 'post_delete'},
+    'redditrepostsleuth.core.celery.maintenance_tasks.*': {'queue': 'scheduled_tasks'}
 
 }
+
 
 beat_schedule = {
     'update-proxy-list': {
@@ -35,28 +37,60 @@ beat_schedule = {
         'schedule': 3600
     },
     'update-subreddit-stats': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_subreddit_stats',
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_subreddit_stats_task',
         'schedule': 21600
     },
     'check-inbox': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_inbox',
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_inbox_task',
         'schedule': 300
     },
+    'check-new-activations': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_new_activations_task',
+        'schedule': 60
+    },
     'check-downvote-comments': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_comments_for_downvotes',
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_comments_for_downvotes_task',
         'schedule': 1800
     },
     'check-monitored-sub-access-level': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_subreddit_access_level',
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_subreddit_access_level_task',
         'schedule': 21600
     },
     'update-subreddit-ban-list': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_ban_list',
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_ban_list_task',
         'schedule': 86400
     },
     'update-mod-status': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_mod_status',
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_mod_status_task',
         'schedule': 86400
+    },
+    'update-monitored-sub-data': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_monitored_sub_data_task',
+        'schedule': 86400
+    },
+    'remove-expired-bans': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.remove_expired_bans_task',
+        'schedule': 300
+    },
+    'update-top-image-reposts': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.update_top_image_reposts_task',
+        'schedule': 86400
+    },
+    'send-reports-to-meme-voting': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.send_reports_to_meme_voting_task',
+        'schedule': 3600
+    },
+    'check-meme-template-potential-votes': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_meme_template_potential_votes_task',
+        'schedule': 1800
+    },
+    'monitored-sub-config-update': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.queue_config_updates_task',
+        'schedule': 120
+    },
+    'post-watch-cleanup': {
+        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.queue_post_watch_cleanup_task',
+        'schedule': 259200
     }
 }
 
