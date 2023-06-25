@@ -80,14 +80,3 @@ class AdminTask(Task):
             self.config,
             notification_svc=self.notification_svc
         )
-
-class RepostLogger(Task):
-    def __init__(self):
-        self.repost_log = logging.getLogger('error_log')
-        self.repost_log.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s: %(message)s')
-        handler = logging.FileHandler('repost.log')
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self.repost_log.addHandler(handler)

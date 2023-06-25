@@ -49,6 +49,7 @@ if __name__ == '__main__':
         name='activation_checker',
         max_instances=1
     )
+    # TODO - Validate and remove
     scheduler.add_job(
         func=stats_updater.run_update,
         trigger='interval',
@@ -56,6 +57,7 @@ if __name__ == '__main__':
         name='stats_update',
         max_instances=1
     )
+    # TODO - Validate and remove
     scheduler.add_job(
         func=inbox_monitor.check_inbox,
         trigger='interval',
@@ -63,6 +65,7 @@ if __name__ == '__main__':
         name='inbox_monitor',
         max_instances=1
     )
+    # TODO - Validate and remove
     scheduler.add_job(
         func=comment_monitor.check_comments,
         trigger='interval',
