@@ -77,6 +77,8 @@ def import_post(self, rows: list[dict]):
     try:
         with self.uowm.start() as uow:
             for row in rows:
+                if len(row['title']) > 400:
+                    row['title'] = row['title'][0:399]
 
                 if row['selftext']:
                     if '[deleted]' in row['selftext']:
