@@ -9,6 +9,7 @@ from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AdminTask, RedditTask, SqlAlchemyTask, PyMysqlTask
+from redditrepostsleuth.core.celery.helpers.admin_task_helpers import update_proxies
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch, Post
 from redditrepostsleuth.core.logfilters import ContextFilter
@@ -188,6 +189,10 @@ def check_if_watched_post_is_active(self, watches: List[RepostWatch]):
 
     uow.commit()
 
+
 @celery.task(bind=True, base=SqlAlchemyTask)
-def save_image_index_map(self, map_data):
-    pass
+def update_proxies_job(self) -> None:
+    try:
+        update_proxies(self.uowm)
+    except Exception as e:
+        log.exception('Failed to update proxies')
