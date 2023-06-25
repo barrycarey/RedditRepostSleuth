@@ -23,7 +23,7 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.maintenance_tasks
             - C_FORCE_ROOT=True
 
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q scheduled_tasks --autoscale=10,2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q scheduled_tasks --autoscale=15,2
 
     scheduler:
         container_name: scheduler
@@ -175,7 +175,7 @@ services:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks,redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q monitored_sub_update,config_update_check,monitored_sub_config_update,watch_remove_deleted -c 5
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q config_update_check,monitored_sub_config_update,watch_remove_deleted -c 5
 
 
     ingest_pushshift_worker:
