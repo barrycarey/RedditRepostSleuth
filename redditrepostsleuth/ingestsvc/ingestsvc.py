@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
-    ServerDisconnectedError
+    ServerDisconnectedError, ClientOSError
 
 from redditrepostsleuth.adminsvc.deleted_post_monitor import build_reddit_query_string
 from redditrepostsleuth.core.celery.ingesttasks import save_new_post
@@ -33,12 +33,15 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
     :return: raw response from request
     """
     async with session.get(url, timeout=ClientTimeout(total=10)) as resp:
-        if resp.status == 200:
-            log.debug('Successful fetch')
-            return await resp.text()
-        else:
-            log.error('Unexpected request status %s - %s', resp.status, url)
-            return
+        try:
+            if resp.status == 200:
+                log.debug('Successful fetch')
+                return await resp.text()
+            else:
+                log.error('Unexpected request status %s - %s', resp.status, url)
+                return
+        except ClientOSError:
+            log.exception('')
 
 
 async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) -> BatchedPostRequestJob:
@@ -93,7 +96,7 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(chunk)}'
             job = BatchedPostRequestJob(url, chunk, JobStatus.STARTED)
             tasks.append(ensure_future(fetch_page_as_job(job, session)))
-            if len(tasks) >= 50 or len(chunk) == 0:
+            if len(tasks) >= 25 or len(chunk) == 0:
                 posts_to_save = []
                 while tasks:
                     results: list[BatchedPostRequestJob] = await gather(*tasks)
