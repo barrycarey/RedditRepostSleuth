@@ -107,6 +107,9 @@ def import_post(self, rows: list[dict]):
                 if post.post_type_id == 2 and not row['dhash_h']:
                         log.info('Skipping missing hash')
                         continue
+
+                if post.crosspost_parent:
+                    post.crosspost_parent = post.crosspost_parent.replace('t3_', '')
                 try:
                     uow.posts.add(post)
 
