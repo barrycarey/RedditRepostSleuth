@@ -7,10 +7,10 @@ import requests
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import HttpProxy
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 log = logging.getLogger(__name__)
-def update_proxies(uowm: SqlAlchemyUnitOfWorkManager) -> None:
+def update_proxies(uowm: UnitOfWorkManager) -> None:
     with uowm.start() as uow:
         auth_token = os.getenv('WEBSHARE_AUTH')
         if not auth_token:
@@ -41,5 +41,5 @@ def update_proxies(uowm: SqlAlchemyUnitOfWorkManager) -> None:
 
 if __name__ == '__main__':
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     update_proxies(uowm)

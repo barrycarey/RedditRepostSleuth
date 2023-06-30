@@ -1,5 +1,4 @@
 import json
-import time
 from typing import Text, NoReturn
 
 from praw import Reddit
@@ -9,7 +8,6 @@ from praw.models import Subreddit, Message
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.notification_service import NotificationService
@@ -108,7 +106,7 @@ class NewActivationMonitor:
 
 if __name__ == '__main__':
     config = Config(r'C:/users/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     invite = NewActivationMonitor(uowm, get_reddit_instance(config))
     while True:
         invite.check_for_new_invites()

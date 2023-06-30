@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, Repost
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -225,7 +225,7 @@ def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
 
 def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
     with uowm.start() as uow:
-        new_repost = LinkRepost(
+        new_repost = Repost(
             post_id=post.post_id,
             repost_of=repost_of.post_id,
             author=post.author,

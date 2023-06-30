@@ -5,7 +5,6 @@ from typing import Text, Optional
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
@@ -14,8 +13,8 @@ from redditrepostsleuth.core.util.helpers import build_image_msg_values_from_sea
     build_msg_values_from_search
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COMMENT, \
     DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH, \
-    DEFAULT_COMMENT_OC, COMMENT_STATS, DEFAULT_REPOST_LINK_COMMENT, \
-    CLOSEST_MATCH, SEARCH_URL, REPORT_POST_LINK, IMAGE_SEARCH_SETTINGS, GENERIC_SEARCH_SETTINGS, \
+    DEFAULT_COMMENT_OC, COMMENT_STATS, CLOSEST_MATCH, SEARCH_URL, REPORT_POST_LINK, IMAGE_SEARCH_SETTINGS, \
+    GENERIC_SEARCH_SETTINGS, \
     COMMENT_SIGNATURE, LINK_REPOST, LINK_OC
 
 DEFAULT_REPORT_MSG = 'RepostSleuthBot-Repost'
@@ -211,5 +210,5 @@ class ResponseBuilder:
 
 if __name__ == '__main__':
     config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     resp = ResponseBuilder(uowm)

@@ -1,19 +1,15 @@
 import threading
 import time
 
-import sys
-# TODO - Mega hackery, figure this out.
-sys.path.append('./')
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.summonssvc.summonsmonitor import SummonsMonitor
 
-
 if __name__ == '__main__':
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     summons = SummonsMonitor(get_reddit_instance(config), uowm, config)
     threading.Thread(target=summons.monitor_for_mentions, name='mention_summons').start()
     #threading.Thread(target=summons.monitor_for_summons_pushshift, name='pushshift_summons').start()

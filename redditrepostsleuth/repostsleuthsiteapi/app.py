@@ -4,7 +4,7 @@ from falcon_multipart.middleware import MultipartMiddleware
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
@@ -27,7 +27,7 @@ from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
 config = Config()
 event_logger = EventLogging(config=config)
-uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+uowm = UnitOfWorkManager(get_db_engine(config))
 reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
 dup = DuplicateImageService(uowm, event_logger, reddit, config=config)

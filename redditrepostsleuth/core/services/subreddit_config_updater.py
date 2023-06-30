@@ -11,7 +11,6 @@ from sqlalchemy import func
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MonitoredSubConfigRevision
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.notification_service import NotificationService
@@ -19,7 +18,7 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, bot_has_permission
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
 class SubredditConfigUpdater:
@@ -451,7 +450,7 @@ if __name__ == '__main__':
     config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     reddit_manager = RedditManager(reddit)
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)

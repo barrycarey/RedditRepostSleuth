@@ -13,7 +13,7 @@ from redditrepostsleuth.core.celery.ingesttasks import save_new_post
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, JobStatus
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
@@ -135,7 +135,7 @@ async def main() -> None:
     log.info('Starting post ingestor')
     reddit = get_reddit_instance(config)
     newest_id = get_newest_praw_post_id(reddit)
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
 
     with uowm.start() as uow:
         oldest_post = uow.posts.get_newest_post()

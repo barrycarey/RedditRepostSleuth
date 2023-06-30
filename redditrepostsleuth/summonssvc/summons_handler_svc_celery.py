@@ -1,23 +1,18 @@
 # TODO - Mega hackery, figure this out.
-import sys
 import time
 
 import redis
 from redis.exceptions import ConnectionError
 
-
-sys.path.append('./')
 from redditrepostsleuth.core.celery.response_tasks import process_summons
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
-
-
 
 if __name__ == '__main__':
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
 
     redis_client = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_database, password=config.redis_password)
     while True:

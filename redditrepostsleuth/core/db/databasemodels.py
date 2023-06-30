@@ -1,6 +1,5 @@
 from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer
-from sqlalchemy.dialects.mysql import YEAR, INTEGER, TINYINT
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -603,3 +602,13 @@ class StatsTopRepost(Base):
     total_count = Column(Integer, nullable=False)
     days = Column(Integer, nullable=False)
     nsfw = Column(Boolean, nullable=False)
+
+class HttpProxy(Base):
+    __tablename__ = 'http_proxy'
+    id = Column(Integer, primary_key=True)
+    address = Column(String(23), nullable=False)
+    enabled = Column(Boolean, default=True)
+    provider = Column(String(50), nullable=False)
+    cooldown_expire = Column(DateTime)
+    times_used = Column(Integer, default=0, nullable=False)
+    successive_failures = Column(Integer, default=0, nullable=False)
