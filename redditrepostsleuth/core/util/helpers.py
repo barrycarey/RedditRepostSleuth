@@ -1,11 +1,12 @@
-from __future__ import annotations
+
+
 import json
 import re
 from logging import Logger
-from typing import List, Text, Optional
+from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
-
+from falcon import Request
 from praw import Reddit
 from redis import Redis
 from redlock import RedLockFactory
@@ -16,10 +17,13 @@ from redditrepostsleuth.core.model.image_search_settings import ImageSearchSetti
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
 
+if TYPE_CHECKING:
+    from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
+
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, Repost, MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -38,21 +42,7 @@ def chunk_list(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
-def get_post_type_id(post_type: str) -> int:
-    if post_type == 'text':
-        return 1
-    elif post_type == 'image':
-        return 2
-    elif post_type == 'link':
-        return 3
-    elif post_type == 'hosted:video':
-        return 4
-    elif post_type == 'rich:video':
-        return 5
-    elif post_type == 'gallery':
-        return 6
-
-def get_post_type_pushshift(submission: dict) -> str:
+def get_post_type_pushshift(submission: Dict) -> str:
     # TODO - Go over this whole function
     if submission.get('is_self', None):
         return 'text'
@@ -61,25 +51,25 @@ def get_post_type_pushshift(submission: dict) -> str:
     if post_hint:
         return post_hint
 
-    post_type = submission.get('post_type', None)
-    if post_type:
-        return post_type
-
-    is_video = submission.get('is_video', None)
-    if is_video:
-        return 'video'
-
-    if not submission['url']:
-        log.debug('No URL, skipping remaining type checks')
-        return
-
-    if 'gallery' in submission['url']:
-        return 'gallery'
-
     image_exts = ['.jpg', '.png', '.jpeg', '.gif']
     for ext in image_exts:
         if ext in submission['url']:
+            #log.debug('Post URL %s is an image', submission['url'])
             return 'image'
+
+    if submission.get('is_video', None):
+        return 'video'
+
+    if submission.get('is_gallery', None):
+        return 'gallery'
+
+    # Last ditch to get post_hint
+    reddit = get_reddit_instance(config=Config())
+    reddit_sub = reddit.submission(id=submission['id'])
+    post_hint = reddit_sub.__dict__.get('post_hint', None)
+    log.debug('Returning post hint %s for post %s', post_hint, reddit_sub.id)
+
+    return post_hint
 
 
 def searched_post_str(post: Post, count: int) -> str:
@@ -107,7 +97,7 @@ def build_site_search_url(post_id: Text, search_settings: ImageSearchSettings) -
     return url
 
 
-def build_image_report_link(search_results: SearchResults) -> Text:
+def build_image_report_link(search_results: 'SearchResults') -> Text:
     """
     Take a set of search results and construct the report message.  Either a positive or negative report
     will be created from the provided search results
@@ -122,7 +112,7 @@ def build_image_report_link(search_results: SearchResults) -> Text:
     return IMAGE_REPORT_TEXT.format(pos_neg_text=pos_neg_text, report_data=search_results.report_data)
 
 
-def build_msg_values_from_search(search_results: SearchResults, uowm: UnitOfWorkManager = None, **kwargs) -> dict:
+def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWorkManager = None, **kwargs) -> Dict:
     """
     Take a ImageRepostWrapper object and return a dict of values for use in a message template
     :param search_results: ImageRepostWrapper
@@ -167,7 +157,7 @@ def build_msg_values_from_search(search_results: SearchResults, uowm: UnitOfWork
 
 
 def build_image_msg_values_from_search(search_results: 'ImageSearchResults', uowm: UnitOfWorkManager = None,
-                                       **kwargs) -> dict:
+                                       **kwargs) -> Dict:
 
     base_values = {
         'closest_sub': search_results.closest_match.post.subreddit if search_results.closest_match else None,
@@ -235,7 +225,7 @@ def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
 
 def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
     with uowm.start() as uow:
-        new_repost = Repost(
+        new_repost = LinkRepost(
             post_id=post.post_id,
             repost_of=repost_of.post_id,
             author=post.author,
@@ -272,7 +262,7 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 
     )
 
-def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSettings:
+def get_image_search_settings_from_request(req: Request, config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
         req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
         config.default_image_target_annoy_distance,
@@ -357,7 +347,7 @@ def get_redis_client(config: Config) -> Redis:
         password=config.redis_password
     )
 
-def batch_check_urls(urls: List[dict], util_api: Text) -> List[dict]:
+def batch_check_urls(urls: List[Dict], util_api: Text) -> List[Dict]:
     """
     Batch checking a list of URLs and Post ID pairs to see if the associated links have been removed.
     This function is using our utility API that runs on a Pool of VMs so we can check matches at high volume
@@ -372,7 +362,7 @@ def batch_check_urls(urls: List[dict], util_api: Text) -> List[dict]:
 
     Several actions can be returned.  However, we're only interested in the remove since that results from the post's
     URL returning a 404
-    :rtype: List[dict]
+    :rtype: List[Dict]
     :param urls: List of URLs and Post ID pairs: {'url': 'example.com', 'id': '124abc}
     :param util_api: API call to make
     """
@@ -429,7 +419,7 @@ def is_image_url(url: Text) -> bool:
         return True
     return False
 
-def update_log_context_data(logger: Logger, context_data: dict):
+def update_log_context_data(logger: Logger, context_data: Dict):
     for handler in logger.handlers:
         for filt in handler.filters:
             for key, value in context_data.items():
@@ -454,14 +444,19 @@ def base36decode(base36: str) -> int:
 def get_next_ids(start_id, count):
     start_num = base36decode(start_id)
     ids = []
-    id_num = -1
     for id_num in range(start_num, start_num + count):
-        ids.append("t3_"+base36encode(id_num))
-    return ids, base36encode(id_num)
+        ids.append(base36encode(id_num))
+    return ids
 
-def get_newest_praw_post_id(reddit: Reddit) -> int:
+def generate_next_ids(start_id, count):
+    start_num = base36decode(start_id)
+    for id_num in range(start_num, start_num + count):
+        yield base36encode(id_num)
+
+
+def get_newest_praw_post_id(reddit: Reddit) -> str:
     """
-    Grab the newest post available via Praw and return the decoded post_id
+    Grab the newest post available via Praw and return the ID
 
     This is used to guage if the manual ingest of IDs is falling behind
     :rtype: object
@@ -470,10 +465,10 @@ def get_newest_praw_post_id(reddit: Reddit) -> int:
     return newest_submissions.id
 
 
-def build_ingest_query_params(starting_id: int, limit: int = 100) -> dict[str, str]:
+def build_ingest_query_params(starting_id: int, limit: int = 100) -> Dict[str, str]:
     """
     Take a starting ID and build the dict used as a param for the ingest request
-    :rtype: dict
+    :rtype: Dict
     """
     ids_to_get = get_next_ids(starting_id, limit)[0]
     return {

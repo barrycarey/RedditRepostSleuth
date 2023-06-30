@@ -1,10 +1,13 @@
 pymysql
 praw
 sqlalchemy
-influxdb
+influxdb-client
 imagehash
 apscheduler
 redis
-celery[redis]==4.4.7
+celery[redis]
 falcon
 redlock
+aiohttp
+Brotli
+influxdb-client

@@ -11,7 +11,7 @@ flower
 eventlet
 ImageHash
 RedLock
-influxdb
+influxdb-client
 gensim
 ffmpeg-python
 wavio
@@ -30,4 +30,5 @@ google-cloud-vision
 opencv-python
 imutils
 pydantic
-videohash
+aiohttp
+pytest-asyncio

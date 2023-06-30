@@ -1,9 +1,9 @@
-FROM python:3.11.3-buster
+FROM python:3.11.2-buster
 MAINTAINER Barry Carey <mcarey66@gmail.com>
 
 VOLUME /src/
 COPY sleuth_config.json /src/
-COPY /redditrepostsleuth/workers/repost/requirements.txt /src/
+COPY redditrepostsleuth/adminsvc/requirements.txt /src/
 ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src
 
@@ -12,3 +12,5 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libffi-dev \
     python-dev && pip install -r requirements.txt
+
+CMD ["python", "-u", "/src/redditrepostsleuth/adminsvc/deleted_post_monitor.py"]

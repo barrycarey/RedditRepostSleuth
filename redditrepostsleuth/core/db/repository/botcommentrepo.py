@@ -25,3 +25,6 @@ class BotCommentRepo:
 
     def remove(self, item: BotComment):
         self.db_session.delete(item)
+
+    def remove_by_post_id(self, post_id: str) -> None:
+        self.db_session.query(BotComment).filter(BotComment.post_id == post_id).delete()

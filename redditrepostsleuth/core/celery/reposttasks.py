@@ -1,4 +1,3 @@
-import json
 from time import perf_counter
 from typing import List, NoReturn
 
@@ -11,14 +10,18 @@ from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
+from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
+from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, ImageConversioinException
 from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, RepostSearch, Repost
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes, generate_img_by_url
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 
 log = configure_logger(
@@ -34,16 +37,17 @@ def ingest_repost_check(post):
     elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
 
-
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
 
     r = requests.head(post.url)
     if r.status_code != 200:
         log.info('Skipping image that is deleted %s', post.url)
+        celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
         return
 
     search_settings = get_default_image_search_settings(self.config)
+    search_settings.meme_filter = True
     search_settings.max_matches = 75
     search_results = self.dup_service.check_image(
         post.url,
@@ -70,6 +74,10 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
 def link_repost_check(self, posts, ):
     with self.uowm.start() as uow:
         for post in posts:
+
+            if post.url_hash in self.link_blacklist:
+                log.info('Skipping blacklisted URL hash %s', post.url_hash)
+                continue
             try:
                 if post.url_hash in self.link_blacklist:
                     log.info('Skipping blacklisted URL hash %s', post.url_hash)
@@ -133,7 +141,7 @@ def link_repost_check(self, posts, ):
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
-def notify_watch(self, watches: List[dict[SearchMatch, RepostWatch]], repost: Post):
+def notify_watch(self, watches: list[dict[SearchMatch, RepostWatch]], repost: Post):
     repost_watch_notify(watches, self.reddit, self.response_handler, repost)
     with self.uowm.start() as uow:
         for w in watches:

@@ -28,6 +28,7 @@ if __name__ == '__main__':
                 for s in summons:
                     log.info('Starting summons %s', s.id)
                     process_summons.apply_async((s,), queue='summons')
+                    # TODO - Instead of directly checking celery we can hold the tasks and wait for completion
                 while True:
                     queued_items = redis_client.lrange('summons', 0, 20000)
                     if len(queued_items) == 0:

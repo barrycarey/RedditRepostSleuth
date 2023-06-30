@@ -8,7 +8,7 @@ from prawcore import Forbidden, NotFound, Redirect
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
-    update_monitored_sub_stats, check_if_watched_post_is_active
+    check_if_watched_post_is_active
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MemeTemplatePotential, \
     MemeTemplate, StatsTopImageRepost
@@ -23,17 +23,14 @@ from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, is_sub_mod_praw, is_bot_banned, \
     bot_has_permission
 
-def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+
+def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
     """
     Go through all registered subs and check if their a mod and what level of permissions they have
     :param uowm: UnitOfWorkManager
     :param reddit: Rreddit
     """
-    ignore_no_mod = [
-        'CouldYouDeleteThat',
-        'CouldYouDeleteThat',
 
-    ]
     print('[Scheduled Job] Checking Mod Status Start')
     with uowm.start() as uow:
         monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
@@ -69,7 +66,7 @@ def update_subreddit_access_level(uowm: UnitOfWorkManager, reddit: Reddit):
                 log.error('Error getting sub settings')
         uow.commit()
 
-def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None) -> NoReturn:
+def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None) -> None:
     """
     Go through banned subs and see if we're still banned
     :rtype: NoReturn
@@ -98,14 +95,9 @@ def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: N
             uow.commit()
 
 
-def update_monitored_sub_data(uowm: UnitOfWorkManager) -> NoReturn:
-    print('[Scheduled Job] Update Monitored Sub Data')
-    with uowm.start() as uow:
-        subs = uow.monitored_sub.get_all_active()
-        for sub in subs:
-            update_monitored_sub_stats.apply_async((sub.name,))
 
-def remove_expired_bans(uowm: UnitOfWorkManager, notification_svc: NotificationService = None) -> NoReturn:
+
+def remove_expired_bans(uowm: UnitOfWorkManager, notification_svc: NotificationService = None) -> None:
     print('[Scheduled Job] Removed Expired Bans Start')
     with uowm.start() as uow:
         bans = uow.banned_user.get_expired_bans()
@@ -119,7 +111,7 @@ def remove_expired_bans(uowm: UnitOfWorkManager, notification_svc: NotificationS
             uow.banned_user.remove(ban)
             uow.commit()
 
-def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
     """
     Update the banned sub wiki page with the most recent list of banned subs
     :param uowm: UnitOfWorkmanager
@@ -144,7 +136,7 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
     log.info('[Banned Sub Wiki Update] Fished update')
     print('[Scheduled Job] Update Ban Wiki End')
 
-def update_stat_top_image_repost(uowm: UnitOfWorkManager, reddit: Reddit) -> NoReturn:
+def update_stat_top_image_repost(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
     days = [1,7,30,365]
     with uowm.start() as uow:
         uow.session.execute('TRUNCATE `stat_top_image_repost`')

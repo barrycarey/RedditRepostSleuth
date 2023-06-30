@@ -1,304 +1,204 @@
-import json
-import os
-from typing import List, Text, NoReturn
-from urllib.parse import urlparse
+import logging
 
-import requests
-from sqlalchemy import func
+from praw.exceptions import PRAWException
 
+from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
+from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_top_image_reposts, send_reports_to_meme_voting, \
+    check_meme_template_potential_votes, queue_config_updates, queue_post_watch_cleanup, update_subreddit_access_level, \
+    update_ban_list, remove_expired_bans
+from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
+from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
+from redditrepostsleuth.core.celery.basetasks import RedditTask
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.util.reddithelpers import get_subscribers, is_sub_mod_praw, get_bot_permissions
+from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
+    MONITORED_SUB_MOD_REMOVED_SUBJECT
 
-from redditrepostsleuth.core.logging import log
-
-BAD_DOMAINS = [
-    'imgur.club',
-    'rochelleskincareasli',
-    'corepix',
-    'media.humblr.social',
-    'bmobcloud'
-
-]
-@celery.task(bind=True, base=SqlAlchemyTask)
-def cleanup_removed_posts_batch(self, posts: List[Text]) -> NoReturn:
-    util_api = os.getenv('UTIL_API')
-    if not util_api:
-        raise ValueError('Missing util API')
-
+log = logging.getLogger(__name__)
+@celery.task(bind=True, base=RedditTask)
+def update_subreddit_stats_task(self) -> None:
+    log.info('Scheduled Task: Update Subreddit Stats')
+    stats_updater = StatsUpdater(config=self.config)
     try:
-        res = requests.post(f'{util_api}/maintenance/removed', json=posts)
+        stats_updater.run_update()
     except Exception as e:
-        log.exception('Failed to call delete check api', exc_info=True)
-        return
-    if res.status_code != 200:
-        log.error('Unexpected status code: %s', res.status_code)
-        return
+        log.exception('Failed to update subreddit stats')
 
-    res_data = json.loads(res.text)
+
+@celery.task(bind=True, base=RedditTask)
+def test_task(self) -> None:
+    print('Scheduled Task: Test')
+
+
+@celery.task(bind=True, base=RedditTask)
+def check_inbox_task(self) -> None:
+    log.info('Scheduled Task: Check Inbox')
+    inbox_monitor = InboxMonitor(self.uowm, self.reddit.reddit.reddit, self.response_handler)
+    try:
+        inbox_monitor.check_inbox()
+    except Exception as e:
+        log.exception('Failed to update subreddit stats')
+
+@celery.task(bind=True, base=RedditTask)
+def check_new_activations_task(self) -> None:
+    log.info('Scheduled Task: Checking For Activations')
+    activation_monitor = NewActivationMonitor(self.uowm, self.reddit.reddit, notification_svc=self.notification_svc)
+    try:
+        activation_monitor.check_for_new_invites()
+    except Exception as e:
+        log.exception('Failed to update subreddit stats')
+
+
+@celery.task(bind=True, base=RedditTask)
+def check_comments_for_downvotes_task(self) -> None:
+    log.info('Scheduled Task: Check Comment Downvotes')
+    comment_monitor = BotCommentMonitor(self.reddit, self.uowm, self.config, notification_svc=self.notification_svc)
+    try:
+        comment_monitor.check_comments()
+    except Exception as e:
+        log.exception('Failed to update subreddit stats')
+
+
+@celery.task(bind=True, base=RedditTask)
+def update_subreddit_access_level_task(self) -> None:
+    """
+        Go through all monitored subs and update their is_private status
+        :return:
+        """
+    log.info('Starting Job: Post watch cleanup')
+    try:
+        update_subreddit_access_level(self.uowm, self.reddit.reddit)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+
+@celery.task(bind=True, base=RedditTask)
+def update_ban_list_task(self) -> None:
+    """
+    Go through banned subs and see if we're still banned
+    """
+    log.info('Starting Job: Update Subreddit Bans')
+    try:
+        update_ban_list(self.uowm, self.reddit.reddit, self.notification_svc)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+@celery.task(bind=True, base=RedditTask)
+def update_monitored_sub_data_task(self) -> None:
+    log.info('Starting Job: Update Subreddit Data')
+    try:
+        with self.uowm.start() as uow:
+            subs = uow.monitored_sub.get_all_active()
+            for sub in subs:
+                update_monitored_sub_stats.apply_async((sub.name,))
+    except Exception as e:
+        log.exception('Problem with scheduled task')
+
+@celery.task(bind=True, base=RedditTask)
+def remove_expired_bans_task(self) -> None:
+    log.info('Starting Job: Remove Expired Bans')
+    try:
+        remove_expired_bans(self.uowm, self.notification_svc)
+    except Exception as e:
+        log.exception('Scheduled Task Failed: Update Mod Status')
+
+@celery.task(bind=True, base=RedditTask)
+def update_top_image_reposts_task(self) -> None:
+    log.info('Starting Job: Remove Expired Bans')
+    try:
+        update_top_image_reposts(self.uowm, self.reddit.reddit)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+@celery.task(bind=True, base=RedditTask)
+def send_reports_to_meme_voting_task(self):
+    log.info('Starting Job: Reports to meme voting')
+    try:
+        send_reports_to_meme_voting(self.uowm)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+@celery.task(bind=True, base=RedditTask)
+def check_meme_template_potential_votes_task(self):
+    log.info('Starting Job: Meme Template Vote')
+    try:
+        check_meme_template_potential_votes(self.uowm)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+
+@celery.task(bind=True, base=RedditTask)
+def queue_config_updates_task(self):
+    log.info('Starting Job: Config Update Check')
+    try:
+        queue_config_updates(self.uowm, self.config)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+@celery.task(bind=True, base=RedditTask)
+def queue_post_watch_cleanup_task(self):
+    log.info('Starting Job: Post watch cleanup')
+    try:
+        queue_post_watch_cleanup(self.uowm, self.config)
+    except Exception as e:
+        log.exception('Problem in scheduled task')
+
+@celery.task(bind=True, base=RedditTask)
+def update_monitored_sub_stats(self, sub_name: str) -> None:
     with self.uowm.start() as uow:
-        for p in res_data:
+        monitored_sub: MonitoredSub = uow.monitored_sub.get_by_sub(sub_name)
+        if not monitored_sub:
+            log.error('Failed to find subreddit %s', sub_name)
+            return
 
-            if (urlparse(p['url'])).hostname in BAD_DOMAINS:
-                p['action'] = 'remove'
+        monitored_sub.subscribers = get_subscribers(monitored_sub.name, self.reddit.reddit)
 
-            #log.info('Checking post %s', id)
+        log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
+        monitored_sub.is_mod = is_sub_mod_praw(monitored_sub.name, 'repostsleuthbot', self.reddit.reddit)
+        perms = get_bot_permissions(monitored_sub.name, self.reddit) if monitored_sub.is_mod else []
+        monitored_sub.post_permission = True if 'all' in perms or 'posts' in perms else None
+        monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
+        log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission, monitored_sub.wiki_permission)
 
-            if p['action'] == 'skip':
-                #log.info('Skipping %s', post.url)
-                continue
-            elif p['action'] == 'update':
-                #log.info('Updating: %s', post.url)
-                post = uow.posts.get_by_post_id(p['id'])
-                if not post:
-                    continue
-                post.last_deleted_check = func.utc_timestamp()
-            elif p['action'] == 'remove':
-                uow.to_be_deleted.add(
-                    ToBeDeleted(
-                        post_id=p['id'],
-                        post_type='image'
-                    )
+        if not monitored_sub.failed_admin_check_count:
+            monitored_sub.failed_admin_check_count = 0
+
+        if monitored_sub.is_mod:
+            if monitored_sub.failed_admin_check_count > 0:
+                self.notification_svc.send_notification(
+                    f'Failed admin check for r/{monitored_sub.name} reset',
+                    subject='Failed Admin Check Reset'
                 )
-                """
-                image_post = uow.image_post.get_by_post_id(post.post_id)
-                image_post_current = uow.image_post_current.get_by_post_id(post.post_id)
-                investigate_post = uow.investigate_post.get_by_post_id(post.post_id)
-                link_repost = uow.link_repost.get_by_repost_of(post.post_id)
-                image_reposts = uow.image_repost.get_by_repost_of(post.post_id)
-                comments = uow.bot_comment.get_by_post_id(post.post_id)
-                summons = uow.summons.get_by_post_id(post.post_id)
-                image_search = uow.image_search.get_by_post_id(post.post_id)
-                user_reports = uow.user_report.get_by_post_id(post.post_id)
+            monitored_sub.failed_admin_check_count = 0
+        else:
+            monitored_sub.failed_admin_check_count += 1
+            monitored_sub.active = False
+            self.notification_svc.send_notification(
+                f'Failed admin check for r/{monitored_sub.name} increased to {monitored_sub.failed_admin_check_count}.',
+                subject='Failed Admin Check Increased'
+            )
 
-                # uow.posts.remove(post)
-                if image_post:
-                    log.info('Deleting image post %s - %s', image_post.id, post.url)
-                    #log.info(post.url)
-                    uow.image_post.remove(image_post)
-                if image_post_current:
-                    log.info('Deleting image post current %s', image_post_current.id)
-                    uow.image_post_current.remove(image_post_current)
-                if investigate_post:
-                    log.info('Deleting investigate %s', investigate_post.id)
-                    uow.investigate_post.remove(investigate_post)
-                if link_repost:
-                    for r in link_repost:
-                        log.info('Deleting link repost %s', r.id)
-                        uow.link_repost.remove(r)
-                if image_reposts:
-                    for r in image_reposts:
-                        log.info('Deleting image repost %s', r.id)
-                        uow.image_repost.remove(r)
-                if comments:
-                    for c in comments:
-                        log.info('Deleting comment %s', c.id)
-                        uow.bot_comment.remove(c)
-                if summons:
-                    for s in summons:
-                        log.info('deleting summons %s', s.id)
-                        uow.summons.remove(s)
-                if image_search:
-                    for i in image_search:
-                        log.info('Deleting image search %s', i.id)
-                        uow.image_search.remove(i)
-                if user_reports:
-                    for u in user_reports:
-                        log.info('Deleting report %s', u.id)
-                        uow.user_report.remove(u)
-                if not post.post_type or post.post_type == 'text':
-                    print(f'Deleting Text Post {post.id} - {post.created_at} - {post.url}')
-                uow.posts.remove(post)
-                """
-            elif p['action'] == 'default':
-                log.info('Got default: %s', post.url)
-            else:
-                continue
+        if monitored_sub.failed_admin_check_count == 2:
+            subreddit = self.reddit.subreddit(monitored_sub.name)
+            message = MONITORED_SUB_MOD_REMOVED_CONTENT.format(hours='72', subreddit=monitored_sub.name)
+            try:
+                subreddit.message(
+                    MONITORED_SUB_MOD_REMOVED_SUBJECT,
+                    message
+                )
+            except PRAWException:
+                pass
+        elif monitored_sub.failed_admin_check_count >= 4 and monitored_sub.name.lower() != 'dankmemes':
+            self.notification_svc.send_notification(
+                f'Sub r/{monitored_sub.name} failed admin check 4 times.  Removing',
+                subject='Removing Monitored Subreddit'
+            )
+            uow.monitored_sub.remove(monitored_sub)
 
         uow.commit()
-
-@celery.task(bind=True, base=SqlAlchemyTask)
-def deleted_post_cleanup(self, posts: List[Text]) -> NoReturn:
-    util_api = os.getenv('UTIL_API')
-    if not self.config.util_api:
-        raise ValueError('Missing util API')
-
-    try:
-        res = requests.post(f'{self.config.util_api}/maintenance/removed', json=posts)
-    except Exception as e:
-        log.exception('Failed to call delete check api', exc_info=False)
-        return
-    if res.status_code != 200:
-        log.error('Unexpected status code: %s', res.status_code)
-        return
-
-    res_data = json.loads(res.text)
-    with self.uowm.start() as uow:
-        for p in res_data:
-
-            if p['action'] == 'skip':
-                continue
-            elif p['action'] == 'update':
-                #log.info('Updating: %s', post.url)
-                post = uow.posts.get_by_post_id(p['id'])
-                if not post:
-                    continue
-                post.last_deleted_check = func.utc_timestamp()
-            elif p['action'] == 'remove':
-                post = uow.posts.get_by_post_id(p['id'])
-                image_post, image_post_current = None, None
-                if post.post_type == 'image':
-                    image_post = uow.image_post.get_by_post_id(p['id'])
-                    image_post_current = uow.image_post_current.get_by_post_id(p['id'])
-                investigate_post = uow.investigate_post.get_by_post_id(p['id'])
-                image_reposts = uow.image_repost.get_by_repost_of(p['id'])
-                comments = uow.bot_comment.get_by_post_id(p['id'])
-                summons = uow.summons.get_by_post_id(p['id'])
-                image_search = uow.image_search.get_by_post_id(p['id'])
-                user_reports = uow.user_report.get_by_post_id(p['id'])
-                watches = uow.repostwatch.get_all_by_post_id(p['id'])
-
-                # uow.posts.remove(post)
-                if image_post:
-                    log.info('Deleting image post %s - %s', image_post.id, post.url)
-                    # log.info(post.url)
-                    uow.image_post.remove(image_post)
-                if image_post_current:
-                    log.info('Deleting image post current %s', image_post_current.id)
-                    uow.image_post_current.remove(image_post_current)
-                if investigate_post:
-                    log.info('Deleting investigate %s', investigate_post.id)
-                    uow.investigate_post.remove(investigate_post)
-                if image_reposts:
-                    for r in image_reposts:
-                        log.info('Deleting image repost %s', r.id)
-                        uow.image_repost.remove(r)
-                if comments:
-                    for c in comments:
-                        log.info('Deleting comment %s', c.id)
-                        uow.bot_comment.remove(c)
-                if summons:
-                    for s in summons:
-                        log.info('deleting summons %s', s.id)
-                        uow.summons.remove(s)
-                if image_search:
-                    for i in image_search:
-                        log.info('Deleting image search %s', i.id)
-                        uow.image_search.remove(i)
-                if user_reports:
-                    for u in user_reports:
-                        log.info('Deleting report %s', u.id)
-                        uow.user_report.remove(u)
-                if watches:
-                    for w in watches:
-                        log.info('Deleting watch %s', w.id)
-                        uow.repostwatch.remove(w)
-                if post:
-                    uow.posts.remove(post)
-
-            elif p['action'] == 'default':
-                log.info('Got default: %s', post.url)
-            else:
-                continue
-
-        uow.commit()
-
-@celery.task(bind=True, base=SqlAlchemyTask)
-def image_post_cleanup(self, posts: List[Text]) -> NoReturn:
-    with self.uowm.start() as uow:
-        for p in posts:
-            post = uow.posts.get_by_post_id(p.post_id)
-            image_post = uow.image_post.get_by_post_id(p.post_id)
-            image_post_current = uow.image_post_current.get_by_post_id(p.post_id)
-            investigate_post = uow.investigate_post.get_by_post_id(p.post_id)
-            image_reposts = uow.image_repost.get_by_repost_of(p.post_id)
-            comments = uow.bot_comment.get_by_post_id(p.post_id)
-            summons = uow.summons.get_by_post_id(p.post_id)
-            image_search = uow.image_search.get_by_post_id(p.post_id)
-            user_reports = uow.user_report.get_by_post_id(p.post_id)
-
-            # uow.posts.remove(post)
-            if image_post:
-                log.info('Deleting image post %s - %s', image_post.id, post.url)
-                # log.info(post.url)
-                uow.image_post.remove(image_post)
-            if image_post_current:
-                log.info('Deleting image post current %s', image_post_current.id)
-                uow.image_post_current.remove(image_post_current)
-            if investigate_post:
-                log.info('Deleting investigate %s', investigate_post.id)
-                uow.investigate_post.remove(investigate_post)
-            if image_reposts:
-                for r in image_reposts:
-                    log.info('Deleting image repost %s', r.id)
-                    uow.image_repost.remove(r)
-            if comments:
-                for c in comments:
-                    log.info('Deleting comment %s', c.id)
-                    uow.bot_comment.remove(c)
-            if summons:
-                for s in summons:
-                    log.info('deleting summons %s', s.id)
-                    uow.summons.remove(s)
-            if image_search:
-                for i in image_search:
-                    log.info('Deleting image search %s', i.id)
-                    uow.image_search.remove(i)
-            if user_reports:
-                for u in user_reports:
-                    log.info('Deleting report %s', u.id)
-                    uow.user_report.remove(u)
-            if post:
-                uow.posts.remove(post)
-            uow.to_be_deleted.remove(p)
-        uow.commit()
-
-@celery.task(bind=True, base=SqlAlchemyTask)
-def link_post_cleanup(self, posts: List[Text]) -> NoReturn:
-    with self.uowm.start() as uow:
-        for p in posts:
-            post = uow.posts.get_by_post_id(p.post_id)
-            investigate_post = uow.investigate_post.get_by_post_id(p.post_id)
-            link_repost = uow.link_repost.get_by_repost_of(post.post_id)
-            comments = uow.bot_comment.get_by_post_id(p.post_id)
-            summons = uow.summons.get_by_post_id(p.post_id)
-            user_reports = uow.user_report.get_by_post_id(p.post_id)
-
-            if investigate_post:
-                log.info('Deleting investigate %s', investigate_post.id)
-                uow.investigate_post.remove(investigate_post)
-            if link_repost:
-                for r in link_repost:
-                    log.info('Deleting link repost %s', r.id)
-                    uow.link_repost.remove(r)
-            if comments:
-                for c in comments:
-                    log.info('Deleting comment %s', c.id)
-                    uow.bot_comment.remove(c)
-            if summons:
-                for s in summons:
-                    log.info('deleting summons %s', s.id)
-                    uow.summons.remove(s)
-
-            if user_reports:
-                for u in user_reports:
-                    log.info('Deleting report %s', u.id)
-                    uow.user_report.remove(u)
-            if post:
-                uow.posts.remove(post)
-            uow.to_be_deleted.remove(p)
-        uow.commit()
-
-@celery.task(bind=True, base=SqlAlchemyTask)
-def cleanup_orphan_image_post(self, image_posts: List[Text]) -> NoReturn:
-    log.info('Checking orphan batch')
-    with self.uowm.start() as uow:
-        for post_id in image_posts:
-            log.debug('Checking image post %s', post_id)
-            post = uow.posts.get_by_post_id(post_id)
-            image_post = uow.image_post.get_by_post_id(post_id)
-            if not post:
-                #log.info('Removing orphan image post %s', post_id)
-                uow.image_post.remove(image_post)
-        uow.commit()
-        log.info('Finished Orphan Batch')
-

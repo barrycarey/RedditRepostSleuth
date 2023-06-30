@@ -5,9 +5,11 @@ from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRep
 from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
 from redditrepostsleuth.core.db.repository.botcommentrepo import BotCommentRepo
 from redditrepostsleuth.core.db.repository.config_message_template_repo import ConfigMessageTemplateRepo
+from redditrepostsleuth.core.db.repository.http_proxy_repo import HttpProxyRepo
 from redditrepostsleuth.core.db.repository.image_index_map_rep import ImageIndexMapRepo
 from redditrepostsleuth.core.db.repository.indexbuildtimesrepository import IndexBuildTimesRepository
 from redditrepostsleuth.core.db.repository.investigatepostrepo import InvestigatePostRepo
+from redditrepostsleuth.core.db.repository.meme_hash_repo import MemeHashRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_repo import MemeTemplatePotentialRepo
 from redditrepostsleuth.core.db.repository.meme_template_potential_votes_repo import MemeTemplatePotentialVoteRepo
 from redditrepostsleuth.core.db.repository.memetemplaterepository import MemeTemplateRepository
@@ -127,6 +129,14 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     @property
     def image_index_map(self) -> ImageIndexMapRepo:
         return ImageIndexMapRepo(self.session)
+
+    @property
+    def meme_hash(self) -> MemeHashRepo:
+        return MemeHashRepo(self.session)
+
+    @property
+    def http_proxy(self) -> HttpProxyRepo:
+        return HttpProxyRepo(self.session)
 
     @property
     def repost_search(self) -> RepostSearchRepo:
