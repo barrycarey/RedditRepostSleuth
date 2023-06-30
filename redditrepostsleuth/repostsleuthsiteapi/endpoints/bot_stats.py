@@ -4,11 +4,11 @@ from falcon import Request, Response, HTTPNotFound, HTTPBadRequest
 from matplotlib.text import Text
 from praw import Reddit
 
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 
 class BotStats:
-    def __init__(self, uowm: SqlAlchemyUnitOfWorkManager, reddit: Reddit):
+    def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit):
         self.reddit = reddit
         self.uowm = uowm
 

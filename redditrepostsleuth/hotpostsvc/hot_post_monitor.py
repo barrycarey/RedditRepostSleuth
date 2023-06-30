@@ -7,7 +7,6 @@ from praw.models import Comment, Submission
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, BotComment
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
@@ -230,7 +229,7 @@ class TopPostMonitor:
 
 if __name__ == '__main__':
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     event_logger = EventLogging(config=config)
     dup = DuplicateImageService(uowm, event_logger, config=config)
     response_builder = ResponseBuilder(uowm)

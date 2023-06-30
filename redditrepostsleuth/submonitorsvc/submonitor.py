@@ -1,6 +1,5 @@
 import logging
 import time
-from time import perf_counter
 from typing import List, Text, NoReturn, Optional
 
 from praw.exceptions import APIException, RedditAPIException
@@ -11,7 +10,7 @@ from redlock import RedLockError
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
 from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
@@ -35,7 +34,7 @@ class SubMonitor:
     def __init__(
             self,
             image_service: DuplicateImageService,
-            uowm: SqlAlchemyUnitOfWorkManager,
+            uowm: UnitOfWorkManager,
             reddit: RedditManager,
             response_builder: ResponseBuilder,
             response_handler: ResponseHandler,

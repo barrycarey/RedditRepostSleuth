@@ -15,9 +15,9 @@ from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery.admin_tasks import delete_post_task
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate, MemeHash
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash, RepostSearch
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
+from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults, ImageMatch
@@ -228,7 +228,7 @@ class DuplicateImageService:
             try:
                 meme_hashes = get_image_hashes(url, hash_size=self.config.default_meme_filter_hash_size)
                 meme_hash = meme_hashes['dhash_h']
-            except ImageConversioinException:
+            except ImageConversionException:
                 log.error('Failed to get meme hash. ')
                 if post_id:
                     # TODO - This can potentially start deleting images if we drop internet connection
@@ -359,36 +359,21 @@ class DuplicateImageService:
             used_current_index: bool,
             used_historical_index: bool,
     ) -> ImageSearchResults:
-        image_search = ImageSearch(
-            post_id=search_results.checked_post.post_id if search_results.checked_post else 'url',
-            used_historical_index=used_historical_index,
-            used_current_index=used_current_index,
-            target_hamming_distance=search_results.target_hamming_distance,
-            target_annoy_distance=search_results.search_settings.target_annoy_distance,
-            same_sub=search_results.search_settings.same_sub,
-            max_days_old=search_results.search_settings.max_days_old,
-            filter_dead_matches=search_results.search_settings.filter_dead_matches,
-            only_older_matches=search_results.search_settings.only_older_matches,
-            meme_filter=search_results.search_settings.meme_filter,
-            meme_template_used=search_results.meme_template.id if search_results.meme_template else None,
-            search_time=search_results.search_times.total_search_time,
-            index_search_time=search_results.search_times.index_search_time,
-            total_filter_time=search_results.search_times.total_filter_time,
-            target_title_match=search_results.search_settings.target_title_match,
-            matches_found=len(search_results.matches),
+        logged_search = RepostSearch(
+            post_id=search_results.checked_post.id,
+            subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
             source=source,
-            subreddit=search_results.checked_post.subreddit if search_results.checked_post else 'url',
-            target_image_meme_match=search_results.search_settings.target_meme_match_percent,
-            target_image_match=search_results.search_settings.target_match_percent,
-            filter_crossposts=search_results.search_settings.filter_crossposts,
-            filter_same_author=search_results.search_settings.filter_same_author
+            search_params=json.dumps(search_results.search_settings.to_dict()),
+            matches_found=len(search_results.matches),
+            search_time=search_results.search_times.total_search_time,
+            post_type=2
         )
 
         with self.uowm.start() as uow:
-            uow.image_search.add(image_search)
+            uow.repost_search.add(logged_search)
             try:
                 uow.commit()
-                search_results.logged_search = image_search
+                search_results.logged_search = logged_search
             except Exception as e:
                 log.exception('Failed to save image search', exc_info=False)
 

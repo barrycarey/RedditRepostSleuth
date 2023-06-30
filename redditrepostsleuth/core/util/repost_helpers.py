@@ -8,7 +8,7 @@ import Levenshtein
 import requests
 from praw import Reddit
 
-from redditrepostsleuth.core.db.databasemodels import Post, RepostSearch
+from redditrepostsleuth.core.db.databasemodels import Post, RepostSearch, PostHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
@@ -74,10 +74,10 @@ def get_link_reposts(
         search_results = LinkSearchResults(url, search_settings, checked_post=post, search_times=LinkSearchTimes())
         search_results.search_times.start_timer('query_time')
         search_results.search_times.start_timer('total_search_time')
-        raw_results = uow.posts.find_all_by_url_hash(url_hash)
+        raw_results: list[PostHash] = uow.post_hash.find_by_hash_and_type(url_hash, 2)
         search_results.search_times.stop_timer('query_time')
         log.debug('Query time: %s', search_results.search_times.query_time)
-        search_results.matches = [SearchMatch(url, match) for match in raw_results]
+        search_results.matches = [SearchMatch(url, match.post) for match in raw_results]
 
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')

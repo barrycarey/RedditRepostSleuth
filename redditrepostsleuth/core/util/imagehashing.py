@@ -13,7 +13,7 @@ import imagehash
 from PIL import Image
 from PIL.Image import DecompressionBombError
 
-from redditrepostsleuth.core.exception import ImageConversioinException
+from redditrepostsleuth.core.exception import ImageConversionException
 from redditrepostsleuth.core.db.databasemodels import Post
 
 log = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def generate_img_by_post(post: Post) -> Image:
 
     try:
         img = generate_img_by_url(post.url)
-    except (ImageConversioinException) as e:
+    except (ImageConversionException) as e:
         log.error('Failed to convert image %s. Error: %s (%s)', post.id, str(e), str(post))
         return None
 
@@ -46,7 +46,7 @@ def generate_img_by_url(url: str) -> Image:
         img = Image.open(BytesIO(response.read()))
     except (HTTPError, ConnectionError, OSError, DecompressionBombError, UnicodeEncodeError) as e:
         log.exception('Failed to convert image %s. Error: %s ', url, str(e), exc_info=False)
-        raise ImageConversioinException(str(e))
+        raise ImageConversionException(str(e))
 
     return img if img else None
 
@@ -56,7 +56,7 @@ def generate_img_by_file(path: str) -> Image:
         img = Image.open(path)
     except (HTTPError, ConnectionError, OSError, DecompressionBombError, UnicodeEncodeError) as e:
         log.exception('Failed to convert image %s. Error: %s ', path, str(e))
-        raise ImageConversioinException(str(e))
+        raise ImageConversionException(str(e))
 
     return img if img else None
 
@@ -64,7 +64,7 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
     log.debug('Hashing image post')
     try:
         img = generate_img_by_url(post.url)
-    except ImageConversioinException as e:
+    except ImageConversionException as e:
         raise
 
     try:
@@ -132,7 +132,7 @@ def set_image_hashes_api(post: Post, api_url: str) -> Post:
     r = requests.get(api_url, params={'url': post.url})
     if r.status_code != 200:
         log.error('Back statuscode from DO API %s', r.status_code)
-        raise ImageConversioinException('Bad response from DO API')
+        raise ImageConversionException('Bad response from DO API')
 
     hashes = json.loads(r.text)
     log.debug(hashes)

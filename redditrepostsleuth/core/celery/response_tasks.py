@@ -19,7 +19,7 @@ from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Summons
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import configure_logger, get_configured_logger
@@ -52,7 +52,7 @@ class SummonsHandlerTask(Task):
         self.redlock = get_redlock_factory(self.config)
         self.reddit = get_reddit_instance(self.config)
         self.reddit_manager = RedditManager(self.reddit)
-        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
         notification_svc = NotificationService(self.config)
         self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons',
@@ -75,7 +75,7 @@ class SubMonitorTask(Task):
         self.config = Config()
         self.reddit = get_reddit_instance(self.config)
         self.reddit_manager = RedditManager(self.reddit)
-        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         event_logger = EventLogging(config=self.config)
         response_handler = ResponseHandler(self.reddit_manager, self.uowm, event_logger, source='submonitor', live_response=self.config.live_responses)
         dup_image_svc = DuplicateImageService(self.uowm, event_logger, self.reddit, config=self.config)

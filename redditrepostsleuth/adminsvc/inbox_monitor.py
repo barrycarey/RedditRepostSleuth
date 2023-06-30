@@ -9,7 +9,6 @@ from praw.models import Message
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import UserReport, RepostWatch
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.notification_service import NotificationService
@@ -137,7 +136,7 @@ class InboxMonitor:
 
 if __name__ == '__main__':
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     reddit = get_reddit_instance(config)
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit, uowm, event_logger, source='submonitor')
