@@ -1,4 +1,4 @@
-celery[redis]==4.4.7
+celery[redis]
 praw
 requests
 sqlalchemy
@@ -6,9 +6,10 @@ pymysql
 annoy
 distance
 imagehash
-influxdb
+influxdb-client
 redlock
 dataclasses
 python-Levenshtein
 redlock
 falcon
+pydantic

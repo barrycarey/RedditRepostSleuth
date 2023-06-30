@@ -1,10 +1,8 @@
 import threading
 import time
-# TODO - Mega hackery, figure this out.
+
 import sys
-
-
-
+# TODO - Mega hackery, figure this out.
 sys.path.append('./')
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine

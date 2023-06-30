@@ -1,9 +1,9 @@
-celery[redis]==4.4.7
+celery[redis]
 praw
 redlock
 sqlalchemy
 pymysql
 imagehash
-influxdb
 falcon
-redlock
+influxdb-client
+aiohttp

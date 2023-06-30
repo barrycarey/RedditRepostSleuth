@@ -26,6 +26,17 @@ class SqlAlchemyTask(Task):
         self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging()
 
+class PyMysqlTask(Task):
+    def __init__(self):
+        self.config = Config()
+
+    def get_conn(self):
+        return pymysql.connect(host=self.config.db_host,
+                        user=self.config.db_user,
+                        password=self.config.db_password,
+                        db=self.config.db_name,
+                        cursorclass=pymysql.cursors.SSDictCursor)
+
 class RepostTask(SqlAlchemyTask):
     def __init__(self):
         super().__init__()
@@ -69,55 +80,3 @@ class AdminTask(Task):
             self.config,
             notification_svc=self.notification_svc
         )
-
-class RepostLogger(Task):
-    def __init__(self):
-        self.repost_log = logging.getLogger('error_log')
-        self.repost_log.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s: %(message)s')
-        handler = logging.FileHandler('repost.log')
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self.repost_log.addHandler(handler)
-
-class PyMySQLTask(Task):
-    def __init__(self):
-        self.config = Config()
-        self.conn = self.get_conn()
-
-    def get_conn(self):
-        return pymysql.connect(host=self.config.db_host,
-                           user=self.config.db_user,
-                           password=self.config.db_password,
-                           db=self.config.db_name,
-                           cursorclass=pymysql.cursors.SSDictCursor)
-
-    def bulk_insert_post(self, rows):
-        conn = self.get_conn()
-        try:
-            with conn.cursor() as cur:
-                q = 'INSERT INTO post (post_id, url, perma_link, post_type, author, selftext, created_at, ingested_at, subreddit, title, crosspost_parent, hash_1, hash_2, url_hash) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
-                data = list([(row['post_id'], row['url'], row['perma_link'], row['post_type'], row['author'], row['selftext'], row['created_at'], row['ingested_at'], row['subreddit'], row['title'], row['crosspost_parent'], row['dhash_h'], row['dhash_v'], row['url_hash']) for row in rows])
-                cur.executemany(q, data)
-            try:
-                self.conn.commit()
-            except Exception as e:
-                print('')
-                conn.close()
-            conn.close()
-        except Exception as e:
-            print('')
-
-    def bulk_insert_image_post(self, rows):
-        try:
-            with self.conn.cursor() as cur:
-                q = 'INSERT INTO post (created_at, post_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
-                data = list([(row['post_id'], row['url'], row['perma_link'], row['post_type'], row['author'], row['selftext'], row['created_at'], row['ingested_at'], row['subreddit'], row['title'], row['crosspost_parent'], row['dhash_h'], row['dhash_v'], row['url_hash']) for row in rows])
-                cur.executemany(q, data)
-            try:
-                self.conn.commit()
-            except Exception as e:
-                print('')
-        except Exception as e:
-            print('')

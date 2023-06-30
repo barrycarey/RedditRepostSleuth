@@ -43,5 +43,4 @@ class ImageSearchMatch(SearchMatch):
             'annoy_distance': self.annoy_distance,
             'hamming_match_percent': self.hamming_match_percent,
             'hash_size': self.hash_size,
-            'index_match_id': self.index_match_id,
         }, **super().to_dict()}
