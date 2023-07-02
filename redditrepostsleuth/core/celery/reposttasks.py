@@ -1,5 +1,4 @@
-from time import perf_counter
-from typing import List, NoReturn
+from typing import NoReturn
 
 import requests
 from redlock import RedLockError
@@ -10,18 +9,14 @@ from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, RepostWatch
-from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, ImageConversioinException
-from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, RepostSearch, Repost
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
-from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
-from redditrepostsleuth.core.util.imagehashing import get_image_hashes, generate_img_by_url
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
 
 log = configure_logger(
