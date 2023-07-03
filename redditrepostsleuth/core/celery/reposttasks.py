@@ -45,7 +45,6 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         return
 
     search_settings = get_default_image_search_settings(self.config)
-    search_settings.meme_filter = True
     search_settings.max_matches = 75
     search_results = self.dup_service.check_image(
         post.url,
