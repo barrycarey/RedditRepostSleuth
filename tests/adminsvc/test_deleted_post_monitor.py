@@ -2,8 +2,8 @@ from unittest import TestCase, IsolatedAsyncioTestCase
 
 import pytest
 
-from redditrepostsleuth.adminsvc.deleted_post_monitor import build_reddit_req_url, get_post_ids_from_reddit_req_url, \
-    db_ids_from_post_ids, merge_results
+from redditrepostsleuth.adminsvc.deleted_post_monitor import db_ids_from_post_ids, merge_results
+from redditrepostsleuth.adminsvc.utils import get_post_ids_from_reddit_req_url, build_reddit_req_url
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, BatchedPostRequestJob, JobStatus
 

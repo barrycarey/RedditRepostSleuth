@@ -9,7 +9,7 @@ from typing import List, Optional
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
 
-from redditrepostsleuth.adminsvc.deleted_post_monitor import build_reddit_query_string
+from redditrepostsleuth.adminsvc.utils import build_reddit_query_string
 from redditrepostsleuth.core.celery.ingesttasks import save_new_post
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
