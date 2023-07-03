@@ -3,11 +3,10 @@ import os
 import sys
 import time
 from asyncio import run, ensure_future, gather
-from urllib.parse import urlparse
 
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError, ClientConnectorError, TCPConnector
 
-sys.path.append('./')
+from redditrepostsleuth.adminsvc.utils import build_reddit_query_string, build_reddit_req_url
 from redditrepostsleuth.core.celery.admin_tasks import update_last_deleted_check, bulk_delete
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
@@ -26,8 +25,7 @@ async def fetch_page(job: BatchedPostRequestJob, session: ClientSession) -> Batc
     proxy = f'http://{job.proxy.address}'
 
     try:
-        async with session.get(job.url, proxy=proxy,
-                               headers=GENERIC_REQ_HEADERS, timeout=ClientTimeout(total=10)) as resp:
+        async with session.get(job.url, timeout=ClientTimeout(total=10)) as resp:
             if resp.status == 200:
                 log.debug('Successful fetch')
                 job.status = JobStatus.SUCCESS
@@ -50,19 +48,6 @@ async def fetch_page(job: BatchedPostRequestJob, session: ClientSession) -> Batc
 
     return job
 
-def build_reddit_req_url(post_ids: list[str]) -> str:
-    t3_ids = [f't3_{p}' for p in post_ids]
-    return f'https://api.reddit.com/api/info?id={",".join(t3_ids)}'
-
-def build_reddit_query_string(post_ids: list[str]) -> str:
-    t3_ids = [f't3_{p}' for p in post_ids]
-    return f'{",".join(t3_ids)}'
-
-def get_post_ids_from_reddit_req_url(url: str) -> list[str]:
-    parsed_url = urlparse(url)
-    t3_ids = parsed_url.query.replace('id=', '').split(',')
-    return [id.replace('t3_', '') for id in t3_ids]
-
 
 def check_reddit_batch(job: BatchedPostRequestJob) -> DeleteCheckResult:
     result = DeleteCheckResult()
@@ -75,6 +60,8 @@ def check_reddit_batch(job: BatchedPostRequestJob) -> DeleteCheckResult:
         return result
 
     res_data = json.loads(job.resp_data)
+
+
     for p in res_data['data']['children']:
         if p['data']['removed_by_category'] in removal_reasons_to_flag:
             result.to_delete.append(p['data']['name'].replace('t3_', ''))
@@ -119,7 +106,8 @@ def db_ids_from_post_ids(post_ids: list[str], posts: list[Post]) -> list[int]:
     return results
 
 async def main():
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(Config()))
+    config = Config()
+    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
     proxy_manager = ProxyManager(uowm, 600)
     query_limit = int(os.getenv('QUERY_LIMIT', 20000))
 
@@ -129,22 +117,24 @@ async def main():
         start = time.perf_counter()
         with uowm.start() as uow:
             proxy_manager.enabled_expired_cooldowns()
-            posts = uow.posts.find_all_for_delete_check(90, limit=query_limit)
+            #posts = uow.posts.find_all_for_delete_check(90, limit=query_limit)
+            posts = uow.posts.find_all_recent_for_delete_check(1, limit=query_limit)
             if not posts:
                 log.info('No posts to check')
                 time.sleep(30)
                 continue
             processed_count += query_limit
             celery_jobs = []
-            for batch in chunk_list(posts, 20000):
-                log.info('First: %s %s - Last: %s %s', posts[0].post_id, posts[0].created_at, posts[-1].post_id,
-                         posts[-1].created_at)
+            for batch in chunk_list(posts, 7000):
+                log.info('First: %s %s - Last: %s %s', batch[0].post_id, batch[0].created_at, batch[-1].post_id,
+                         batch[-1].created_at)
                 tasks = []
                 conn = TCPConnector(limit=0)
 
                 async with ClientSession(connector=conn) as session:
                     for req_chunk in chunk_list(batch, 100):
-                        url = build_reddit_req_url([p.post_id for p in req_chunk])
+                        #url = build_reddit_req_url([p.post_id for p in req_chunk])
+                        url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string([p.post_id for p in req_chunk])}'
                         job = BatchedPostRequestJob(url, req_chunk, JobStatus.STARTED, proxy_manager.get_proxy())
                         tasks.append(ensure_future(fetch_page(job, session)))
 
