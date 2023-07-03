@@ -70,6 +70,7 @@ class EventLogging:
             self._successive_failures = 0
             return True
         except Exception as e:
+            log.error(e, exc_info=False)
             if hasattr(e, 'code') and e.code == 404:
                 #log.error('Database %s Does Not Exist.  Attempting To Create', config.influx_database)
                 self._influx_client.create_database(self._config.influx_database)

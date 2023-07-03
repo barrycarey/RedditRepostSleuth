@@ -1,3 +1,4 @@
+import asyncio
 import itertools
 import json
 import time
@@ -63,8 +64,15 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
             else:
                 log.error('Unexpected request status %s - %s', resp.status, job.url)
                 job.status = JobStatus.ERROR
-    except (TimeoutError, ClientConnectorError) as e:
+    except TimeoutError as e:
         log.error('Request Timeout')
+        job.status = JobStatus.ERROR
+    except ClientConnectorError:
+        log.error('Client Connection Error')
+        await asyncio.sleep(5)
+        job.status = JobStatus.ERROR
+    except ServerDisconnectedError:
+        log.error('Server disconnect Error')
         job.status = JobStatus.ERROR
     except Exception as e:
         job.status = JobStatus.ERROR
@@ -99,6 +107,7 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
             if len(tasks) >= 25 or len(chunk) == 0:
                 posts_to_save = []
                 while tasks:
+                    log.info('Gathering %s task results', len(tasks))
                     results: list[BatchedPostRequestJob] = await gather(*tasks)
                     tasks = []
 
@@ -149,8 +158,9 @@ async def main() -> None:
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
             try:
                 results = await fetch_page(url, session)
-            except (ServerDisconnectedError):
+            except (ServerDisconnectedError, ClientConnectorError):
                 log.error('Error during fetch')
+                await asyncio.sleep(2)
                 continue
 
             if not results:
