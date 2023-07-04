@@ -34,7 +34,7 @@ def ingest_repost_check(post):
         link_repost_check.apply_async(([post],))
 
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
+@celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError, NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
 
     r = requests.head(post.url)
@@ -72,14 +72,7 @@ def link_repost_check(self, posts, ):
     with self.uowm.start() as uow:
         for post in posts:
 
-            if post.url_hash in self.link_blacklist:
-                log.info('Skipping blacklisted URL hash %s', post.url_hash)
-                continue
             try:
-                if post.url_hash in self.link_blacklist:
-                    log.info('Skipping blacklisted URL hash %s', post.url_hash)
-                    continue
-
                 log.debug('Checking URL for repost: %s', post.url_hash)
                 search_results = get_link_reposts(post.url, self.uowm, get_default_link_search_settings(self.config),
                                                   post=post, source='ingest')

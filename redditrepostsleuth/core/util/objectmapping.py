@@ -50,9 +50,11 @@ def reddit_submission_to_post(submission: dict) -> Post:
     post.subreddit = submission.get('subreddit', None)
     post.title = submission.get('title', None)
     post.crosspost_parent = submission.get('crosspost_parent', None)
+    if post.crosspost_parent:
+        post.crosspost_parent = post.crosspost_parent.replace('t3_', '')
 
-    post.post_type = get_post_type_pushshift(submission)
-    post.post_type_int = get_post_type_id(post.post_type)
+    post_type = get_post_type_pushshift(submission)
+    post.post_type_id = get_post_type_id(post_type)
     post.nsfw = submission.get('over_18', None)
 
     return post

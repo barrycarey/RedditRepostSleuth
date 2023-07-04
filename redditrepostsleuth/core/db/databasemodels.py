@@ -8,11 +8,8 @@ Base = declarative_base()
 
 class Post(Base):
 
-    def __lt__(self, other):
-        return self.image_hash < other.image_hash
-
     def __repr__(self) -> str:
-        return 'Post ID: {} - Type: {} - URL: {} - Created: {}'.format(self.post_id, self.post_type, self.url, self.created_at)
+        return f'Post ID: {self.post_id} - Type: {self.post_type} - URL: {self.url} - Created: {self.created_at}'
 
     # TODO - Move to_dict methods into JSON encoders
 
@@ -35,7 +32,9 @@ class Post(Base):
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(25), nullable=False)
     title = Column(String(400, collation='utf8mb4_general_ci'), nullable=False)
-    crosspost_parent = Column(String(9))
+    url_hash = Column(String(32), nullable=False)
+    crosspost_parent = Column(String(11))
+    is_crosspost = Column(Boolean, nullable=False)
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     nsfw = Column(Boolean, default=False)
 
@@ -200,15 +199,16 @@ class Repost(Base):
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
     repost_of_id = Column(Integer, ForeignKey('post.id'))
+    post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
     search_id = Column(Integer, ForeignKey('repost_search.id'))
     detected_at = Column(DateTime, default=func.utc_timestamp())
     source = Column(String(25))
     author = Column(String(25))
     subreddit = Column(String(25), nullable=False)
-    post_type = Column(TINYINT())
     post = relationship("Post", back_populates='reposts', foreign_keys=[post_id])
     repost_of = relationship("Post", foreign_keys=[repost_of_id])
     search = relationship("RepostSearch")
+    post_type = relationship('PostType')
 
 
 class MonitoredSub(Base):

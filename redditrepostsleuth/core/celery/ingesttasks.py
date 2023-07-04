@@ -1,13 +1,9 @@
-import json
 import logging
 from random import randint
-from time import perf_counter
-
-import requests
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent, Post
+from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.exception import InvalidImageUrlException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
 from redditrepostsleuth.core.logging import configure_logger
@@ -45,18 +41,14 @@ def save_new_post(self, post: Post):
                 celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post',
                                  args=[post.post_id, monitored_sub],
                                  queue='submonitor')
-            ingest_repost_check.apply_async((post, self.config), queue='repost')
+
+        if post.post_type_id == 2 and self.config.repost_image_check_on_ingest:
+            celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post])
+        elif post.post_type_id == 3 and self.config.repost_link_check_on_ingest:
+            celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]])
 
     except Exception as e:
         log.exception('')
-
-
-@celery.task(ignore_results=True)
-def ingest_repost_check(post, config):
-    if post.post_type == 'image' and config.repost_image_check_on_ingest:
-        celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post], queue='repost_image')
-    elif post.post_type == 'link' and config.repost_link_check_on_ingest:
-        celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]], queue='repost_link')
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)

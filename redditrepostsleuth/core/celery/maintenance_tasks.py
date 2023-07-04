@@ -4,7 +4,7 @@ from praw.exceptions import PRAWException
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
-from redditrepostsleuth.adminsvc.misc_admin_tasks import update_top_image_reposts, send_reports_to_meme_voting, \
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_stat_top_image_repost, send_reports_to_meme_voting, \
     check_meme_template_potential_votes, queue_config_updates, queue_post_watch_cleanup, update_subreddit_access_level, \
     update_ban_list, remove_expired_bans
 from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
@@ -110,7 +110,7 @@ def remove_expired_bans_task(self) -> None:
 def update_top_image_reposts_task(self) -> None:
     log.info('Starting Job: Remove Expired Bans')
     try:
-        update_top_image_reposts(self.uowm, self.reddit.reddit)
+        update_stat_top_image_repost(self.uowm, self.reddit.reddit)
     except Exception as e:
         log.exception('Problem in scheduled task')
 

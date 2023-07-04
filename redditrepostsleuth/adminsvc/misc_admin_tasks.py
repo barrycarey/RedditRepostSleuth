@@ -11,7 +11,7 @@ from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_confi
     check_if_watched_post_is_active
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MemeTemplatePotential, \
-    MemeTemplate, StatsTopImageRepost
+    MemeTemplate, StatsTopRepost
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
@@ -138,10 +138,10 @@ def update_banned_sub_wiki(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
 def update_stat_top_image_repost(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
     days = [1,7,30,365]
     with uowm.start() as uow:
-        uow.session.execute('TRUNCATE `stat_top_image_repost`')
+        uow.session.execute('TRUNCATE `stat_top_repost`')
         for day in days:
             result = uow.session.execute(
-                'SELECT repost_of, COUNT(*) c FROM image_reposts WHERE detected_at > NOW() - INTERVAL :days DAY GROUP BY repost_of HAVING c > 1 ORDER BY c DESC LIMIT 2000',
+                'SELECT repost_of, COUNT(*) c FROM repost WHERE post_type=2 AND detected_at > NOW() - INTERVAL :days DAY GROUP BY repost_of_id HAVING c > 1 ORDER BY c DESC LIMIT 2000',
                 {'days': day})
             for chunk in chunk_list(result.fetchall(), 100):
                 reddit_ids_to_lookup = []
@@ -156,7 +156,7 @@ def update_stat_top_image_repost(uowm: UnitOfWorkManager, reddit: Reddit) -> Non
                     if not count_data:
                         continue
                     uow.stats_top_image_repost.add(
-                        StatsTopImageRepost(
+                        StatsTopRepost(
                             post_id=count_data[0],
                             repost_count=count_data[1],
                             days=day,
