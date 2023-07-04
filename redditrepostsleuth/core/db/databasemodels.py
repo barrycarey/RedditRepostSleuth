@@ -33,7 +33,6 @@ class Post(Base):
     subreddit = Column(String(25), nullable=False)
     title = Column(String(400, collation='utf8mb4_general_ci'), nullable=False)
     url_hash = Column(String(32), nullable=False)
-    crosspost_parent = Column(String(11))
     is_crosspost = Column(Boolean, nullable=False)
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     nsfw = Column(Boolean, default=False)
@@ -192,9 +191,9 @@ class RepostSearch(Base):
 class Repost(Base):
     __tablename__ = 'repost'
     __table_args__ = (
-        Index('idx_repost_by_type', 'post_type', 'detected_at', unique=False),
+        Index('idx_repost_by_type', 'post_type_id', 'detected_at', unique=False),
         Index('idx_repost_of_date',  'author', 'detected_at',unique=False),
-        Index('idx_repost_by_subreddit', 'subreddit', 'post_type', 'detected_at', unique=False),
+        Index('idx_repost_by_subreddit', 'subreddit', 'post_type_id', 'detected_at', unique=False),
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))

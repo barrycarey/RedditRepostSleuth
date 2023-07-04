@@ -1,7 +1,4 @@
 import json
-import logging
-import os
-import sys
 import time
 from datetime import datetime
 from random import randint
@@ -9,7 +6,6 @@ from typing import Text
 
 import requests
 from celery import Task
-from celery.utils.log import get_task_logger
 from praw.exceptions import APIException
 from prawcore import ResponseException
 from redlock import RedLockError
@@ -22,10 +18,8 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logfilters import ContextFilter
-from redditrepostsleuth.core.logging import configure_logger, get_configured_logger
-
+from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
-from redditrepostsleuth.core.model.repostresponse import SummonsResponse
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
