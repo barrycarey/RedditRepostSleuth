@@ -1,10 +1,11 @@
 import logging
+from hashlib import md5
 from typing import Text, Optional
 
 import requests
 from requests.exceptions import ConnectionError
 
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, PostHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversionException, InvalidImageUrlException, ImageRemovedException
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -16,7 +17,7 @@ log = logging.getLogger(__name__)
 
 def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Optional[Post]:
     with uowm.start() as uow:
-        if post.post_type.name == 'image':
+        if post.post_type_id == 2:
             try:
                 post = process_image_post(post)
             except (ImageRemovedException, ImageConversionException, InvalidImageUrlException, ConnectionError):
@@ -26,6 +27,10 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Optional[Post]:
             if not image_hash:
                 log.error('No hash created for image post %s, skipping ingest', post.post_id)
                 return
+
+        url_hash = md5(post.url.encode('utf-8'))
+        url_hash = url_hash.hexdigest()
+        post.hashes.append(PostHash(hash=url_hash, hash_type_id=2, post_created_at=post.created_at))
 
         try:
             uow.posts.add(post)

@@ -4,7 +4,7 @@ from redditrepostsleuth.core.config import Config
 
 config = Config()
 
-broker_url = f'redis://:{config.redis_password}@{config.redis_host}:{config.redis_port}/0'
+broker_url = f'redis://:{config.redis_password}@{config.redis_host}:{config.redis_port}/{config.redis_database}'
 result_backend = broker_url
 task_serializer = 'pickle'
 result_serializer='pickle'
@@ -15,11 +15,10 @@ worker_redirect_stdouts = False
 worker_log_color = None
 task_routes = {
     'redditrepostsleuth.core.celery.ingesttasks.save_new_post': {'queue': 'post_ingest'},
-    'redditrepostsleuth.core.celery.ingesttasks.ingest_repost_check': {'queue': 'repost2'},
+    'redditrepostsleuth.core.celery.ingesttasks.ingest_repost_check': {'queue': 'repost'},
     'redditrepostsleuth.core.celery.reposttasks.check_image_repost_save': {'queue': 'repost_image'},
     'redditrepostsleuth.core.celery.reposttasks.process_repost_annoy': {'queue': 'process_repost'},
-    'redditrepostsleuth.core.celery.tasks.link_repost_check': {'queue': 'repost_link'},
-    'redditrepostsleuth.core.celery.tasks.log_repost': {'queue': 'logrepost'},
+    'redditrepostsleuth.core.celery.reposttasks.link_repost_check': {'queue': 'repost_link'},
     'redditrepostsleuth.core.celery.admin_tasks.check_for_subreddit_config_update_task': {'queue': 'config_update_check'},
     'redditrepostsleuth.core.celery.admin_tasks.update_monitored_sub_stats': {'queue': 'monitored_sub_update'},
     'redditrepostsleuth.core.celery.admin_tasks.check_if_watched_post_is_active': {'queue': 'watch_remove_deleted'},
