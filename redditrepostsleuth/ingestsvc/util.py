@@ -1,46 +1,32 @@
 import logging
-import os
-from typing import Tuple, Text, Optional
-from urllib.parse import urlparse
+from typing import Text, Optional
 
 import requests
-from praw import Reddit
 from requests.exceptions import ConnectionError
-from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversionException, InvalidImageUrlException, ImageRemovedException
-from redditrepostsleuth.core.db.databasemodels import Post
-
-from hashlib import md5
-
-from redditrepostsleuth.core.model.events.ingest_image_process_event import IngestImageProcessEvent
-from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
-from redditrepostsleuth.core.util.imagehashing import set_image_hashes_api, set_image_hashes
+from redditrepostsleuth.core.util.imagehashing import set_image_hashes
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 
 log = logging.getLogger(__name__)
 
-def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[Post]:
+
+def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Optional[Post]:
     with uowm.start() as uow:
-        if post.post_type == 'image':
+        if post.post_type.name == 'image':
             try:
-                post, image_post = process_image_post(post, hash_api)
+                post = process_image_post(post)
             except (ImageRemovedException, ImageConversionException, InvalidImageUrlException, ConnectionError):
                 return
-            if image_post is None:
-                log.error('Failed to save image post. One of the post objects is null', post.post_id)
+
+            image_hash = next((i for i in post.hashes if i.hash_type_id == 1), None)
+            if not image_hash:
+                log.error('No hash created for image post %s, skipping ingest', post.post_id)
                 return
 
-            if not post.dhash_h:
-                log.error('Missing DHash', post.post_id)
-                return
-
-            uow.image_post.add(image_post)
-
-        elif post.post_type == 'hosted:video':
-            pass
         try:
             uow.posts.add(post)
             uow.commit()
@@ -52,13 +38,8 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager, hash_api) -> Optional[
     return post
 
 
-def process_image_post(post: Post, hash_api) -> Post:
+def process_image_post(post: Post) -> Post:
     if 'imgur' not in post.url: # TODO Why in the hell did I do this?
-        """
-        if 'preview.redd.it' in post.url:
-            log.error('Skipping preview URL in %s: %s', post.subreddit, post.url)
-            raise InvalidImageUrlException(f'Unable to get preview image: {post.url}')
-        """
         try: # Make sure URL is still valid
             r = requests.head(post.url, allow_redirects=True)
         except ConnectionError as e:
@@ -78,15 +59,10 @@ def process_image_post(post: Post, hash_api) -> Post:
 
     log.info('Hashing image with URL: %s', post.url)
 
-    # TODO - Is this still needed?
-    if hash_api:
-        log.debug('Using hash API: %s', hash_api)
-        set_image_hashes_api(post, hash_api)
-    else:
-        log.debug('Using local hashing')
-        set_image_hashes(post)
+    set_image_hashes(post)
 
     return post
+
 
 def save_unknown_post(post_id: Text, uowm: UnitOfWorkManager, reddit: RedditManager) -> Post:
     """

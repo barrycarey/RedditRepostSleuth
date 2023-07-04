@@ -28,7 +28,6 @@ class Post(Base):
     post_id = Column(String(9), nullable=False, unique=True)
     url = Column(String(2000, collation='utf8mb4_general_ci'), nullable=False)
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
-    post_type = Column(String(20, collation='latin1_bin'))
     post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
     author = Column(String(25), nullable=False)
     selftext = Column(Text(75000, collation='utf8mb4_general_ci'))

@@ -474,3 +474,19 @@ def build_ingest_query_params(starting_id: int, limit: int = 100) -> Dict[str, s
     return {
         'submission_ids': ','.join(ids_to_get)
     }
+
+def get_post_type_id(post_type: str) -> int:
+    if post_type == 'text':
+        return 1
+    elif post_type == 'image':
+        return 2
+    elif post_type == 'link':
+        return 3
+    elif post_type == 'hosted:video':
+        return 4
+    elif post_type == 'rich:video':
+        return 5
+    elif post_type == 'gallery':
+        return 6
+    elif post_type == 'video':
+        return 7
