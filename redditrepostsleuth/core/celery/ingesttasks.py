@@ -80,6 +80,53 @@ def save_pushshift_results_archive(self, data):
             save_new_post.apply_async((post,), queue='pushshift_ingest')
 
 
+
+def get_type_id(post_type: str) -> int:
+    if post_type == 'text':
+        return 1
+    elif post_type == 'image':
+        return 2
+    elif post_type == 'link':
+        return 3
+    elif post_type == 'hosted:video':
+        return 4
+    elif post_type == 'rich:video':
+        return 5
+    elif post_type == 'gallery':
+        return 6
+    elif post_type == 'video':
+        return 7
+
+
+def post_from_row(row: dict):
+    post =  Post(
+            post_id=row['post_id'],
+            url=row['url'],
+            perma_link=row['perma_link'],
+            author=row['author'],
+            selftext=row['selftext'],
+            created_at=row['created_at'],
+            ingested_at=row['ingested_at'],
+            subreddit=row['subreddit'],
+            title=row['title'],
+            is_crosspost=True if row['crosspost_parent'] else False,
+            last_deleted_check=row['last_deleted_check']
+        )
+
+    post.post_type_id = get_type_id(row['post_type'])
+
+
+    if post.post_type_id == 2:
+        post.hashes.append(
+            PostHash(hash=row['dhash_h'], hash_type_id=1, post_created_at=row['created_at'])
+        )
+        post.hashes.append(
+            PostHash(hash=row['dhash_v'], hash_type_id=2, post_created_at=row['created_at'])
+        )
+
+    return post
+
+
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_post(self, rows: list[dict]):
     print('running')
@@ -100,25 +147,16 @@ def import_post(self, rows: list[dict]):
                     continue
                 post = post_from_row(row)
 
-                """
-                if not post.post_type:
-                    log.error(f'Failed to get post on %s. https://reddit.com%s', post.post_id, post.perma_link)
-                """
-
                 if row['url_hash']:
-                    url_hash = row['url_hash']
+                    post.url_hash = row['url_hash']
                 else:
                     temp_hash = md5(post.url.encode('utf-8'))
-                    url_hash = temp_hash.hexdigest()
-                post.hashes.append(PostHash(hash=url_hash, hash_type_id=2, post_created_at=row['created_at']))
-
+                    post.url_hash = temp_hash.hexdigest()
 
                 if post.post_type_id == 2 and not row['dhash_h']:
                         log.info('Skipping missing hash')
                         continue
 
-                if post.crosspost_parent:
-                    post.crosspost_parent = post.crosspost_parent.replace('t3_', '')
                 try:
                     uow.posts.add(post)
 
@@ -137,3 +175,5 @@ def import_post(self, rows: list[dict]):
         log.exception('')
         return
 
+if __name__ == '__main__':
+    print("")
