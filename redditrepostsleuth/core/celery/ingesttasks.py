@@ -1,9 +1,12 @@
 import logging
+from hashlib import md5
 from random import randint
+
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, PostHash
 from redditrepostsleuth.core.exception import InvalidImageUrlException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
 from redditrepostsleuth.core.logging import configure_logger
@@ -76,4 +79,61 @@ def save_pushshift_results_archive(self, data):
             log.debug('Saving pushshift post: %s', submission['id'])
             save_new_post.apply_async((post,), queue='pushshift_ingest')
 
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_post(self, rows: list[dict]):
+    print('running')
+    try:
+        with self.uowm.start() as uow:
+            for row in rows:
+                if len(row['title']) > 400:
+                    row['title'] = row['title'][0:399]
+
+                if row['selftext']:
+                    if '[deleted]' in row['selftext']:
+                        continue
+                    if '[removed]' in row['selftext']:
+                        continue
+
+                if row['post_type'] == 'image' and not row['dhash_h']:
+                    log.info('Skipping image without hash')
+                    continue
+                post = post_from_row(row)
+
+                """
+                if not post.post_type:
+                    log.error(f'Failed to get post on %s. https://reddit.com%s', post.post_id, post.perma_link)
+                """
+
+                if row['url_hash']:
+                    url_hash = row['url_hash']
+                else:
+                    temp_hash = md5(post.url.encode('utf-8'))
+                    url_hash = temp_hash.hexdigest()
+                post.hashes.append(PostHash(hash=url_hash, hash_type_id=2, post_created_at=row['created_at']))
+
+
+                if post.post_type_id == 2 and not row['dhash_h']:
+                        log.info('Skipping missing hash')
+                        continue
+
+                if post.crosspost_parent:
+                    post.crosspost_parent = post.crosspost_parent.replace('t3_', '')
+                try:
+                    uow.posts.add(post)
+
+                except Exception as e:
+                    log.exception('')
+
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.exception('duplicate')
+            except Exception as e:
+                log.exception('')
+
+    except Exception as e:
+        log.exception('')
+        return
 
