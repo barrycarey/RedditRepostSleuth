@@ -32,7 +32,7 @@ def update_proxies(uowm: UnitOfWorkManager) -> None:
 
         log.info('Deleting existing proxies')
         uow.http_proxy.delete_all()
-
+        uow.commit()
         for proxy in res_data['results']:
             uow.http_proxy.add(
                 HttpProxy(address=f'{proxy["proxy_address"]}:{proxy["port"]}', provider='WebShare')
