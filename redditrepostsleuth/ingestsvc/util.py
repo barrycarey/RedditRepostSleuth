@@ -60,7 +60,7 @@ def process_image_post(post: Post, hash_api) -> Post:
             raise InvalidImageUrlException(f'Unable to get preview image: {post.url}')
         """
         try: # Make sure URL is still valid
-            r = requests.head(post.url)
+            r = requests.head(post.url, allow_redirects=True)
         except ConnectionError as e:
             log.error('Failed to verify image URL at %s', post.post_id, post.url)
             raise

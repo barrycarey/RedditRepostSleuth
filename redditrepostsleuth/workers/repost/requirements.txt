@@ -10,4 +10,4 @@ celery[redis]
 python-Levenshtein
 falcon
 redlock
-pydantic
+pydantic==1.10.9
