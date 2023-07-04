@@ -19,7 +19,7 @@ from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, JobStatus
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
     base36decode, generate_next_ids
-from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
+from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
 
 log = configure_logger(name='redditrepostsleuth')
 config = Config()
@@ -123,7 +123,7 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                             tasks.append(ensure_future(fetch_page_as_job(j, session)))
 
                 log.info('Sending %s posts to save queue', len(posts_to_save))
-                queue_posts_for_ingest([pushshift_to_post(submission) for submission in posts_to_save])
+                queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
             if len(chunk) == 0:
                 break
 
@@ -187,7 +187,7 @@ async def main() -> None:
                 posts_to_save.append(post['data'])
 
             log.info('Sending %s posts to save queue', len(posts_to_save))
-            queue_posts_for_ingest([pushshift_to_post(submission) for submission in posts_to_save])
+            queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
 
             ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(
                 res_data['data']['children'][0]['data']['created_utc'])

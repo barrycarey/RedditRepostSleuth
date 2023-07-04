@@ -14,7 +14,7 @@ from PIL import Image
 from PIL.Image import DecompressionBombError
 
 from redditrepostsleuth.core.exception import ImageConversionException
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, PostHash
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ def generate_img_by_file(path: str) -> Image:
 
     return img if img else None
 
+
 def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
     log.debug('Hashing image post')
     try:
@@ -70,10 +71,8 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
     try:
         dhash_h = imagehash.dhash(img, hash_size=hash_size)
         dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
-        ahash = imagehash.average_hash(img, hash_size=hash_size)
-        post.dhash_h = str(dhash_h)
-        post.dhash_v = str(dhash_v)
-        post.ahash = str(ahash)
+        post.hashes.append(PostHash(hash=dhash_h, hash_type_id=1, post_created_at=post.created_at))
+        post.hashes.append(PostHash(hash=dhash_v, hash_type_id=3, post_created_at=post.created_at))
     except Exception as e:
         # TODO: Specific exception
         log.exception('Error creating hash', exc_info=True)

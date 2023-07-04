@@ -27,10 +27,12 @@ log = configure_logger(
 
 @celery.task(ignore_results=True)
 def ingest_repost_check(post):
+    # TODO: I don't think this is used anywhere
     if post.post_type == 'image':
         check_image_repost_save.apply_async((post,), queue='repost_image')
     elif post.post_type == 'link':
         link_repost_check.apply_async(([post],))
+
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError,NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
@@ -63,6 +65,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
     watches = check_for_post_watch(search_results.matches, self.uowm)
     if watches and self.config.enable_repost_watch:
         notify_watch.apply_async((watches, post), queue='watch_notify')
+
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts, ):

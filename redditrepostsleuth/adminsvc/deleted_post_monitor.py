@@ -11,7 +11,7 @@ from redditrepostsleuth.core.celery.admin_tasks import update_last_deleted_check
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, JobStatus, BatchedPostRequestJob
 from redditrepostsleuth.core.proxy_manager import ProxyManager
@@ -107,7 +107,7 @@ def db_ids_from_post_ids(post_ids: list[str], posts: list[Post]) -> list[int]:
 
 async def main():
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     proxy_manager = ProxyManager(uowm, 600)
     query_limit = int(os.getenv('QUERY_LIMIT', 20000))
 
