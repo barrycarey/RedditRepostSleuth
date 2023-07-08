@@ -143,7 +143,7 @@ def import_post(self, rows: list[dict]):
                         continue
 
                 if row['post_type'] == 'image' and not row['dhash_h']:
-                    log.info('Skipping image without hash')
+                    log.info('Skipping image without hash: %s - %s', row['post_id'], row['url'])
                     continue
                 post = post_from_row(row)
 

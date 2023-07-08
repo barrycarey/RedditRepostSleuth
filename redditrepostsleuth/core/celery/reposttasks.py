@@ -25,14 +25,6 @@ log = configure_logger(
     filters=[ContextFilter()]
 )
 
-@celery.task(ignore_results=True)
-def ingest_repost_check(post):
-    # TODO: I don't think this is used anywhere
-    if post.post_type == 'image':
-        check_image_repost_save.apply_async((post,), queue='repost_image')
-    elif post.post_type == 'link':
-        link_repost_check.apply_async(([post],))
-
 
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError, NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
@@ -78,9 +70,8 @@ def link_repost_check(self, posts, ):
                                                   post=post, source='ingest')
 
                 if len(search_results.matches) > 10000:
-                    log.info('Link hash %s shared %s times. Adding to blacklist', post.url_hash, len(search_results.matches))
-                    self.link_blacklist.append(post.url_hash)
-                    self.notification_svc.send_notification(f'URL has been shared {len(search_results.matches)} times. Adding to blacklist. \n\n {post.url}')
+                    log.info('Link hash %s shared %s times. Search time was %s', post.url_hash,
+                             len(search_results.matches), search_results.search_times.total_search_time)
 
                 search_results = filter_search_results(
                     search_results,

@@ -19,8 +19,8 @@ from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
-    filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_dead_urls_remote, \
-    filter_removed_posts
+    filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_removed_posts, \
+    filter_remove_posts
 
 log = logging.getLogger(__name__)
 
@@ -74,10 +74,10 @@ def get_link_reposts(
         search_results = LinkSearchResults(url, search_settings, checked_post=post, search_times=LinkSearchTimes())
         search_results.search_times.start_timer('query_time')
         search_results.search_times.start_timer('total_search_time')
-        raw_results: list[PostHash] = uow.post_hash.find_by_hash_and_type(url_hash, 2)
+        raw_results: list[Post] = uow.posts.find_all_by_url(url_hash)
         search_results.search_times.stop_timer('query_time')
         log.debug('Query time: %s', search_results.search_times.query_time)
-        search_results.matches = [SearchMatch(url, match.post) for match in raw_results]
+        search_results.matches = [SearchMatch(url, post) for post in raw_results]
 
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')
@@ -137,7 +137,7 @@ def filter_search_results(
 
         if search_results.search_settings.filter_dead_matches and uitl_api:
             search_results.search_times.start_timer('filter_deleted_posts_time')
-            search_results.matches = filter_dead_urls_remote(
+            search_results.matches = filter_remove_posts(
                 uitl_api,
                 search_results.matches
             )
