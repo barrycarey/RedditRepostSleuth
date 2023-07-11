@@ -48,15 +48,15 @@ class SummonsHandlerTask(Task):
         self.reddit_manager = RedditManager(self.reddit)
         self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
-        notification_svc = NotificationService(self.config)
+        self.notification_svc = NotificationService(self.config)
         self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons',
                                                 live_response=self.config.live_responses,
-                                                notification_svc=notification_svc)
+                                                notification_svc=self.notification_svc)
         dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
         self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit_manager, response_builder,
                                               self.response_handler, event_logger=self.event_logger,
-                                              summons_disabled=False, notification_svc=notification_svc)
+                                              summons_disabled=False, notification_svc=self.notification_svc)
 
 
     def _get_log_adaptor(self):
@@ -204,3 +204,4 @@ def process_summons(self, summons: Summons):
                 time.sleep(3)
     except Exception as e:
         log.exception('')
+        self.notification_svc.send_notification('Problem handling summons %s: %s', summons.id, str(e))

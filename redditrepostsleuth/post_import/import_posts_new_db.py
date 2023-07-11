@@ -50,17 +50,7 @@ def load_posts(start_date: datetime, end_date: datetime):
                 print(f'{batch[-1]["id"]} - {batch[-1]["created_at"]}')
                 import_post.apply_async((batch,), queue='post_import')
                 batch = []
-                queued_items = redis_client.lrange('post_import', 0, 20000)
-                print(f'{len(queued_items)} queued items')
-                if len(queued_items) > 500:
-                    batch_delay = 5
-                    print('Setting batch delay to 5')
-                else:
-                    batch_delay = 0
-                    print('setting batch delay to zero')
 
-                if batch_delay > 0:
-                    time.sleep(batch_delay)
 
             count += 1
 

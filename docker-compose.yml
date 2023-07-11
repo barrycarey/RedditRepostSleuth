@@ -73,26 +73,6 @@ services:
             - LOG_LEVEL=WARN
         entrypoint: python -u /src/redditrepostsleuth/monitorsvc/monitorsvc.py
 
-    summons_svc:
-        container_name: summons-svc
-        restart: always
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/summonssvc/Dockerfile
-        environment:
-            - LOG_LEVEL=DEBUG
-        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summonssvc.py
-
-    summons_handler:
-        container_name: summons-handler
-        restart: always
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/summonssvc/Dockerfile
-        environment:
-            - LOG_LEVEL=INFO
-        entrypoint: python -u /src/redditrepostsleuth/summonssvc/summons_handler_svc_celery.py
-
     summons_worker:
         container_name: summons-worker
         restart: always
