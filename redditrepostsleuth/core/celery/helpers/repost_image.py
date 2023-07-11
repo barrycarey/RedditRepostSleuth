@@ -62,6 +62,8 @@ def save_image_repost_result(
     :param uowm: Unit of Work Manager
     :return:None
     """
+    # TODO: This needs to be made generic to support all reposts types
+
     if not search_results.matches:
         log.debug('Post %s has no matches', search_results.checked_post.post_id)
         return

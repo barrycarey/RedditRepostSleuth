@@ -18,6 +18,7 @@ class Post(Base):
         Index('idx_post_type_created_at', 'post_type_id', 'created_at'),
         #Index('idx_post_type_timestamp', 'created_at_timestamp', 'post_type_int'),
         Index('idx_last_delete_check', 'last_deleted_check', 'post_type_id'),
+        Index('idx_ingested_at_by_type', 'ingested_at', 'post_type_id'),
 
     )
 
@@ -69,7 +70,7 @@ class PostType(Base):
 class PostHash(Base):
     __tablename__ = 'post_hash'
     __table_args__ = (
-        Index('idx_hash_type', 'hash_type_id', 'hash'),
+        Index('idx_hash_type_created', 'hash_type_id', 'post_created_at'),
     )
 
     def __repr__(self) -> str:
@@ -100,7 +101,7 @@ class Summons(Base):
     reply_pm_id = Column(Integer, ForeignKey('bot_private_message.id'))
     reply_failure_reason = Column(String(20))
     requestor = Column(String(25))
-    comment_id = Column(String(100), unique=True)
+    comment_id = Column(String(11), unique=True)
     comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
@@ -174,19 +175,21 @@ class RepostWatch(Base):
 
 class RepostSearch(Base):
     __tablename__ = 'repost_search'
-
+    __table_args__ = (
+        Index('idx_post_type_searched_at', 'post_type_id', 'searched_at'),
+    )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
     source = Column(String(20), nullable=False)
-    post_type = Column(TINYINT())
+    post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
     search_params = Column(String(1000), nullable=False)
     search_time = Column(Float, nullable=False)
     matches_found = Column(Integer, nullable=False)
     subreddit = Column(String(100), nullable=True)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 
-
     post = relationship("Post", back_populates='searches')
+    post_type = relationship('PostType')
 
 class Repost(Base):
     __tablename__ = 'repost'

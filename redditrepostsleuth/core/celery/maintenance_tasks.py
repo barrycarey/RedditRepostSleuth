@@ -1,6 +1,7 @@
 import logging
 
 from praw.exceptions import PRAWException
+from prawcore import ResponseException
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -15,6 +16,7 @@ from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.util.reddithelpers import get_subscribers, is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
     MONITORED_SUB_MOD_REMOVED_SUBJECT
+from redditrepostsleuth.summonssvc.summonsmonitor import monitor_for_mentions
 
 log = logging.getLogger(__name__)
 @celery.task(bind=True, base=RedditTask)
@@ -28,18 +30,29 @@ def update_subreddit_stats_task(self) -> None:
 
 
 @celery.task(bind=True, base=RedditTask)
-def test_task(self) -> None:
-    print('Scheduled Task: Test')
-
-
-@celery.task(bind=True, base=RedditTask)
 def check_inbox_task(self) -> None:
     log.info('Scheduled Task: Check Inbox')
-    inbox_monitor = InboxMonitor(self.uowm, self.reddit.reddit.reddit, self.response_handler)
+    inbox_monitor = InboxMonitor(self.uowm, self.reddit.reddit, self.response_handler)
     try:
         inbox_monitor.check_inbox()
     except Exception as e:
         log.exception('Failed to update subreddit stats')
+
+@celery.task(bind=True, base=RedditTask)
+def check_for_mentions_task(self) -> None:
+    log.info('[Mentions Check] Starting')
+
+    try:
+        monitor_for_mentions(self.reddit.reddit, self.uowm)
+    except ResponseException as e:
+        if e.response.status_code == 429:
+            log.error('[Mentions Check] IP Rate limit hit when checking for mentions')
+    except AssertionError as e:
+        if 'code: 429' in str(e):
+            log.error('[Mentions Check] Too many requests from IP.')
+    except Exception as e:
+        log.exception('[Mentions Check] Mention monitor failed', exc_info=True)
+        self.notification_svc.send_notification('Failed to handle summons: %s', str(e))
 
 @celery.task(bind=True, base=RedditTask)
 def check_new_activations_task(self) -> None:

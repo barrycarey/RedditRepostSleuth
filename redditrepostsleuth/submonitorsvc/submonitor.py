@@ -29,6 +29,7 @@ from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 log = logging.getLogger(__name__)
 
+
 class SubMonitor:
 
     def __init__(
@@ -104,9 +105,6 @@ class SubMonitor:
                 search_results = self._check_for_repost(post, monitored_sub)
             elif post.post_type == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
-                if search_results.matches:
-                    # TODO - 1/12/2021 - Why are we doing this?
-                    save_link_repost(post, search_results.matches[0].post, self.uowm, 'sub_monitor')
             else:
                 log.error('Unsuported post type %s', post.post_type)
                 return
@@ -117,6 +115,7 @@ class SubMonitor:
             log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
             return
 
+        # TODO: Save repost if there are search results
         if not search_results.matches and not monitored_sub.comment_on_oc:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
@@ -127,17 +126,17 @@ class SubMonitor:
         try:
             if monitored_sub.comment_on_repost:
                 reply_comment = self._leave_comment(search_results, monitored_sub)
-        except APIException as e:
-            error_type = None
-            if hasattr(e, 'error_type'):
-                error_type = e.error_type
-            log.exception('Praw API Exception.  Error Type=%s', error_type, exc_info=False)
-            return
         except RateLimitException:
             time.sleep(10)
             return
         except RedditAPIException:
             log.exception('Other API exception')
+            return
+        except APIException as e:
+            error_type = None
+            if hasattr(e, 'error_type'):
+                error_type = e.error_type
+            log.exception('Praw API Exception.  Error Type=%s', error_type, exc_info=False)
             return
         except Exception as e:
             log.exception('Failed to leave comment on %s in %s', post.post_id, post.subreddit)
@@ -165,17 +164,7 @@ class SubMonitor:
         if reply_comment:
             self._sticky_reply(monitored_sub, reply_comment)
             self._lock_comment(monitored_sub, reply_comment)
-        self._mark_post_as_comment_left(post)
         self._create_checked_post(search_results, monitored_sub)
-
-    def _mark_post_as_comment_left(self, post: Post):
-        try:
-            with self.uowm.start() as uow:
-                post.left_comment = True
-                uow.posts.update(post)
-                uow.commit()
-        except Exception as e:
-            log.exception('Failed to mark post %s as checked', post.id, exc_info=True)
 
     def _create_checked_post(self, results: SearchResults, monitored_sub: MonitoredSub):
         try:

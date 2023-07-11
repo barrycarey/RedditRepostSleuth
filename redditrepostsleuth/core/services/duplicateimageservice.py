@@ -366,7 +366,7 @@ class DuplicateImageService:
             search_params=json.dumps(search_results.search_settings.to_dict()),
             matches_found=len(search_results.matches),
             search_time=search_results.search_times.total_search_time,
-            post_type=2
+            post_type_id=search_results.checked_post.post_type_id
         )
 
         with self.uowm.start() as uow:
