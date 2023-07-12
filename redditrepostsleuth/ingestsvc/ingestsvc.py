@@ -158,7 +158,7 @@ async def main() -> None:
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
             try:
                 results = await fetch_page(url, session)
-            except (ServerDisconnectedError, ClientConnectorError):
+            except (ServerDisconnectedError, ClientConnectorError, ClientOSError):
                 log.error('Error during fetch')
                 await asyncio.sleep(2)
                 continue
