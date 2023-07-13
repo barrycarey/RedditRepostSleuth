@@ -34,7 +34,7 @@ class Post(Base):
     subreddit = Column(String(25), nullable=False)
     title = Column(String(400, collation='utf8mb4_general_ci'), nullable=False)
     url_hash = Column(String(32), nullable=False)
-    is_crosspost = Column(Boolean, nullable=False)
+    is_crosspost = Column(Boolean, nullable=False, default=False)
     last_deleted_check = Column(DateTime, default=func.utc_timestamp())
     nsfw = Column(Boolean, default=False)
 

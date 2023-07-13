@@ -30,7 +30,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Optional[Post]:
 
         url_hash = md5(post.url.encode('utf-8'))
         url_hash = url_hash.hexdigest()
-        post.hashes.append(PostHash(hash=url_hash, hash_type_id=2, post_created_at=post.created_at))
+        post.url_hash = url_hash
 
         try:
             uow.posts.add(post)

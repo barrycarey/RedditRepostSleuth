@@ -20,7 +20,7 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.constants import USER_AGENTS
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_removed_posts, \
-    filter_remove_posts
+    filter_removed_posts_util_api
 
 log = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ def filter_search_results(
 
         if search_results.search_settings.filter_dead_matches and uitl_api:
             search_results.search_times.start_timer('filter_deleted_posts_time')
-            search_results.matches = filter_remove_posts(
+            search_results.matches = filter_removed_posts_util_api(
                 uitl_api,
                 search_results.matches
             )
