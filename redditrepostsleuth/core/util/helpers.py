@@ -42,8 +42,14 @@ def chunk_list(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
-def get_post_type_pushshift(submission: Dict) -> str:
-    # TODO - Go over this whole function
+
+def get_post_type(submission: dict) -> str:
+    """
+    Take a raw submission dict from Reddit API and try to determine the post type.
+    Not all submissions have a post_hint so we have to also try and guess by extension
+    :param submission: Submission object from Reddit API
+    :return:
+    """
     if submission.get('is_self', None):
         return 'text'
 
@@ -64,6 +70,7 @@ def get_post_type_pushshift(submission: Dict) -> str:
         return 'gallery'
 
     # Last ditch to get post_hint
+    # TODO - I think we can remove this to save API hits
     reddit = get_reddit_instance(config=Config())
     reddit_sub = reddit.submission(id=submission['id'])
     post_hint = reddit_sub.__dict__.get('post_hint', None)
