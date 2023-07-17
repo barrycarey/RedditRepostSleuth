@@ -1,3 +1,4 @@
+import json
 from typing import NoReturn
 
 import requests
@@ -9,7 +10,7 @@ from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost, RepostSearch
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
@@ -29,96 +30,103 @@ log = configure_logger(
 @celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError, NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
 
-    r = requests.head(post.url)
-    if r.status_code != 200:
-        log.info('Skipping image that is deleted %s', post.url)
-        celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
-        return
+    try:
+        r = requests.head(post.url)
+        if r.status_code != 200:
+            log.info('Skipping image that is deleted %s', post.url)
+            celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
+            return
 
-    search_settings = get_default_image_search_settings(self.config)
-    search_settings.max_matches = 75
-    search_results = self.dup_service.check_image(
-        post.url,
-        post=post,
-        search_settings=search_settings,
-        source='ingest'
-    )
+        search_settings = get_default_image_search_settings(self.config)
+        search_settings.max_matches = 75
+        search_results = self.dup_service.check_image(
+            post.url,
+            post=post,
+            search_settings=search_settings,
+            source='ingest'
+        )
 
-    save_image_repost_result(search_results, self.uowm, source='ingest', high_match_check=True)
+        save_image_repost_result(search_results, self.uowm, source='ingest', high_match_check=True)
 
-    self.event_logger.save_event(RepostEvent(
-        event_type='repost_found' if search_results.matches else 'repost_check',
-        status='success',
-        post_type='image',
-        repost_of=search_results.matches[0].post.post_id if search_results.matches else None,
+        if search_results.matches:
+            watches = check_for_post_watch(search_results.matches, self.uowm)
+            if watches and self.config.enable_repost_watch:
+                notify_watch.apply_async((watches, post), queue='watch_notify')
 
-    ))
-
-    watches = check_for_post_watch(search_results.matches, self.uowm)
-    if watches and self.config.enable_repost_watch:
-        notify_watch.apply_async((watches, post), queue='watch_notify')
+    except (RedLockError, NoIndexException, IngestHighMatchMeme):
+        raise
+    except Exception as e:
+        log.exception('')
 
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts, ):
-    with self.uowm.start() as uow:
-        for post in posts:
-
-            try:
-                log.debug('Checking URL for repost: %s', post.url_hash)
-                search_results = get_link_reposts(post.url, self.uowm, get_default_link_search_settings(self.config),
-                                                  post=post, source='ingest')
-
-                if len(search_results.matches) > 10000:
-                    log.info('Link hash %s shared %s times. Search time was %s', post.url_hash,
-                             len(search_results.matches), search_results.search_times.total_search_time)
-
-                search_results = filter_search_results(
-                    search_results,
-                    uitl_api=f'{self.config.util_api}/maintenance/removed'
-                )
-                search_results.search_times.stop_timer('total_search_time')
-                log.info('Link Query Time: %s', search_results.search_times.query_time)
-
-
-                if not search_results.matches:
-                    log.debug('Not matching links for post %s', post.post_id)
-                    uow.commit()
-                    continue
-
-                log.info('Found %s matching links', len(search_results.matches))
-                log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id, search_results.matches[0].post.post_id)
-                repost_of = search_results.matches[0].post
-
-                new_repost = Repost(
-                    post_id=post.id,
-                    repost_of=repost_of,
-                    author=post.author,
-                    source='ingest',
-                    subreddit=post.subreddit,
-                    search=search_results.logged_search,
-                    post_type=search_results.checked_post.post_type_int
-                )
-                uow.repost.add(new_repost)
-
+    try:
+        with self.uowm.start() as uow:
+            for post in posts:
 
                 try:
+                    log.debug('Checking URL for repost: %s', post.url_hash)
+                    search_results = get_link_reposts(post.url, self.uowm,
+                                                      get_default_link_search_settings(self.config),
+                                                      post=post)
+
+                    if len(search_results.matches) > 10000:
+                        log.info('Link hash %s shared %s times. Search time was %s', post.url_hash,
+                                 len(search_results.matches), search_results.search_times.total_search_time)
+
+                    search_results = filter_search_results(
+                        search_results,
+                        uitl_api=f'{self.config.util_api}/maintenance/removed'
+                    )
+                    search_results.search_times.stop_timer('total_search_time')
+                    log.info('Link Query Time: %s', search_results.search_times.query_time)
+
+                    logged_search = RepostSearch(
+                        post_id=search_results.checked_post.id,
+                        subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
+                        source='ingest',
+                        search_params=json.dumps(search_results.search_settings.to_dict()),
+                        matches_found=len(search_results.matches),
+                        search_time=search_results.search_times.total_search_time,
+                        post_type_id=search_results.checked_post.post_type_id
+                    )
+                    uow.repost_search.add(logged_search)
                     uow.commit()
-                    self.event_logger.save_event(RepostEvent(event_type='repost_found', status='success',
-                                                             repost_of=search_results.matches[0].post.post_id,
-                                                             post_type=post.post_type))
-                except IntegrityError as e:
-                    uow.rollback()
-                    log.exception('Error saving link repost', exc_info=True)
-                    self.event_logger.save_event(RepostEvent(event_type='repost_found', status='error',
-                                                             repost_of=search_results.matches[0].post.post_id,
-                                                             post_type=post.post_type))
+                    search_results.logged_search = logged_search
 
-            except Exception as e:
-                log.exception('')
+                    if not search_results.matches:
+                        log.debug('Not matching links for post %s', post.post_id)
+                        uow.commit()
+                        continue
 
-            self.event_logger.save_event(
-                BatchedEvent(event_type='repost_check', status='success', count=len(posts), post_type='link'))
+                    log.info('Found %s matching links', len(search_results.matches))
+                    log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id,
+                             search_results.matches[0].post.post_id)
+                    repost_of = search_results.matches[0].post
+
+                    new_repost = Repost(
+                        post_id=post.id,
+                        repost_of_id=repost_of.id,
+                        author=post.author,
+                        source='ingest',
+                        subreddit=post.subreddit,
+                        search_id=search_results.logged_search.id,
+                        post_type_id=post.post_type_id
+                    )
+                    uow.repost.add(new_repost)
+
+                    try:
+                        uow.commit()
+                    except IntegrityError as e:
+                        uow.rollback()
+                        log.exception('Error saving link repost', exc_info=True)
+
+                except Exception as e:
+                    log.exception('')
+
+    except Exception as e:
+        log.exception('')
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)

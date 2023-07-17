@@ -33,4 +33,8 @@ def log_queue_size(event_logger):
 
 if __name__ == '__main__':
     log.info('Starting Monitor Service')
-    log_queue_size(EventLogging())
+    try:
+        log_queue_size(EventLogging())
+    except redis.exceptions.ConnectionError as e:
+        log.error('Failed to connect to Redis')
+        time.sleep(5)

@@ -19,6 +19,7 @@ class Post(Base):
         #Index('idx_post_type_timestamp', 'created_at_timestamp', 'post_type_int'),
         Index('idx_last_delete_check', 'last_deleted_check', 'post_type_id'),
         Index('idx_ingested_at_by_type', 'ingested_at', 'post_type_id'),
+        Index('idx_url_hash', 'url_hash'),
 
     )
 
@@ -182,9 +183,22 @@ class RepostSearch(Base):
     post_id = Column(Integer, ForeignKey('post.id'))
     source = Column(String(20), nullable=False)
     post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
-    search_params = Column(String(1000), nullable=False)
     search_time = Column(Float, nullable=False)
     matches_found = Column(Integer, nullable=False)
+    target_title_match = Column(Integer)
+    max_matches = Column(Integer)
+    same_sub = Column(Boolean,default=False)
+    max_days_old = Column(Integer)
+    filter_dead_matches = Column(Boolean, default=False)
+    filter_removed_matches = Column(Boolean, default=False)
+    only_older_matches = Column(Boolean, default=True)
+    filter_same_author = Column(Boolean, default=True)
+    filter_crossposts = Column(Boolean, default=True)
+    target_match_percent = Column(Float)
+    target_annoy_distance = Column(Float)
+    target_meme_match_percent = Column(Float)
+    meme_filter = Column(Boolean, default=False)
+    max_depth = Column(Integer)
     subreddit = Column(String(100), nullable=True)
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 

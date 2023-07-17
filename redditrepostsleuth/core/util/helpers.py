@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, Repost
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, Repost, RepostSearch
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -497,3 +497,10 @@ def get_post_type_id(post_type: str) -> int:
         return 6
     elif post_type == 'video':
         return 7
+
+
+def set_repost_search_params_from_search_settings(search_settings: SearchSettings, repost_search: RepostSearch) -> RepostSearch:
+    for attr in search_settings.__dict__.keys():
+        if hasattr(RepostSearch, attr):
+            setattr(repost_search, attr, getattr(search_settings, attr))
+    return repost_search
