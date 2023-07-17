@@ -1,14 +1,14 @@
-import json
+import logging
 import logging
 import random
 from hashlib import md5
-from typing import List, Text
+from typing import List, Text, Optional
 
 import Levenshtein
 import requests
 from praw import Reddit
 
-from redditrepostsleuth.core.db.databasemodels import Post, RepostSearch, PostHash
+from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
@@ -51,12 +51,16 @@ def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> 
         return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
 
 
-def get_closest_image_match(posts: List[ImageSearchMatch], reverse=True, check_url=True) -> ImageSearchMatch:
+def get_closest_image_match(
+        posts: list[ImageSearchMatch],
+        reverse: bool =True,
+        validate_url: bool =True
+) -> Optional[ImageSearchMatch]:
     if not posts:
-        return None
-    if not check_url:
-        return sorted(posts, key=lambda x: x.hamming_match_percent, reverse=reverse)[0]
+        return
     sorted_matches = sorted(posts, key=lambda x: x.hamming_match_percent, reverse=reverse)
+    if not validate_url:
+        return sorted_matches[0]
     return get_first_active_match(sorted_matches)
 
 def get_link_reposts(
@@ -65,7 +69,6 @@ def get_link_reposts(
         search_settings: SearchSettings,
         post: Post = None,
         get_total: bool = False,
-        source: str = 'unknown'
         ) -> LinkSearchResults:
 
     url_hash = md5(url.encode('utf-8'))
@@ -82,18 +85,7 @@ def get_link_reposts(
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')
 
-        logged_search = RepostSearch(
-            post_id=search_results.checked_post.id,
-            subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
-            source=source,
-            search_params=json.dumps(search_results.search_settings.to_dict()),
-            matches_found=len(search_results.matches),
-            search_time=search_results.search_times.total_search_time,
-            post_type_id=search_results.checked_post.post_type_int
-        )
-        uow.repost_search.add(logged_search)
-        uow.commit()
-        search_results.logged_search = logged_search
+
 
 
     return search_results

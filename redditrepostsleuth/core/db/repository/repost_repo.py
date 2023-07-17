@@ -47,7 +47,6 @@ class RepostRepo:
         return query.first()
 
     def add(self, item):
-        log.debug('Inserting: %s', item)
         self.db_session.add(item)
 
     def bulk_save(self, items: List[Repost]):

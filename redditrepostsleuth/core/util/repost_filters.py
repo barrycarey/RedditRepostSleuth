@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 def cross_post_filter(match: SearchMatch) -> bool:
-    if match.post.crosspost_parent:
+    if match.post.is_crosspost:
         log.debug('Crosspost Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
         return False
     else:

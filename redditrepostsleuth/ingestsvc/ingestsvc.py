@@ -71,7 +71,7 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
         log.error('Client Connection Error')
         await asyncio.sleep(5)
         job.status = JobStatus.ERROR
-    except ServerDisconnectedError:
+    except ServerDisconnectedError as e:
         log.error('Server disconnect Error')
         job.status = JobStatus.ERROR
     except Exception as e:

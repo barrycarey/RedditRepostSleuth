@@ -6,6 +6,7 @@ from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, MemeTem
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -81,12 +82,12 @@ def save_image_repost_result(
 
         new_repost = Repost(
             post_id=search_results.checked_post.id,
-            repost_of=search_results.matches[0].post,
+            repost_of_id=search_results.matches[0].post.id,
             author=search_results.checked_post.author,
             search_id=search_results.logged_search.id if search_results.logged_search else None,
             subreddit=search_results.checked_post.subreddit,
             source=source,
-            post_type=search_results.checked_post.post_type_int
+            post_type_id=search_results.checked_post.post_type_id
         )
 
         try:
@@ -103,11 +104,11 @@ def save_image_repost_result(
         log.info(' Saved Repost')
 
 
-def check_for_post_watch(matches: List[SearchMatch], uowm: UnitOfWorkManager) -> List[dict]:
+def check_for_post_watch(matches: list[ImageSearchMatch], uowm: UnitOfWorkManager) -> List[dict]:
     results = []
     with uowm.start() as uow:
         for match in matches:
-            watches = uow.repostwatch.get_all_active_by_post_id(match.post.id)
+            watches = uow.repostwatch.get_all_active_by_post_id(match.match_id)
             if watches:
                 log.info('Found %s active watch requests for post %s', len(watches), match.post.post_id)
                 for watch in watches:
