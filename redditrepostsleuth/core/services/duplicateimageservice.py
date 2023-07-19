@@ -31,7 +31,7 @@ from redditrepostsleuth.core.util.imagehashing import get_image_hashes, get_imag
 from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter, \
     filter_no_dhash
 from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
-    filter_search_results
+    filter_search_results, log_search
 
 log = logging.getLogger(__name__)
 
@@ -198,7 +198,8 @@ class DuplicateImageService:
         search_results.search_times.stop_timer('total_search_time')
         self._log_search_time(search_results, source)
 
-        search_results = self._log_search(search_results, source)
+        logged_search = log_search(self.uowm, search_results, source)
+        search_results.logged_search = logged_search
 
         log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
@@ -336,31 +337,6 @@ class DuplicateImageService:
             )
         )
 
-    def _log_search(
-            self,
-            search_results: ImageSearchResults,
-            source: str,
-    ) -> ImageSearchResults:
-        logged_search = RepostSearch(
-            post_id=search_results.checked_post.id,
-            subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
-            source=source,
-            matches_found=len(search_results.matches),
-            search_time=search_results.search_times.total_search_time,
-            post_type_id=search_results.checked_post.post_type_id
-        )
-
-        set_repost_search_params_from_search_settings(search_results.search_settings, logged_search)
-
-        with self.uowm.start() as uow:
-            uow.repost_search.add(logged_search)
-            try:
-                uow.commit()
-                search_results.logged_search = logged_search
-            except Exception as e:
-                log.exception('Failed to save image search', exc_info=False)
-
-        return search_results
 
     def _remove_duplicates(self, matches: List[ImageSearchMatch]) -> List[ImageSearchMatch]:
         log.debug('Remove duplicates from %s matches', len(matches))

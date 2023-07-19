@@ -21,6 +21,7 @@ class ImageSearchResults(SearchResults):
         self.checked_post = checked_post
         self._target_hash = None
         if self.checked_post:
+            # TODO: This only ever gives us the first dhash and will cause issues when we support galleries
             self._target_hash = next((post_hash.hash for post_hash in checked_post.hashes if post_hash.hash_type_id == 1), None)
         self.meme_template: Optional[MemeTemplate] = None
         self.closest_match: Optional[ImageSearchMatch] = None

@@ -17,8 +17,9 @@ from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
 from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
-from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
+from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings, \
+    set_repost_search_params_from_search_settings
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results, log_search
 
 log = configure_logger(
     name='redditrepostsleuth',
@@ -81,19 +82,6 @@ def link_repost_check(self, posts, ):
                     )
                     search_results.search_times.stop_timer('total_search_time')
                     log.info('Link Query Time: %s', search_results.search_times.query_time)
-
-                    logged_search = RepostSearch(
-                        post_id=search_results.checked_post.id,
-                        subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
-                        source='ingest',
-                        search_params=json.dumps(search_results.search_settings.to_dict()),
-                        matches_found=len(search_results.matches),
-                        search_time=search_results.search_times.total_search_time,
-                        post_type_id=search_results.checked_post.post_type_id
-                    )
-                    uow.repost_search.add(logged_search)
-                    uow.commit()
-                    search_results.logged_search = logged_search
 
                     if not search_results.matches:
                         log.debug('Not matching links for post %s', post.post_id)

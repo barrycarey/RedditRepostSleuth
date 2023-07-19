@@ -4,7 +4,7 @@ from typing import List, Text, NoReturn, Optional
 
 from praw.exceptions import APIException, RedditAPIException
 from praw.models import Submission, Comment, Subreddit
-from prawcore import Forbidden
+from prawcore import Forbidden, TooManyRequests
 from redlock import RedLockError
 
 from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
@@ -96,17 +96,14 @@ class SubMonitor:
 
     def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
-        if post.post_type == 'image' and post.hash_1 is None:
-            log.error('Post %s has no dhash', post.post_id)
-            return
 
         try:
-            if post.post_type == 'image':
+            if post.post_type.name == 'image':
                 search_results = self._check_for_repost(post, monitored_sub)
-            elif post.post_type == 'link':
+            elif post.post_type.name == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
             else:
-                log.error('Unsuported post type %s', post.post_type)
+                log.error('Unsupported post type %s', post.post_type.name)
                 return
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)
@@ -132,6 +129,9 @@ class SubMonitor:
         except RedditAPIException:
             log.exception('Other API exception')
             return
+        except TooManyRequests:
+            log.error('TooManyRequests exception')
+            raise
         except APIException as e:
             error_type = None
             if hasattr(e, 'error_type'):
@@ -172,7 +172,7 @@ class SubMonitor:
                 uow.monitored_sub_checked.add(
                     MonitoredSubChecks(
                         post_id=results.checked_post.id,
-                        post_type=results.checked_post.post_type,
+                        post_type_id=results.checked_post.post_type_id,
                         monitored_sub=monitored_sub,
                         search=results.logged_search
                     )
