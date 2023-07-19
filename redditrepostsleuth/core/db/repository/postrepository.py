@@ -43,7 +43,7 @@ class PostRepository:
 
     def get_by_post_id(self, id: str) -> Post:
         #log.debug('Looking up post with ID %s', id)
-        return self.db_session.query(Post).options(joinedload(Post.hashes)).filter(Post.post_id == id).first()
+        return self.db_session.query(Post).options(joinedload(Post.hashes), joinedload(Post.post_type)).filter(Post.post_id == id).first()
 
     def find_all_by_url(self, url_hash: str, limit: int = None):
         return self.db_session.query(Post).filter(Post.url_hash == url_hash).limit(limit).all()

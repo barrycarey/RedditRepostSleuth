@@ -46,7 +46,7 @@ class ResponseBuilder:
         :param search_results: Search results
         """
         msg_template = ''
-        if search_results.checked_post.post_type == 'image':
+        if search_results.checked_post.post_type.name == 'image':
             if len(search_results.matches) == 0:
                 msg_template = DEFAULT_COMMENT_OC
             elif len(search_results.matches) == 1:
@@ -54,7 +54,7 @@ class ResponseBuilder:
             else:
                 msg_template = DEFAULT_REPOST_IMAGE_COMMENT
 
-        if search_results.checked_post.post_type == 'link':
+        if search_results.checked_post.post_type.name == 'link':
             if len(search_results.matches) == 0:
                 msg_template = LINK_OC
             else:

@@ -11,6 +11,7 @@ from sqlalchemy import func
 from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddit, BotPrivateMessage
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import RateLimitException
+from redditrepostsleuth.core.model.DummyComment import DummyComment
 
 from redditrepostsleuth.core.model.events.reddit_api_event import RedditApiEvent
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
@@ -57,7 +58,10 @@ class ResponseHandler:
 
         try:
             start_time = perf_counter()
-            comment = submission.reply(comment_body)
+            if self.live_response:
+                comment = submission.reply(comment_body)
+            else:
+                comment = DummyComment(comment_body)
             self._record_api_event(
                 float(round(perf_counter() - start_time, 2)),
                 'reply_to_submission',
@@ -82,11 +86,7 @@ class ResponseHandler:
             raise
 
     def reply_to_submission(self, submission_id: str, comment_body) -> Optional[Comment]:
-        if self.live_response:
-            return self._reply_to_submission(submission_id, comment_body)
-        log.debug('Live response disabled')
-        return Comment(self.reddit.reddit, id='1111')
-
+        return self._reply_to_submission(submission_id, comment_body)
 
     def _reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
         """

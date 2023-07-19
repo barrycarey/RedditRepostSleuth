@@ -8,7 +8,7 @@ import Levenshtein
 import requests
 from praw import Reddit
 
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, RepostSearch
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
@@ -18,6 +18,7 @@ from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.constants import USER_AGENTS
+from redditrepostsleuth.core.util.helpers import set_repost_search_params_from_search_settings
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
     filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_removed_posts, \
     filter_removed_posts_util_api
@@ -63,10 +64,28 @@ def get_closest_image_match(
         return sorted_matches[0]
     return get_first_active_match(sorted_matches)
 
+def log_search(uowm: UnitOfWorkManager, search_results: SearchResults, source: str) -> Optional[RepostSearch]:
+    try:
+        with uowm.start() as uow:
+            logged_search = RepostSearch(
+                post_id=search_results.checked_post.id,
+                subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
+                source=source,
+                matches_found=len(search_results.matches),
+                search_time=search_results.search_times.total_search_time,
+                post_type_id=search_results.checked_post.post_type_id
+            )
+            set_repost_search_params_from_search_settings(search_results.search_settings, logged_search)
+            uow.repost_search.add(logged_search)
+            uow.commit()
+    except Exception as e:
+        log.exception('Failed to save repost search')
+
 def get_link_reposts(
         url: Text,
         uowm: UnitOfWorkManager,
         search_settings: SearchSettings,
+        source: str,
         post: Post = None,
         get_total: bool = False,
         ) -> LinkSearchResults:
@@ -85,8 +104,8 @@ def get_link_reposts(
         if get_total:
             search_results.total_searched = uow.posts.count_by_type('link')
 
-
-
+    logged_search = log_search(uowm, search_results, source)
+    search_results.logged_search = logged_search
 
     return search_results
 

@@ -7,7 +7,7 @@ from typing import Text
 import requests
 from celery import Task
 from praw.exceptions import APIException
-from prawcore import ResponseException
+from prawcore import ResponseException, TooManyRequests
 from redlock import RedLockError
 from requests.exceptions import ConnectionError
 
@@ -78,8 +78,8 @@ class SubMonitorTask(Task):
         self.blacklisted_posts = []
 
 
-@celery.task(bind=True, base=SubMonitorTask, serializer='pickle')
-def sub_monitor_check_post(self, post_id: Text, monitored_sub: MonitoredSub):
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
+def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': post_id,
                                   'subreddit': monitored_sub.name, 'service': 'Subreddit_Monitor'})
     if self.sub_monitor.has_post_been_checked(post_id):
@@ -93,18 +93,16 @@ def sub_monitor_check_post(self, post_id: Text, monitored_sub: MonitoredSub):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(post_id)
         if not post:
-            log.info('Post %s does exist, attempting to ingest', post_id)
-            post = save_unknown_post(post_id, self.uowm, self.reddit)
-            if not post:
-                log.error('Failed to save post during monitor sub check')
-                self.blacklisted_posts.append(post_id)
-                return
+            log.info('Post %s does exist', post_id)
+            return
+        if not post.post_type:
+            log.error('Unknown post type for %s - https://redd.it/%s', post.post_id, post.post_id)
+            return
 
     title_keywords = []
     if monitored_sub.title_ignore_keywords:
         title_keywords = monitored_sub.title_ignore_keywords.split(',')
 
-    try:
         if not self.sub_monitor.should_check_post(
                 post,
                 monitored_sub.check_image_posts,
@@ -112,9 +110,15 @@ def sub_monitor_check_post(self, post_id: Text, monitored_sub: MonitoredSub):
                 title_keyword_filter=title_keywords
         ):
             return
+
+    try:
+        results = self.sub_monitor.check_submission(monitored_sub, post)
+    except TooManyRequests:
+        # TODO: This may cause issues since it is thrown after the checked post is created
+        raise
     except Exception as e:
-        log.error('')
-    results = self.sub_monitor.check_submission(monitored_sub, post)
+        log.exception('')
+        return
     total_check_time = round(time.perf_counter() - start, 5)
 
     if total_check_time > 20:

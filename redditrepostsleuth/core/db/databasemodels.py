@@ -351,13 +351,14 @@ class MonitoredSubChecks(Base):
 
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
-    post_type = Column(String(20), nullable=False)
+    post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
     checked_at = Column(DateTime, default=func.utc_timestamp())
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
     search_id = Column(Integer, ForeignKey('repost_search.id'))
 
     monitored_sub = relationship("MonitoredSub", back_populates='post_checks')
     search = relationship("RepostSearch")
+    post_type = relationship('PostType')
     post = relationship("Post", foreign_keys=[post_id])
 
 
