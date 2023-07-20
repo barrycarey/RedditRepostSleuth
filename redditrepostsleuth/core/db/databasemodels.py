@@ -129,6 +129,7 @@ class BotComment(Base):
     karma = Column(Integer)
     active = Column(Boolean, default=True)
     needs_review = Column(Boolean, default=False)
+    subreddit = Column(String(25), nullable=False)
 
     post = relationship("Post", back_populates='bot_comments')
     summons = relationship('Summons', back_populates='comment')

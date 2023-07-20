@@ -61,7 +61,7 @@ class ResponseHandler:
             if self.live_response:
                 comment = submission.reply(comment_body)
             else:
-                comment = DummyComment(comment_body)
+                comment = DummyComment(comment_body, submission.subreddit.display_name)
             self._record_api_event(
                 float(round(perf_counter() - start_time, 2)),
                 'reply_to_submission',
@@ -274,6 +274,7 @@ class ResponseHandler:
                     comment_body=comment.body,
                     reddit_post_id=comment.submission.id,
                     perma_link=comment.permalink,
+                    subreddit=comment.subreddit.display_name
                 )
             uow.bot_comment.add(bot_comment)
             try:

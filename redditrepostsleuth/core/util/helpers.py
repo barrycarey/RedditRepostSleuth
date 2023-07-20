@@ -129,7 +129,7 @@ def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWo
         'total_searched': f'{search_results.total_searched:,}',
         'total_posts': 0,
         'match_count': len(search_results.matches),
-        'post_type': search_results.checked_post.post_type,
+        'post_type': search_results.checked_post.post_type.name,
         'this_subreddit': search_results.checked_post.subreddit,
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
