@@ -22,6 +22,7 @@ scipy
 falcon
 waitress
 falcon-cors
+falcon-multipart
 python-Levenshtein
 apscheduler
 gunicorn
