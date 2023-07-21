@@ -3,6 +3,7 @@ import os
 from time import perf_counter
 from typing import Text, NoReturn, Optional
 
+from praw import Reddit
 from praw.exceptions import APIException, RedditAPIException
 from praw.models import Comment, Redditor, Message
 from prawcore import Forbidden
@@ -12,12 +13,10 @@ from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddi
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import RateLimitException
 from redditrepostsleuth.core.model.DummyComment import DummyComment
-
 from redditrepostsleuth.core.model.events.reddit_api_event import RedditApiEvent
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.util.replytemplates import REPLY_TEST_MODE
 
 log = logging.getLogger(__name__)
@@ -26,7 +25,7 @@ class ResponseHandler:
 
     def __init__(
             self,
-            reddit: RedditManager,
+            reddit: Reddit,
             uowm: UnitOfWorkManager,
             event_logger: EventLogging,
             notification_svc: NotificationService = None,
@@ -65,7 +64,7 @@ class ResponseHandler:
             self._record_api_event(
                 float(round(perf_counter() - start_time, 2)),
                 'reply_to_submission',
-                self.reddit.reddit.auth.limits['remaining']
+                self.reddit.auth.limits['remaining']
             )
             log.info('Left comment at: https://reddit.com%s', comment.permalink)
             log.debug(comment_body)
@@ -105,11 +104,14 @@ class ResponseHandler:
             return
         try:
             start_time = perf_counter()
-            reply_comment = comment.reply(comment_body)
+            if self.live_response:
+                reply_comment = comment.reply(comment_body)
+            else:
+                reply_comment = DummyComment(comment_body, comment.submission.subreddit.display_name)
             self._record_api_event(
                 float(round(perf_counter() - start_time, 2)),
                 'reply_to_comment',
-                self.reddit.reddit.auth.limits['remaining']
+                self.reddit.auth.limits['remaining']
             )
 
             log.info('Left comment at: https://reddit.com%s', reply_comment.permalink)
@@ -126,11 +128,7 @@ class ResponseHandler:
             raise
 
     def reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
-        if self.live_response:
-            return self._reply_to_comment(comment_id, comment_body, subreddit=subreddit)
-        log.debug('Live response disabled')
-        # TODO - 1/12/2021 - Sketchy at best
-        return Comment(self.reddit.reddit, id='1111')
+        return self._reply_to_comment(comment_id, comment_body, subreddit=subreddit)
 
     def _send_private_message(
             self,
@@ -150,11 +148,12 @@ class ResponseHandler:
 
         try:
             start_time = perf_counter()
-            user.message(subject, message_body)
+            if self.live_response:
+                user.message(subject, message_body)
             self._record_api_event(
                 float(round(perf_counter() - start_time, 2)),
                 'private_message',
-                self.reddit.reddit.auth.limits['remaining']
+                self.reddit.auth.limits['remaining']
             )
             log.info('Sent PM to %s. ', user.name)
         except Exception as e:
@@ -181,9 +180,8 @@ class ResponseHandler:
             comment_id: Text = None
     ) -> Optional[BotPrivateMessage]:
 
-        if self.live_response:
-            return self._send_private_message(user, message_body, subject, source=source, comment_id=comment_id)
-        log.debug('Live resposne disabled')
+        return self._send_private_message(user, message_body, subject, source=source, comment_id=comment_id)
+
 
     def reply_to_private_message(self, message: Message, body: Text) -> NoReturn:
         log.debug('Replying to private message from %s with subject %s', message.dest.name, message.subject)

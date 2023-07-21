@@ -45,7 +45,7 @@ def load_posts(start_date: datetime, end_date: datetime):
         batch_delay = 0
         for row in cur:
             batch.append(row)
-            if len(batch) > 3000:
+            if len(batch) > 200:
                 print('sending batch')
                 print(f'{batch[-1]["id"]} - {batch[-1]["created_at"]}')
                 import_post.apply_async((batch,), queue='post_import')

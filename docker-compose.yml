@@ -13,7 +13,7 @@ services:
 
     scheduled_task_svc:
         container_name: scheduled_task_svc
-        restart: always
+        restart: unless-stopped
         user: "1001:1001"
         build:
             context: .
@@ -27,7 +27,7 @@ services:
 
     scheduler:
         container_name: scheduler
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/adminsvc/Dockerfile
@@ -40,7 +40,7 @@ services:
         entrypoint: celery -A redditrepostsleuth.core.celery beat
 
     delete_post_svc:
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
@@ -51,7 +51,7 @@ services:
 
     delete_post_worker:
         container_name: delete-post-worker
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
@@ -65,7 +65,17 @@ services:
 
     stat_monitor_svc:
         container_name: stat_monitor
-        restart: always
+        restart: unless-stopped
+        build:
+            context: .
+            dockerfile: redditrepostsleuth/monitorsvc/Dockerfile
+        environment:
+            - LOG_LEVEL=WARN
+        entrypoint: python -u /src/redditrepostsleuth/monitorsvc/monitorsvc.py
+
+    summons_monitor:
+        container_name: summons-monitor
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/monitorsvc/Dockerfile
@@ -75,7 +85,7 @@ services:
 
     summons_worker:
         container_name: summons-worker
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
@@ -87,7 +97,7 @@ services:
 
     submonitor_worker:
         container_name: submonitor-worker
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/SubMonitorWorkerDockerFile
@@ -98,7 +108,7 @@ services:
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -c 6
 
     ingest_worker:
-        restart: always
+        restart: unless-stopped
         container_name: ingest-worker
         build:
             context: .
@@ -111,7 +121,7 @@ services:
 
     generic_repost_worker:
         container_name: generic-repost-worker
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
@@ -123,7 +133,7 @@ services:
 
     image_repost_worker:
         container_name: image-repost-worker
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
@@ -135,7 +145,7 @@ services:
 
     misc_task_worker:
         container_name: misc-task-worker
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/repost/Dockerfile
@@ -147,7 +157,7 @@ services:
 
 
     ingest_pushshift_worker:
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
@@ -159,7 +169,7 @@ services:
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 4
 
     pushshift_archive_intake_worker:
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/Dockerfile
@@ -170,7 +180,7 @@ services:
         entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_intake -c 1
 
     pushshift_archive_ingest:
-        restart: always
+        restart: unless-stopped
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/Dockerfile
@@ -187,7 +197,7 @@ services:
             dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
         environment:
             LOG_LEVEL: INFO
-        restart: always
+        restart: unless-stopped
         entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:7777 --workers 10
         ports:
             - 7777:7777

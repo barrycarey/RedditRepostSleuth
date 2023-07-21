@@ -89,10 +89,7 @@ beat_schedule = {
         'task': 'redditrepostsleuth.core.celery.maintenance_tasks.queue_post_watch_cleanup_task',
         'schedule': 259200
     },
-    'post-watch-cleanup': {
-        'task': 'redditrepostsleuth.core.celery.maintenance_tasks.check_for_mentions_task',
-        'schedule': 60
-    }
+
 }
 
 # TODO - I don't like this solution but had to do it to reduce dependancies per service

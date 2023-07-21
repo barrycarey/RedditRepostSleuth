@@ -1,11 +1,11 @@
+import logging
 from typing import List, NoReturn, Text
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.agent_class_maps import AGENT_MAP
 from redditrepostsleuth.core.notification.notification_agent import NotificationAgent
 
-
+log = logging.getLogger(__name__)
 class NotificationService:
     def __init__(self, config: Config):
         self.config = config
