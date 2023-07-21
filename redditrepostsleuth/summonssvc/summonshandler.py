@@ -3,6 +3,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Tuple, Text, NoReturn, Optional
 
+from praw import Reddit
 from praw.exceptions import APIException
 from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
@@ -17,7 +18,6 @@ from redditrepostsleuth.core.model.repostresponse import SummonsResponse
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import save_link_repost, get_default_image_search_settings, \
@@ -35,7 +35,7 @@ class SummonsHandler:
             self,
             uowm: UnitOfWorkManager,
             image_service: DuplicateImageService,
-            reddit: RedditManager,
+            reddit: Reddit,
             response_builder: ResponseBuilder,
             response_handler: ResponseHandler,
             config: Config = None,
@@ -80,8 +80,8 @@ class SummonsHandler:
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
 
-        if summons.post.post_type is None or summons.post.post_type not in self.config.supported_post_types:
-            log.error('Post %s: Type %s not support', f'https://redd.it/{summons.post.post_id}', summons.post.post_type)
+        if summons.post.post_type.name is None or summons.post.post_type.name not in self.config.supported_post_types:
+            log.error('Post %s: Type %s not supported', f'https://redd.it/{summons.post.post_id}', summons.post.post_type.name)
             self._send_unsupported_msg(summons)
             return
 
@@ -171,7 +171,7 @@ class SummonsHandler:
     def _send_unsupported_msg(self, summons: Summons):
         response = SummonsResponse(summons=summons)
         response.status = 'error'
-        response.message = UNSUPPORTED_POST_TYPE.format(post_type=summons.post.post_type)
+        response.message = UNSUPPORTED_POST_TYPE.format(post_type=summons.post.post_type.name)
         self._send_response(response)
 
     def _send_summons_disable_msg(self, summons: Summons):
@@ -235,9 +235,9 @@ class SummonsHandler:
         self._send_response(response)
 
     def process_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None):
-        if summons.post.post_type == 'image':
+        if summons.post.post_type.name == 'image':
             self.process_image_repost_request(summons, monitored_sub=monitored_sub)
-        elif summons.post.post_type == 'link':
+        elif summons.post.post_type.name == 'link':
             self.process_link_repost_request(summons)
 
     def process_link_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):

@@ -1,15 +1,10 @@
-celery[redis]
 praw
 requests
 sqlalchemy
 pymysql
-annoy
 distance
 imagehash
 influxdb-client
-redlock
-dataclasses
 python-Levenshtein
-redlock
-falcon
 pydantic
+python-logging-discord-handler

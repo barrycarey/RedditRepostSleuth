@@ -1,35 +1,28 @@
 import json
 import logging
-from collections import Counter
-from logging import LoggerAdapter
 from time import perf_counter
 from typing import List, Text, Optional
 
 import requests
-from celery import group
 from distance import hamming
 from praw import Reddit
 from requests.exceptions import ConnectionError
-from celery.exceptions import TimeoutError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.celery.admin_tasks import delete_post_task
+from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash, RepostSearch
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
-from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
-from redditrepostsleuth.core.model.image_index_api_result import APISearchResults, ImageMatch
+from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import create_search_result_json, get_default_image_search_settings, \
-    set_repost_search_params_from_search_settings
-from redditrepostsleuth.core.util.imagehashing import get_image_hashes, get_image_hashes_from_pil
-from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter, \
-    filter_no_dhash
+from redditrepostsleuth.core.util.helpers import get_default_image_search_settings
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes
+from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter
 from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
     filter_search_results, log_search
 
@@ -201,7 +194,7 @@ class DuplicateImageService:
         logged_search = log_search(self.uowm, search_results, source)
         search_results.logged_search = logged_search
 
-        log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
+        log.info('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
     def _get_meme_hash(self, url: str, post_id=None) -> Optional[Text]:
@@ -229,7 +222,7 @@ class DuplicateImageService:
                 if post_id:
                     # TODO - This can potentially start deleting images if we drop internet connection
                     log.info('Sending post % to delete queue', post_id)
-                    delete_post_task.apply_async((post_id,))
+                    celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post_id,])
                 return
             except Exception:
                 log.exception('Failed to get meme hash for %s', url, exc_info=True)

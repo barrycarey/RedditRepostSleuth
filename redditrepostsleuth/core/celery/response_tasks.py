@@ -1,36 +1,28 @@
 import json
 import time
-from datetime import datetime
 from random import randint
-from typing import Text
 
 import requests
 from celery import Task
-from praw.exceptions import APIException
-from prawcore import ResponseException, TooManyRequests
-from redlock import RedLockError
+from prawcore import TooManyRequests
 from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Summons
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import LoadSubredditException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import configure_logger
-from redditrepostsleuth.core.model.events.summonsevent import SummonsEvent
-from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import get_redlock_factory, update_log_context_data
+from redditrepostsleuth.core.util.helpers import update_log_context_data
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
-from redditrepostsleuth.ingestsvc.util import save_unknown_post
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
-from redditrepostsleuth.summonssvc.summonshandler import SummonsHandler
 
 log = configure_logger(
     name='redditrepostsleuth',
@@ -38,32 +30,8 @@ log = configure_logger(
     filters=[ContextFilter()]
 )
 
-#configure_root_logger('%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [Search ID: %(search_id)s][Post ID: %(post_id)s][Subreddit: %(subreddit)s]- %(levelname)s: %(message)s', [SearchContextFilter()])
-
-class SummonsHandlerTask(Task):
-    def __init__(self):
-        self.config = Config()
-        self.redlock = get_redlock_factory(self.config)
-        self.reddit = get_reddit_instance(self.config)
-        self.reddit_manager = RedditManager(self.reddit)
-        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
-        self.event_logger = EventLogging(config=self.config)
-        self.notification_svc = NotificationService(self.config)
-        self.response_handler = ResponseHandler(self.reddit_manager, self.uowm, self.event_logger, source='summons',
-                                                live_response=self.config.live_responses,
-                                                notification_svc=self.notification_svc)
-        dup_image_svc = DuplicateImageService(self.uowm, self.event_logger, self.reddit, config=self.config)
-        response_builder = ResponseBuilder(self.uowm)
-        self.summons_handler = SummonsHandler(self.uowm, dup_image_svc, self.reddit_manager, response_builder,
-                                              self.response_handler, event_logger=self.event_logger,
-                                              summons_disabled=False, notification_svc=self.notification_svc)
-
-
-    def _get_log_adaptor(self):
-        pass
 
 class SubMonitorTask(Task):
-
 
     def __init__(self):
         self.config = Config()
@@ -165,47 +133,3 @@ def process_monitored_sub(self, monitored_sub):
 
     log.info('All submissions from %s sent to queue', monitored_sub.name)
 
-
-@celery.task(bind=True, base=SummonsHandlerTask, serializer='pickle', ignore_results=True, )
-def process_summons(self, summons: Summons):
-    try:
-        update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': summons.post.post_id, 'service': 'Summons'})
-        with self.uowm.start() as uow:
-            log.info('Starting summons %s ', summons.id)
-            updated_summons = uow.summons.get_by_id(summons.id)
-            if updated_summons and updated_summons.summons_replied_at:
-                log.info('Summons %s already replied, skipping', summons.id)
-                return
-            try:
-                with self.redlock.create_lock(f'summons_{summons.id}', ttl=120000):
-
-                    try:
-                        self.summons_handler.process_summons(summons)
-                    except ResponseException as e:
-                        if e.response.status_code == 429:
-                            log.error('IP Rate limit hit.  Waiting')
-                            time.sleep(60)
-                            return
-                    except AssertionError as e:
-                        if 'code: 429' in str(e):
-                            log.error('Too many requests from IP.  Waiting')
-                            time.sleep(60)
-                            return
-                    except APIException as e:
-                        if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
-                            log.error('Hit API rate limit for summons %s on sub %s.', summons.id, summons.post.subreddit)
-                            return
-                    except Exception as e:
-                        log.exception('Unknown error')
-
-                    # TODO - This sends completed summons events to influx even if they fail
-                    summons_event = SummonsEvent(float((datetime.utcnow() - summons.summons_received_at).seconds),
-                                                 summons.summons_received_at, summons.requestor, event_type='summons')
-                    self.summons_handler._send_event(summons_event)
-                    log.info('Finished summons %s', summons.id)
-            except RedLockError:
-                log.error('Summons %s already in process', summons.id)
-                time.sleep(3)
-    except Exception as e:
-        log.exception('')
-        self.notification_svc.send_notification('Problem handling summons %s: %s', summons.id, str(e))

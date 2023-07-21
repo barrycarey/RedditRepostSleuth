@@ -1,3 +1,4 @@
+import logging
 from typing import List, NoReturn, Text
 
 from sqlalchemy.exc import IntegrityError
@@ -5,7 +6,6 @@ from sqlalchemy.exc import IntegrityError
 from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, MemeTemplate, Repost
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import IngestHighMatchMeme
-from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
@@ -14,6 +14,7 @@ from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.replytemplates import WATCH_NOTIFY_OF_MATCH
 
+log = logging.getLogger(__name__)
 
 def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWorkManager) -> NoReturn:
     if search_results.meme_template is not None:

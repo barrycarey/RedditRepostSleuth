@@ -204,7 +204,8 @@ class Config:
             'default_link_only_older_matches',
             'default_link_same_author_filter',
             'default_link_crosspost_filter',
-            'default_link_max_days_old_filter'
+            'default_link_max_days_old_filter',
+            'discord_logging_hook'
 
         ]
 
