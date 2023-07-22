@@ -20,7 +20,7 @@ services:
             dockerfile: redditrepostsleuth/adminsvc/Dockerfile
         environment:
             - LOG_LEVEL=INFO
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.maintenance_tasks
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.tasks.scheduled_tasks
             - C_FORCE_ROOT=True
 
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q scheduled_tasks --autoscale=15,2

@@ -1,6 +1,5 @@
 import falcon
-from falcon_cors import CORS
-from falcon_multipart.middleware import MultipartMiddleware
+from falcon import CORSMiddleware
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -43,9 +42,13 @@ config_updater = SubredditConfigUpdater(
 
 
 
-cors = CORS(allow_origins_list=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
+#cors = CORS(allow_origins_list=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
 
-api = application = falcon.API(middleware=[cors.middleware, MultipartMiddleware()])
+api = application = falcon.App(
+    middleware=[
+        CORSMiddleware(allow_origins=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'])
+    ]
+)
 api.req_options.auto_parse_form_urlencoded = True
 image_store = ImageStore('/opt/imageuploads')
 

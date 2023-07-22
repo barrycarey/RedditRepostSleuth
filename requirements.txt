@@ -32,3 +32,6 @@ imutils
 pydantic
 aiohttp
 pytest-asyncio
+python-logging-discord-handler
+sentry-sdk
+pytesseract

@@ -56,7 +56,7 @@ class AnnoyTask(Task):
 class RedditTask(Task):
     def __init__(self):
         self.config = Config()
-        self.reddit = RedditManager(get_reddit_instance(self.config))
+        self.reddit = get_reddit_instance(self.config)
         self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
         self.notification_svc = NotificationService(self.config)
