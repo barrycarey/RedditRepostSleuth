@@ -121,7 +121,6 @@ class StatsUpdater:
 
         return table
 
-
     def build_template(self):
         template = self.get_template()
         msg_values = self.stats.__dict__
@@ -132,7 +131,6 @@ class StatsUpdater:
         return final_msg
 
     def get_template(self):
-        print(os.getcwd())
         with open('stats.md', 'r') as f:
             template = f.read()
 
@@ -149,11 +147,3 @@ class StatsUpdater:
             log.error('Failed to update wiki page')
         print('[Scheduled Job] Stats Update Ending')
 
-if __name__ == '__main__':
-    config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
-    stats = StatsUpdater()
-    stats.get_all_stats()
-    output = stats.build_template()
-    wiki = stats.reddit.subreddit('RepostSleuthBot').wiki['stats']
-    wiki.edit(output)
-    print('')

@@ -25,7 +25,7 @@ task_routes = {
     'redditrepostsleuth.core.celery.admin_tasks.delete_post_task': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.admin_tasks.update_last_deleted_check': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.admin_tasks.bulk_delete': {'queue': 'post_delete'},
-    'redditrepostsleuth.core.celery.maintenance_tasks.*': {'queue': 'scheduled_tasks'},
+    'redditrepostsleuth.core.celery.tasks.scheduled_tasks.*': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.admin_tasks.update_proxies_job': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.response_tasks.process_summons':  {'queue': 'summons'}
 

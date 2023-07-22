@@ -1,4 +1,4 @@
-falcon==2.0.0
+falcon
 gunicorn
 requests
 falcon_cors

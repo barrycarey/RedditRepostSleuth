@@ -5,12 +5,13 @@ import redis
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.model.events.celerytask import CeleryQueueSize
-from redditrepostsleuth.core.logging import log, get_configured_logger
+from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 
 config = Config()
 
 log = get_configured_logger(__name__)
+
 
 def log_queue_size(event_logger):
     skip_keys = ['unacked_index', 'unacked_mutex', 'unacked']
@@ -30,6 +31,7 @@ def log_queue_size(event_logger):
             log.error('Failed to connect to Redis')
             time.sleep(30)
             # log.error('Queue update task failed. Key %s', queue_name)
+
 
 if __name__ == '__main__':
     log.info('Starting Monitor Service')

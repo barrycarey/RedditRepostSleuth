@@ -1,24 +1,27 @@
 import logging
 
 from praw.exceptions import PRAWException
-from prawcore import ResponseException
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
-from redditrepostsleuth.adminsvc.misc_admin_tasks import update_stat_top_image_repost, send_reports_to_meme_voting, \
-    check_meme_template_potential_votes, queue_config_updates, queue_post_watch_cleanup, update_subreddit_access_level, \
-    update_ban_list, remove_expired_bans
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_subreddit_access_level, update_ban_list, \
+    remove_expired_bans, update_stat_top_image_repost, send_reports_to_meme_voting, check_meme_template_potential_votes, \
+    queue_config_updates, queue_post_watch_cleanup
 from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
 from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import RedditTask
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.util.reddithelpers import get_subscribers, is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
     MONITORED_SUB_MOD_REMOVED_SUBJECT
-from redditrepostsleuth.summonssvc.summonsmonitor import monitor_for_mentions
 
-log = logging.getLogger(__name__)
+log = configure_logger(
+    name='redditrepostsleuth',
+)
+
+
 @celery.task(bind=True, base=RedditTask)
 def update_subreddit_stats_task(self) -> None:
     log.info('Scheduled Task: Update Subreddit Stats')
@@ -32,32 +35,17 @@ def update_subreddit_stats_task(self) -> None:
 @celery.task(bind=True, base=RedditTask)
 def check_inbox_task(self) -> None:
     log.info('Scheduled Task: Check Inbox')
-    inbox_monitor = InboxMonitor(self.uowm, self.reddit.reddit, self.response_handler)
+    inbox_monitor = InboxMonitor(self.uowm, self.reddit, self.response_handler)
     try:
         inbox_monitor.check_inbox()
     except Exception as e:
         log.exception('Failed to update subreddit stats')
 
-@celery.task(bind=True, base=RedditTask)
-def check_for_mentions_task(self) -> None:
-    log.info('[Mentions Check] Starting')
-
-    try:
-        monitor_for_mentions(self.reddit.reddit, self.uowm)
-    except ResponseException as e:
-        if e.response.status_code == 429:
-            log.error('[Mentions Check] IP Rate limit hit when checking for mentions')
-    except AssertionError as e:
-        if 'code: 429' in str(e):
-            log.error('[Mentions Check] Too many requests from IP.')
-    except Exception as e:
-        log.exception('[Mentions Check] Mention monitor failed', exc_info=True)
-        self.notification_svc.send_notification('Failed to handle summons: %s', str(e))
 
 @celery.task(bind=True, base=RedditTask)
 def check_new_activations_task(self) -> None:
     log.info('Scheduled Task: Checking For Activations')
-    activation_monitor = NewActivationMonitor(self.uowm, self.reddit.reddit, notification_svc=self.notification_svc)
+    activation_monitor = NewActivationMonitor(self.uowm, self.reddit, notification_svc=self.notification_svc)
     try:
         activation_monitor.check_for_new_invites()
     except Exception as e:
@@ -82,10 +70,9 @@ def update_subreddit_access_level_task(self) -> None:
         """
     log.info('Starting Job: Post watch cleanup')
     try:
-        update_subreddit_access_level(self.uowm, self.reddit.reddit)
+        update_subreddit_access_level(self.uowm, self.reddit)
     except Exception as e:
         log.exception('Problem in scheduled task')
-
 
 
 @celery.task(bind=True, base=RedditTask)
@@ -95,7 +82,7 @@ def update_ban_list_task(self) -> None:
     """
     log.info('Starting Job: Update Subreddit Bans')
     try:
-        update_ban_list(self.uowm, self.reddit.reddit, self.notification_svc)
+        update_ban_list(self.uowm, self.reddit, self.notification_svc)
     except Exception as e:
         log.exception('Problem in scheduled task')
 
@@ -111,6 +98,7 @@ def update_monitored_sub_data_task(self) -> None:
     except Exception as e:
         log.exception('Problem with scheduled task')
 
+
 @celery.task(bind=True, base=RedditTask)
 def remove_expired_bans_task(self) -> None:
     log.info('Starting Job: Remove Expired Bans')
@@ -119,11 +107,12 @@ def remove_expired_bans_task(self) -> None:
     except Exception as e:
         log.exception('Scheduled Task Failed: Update Mod Status')
 
+
 @celery.task(bind=True, base=RedditTask)
 def update_top_image_reposts_task(self) -> None:
     log.info('Starting Job: Remove Expired Bans')
     try:
-        update_stat_top_image_repost(self.uowm, self.reddit.reddit)
+        update_stat_top_image_repost(self.uowm, self.reddit)
     except Exception as e:
         log.exception('Problem in scheduled task')
 
@@ -154,6 +143,7 @@ def queue_config_updates_task(self):
     except Exception as e:
         log.exception('Problem in scheduled task')
 
+
 @celery.task(bind=True, base=RedditTask)
 def queue_post_watch_cleanup_task(self):
     log.info('Starting Job: Post watch cleanup')
@@ -161,6 +151,7 @@ def queue_post_watch_cleanup_task(self):
         queue_post_watch_cleanup(self.uowm, self.config)
     except Exception as e:
         log.exception('Problem in scheduled task')
+
 
 @celery.task(bind=True, base=RedditTask)
 def update_monitored_sub_stats(self, sub_name: str) -> None:
@@ -170,10 +161,10 @@ def update_monitored_sub_stats(self, sub_name: str) -> None:
             log.error('Failed to find subreddit %s', sub_name)
             return
 
-        monitored_sub.subscribers = get_subscribers(monitored_sub.name, self.reddit.reddit)
+        monitored_sub.subscribers = get_subscribers(monitored_sub.name, self.reddit)
 
         log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
-        monitored_sub.is_mod = is_sub_mod_praw(monitored_sub.name, 'repostsleuthbot', self.reddit.reddit)
+        monitored_sub.is_mod = is_sub_mod_praw(monitored_sub.name, 'repostsleuthbot', self.reddit)
         perms = get_bot_permissions(monitored_sub.name, self.reddit) if monitored_sub.is_mod else []
         monitored_sub.post_permission = True if 'all' in perms or 'posts' in perms else None
         monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None

@@ -9,11 +9,11 @@ class ImageMatch(BaseModel):
 
 class IndexSearchResult(BaseModel):
     index_name: str
-    hamming_filtered = False
-    annoy_filtered = False
+    hamming_filtered: bool = False
+    annoy_filtered: bool = False
     index_search_time: float = 0
     total_time: float = 0
-    total_searched = 0
+    total_searched: int = 0
     matches: List[ImageMatch] = []
 
 class APISearchResults(BaseModel):
