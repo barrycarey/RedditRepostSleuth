@@ -1,6 +1,5 @@
-import logging
-
 from praw.exceptions import PRAWException
+from sqlalchemy import text, func
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -10,8 +9,10 @@ from redditrepostsleuth.adminsvc.misc_admin_tasks import update_subreddit_access
 from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
 from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import RedditTask
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub
+from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount, StatsTopRepost
+from redditrepostsleuth.core.db.databasemodels import StatsTopReposters
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.util.reddithelpers import get_subscribers, is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
@@ -153,6 +154,78 @@ def queue_post_watch_cleanup_task(self):
         log.exception('Problem in scheduled task')
 
 
+@celery.task(bind=True, base=SqlAlchemyTask)
+def update_daily_stats(self):
+    daily_stats = StatsDailyCount()
+    try:
+        with self.uowm.start() as uow:
+            daily_stats.summons = uow.summons.get_count(hours=24)
+            daily_stats.comments = uow.bot_comment.get_count(hours=24)
+            daily_stats.link_reposts = uow.repost.get_count(hours=24, post_type=3)
+            daily_stats.image_reposts = uow.repost.get_count(hours=24, post_type=2)
+            uow.stat_daily_count.add(daily_stats)
+            uow.commit()
+            log.info('Updated daily stats')
+    except Exception as e:
+        log.exception('')
+
+
+def update_top_reposters(uowm: UnitOfWorkManager):
+    post_types = [2, 3]
+    day_ranges = [1, 7, 14, 30, None]
+    range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 1 ORDER BY c DESC LIMIT 1000"
+    all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 1 ORDER BY c DESC LIMIT 1000"
+    with uowm.start() as uow:
+        for post_type in post_types:
+            for days in day_ranges:
+                log.info('Getting top repostors for post type %s with range %s', post_type, days)
+                if days:
+                    query = range_query
+                else:
+                    query = all_time_query
+                uow.session.execute(text('DELETE FROM stat_top_reposters WHERE post_type_id=:posttype AND day_range=:days'), {'posttype': post_type, 'days': days})
+                uow.commit()
+                result = uow.session.execute(text(query), {'posttype': post_type, 'days': days})
+                for row in result:
+                    stat = StatsTopReposters()
+                    stat.author = row[0]
+                    stat.post_type_id = post_type
+                    stat.day_range = days
+                    stat.repost_count = row[1]
+                    stat.updated_at = func.utc_timestamp()
+                    uow.stat_top_reposter.add(stat)
+                    uow.commit()
+
+def update_top_reposts(uowm: UnitOfWorkManager):
+    post_types = [2, 3]
+    day_ranges = [1, 7, 14, 30, 365, None]
+    range_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY AND post_type_id=:posttype GROUP BY repost_of_id HAVING c > 1 ORDER BY c DESC LIMIT 1000"
+    all_time_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE post_type_id=:posttype GROUP BY repost_of_id HAVING c > 1 ORDER BY c DESC LIMIT 1000"
+    with uowm.start() as uow:
+        for post_type in post_types:
+            for days in day_ranges:
+                log.info('Getting top reposts for post type %s with range %s', post_type, days)
+                if days:
+                    query = range_query
+                else:
+                    query = all_time_query
+                uow.session.execute(text('DELETE FROM stat_top_repost WHERE post_type_id=:posttype AND day_range=:days'), {'posttype': post_type, 'days': days})
+                uow.commit()
+                result = uow.session.execute(text(query), {'posttype': post_type, 'days': days})
+                for row in result:
+                    stat = StatsTopRepost()
+                    stat.post_id = row[0]
+                    stat.post_type_id = post_type
+                    stat.day_range = days
+                    stat.repost_count = row[1]
+                    stat.updated_at = func.utc_timestamp()
+                    stat.nsfw = False
+                    uow.stat_top_repost.add(stat)
+                    uow.commit()
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def update_top_reposters_task(self):
+    pass
 @celery.task(bind=True, base=RedditTask)
 def update_monitored_sub_stats(self, sub_name: str) -> None:
     with self.uowm.start() as uow:

@@ -34,7 +34,7 @@ class RepostRepo:
     def get_count(self, hours: int = None, post_type: int = None):
         query = self.db_session.query(func.count(Repost.id))
         if post_type:
-            query = query.filter(Repost.post_type == post_type)
+            query = query.filter(Repost.post_type_id == post_type)
         if hours:
             query = query.filter(Repost.detected_at > (datetime.now() - timedelta(hours=hours)))
         r = query.first()

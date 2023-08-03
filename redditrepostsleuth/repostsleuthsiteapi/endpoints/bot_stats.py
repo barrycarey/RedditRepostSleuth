@@ -1,4 +1,5 @@
 import json
+import logging
 
 from falcon import Request, Response, HTTPNotFound, HTTPBadRequest
 from matplotlib.text import Text
@@ -6,6 +7,8 @@ from praw import Reddit
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
+
+log = logging.getLogger(__name__)
 
 class BotStats:
     def __init__(self, uowm: UnitOfWorkManager, reddit: Reddit):
@@ -39,11 +42,13 @@ class BotStats:
         days = req.get_param_as_int('days', default=30, required=False)
         limit = req.get_param_as_int('limit', default=100, required=False, max_value=2000)
         nsfw = req.get_param_as_bool('nsfw', default=False, required=False)
+        post_type = req.get_param_as_int('post_type', default=3)
         results = []
         with self.uowm.start() as uow:
-            result = uow.session.execute("SELECT author, COUNT(*) c FROM repost WHERE post_type=2 AND author is not NULL AND author!= '[deleted]' AND detected_at > NOW() - INTERVAL :days DAY GROUP BY author HAVING c > 1 ORDER BY c DESC LIMIT 1000", {'days': days})
-            results = [{'user': r[0], 'repost_count': r[1]} for r in result]
-        resp.body = json.dumps(results)
+            result = uow.stat_top_reposter.get_by_post_type_and_range(post_type, days)
+            # TODO: This is temp to stay compatible with frontend
+            result_list = [{'user': r.author, 'repost_count': r.repost_count} for r in result]
+        resp.body = json.dumps(result_list)
 
     def on_get_top_image_reposts(self, req: Request, resp: Response):
         limit = req.get_param_as_int('limit', default=100, required=False, max_value=2000)
@@ -113,8 +118,12 @@ class BotStats:
     def on_get_home(self, req: Request, resp: Response):
         stat_name = req.get_param('stat_name', required=True)
         with self.uowm.start() as uow:
+            stats = uow.stat_daily_count.get_latest()
+            if not stats:
+                log.error('No stats available')
+                raise HTTPNotFound(title='No stats found', description=f'No bot stats are available')
             if stat_name.lower() == 'summons_all':
-                resp.body = json.dumps({'count': uow.summons.get_count(), 'stat_name': stat_name})
+                resp.body = json.dumps({'count': stats.summons, 'stat_name': stat_name})
             elif stat_name.lower() == 'summons_today':
                 resp.body = json.dumps({'count': uow.summons.get_count(hours=24), 'stat_name': stat_name})
             elif stat_name.lower() == 'reposts_all':
