@@ -3,7 +3,7 @@ import sys
 
 import pymysql
 
-from redditrepostsleuth.core.celery.ingesttasks import import_image_repost, import_bot_comment_task, \
+from redditrepostsleuth.core.celery.tasks.migrate_tasks import import_image_repost, import_bot_comment_task, \
     import_bot_summons_task, import_bot_pm_task, import_mon_sub_config_change_task, import_mon_sub_config_revision_task, \
     import_repost_watch_task, import_mon_sub_checks_task
 from redditrepostsleuth.core.config import Config
@@ -120,12 +120,12 @@ def run_query(query, celery_task):
         for row in cur:
             celery_task.apply_async((row,), queue='misc_import')
 
-run_batched_query('SELECT * from link_reposts', import_image_repost)
-run_batched_query('SELECT * from image_reposts', import_image_repost)
-run_batched_query('SELECT * from reddit_bot_comment', import_bot_comment_task)
-run_batched_query('SELECT * from reddit_bot_summons', import_bot_summons_task)
-run_batched_query('SELECT * from reddit_bot_private_message ', import_bot_pm_task)
-#sys.exit()
+run_batched_query('SELECT * from link_reposts where id > 86037228', import_image_repost)
+run_batched_query('SELECT * from image_reposts WHERE id > 49838167', import_image_repost)
+run_batched_query('SELECT * from reddit_bot_comment WHERE id > 3572169', import_bot_comment_task)
+run_batched_query('SELECT * from reddit_bot_summons where id > 1348824', import_bot_summons_task, batch_size=100)
+run_batched_query('SELECT * from reddit_bot_private_message where id > 558183 ', import_bot_pm_task)
+sys.exit()
 run_query('SELECT * from reddit_monitored_sub_config_change', import_mon_sub_config_change_task)
 run_query('SELECT * from reddit_monitored_sub_config_revision ', import_mon_sub_config_revision_task)
 run_batched_query('SELECT * from reddit_repost_watch', import_repost_watch_task)

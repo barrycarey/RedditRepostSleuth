@@ -25,6 +25,7 @@ from redditrepostsleuth.core.db.repository.repost_watch_repo import RepostWatchR
 from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
 from redditrepostsleuth.core.db.repository.stat_daily_count_repo import StatDailyCountRepo
 from redditrepostsleuth.core.db.repository.stat_top_repost_repo import StatTopRepostRepo
+from redditrepostsleuth.core.db.repository.stats_top_reposter_repo import StatTopReposterRepo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
 
@@ -157,3 +158,7 @@ class UnitOfWork:
     @property
     def post_hash(self) -> PostHashRepo:
         return PostHashRepo(self.session)
+
+    @property
+    def stat_top_reposter(self) -> StatTopReposterRepo:
+        return StatTopReposterRepo(self.session)

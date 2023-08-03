@@ -104,6 +104,7 @@ class Summons(Base):
     requestor = Column(String(25))
     comment_id = Column(String(11), unique=True)
     comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
+    subreddit = Column(String(25), nullable=False)
     summons_received_at = Column(DateTime)
     summons_replied_at = Column(DateTime)
 
@@ -116,6 +117,7 @@ class BotComment(Base):
     __tablename__ = 'bot_comment'
     __table_args__ = (
         Index('idx_comment_left_at', 'comment_left_at'),
+        Index('idx_comment_id', 'comment_id')
     )
 
     id = Column(Integer, primary_key=True)
@@ -139,7 +141,7 @@ class BotPrivateMessage(Base):
 
     id = Column(Integer, primary_key=True)
     subject = Column(String(200), nullable=False)
-    body = Column(String(1000), nullable=False)
+    body = Column(String(1500), nullable=False)
     in_response_to_comment = Column(String(20))
     recipient = Column(String(25), nullable=False)
     triggered_from = Column(String(20), nullable=False)
@@ -581,44 +583,47 @@ class MemeHash(Base):
 
 class StatsDailyCount(Base):
     __tablename__ = 'stat_daily_count'
-    date = Column(String(10), nullable=False, unique=True, primary_key=True)
-    summons = Column(Integer)
-    comments = Column(Integer)
-    comment_karma = Column(Integer)
-    image_reposts = Column(Integer)
+    id = Column(Integer, primary_key=True)
+    ran_at = Column(DateTime, default=func.utc_timestamp())
+    summons_total = Column(Integer)
+    summons_24 = Column(Integer)
+    comments_total = Column(Integer)
+    comments_24h = Column(Integer)
+    image_reposts_total = Column(Integer)
+    image_reposts_24h = Column(Integer)
     link_reposts = Column(Integer)
+    link_reposts_24h = Column(Integer)
     video_reposts = Column(Integer)
+    video_reposts_24h = Column(Integer)
     text_reposts = Column(Integer)
+    text_reposts_24h = Column(Integer)
+    monitored_subreddit_count = Column(Integer)
 
 class StatsTopReposters(Base):
     __tablename__ = 'stat_top_reposters'
-    author = Column(String(25), nullable=False, unique=True, primary_key=True)
-    image_1_day = Column(Integer)
-    image_7_day = Column(Integer)
-    image_30_day = Column(Integer)
-    image_90_day = Column(Integer)
-    image_all = Column(Integer)
-    link_1_day = Column(Integer)
-    link_7_day = Column(Integer)
-    link_30_day = Column(Integer)
-    link_90_day = Column(Integer)
-    link_all = Column(Integer)
+    __table_args__ = (
+        Index('idx_existing_stat', 'author', 'post_type_id', 'day_range'),
+    )
+    id = Column(Integer, primary_key=True)
+    author = Column(String(25), nullable=False)
+    post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
+    day_range = Column(Integer)
+    repost_count = Column(Integer, nullable=False)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+
 
 class StatsTopRepost(Base):
     __tablename__ = 'stat_top_repost'
     __table_args__ = (
-        Index('idx_post_type', 'post_type', 'nsfw'),
+        Index('idx_post_type', 'post_type_id', 'day_range', 'nsfw'),
     )
-    post_db_id = Column(Integer, primary_key=True)
-    post_reddit_id = Column(String(6), nullable=False)
-    post_type = Column(TINYINT())
-    day_count_1 = Column(Integer, nullable=False)
-    day_count_7 = Column(Integer, nullable=False)
-    day_count_30 = Column(Integer, nullable=False)
-    day_count_365 = Column(Integer, nullable=False)
-    total_count = Column(Integer, nullable=False)
-    days = Column(Integer, nullable=False)
+    id = Column(Integer, primary_key=True)
+    post_id = Column(Integer(), ForeignKey('post.id'))
+    post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
+    day_range = Column(Integer)
+    repost_count = Column(Integer, nullable=False)
     nsfw = Column(Boolean, nullable=False)
+    updated_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 
 class HttpProxy(Base):
     __tablename__ = 'http_proxy'
@@ -629,3 +634,13 @@ class HttpProxy(Base):
     cooldown_expire = Column(DateTime)
     times_used = Column(Integer, default=0, nullable=False)
     successive_failures = Column(Integer, default=0, nullable=False)
+
+class UserCheck(Base):
+    __tablename__ = 'user_check'
+    __table_args__ = (
+        Index('idx_last_checked', 'last_checked'),
+    )
+    username = Column(String(25), nullable=False, primary_key=True, unique=True)
+    onlyfans_links = Column(Boolean, default=False)
+    added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    last_checked = Column(DateTime, nullable=False)
