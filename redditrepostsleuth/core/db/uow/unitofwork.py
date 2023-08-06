@@ -28,7 +28,7 @@ from redditrepostsleuth.core.db.repository.stat_top_repost_repo import StatTopRe
 from redditrepostsleuth.core.db.repository.stats_top_reposter_repo import StatTopReposterRepo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
-
+from redditrepostsleuth.core.db.repository.user_review_repo import UserReviewRepo
 
 
 class UnitOfWork:
@@ -162,3 +162,7 @@ class UnitOfWork:
     @property
     def stat_top_reposter(self) -> StatTopReposterRepo:
         return StatTopReposterRepo(self.session)
+
+    @property
+    def user_review(self) -> UserReviewRepo:
+        return UserReviewRepo(self.session)

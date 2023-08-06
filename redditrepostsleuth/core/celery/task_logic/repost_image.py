@@ -31,6 +31,7 @@ def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWo
                 return
 
             try:
+
                 meme_template = MemeTemplate(
                     dhash_h=search_results.checked_post.dhash_h,
                     dhash_256=meme_hashes['dhash_h'],
@@ -88,7 +89,8 @@ def save_image_repost_result(
             search_id=search_results.logged_search.id if search_results.logged_search else None,
             subreddit=search_results.checked_post.subreddit,
             source=source,
-            post_type_id=search_results.checked_post.post_type_id
+            post_type_id=search_results.checked_post.post_type_id,
+            hamming_distance=search_results.closest_match.hamming_distance
         )
 
         try:
@@ -130,7 +132,6 @@ def repost_watch_notify(watches: List[dict[SearchMatch, RepostWatch]], reddit: R
         response_handler.send_private_message(
             redditor,
             msg,
-            subject='A post you are watching has been reposted',
-            source='watch',
-            post_id=watch['watch'].post_id
+            'A post you are watching has been reposted',
+            'watch',
         )

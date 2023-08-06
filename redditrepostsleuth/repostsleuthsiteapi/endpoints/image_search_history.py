@@ -24,7 +24,7 @@ class ImageSearchHistory:
         if limit == -1:
             limit = 1000
         with self.uowm.start() as uow:
-            checked = uow.image_search.get_by_subreddit(
+            checked = uow.repost_search.get_by_subreddit(
                 req.get_param('subreddit', required=True),
                 limit=limit,
                 offset=req.get_param_as_int('offset', required=False, default=None),

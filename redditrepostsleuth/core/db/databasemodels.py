@@ -52,14 +52,13 @@ class Post(Base):
         return {
             'post_id': self.post_id,
             'url': self.url,
-            'shortlink': self.shortlink,
             'perma_link': self.perma_link,
+            'post_type': self.post_type.name,
             'title': self.title,
-            'dhash_v': self.dhash_v,
-            'dhash_h': self.dhash_h,
             'created_at': self.created_at.timestamp(),
             'author': self.author,
-            'subreddit': self.subreddit
+            'subreddit': self.subreddit,
+            'hashes': [h.to_dict() for h in self.hashes]
         }
 
 class PostType(Base):
@@ -83,12 +82,25 @@ class PostHash(Base):
     post_created_at = Column(DateTime, nullable=False)  # TODO: change to default timestamp
 
     post = relationship("Post", back_populates='hashes')
+    hash_type = relationship("HashType")
+
+    def to_dict(self):
+        return {
+            'hash': self.hash,
+            'post_id': self.post_id,
+            'hash_type': self.hash_type.to_dict()
+        }
 
 class HashType(Base):
     __tablename__ = 'hash_type'
 
     id = Column(TINYINT(), primary_key=True)
     name = Column(String(12, collation='latin1_bin'), nullable=False)
+
+    def to_dict(self):
+        return {
+            'name': self.name
+        }
 
 class Summons(Base):
     __tablename__ = 'summons'
@@ -181,6 +193,7 @@ class RepostSearch(Base):
     __tablename__ = 'repost_search'
     __table_args__ = (
         Index('idx_post_type_searched_at', 'post_type_id', 'searched_at'),
+        Index('idx_by_subreddit_and_type', 'subreddit', 'post_type_id', 'matches_found')
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
@@ -208,6 +221,29 @@ class RepostSearch(Base):
     post = relationship("Post", back_populates='searches')
     post_type = relationship('PostType')
 
+    def to_dict(self):
+        return {
+            'post': self.post.to_dict(),
+            'source': self.source,
+            'post_type': self.post_type.name,
+            'search_time': self.search_time,
+            'matches_found': self.matches_found,
+            'target_title_match': self.target_title_match,
+            'max_matches': self.matches_found,
+            'same_sub': self.same_sub,
+            'max_days_old': self.max_days_old,
+            'filter_dead_matches': self.filter_dead_matches,
+            'filter_removed_matches': self.filter_removed_matches,
+            'only_older_matches': self.only_older_matches,
+            'filter_same_author': self.filter_same_author,
+            'filter_crossposts': self.filter_crossposts,
+            'target_match_percent': self.target_match_percent,
+            'target_meme_match_percent': self.target_meme_match_percent,
+            'meme_filter': self.meme_filter,
+            'subreddit': self.subreddit,
+            'searched_at': self.search_time.timestamp()
+        }
+
 class Repost(Base):
     __tablename__ = 'repost'
     __table_args__ = (
@@ -224,10 +260,25 @@ class Repost(Base):
     source = Column(String(25))
     author = Column(String(25))
     subreddit = Column(String(25), nullable=False)
+    hamming_distance = Column(Integer)
+
     post = relationship("Post", back_populates='reposts', foreign_keys=[post_id])
     repost_of = relationship("Post", foreign_keys=[repost_of_id])
     search = relationship("RepostSearch")
     post_type = relationship('PostType')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'post': self.post.to_dict(),
+            'repost_of': self.repost_of.to_dict(),
+            'search': self.search.to_dict() if self.search else None,
+            'detected_at': self.detected_at.timestamp(),
+            'source': self.source,
+            'author': self.author,
+            'subreddit': self.subreddit,
+            'post_type': self.post_type.name
+        }
 
 
 class MonitoredSub(Base):
@@ -586,16 +637,16 @@ class StatsDailyCount(Base):
     id = Column(Integer, primary_key=True)
     ran_at = Column(DateTime, default=func.utc_timestamp())
     summons_total = Column(Integer)
-    summons_24 = Column(Integer)
+    summons_24h = Column(Integer)
     comments_total = Column(Integer)
     comments_24h = Column(Integer)
     image_reposts_total = Column(Integer)
     image_reposts_24h = Column(Integer)
-    link_reposts = Column(Integer)
+    link_reposts_total = Column(Integer)
     link_reposts_24h = Column(Integer)
-    video_reposts = Column(Integer)
+    video_reposts_total = Column(Integer)
     video_reposts_24h = Column(Integer)
-    text_reposts = Column(Integer)
+    text_reposts_total = Column(Integer)
     text_reposts_24h = Column(Integer)
     monitored_subreddit_count = Column(Integer)
 
@@ -635,12 +686,13 @@ class HttpProxy(Base):
     times_used = Column(Integer, default=0, nullable=False)
     successive_failures = Column(Integer, default=0, nullable=False)
 
-class UserCheck(Base):
-    __tablename__ = 'user_check'
+class UserReview(Base):
+    __tablename__ = 'user_review'
     __table_args__ = (
         Index('idx_last_checked', 'last_checked'),
     )
     username = Column(String(25), nullable=False, primary_key=True, unique=True)
-    onlyfans_links = Column(Boolean, default=False)
+    content_links_found = Column(Boolean, default=False)
     added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
-    last_checked = Column(DateTime, nullable=False)
+    notes = Column(String(150))
+    last_checked = Column(DateTime)

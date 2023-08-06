@@ -1,5 +1,7 @@
 import falcon
+import sentry_sdk
 from falcon import CORSMiddleware
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -41,12 +43,16 @@ config_updater = SubredditConfigUpdater(
 )
 
 
+sentry_sdk.init(
+    dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
+    traces_sample_rate=1.0,
+)
 
 #cors = CORS(allow_origins_list=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
 
 api = application = falcon.App(
     middleware=[
-        CORSMiddleware(allow_origins=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'])
+        CORSMiddleware(allow_origins=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'])
     ]
 )
 api.req_options.auto_parse_form_urlencoded = True
@@ -85,4 +91,5 @@ api.add_route('/admin/message-templates/{id:int}', MessageTemplate(uowm))
 api.add_route('/admin/message-templates/all', MessageTemplate(uowm), suffix='all')
 api.add_route('/admin/users', GeneralAdmin(uowm))
 
+api = SentryWsgiMiddleware(api)
 #serve(api, host='localhost', port=8888, threads=15)

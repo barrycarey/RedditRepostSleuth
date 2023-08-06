@@ -77,7 +77,7 @@ class InboxMonitor:
                 log.info('Created post watch on %s for %s.  Source: Top Post', post_id, msg.author.name)
                 self.response_handler.reply_to_private_message(msg, WATCH_ENABLED)
 
-    def _process_user_report(self, msg: Message):
+    def _process_user_report(self, msg: Message) -> None:
         with self.uowm.start() as uow:
             existing = uow.user_report.get_first_by_message_id(msg.id)
             if existing:
@@ -96,6 +96,8 @@ class InboxMonitor:
             post = uow.posts.get_by_post_id(report_data['post_id'])
             if not post:
                 log.error('Failed to find post %s for report', report_data['post_id'])
+                return
+
             report = UserReport(
                 post_id=post.id,
                 reported_by=msg.author.name,

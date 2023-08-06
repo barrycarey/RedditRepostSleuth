@@ -35,14 +35,16 @@ class PostRepository:
     def get_newest(self, limit: int = 500):
         return self.db_session.query(Post).order_by(Post.id.desc()).limit(limit).all()
 
+    def get_newest_by_type(self, post_type_id: int, limit: int = 500, offset: int = None):
+        return self.db_session.query(Post).filter(Post.post_type_id == post_type_id).order_by(Post.id.desc()).limit(limit).offset(offset).all()
+
     def get_oldest_post(self, limit: int = None):
         return self.db_session.query(Post).order_by(Post.created_at).first()
 
     def get_by_id(self, id: int) -> Post:
-        return self.db_session.query(Post).filter(Post.id == id).first()
+        return self.db_session.query(Post).options(joinedload(Post.hashes), joinedload(Post.post_type)).filter(Post.id == id).first()
 
     def get_by_post_id(self, id: str) -> Post:
-        #log.debug('Looking up post with ID %s', id)
         return self.db_session.query(Post).options(joinedload(Post.hashes), joinedload(Post.post_type)).filter(Post.post_id == id).first()
 
     def find_all_by_url(self, url_hash: str, limit: int = None):
@@ -67,8 +69,8 @@ class PostRepository:
         since = datetime.now() - timedelta(days=days)
         return self.db_session.query(Post).filter(Post.created_at > since).offset(offset).limit(limit).all()
 
-    def count_by_type(self, post_type: str):
-        r = self.db_session.query(func.count(Post.id)).filter(Post.post_type == post_type).first()
+    def count_by_type(self, post_type_id: int):
+        r = self.db_session.query(func.count(Post.id)).filter(Post.post_type_id == post_type_id).first()
         return r[0] if r else None
 
     def get_count(self):

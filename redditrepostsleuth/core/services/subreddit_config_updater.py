@@ -363,8 +363,11 @@ class SubredditConfigUpdater:
         """
         log.info('Sending config created notification to %s', subreddit.display_name)
         try:
-            subreddit.message('Repost Sleuth Has Loaded Your New Config!',
-                              'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
+            self.response_handler.send_mod_mail(
+                subreddit.display_name,
+                'Repost Sleuth Has Loaded Your New Config!',
+                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.'
+            )
             return True
         except Exception as e:
             log.exception('Failed to send config created notification')
@@ -381,7 +384,7 @@ class SubredditConfigUpdater:
                 'Please validate your changes and try again'
 
         try:
-            subreddit.message('Repost Sleuth Failed To Load Config', body)
+            self.response_handler.send_mod_mail(subreddit.display_name, body, 'Repost Sleuth Failed To Load Config', source='submonitor')
             return True
         except Exception as e:
             log.exception('Failed to send PM to %s', subreddit.display_name)
@@ -395,7 +398,12 @@ class SubredditConfigUpdater:
                 subject=f'Subreddit Config Load Success'
             )
         try:
-            subreddit.message('Repost Sleuth Has Loaded Your New Config!', 'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
+            self.response_handler.send_mod_mail(
+                subreddit.display_name,
+                'Repost Sleuth Has Loaded Your New Config!',
+                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.',
+                source='submonitor'
+            )
             return True
         except Exception as e:
             log.exception('Failed to send PM to %s', subreddit.display_name)
@@ -409,12 +417,8 @@ class SubredditConfigUpdater:
                 subject='New Config Options Notification Sent'
             )
         try:
-            subreddit.message(
-                'New Repost Sleuth Options Available!',
-                'Your Repost Sleuth config was missing some newly available options.\n\n '
-                f'I\'ve added the following options to your config: {config_keys}\n\n' 
-                'You can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth#wiki_config_value_explanation'
-            )
+            message = f'Your Repost Sleuth config was missing some newly available options.\n\n I\'ve added the following options to your config: {config_keys}\n\nYou can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth#wiki_config_value_explanation'
+            self.response_handler.send_mod_mail(subreddit.display_name, message, 'New Repost Sleuth Options Available!', source='submonitor')
             return True
         except Exception as e:
             log.exception('Failed to send PM to %s', subreddit.display_name)

@@ -1,4 +1,3 @@
-import json
 from typing import NoReturn
 
 import requests
@@ -8,17 +7,14 @@ from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result, \
+from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost, RepostSearch
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
-from redditrepostsleuth.core.model.events.celerytask import BatchedEvent
-from redditrepostsleuth.core.model.events.repostevent import RepostEvent
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
-from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings, \
-    set_repost_search_params_from_search_settings
+from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results, log_search
 
 log = configure_logger(
@@ -82,7 +78,7 @@ def link_repost_check(self, posts, ):
                     )
                     search_results.search_times.stop_timer('total_search_time')
                     log.info('Link Query Time: %s', search_results.search_times.query_time)
-
+                    log_search(self.uowm, search_results, 'ingest')
                     if not search_results.matches:
                         log.debug('Not matching links for post %s', post.post_id)
                         uow.commit()

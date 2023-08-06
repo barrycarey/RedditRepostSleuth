@@ -23,7 +23,7 @@ class RepostSearchRepo:
     def get_all(self, limit: int = None):
         return self.db_session.query(RepostSearch).limit(limit).all()
 
-    def get_by_subreddit(self, subreddit: Text, source: Text = 'sub_monitor', only_reposts: bool = False, limit: int = None, offset: int = None) -> List[RepostSearch]:
+    def get_by_subreddit(self, subreddit: str, source: Text = 'sub_monitor', only_reposts: bool = False, limit: int = None, offset: int = None) -> List[RepostSearch]:
         query = self.db_session.query(RepostSearch).filter(RepostSearch.subreddit == subreddit, RepostSearch.source == source)
         if only_reposts:
             query = query.filter(RepostSearch.matches_found > 0)

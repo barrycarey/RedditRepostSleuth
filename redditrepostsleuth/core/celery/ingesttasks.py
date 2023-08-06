@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import Post, PostHash
+from redditrepostsleuth.core.db.databasemodels import Post, PostHash, UserReview
 from redditrepostsleuth.core.exception import InvalidImageUrlException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
 from redditrepostsleuth.core.logging import configure_logger
@@ -50,9 +50,23 @@ def save_new_post(self, post: Post):
         elif post.post_type_id == 3 and self.config.repost_link_check_on_ingest:
             celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]])
 
+        if monitored_sub:
+            with self.uowm.start() as uow:
+                user_review = uow.user_review.get_by_username(post.author)
+                if not user_review:
+                    user_review = UserReview()
+                    user_review.username = post.author
+                    uow.user_review.add(user_review)
+                    uow.commit()
+
     except Exception as e:
         log.exception('')
 
+
+@celery.task
+def save_new_posts(posts: list[Post]) -> None:
+    for post in posts:
+        save_new_post.apply_async((post,))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results(self, data):
