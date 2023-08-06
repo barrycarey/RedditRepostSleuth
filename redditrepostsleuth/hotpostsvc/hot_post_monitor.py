@@ -151,7 +151,7 @@ class TopPostMonitor:
         msg = self.response_builder.build_default_comment(search_results)
 
         try:
-            self.response_handler.reply_to_submission(post.post_id, msg)
+            self.response_handler.reply_to_submission(post.post_id, msg, 'hotpost')
         except APIException:
             log.error('Failed to leave comment on %s in %s. ', post.post_id, post.subreddit)
         except Exception:
@@ -188,9 +188,8 @@ class TopPostMonitor:
             self.response_handler.send_private_message(
                 submission.author,
                 TOP_POST_WATCH_BODY.format(shortlink=f'https://redd.it/{submission.id}'),
-                subject=TOP_POST_WATCH_SUBJECT,
-                source='toppost',
-                post_id=submission.id
+                TOP_POST_WATCH_SUBJECT,
+                'toppost',
             )
         except APIException as e:
             if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':

@@ -2,9 +2,10 @@ import os
 import time
 from datetime import datetime
 
+import sentry_sdk
 from praw import Reddit
 from praw.exceptions import APIException
-from prawcore import ResponseException
+from prawcore import ResponseException, TooManyRequests
 from sqlalchemy.exc import DataError
 
 from redditrepostsleuth.core.config import Config
@@ -38,6 +39,12 @@ summons_handler = SummonsHandler(uowm, dup_image_svc, reddit, response_builder,
 log = get_configured_logger(
     'redditrepostsleuth',
     format='%(asctime)s | Summons Monitor |  %(module)s:%(funcName)s:%(lineno)d | [%(process)d][%(threadName)s] | %(levelname)s: %(message)s'
+)
+
+sentry_sdk.init(
+    dsn=os.getenv('SENTRY_DSN', None),
+    traces_sample_rate=1.0,
+    environment=os.getenv('RUN_ENV', 'dev')
 )
 
 
@@ -99,6 +106,7 @@ def monitor_for_mentions(reddit: Reddit, uowm: UnitOfWorkManager):
                 comment_body=comment.body.replace('\\', ''),
                 summons_received_at=datetime.fromtimestamp(comment.created_utc),
                 requestor=comment.author.name,
+                subreddit=comment.subreddit.display_name
             )
             uow.summons.add(summons)
             try:
@@ -113,5 +121,8 @@ def monitor_for_mentions(reddit: Reddit, uowm: UnitOfWorkManager):
 if __name__ == '__main__':
 
     while True:
-        monitor_for_mentions(reddit, uowm)
+        try:
+            monitor_for_mentions(reddit, uowm)
+        except TooManyRequests:
+            log.info('Out of API credits')
         time.sleep(int(os.getenv('DELAY', 5)))

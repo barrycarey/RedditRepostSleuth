@@ -16,6 +16,9 @@ class RepostRepo:
     def get_all(self, limit: int = None, offset: int = None) -> List[Repost]:
         return self.db_session.query(Repost).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
+    def get_all_by_type(self, post_type_id: int, limit: None, offset: None) -> list[Repost]:
+        return self.db_session.query(Repost).filter(Repost.post_type_id == post_type_id).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
+
     def get_all_without_author(self, limit: int = None, offset: int = None):
         return self.db_session.query(Repost).filter(Repost.author == None).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
@@ -40,8 +43,8 @@ class RepostRepo:
         r = query.first()
         return r[0] if r else None
 
-    def get_count_by_subreddit(self, subreddit: str, post_type: str, hours: int = None):
-        query = self.db_session.query(func.count(Repost.id)).filter(Repost.subreddit == subreddit, Repost.post_type == post_type)
+    def get_count_by_subreddit(self, subreddit: str, post_type_id: str, hours: int = None):
+        query = self.db_session.query(func.count(Repost.id)).filter(Repost.subreddit == subreddit, Repost.post_type_id == post_type_id)
         if hours:
             query = query.filter(Repost.detected_at > (datetime.now() - timedelta(hours=hours)))
         return query.first()

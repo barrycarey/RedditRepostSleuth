@@ -1,16 +1,19 @@
 import asyncio
 import itertools
 import json
+import os
 import time
-from asyncio import ensure_future, gather, run
+from asyncio import ensure_future, gather, run, TimeoutError
 from datetime import datetime
 from typing import List, Optional
 
+import sentry_sdk
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 from redditrepostsleuth.core.util.utils import build_reddit_query_string
-from redditrepostsleuth.core.celery.ingesttasks import save_new_post
+from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -20,6 +23,14 @@ from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, Job
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
     base36decode, generate_next_ids
 from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
+
+
+sentry_sdk.init(
+    dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
+    traces_sample_rate=1.0,
+    environment=os.getenv('RUN_ENV', 'dev')
+)
+
 
 log = configure_logger(name='redditrepostsleuth')
 config = Config()
@@ -39,9 +50,9 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
                 log.debug('Successful fetch')
                 return await resp.text()
             else:
-                log.error('Unexpected request status %s - %s', resp.status, url)
+                log.info('Unexpected request status %s - %s', resp.status, url)
                 return
-        except ClientOSError:
+        except (ClientOSError, TimeoutError):
             log.exception('')
 
 
@@ -104,7 +115,7 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(chunk)}'
             job = BatchedPostRequestJob(url, chunk, JobStatus.STARTED)
             tasks.append(ensure_future(fetch_page_as_job(job, session)))
-            if len(tasks) >= 25 or len(chunk) == 0:
+            if len(tasks) >= 50 or len(chunk) == 0:
                 posts_to_save = []
                 while tasks:
                     log.info('Gathering %s task results', len(tasks))
@@ -123,7 +134,8 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                             tasks.append(ensure_future(fetch_page_as_job(j, session)))
 
                 log.info('Sending %s posts to save queue', len(posts_to_save))
-                queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
+                #queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
+                save_new_posts.apply_async(([reddit_submission_to_post(submission) for submission in posts_to_save],))
             if len(chunk) == 0:
                 break
 
@@ -137,7 +149,7 @@ def queue_posts_for_ingest(posts: List[Post]):
     """
     log.info('Sending batch of %s posts to ingest queue', len(posts))
     for post in posts:
-        save_new_post.apply_async((post,), queue='post_ingest')
+        save_new_post.apply_async((post,))
 
 
 async def main() -> None:

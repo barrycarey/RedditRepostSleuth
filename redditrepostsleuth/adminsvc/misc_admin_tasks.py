@@ -1,16 +1,13 @@
 import os
 from datetime import datetime
-from typing import NoReturn, List
+from typing import NoReturn
 
 import requests
 from praw import Reddit
-from prawcore import Forbidden, NotFound, Redirect
 from sqlalchemy import func
 
-from redditrepostsleuth.core.celery.admin_tasks import check_for_subreddit_config_update_task, \
-    check_if_watched_post_is_active
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MemeTemplatePotential, \
+from redditrepostsleuth.core.db.databasemodels import MemeTemplatePotential, \
     MemeTemplate, StatsTopRepost
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -19,51 +16,8 @@ from redditrepostsleuth.core.notification.notification_service import Notificati
 from redditrepostsleuth.core.util.helpers import build_markdown_table, \
     chunk_list, get_redis_client
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, is_sub_mod_praw, is_bot_banned, \
-    bot_has_permission
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, is_bot_banned
 
-
-def update_mod_status(uowm: UnitOfWorkManager, reddit: Reddit) -> None:
-    """
-    Go through all registered subs and check if their a mod and what level of permissions they have
-    :param uowm: UnitOfWorkManager
-    :param reddit: Rreddit
-    """
-
-    print('[Scheduled Job] Checking Mod Status Start')
-    with uowm.start() as uow:
-        monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
-        for sub in monitored_subs:
-            if not is_sub_mod_praw(sub.name, 'RepostSleuthBot', reddit):
-                log.info('[Mod Check] Bot is not a mod on %s', sub.name)
-                sub.is_mod = False
-                uow.commit()
-                continue
-
-            sub.is_mod = True
-            sub.post_permission = bot_has_permission(sub.name, 'posts', reddit)
-            sub.wiki_permission = bot_has_permission(sub.name, 'wiki', reddit)
-            log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', sub.name, sub.post_permission, sub.wiki_permission)
-            uow.commit()
-    print('[Scheduled Job] Checking Mod Status End')
-
-def update_subreddit_access_level(uowm: UnitOfWorkManager, reddit: Reddit):
-    """
-    Go through all monitored subs and update their is_private status
-    :return:
-    """
-    log.info('Starting Job: Update subreddit is_private and nsfw')
-    with uowm.start() as uow:
-        monitored_subs: List[MonitoredSub] = uow.monitored_sub.get_all()
-        for monitored_sub in monitored_subs:
-            try:
-                sub_data = reddit.subreddit(monitored_sub.name)
-                monitored_sub.is_private = True if sub_data.subreddit_type == 'private' else False
-                monitored_sub.nsfw = True if sub_data.over18 else False
-                log.debug('%s: is_private: %s | nsfw: %s', monitored_sub.name, monitored_sub.is_private, monitored_sub.nsfw)
-            except (Redirect, Forbidden):
-                log.error('Error getting sub settings')
-        uow.commit()
 
 def update_ban_list(uowm: UnitOfWorkManager, reddit: Reddit, notification_svc: NotificationService = None) -> None:
     """
@@ -175,7 +129,7 @@ def send_reports_to_meme_voting(uowm: UnitOfWorkManager) -> NoReturn:
             if uow.meme_template_potential.get_by_post_id(report.post_id):
                 continue
 
-            post = uow.posts.get_by_post_id(report.post_id)
+            post = uow.posts.get_by_id(report.post_id)
             if not post:
                 continue
             try:
@@ -206,7 +160,7 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                     return
 
                 log.info('Post %s received %s votes.  Creating meme template', potential_template.post_id, potential_template.vote_total)
-                post = uow.posts.get_by_post_id(potential_template.post_id)
+                post = uow.posts.get_by_id(potential_template.post_id)
                 try:
                     meme_hashes = get_image_hashes(post.searched_url, hash_size=32)
                 except Exception as e:
@@ -228,43 +182,6 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
             else:
                 continue
             uow.commit()
-
-def queue_config_updates(uowm: UnitOfWorkManager, config: Config) -> NoReturn:
-    """
-    Send all monitored subs to celery queue to check for config updates
-    :param uowm: Unit of Work Manager
-    :param config: Config
-    :return: None
-    """
-    print('[Scheduled Job] Queue config update check')
-    redis = get_redis_client(config)
-    if len(redis.lrange('config_update_check', 0, 20000)) > 0:
-        log.info('Config update queue still has pending jobs.  Skipping update queueing ')
-        return
-
-    with uowm.start() as uow:
-        monitored_subs = uow.monitored_sub.get_all()
-        for monitored_sub in monitored_subs:
-            check_for_subreddit_config_update_task.apply_async((monitored_sub,))
-
-    print('[Scheduled Job Complete] Queue config update check')
-
-
-def queue_post_watch_cleanup(uowm: UnitOfWorkManager, config: Config) -> NoReturn:
-    """
-    Send all watches to celery to check if the post has been deleted
-    :param uowm: Unit of work manager
-    """
-    print('[Scheduled Job] Queue Deleted Watch Check')
-    redis = get_redis_client(config)
-    if len(redis.lrange('watch_remove_deleted', 0, 20000)) > 0:
-        log.info('Deleted watchqueue still has pending jobs.  Skipping update queueing ')
-        return
-
-    with uowm.start() as uow:
-        watches = uow.repostwatch.get_all()
-        for chunk in chunk_list(watches, 30):
-            check_if_watched_post_is_active.apply_async((chunk,))
 
 if __name__ == '__main__':
     config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config_dev.json')

@@ -8,9 +8,9 @@ from praw.exceptions import APIException
 from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
+from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Summons, Post, RepostWatch, BannedUser, MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import Summons, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, InvalidCommandException
 from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
@@ -160,8 +160,9 @@ class SummonsHandler:
             self.response_handler.send_private_message(
                 redditor,
                 response.message,
+                'Repost Check',
+                'summons',
                 comment_id=summons.comment_id,
-                source='summons'
             )
         except APIException as e:
             if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
@@ -240,19 +241,19 @@ class SummonsHandler:
         elif summons.post.post_type.name == 'link':
             self.process_link_repost_request(summons)
 
-    def process_link_repost_request(self, summons: Summons, post: Post, monitored_sub: MonitoredSub = None):
+    def process_link_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None):
         response = SummonsResponse(summons=summons)
 
         search_results = get_link_reposts(
-            post.url,
+            summons.post.url,
             self.uowm,
             get_default_link_search_settings(self.config),
-            post=post,
+            post=summons.post,
             get_total=True
         )
         search_results = filter_search_results(
             search_results,
-            reddit=self.reddit.reddit,
+            reddit=self.reddit,
             uitl_api=f'{self.config.util_api}/maintenance/removed'
         )
 
@@ -338,7 +339,7 @@ class SummonsHandler:
     def _reply_to_comment(self, response: SummonsResponse) -> SummonsResponse:
         log.debug('Sending response to summons comment %s. MESSAGE: %s', response.summons.comment_id, response.message)
         try:
-            reply_comment = self.response_handler.reply_to_comment(response.summons.comment_id, response.message,
+            reply_comment = self.response_handler.reply_to_comment(response.summons.comment_id, response.message, 'summons',
                                                                    subreddit=response.summons.post.subreddit)
             if reply_comment:
                 response.comment_reply_id = reply_comment.id
@@ -374,8 +375,9 @@ class SummonsHandler:
         reply_pm = self.response_handler.send_private_message(
             redditor,
             msg,
+            'Repost Check',
+            'summons',
             comment_id=response.summons.comment_id,
-            source='summons'
         )
         response.message = msg
         if reply_pm:
@@ -405,8 +407,8 @@ class SummonsHandler:
         response.status = 'success'
         response.message = OVER_LIMIT_BAN.format(ban_expires=datetime.utcnow() + timedelta(hours=1))
         redditor = self.reddit.redditor(summons.requestor)
-        reply_message = self.response_handler.send_private_message(redditor, response.message, subject='Temporary RepostSleuth Ban')
-        self._save_response(response, bot_pm_id=reply_message.id if reply_message else None)
+        reply_message = self.response_handler.send_private_message(redditor, response.message, 'Temporary RepostSleuth Ban', 'summons')
+        self._save_response(response)
 
     def _ban_user(self, requestor: Text) -> NoReturn:
         ban_expires = datetime.utcnow() + timedelta(hours=1)

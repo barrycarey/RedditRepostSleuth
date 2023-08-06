@@ -1,3 +1,5 @@
+import os
+
 import sentry_sdk
 from celery.signals import after_setup_logger
 
@@ -15,12 +17,12 @@ celery.config_from_object('redditrepostsleuth.core.celery.celeryconfig')
 def init_sentry(**_kwargs):
     sentry_sdk.init(
         dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
+        environment=os.getenv('RUN_ENV', 'dev'),
         integrations=[
             CeleryIntegration(
                 monitor_beat_tasks=True,
             ),
         ],
-        traces_sample_rate=1.0,
     )
 
 @after_setup_logger.connect

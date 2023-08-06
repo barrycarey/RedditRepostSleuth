@@ -7,7 +7,6 @@ import pymysql
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AdminTask, SqlAlchemyTask, PyMysqlTask
-from redditrepostsleuth.core.celery.helpers.admin_task_helpers import update_proxies
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch, Post
 from redditrepostsleuth.core.logfilters import ContextFilter
@@ -96,9 +95,6 @@ def update_last_deleted_check(self, post_ids: list[int]) -> None:
     except Exception as e:
         log.exception()
 
-@celery.task(bind=True, base=AdminTask)
-def check_for_subreddit_config_update_task(self, monitored_sub: MonitoredSub) -> NoReturn:
-    self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)
 
 @celery.task(bind=True, base=AdminTask)
 def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, user_data: dict) -> NoReturn:
@@ -109,32 +105,3 @@ def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, use
     )
 
 
-@celery.task(bind=True, base=SqlAlchemyTask)
-def check_if_watched_post_is_active(self, watches: List[RepostWatch]):
-    urls_to_check = []
-    with self.uowm.start() as uow:
-        for watch in watches:
-            post = uow.posts.get_by_post_id(watch.post_id)
-            if not post:
-                continue
-            urls_to_check.append({'url': post.url, 'id': str(watch.id)})
-
-        active_urls = batch_check_urls(
-            urls_to_check,
-            f'{self.config.util_api}/maintenance/removed'
-        )
-
-    for watch in watches:
-        if not next((x for x in active_urls if x['id'] == str(watch.id)), None):
-            log.info('Removing watch %s', watch.id)
-            uow.repostwatch.remove(watch)
-
-    uow.commit()
-
-
-@celery.task(bind=True, base=SqlAlchemyTask)
-def update_proxies_job(self) -> None:
-    try:
-        update_proxies(self.uowm)
-    except Exception as e:
-        log.exception('Failed to update proxies')

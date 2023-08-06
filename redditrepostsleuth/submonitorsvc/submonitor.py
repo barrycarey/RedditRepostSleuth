@@ -7,7 +7,7 @@ from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden, TooManyRequests
 from redlock import RedLockError
 
-from redditrepostsleuth.core.celery.helpers.repost_image import save_image_repost_result
+from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -21,10 +21,10 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    save_link_repost, get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
+    get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
+from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results, log_search
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 log = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ class SubMonitor:
             log.error('Failed to get submission %s for sub %s.  Cannot perform admin functions', post.post_id, post.subreddit)
             return
 
-        if search_results.matches:
+        if search_results.matches and self.config.live_responses:
             msg_values = build_msg_values_from_search(search_results, self.uowm,
                                                       target_days_old=monitored_sub.target_days_old)
             if search_results.checked_post.post_type == 'image':
@@ -188,13 +188,17 @@ class SubMonitor:
             get_link_search_settings_for_monitored_sub(monitored_sub),
             post=post,
             get_total=False,
-            source='submonitor'
         )
-        return filter_search_results(
+        search_results = filter_search_results(
             search_results,
             reddit=self.reddit.reddit,
             uitl_api=f'{self.config.util_api}/maintenance/removed'
         )
+        search_results.search_times.stop_timer('total_search_time')
+        log_search(self.uowm, search_results, 'submonitor')
+
+        return search_results
+
 
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageSearchResults:
         """
@@ -304,7 +308,7 @@ class SubMonitor:
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
-        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message)
+        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message, 'submonitor')
 
     def save_unknown_post(self, post_id: str) -> Post:
         """

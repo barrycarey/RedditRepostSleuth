@@ -117,20 +117,21 @@ class BotStats:
 
     def on_get_home(self, req: Request, resp: Response):
         stat_name = req.get_param('stat_name', required=True)
+        # TODO - Refactor.  Hacked in to stay consistant with frontend after db change
         with self.uowm.start() as uow:
             stats = uow.stat_daily_count.get_latest()
             if not stats:
                 log.error('No stats available')
                 raise HTTPNotFound(title='No stats found', description=f'No bot stats are available')
             if stat_name.lower() == 'summons_all':
-                resp.body = json.dumps({'count': stats.summons, 'stat_name': stat_name})
+                resp.body = json.dumps({'count': stats.summons_total, 'stat_name': stat_name})
             elif stat_name.lower() == 'summons_today':
-                resp.body = json.dumps({'count': uow.summons.get_count(hours=24), 'stat_name': stat_name})
+                resp.body = json.dumps({'count': stats.summons_24h, 'stat_name': stat_name})
             elif stat_name.lower() == 'reposts_all':
-                total = uow.repost.get_count()
+                total = stats.image_reposts_total
                 resp.body = json.dumps({'count': total, 'stat_name': stat_name})
             elif stat_name.lower() == 'reposts_today':
-                total = uow.repost.get_count(hours=24)
+                total = stats.image_reposts_24h
                 resp.body = json.dumps({'count': total, 'stat_name': stat_name})
             elif stat_name.lower() == 'subreddit_count':
                 resp.body = json.dumps({'count': uow.monitored_sub.get_count(), 'stat_name': stat_name})

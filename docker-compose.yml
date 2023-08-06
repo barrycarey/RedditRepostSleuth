@@ -83,18 +83,6 @@ services:
             - LOG_LEVEL=WARN
         entrypoint: python -u /src/redditrepostsleuth/monitorsvc/monitorsvc.py
 
-    summons_worker:
-        container_name: summons-worker
-        restart: unless-stopped
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/workers/SummonsWorkerDockerFile
-        environment:
-            - LOG_LEVEL=INFO
-            - C_FORCE_ROOT=True
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q summons -c 3
-
     submonitor_worker:
         container_name: submonitor-worker
         restart: unless-stopped
@@ -143,62 +131,4 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.ingesttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image --autoscale=14,5
 
-    misc_task_worker:
-        container_name: misc-task-worker
-        restart: unless-stopped
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/workers/repost/Dockerfile
-        environment:
-            - LOG_LEVEL=INFO
-            - C_FORCE_ROOT=True
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks,redditrepostsleuth.core.celery.maintenance_tasks,redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q config_update_check,monitored_sub_config_update,watch_remove_deleted -c 5
-
-
-    ingest_pushshift_worker:
-        restart: unless-stopped
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/workers/ingest/Dockerfile
-        environment:
-            - LOG_LEVEL=WARN
-            - SLEUTHCONFIG=testconfig.ini
-            - C_FORCE_ROOT=True
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q pushshift -c 4
-
-    pushshift_archive_intake_worker:
-        restart: unless-stopped
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/workers/Dockerfile
-        environment:
-            - LOG_LEVEL=WARN
-            - SLEUTHCONFIG=testconfig.ini
-            - C_FORCE_ROOT=True
-        entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_intake -c 1
-
-    pushshift_archive_ingest:
-        restart: unless-stopped
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/workers/Dockerfile
-        environment:
-            - LOG_LEVEL=WARN
-            - SLEUTHCONFIG=testconfig.ini
-            - C_FORCE_ROOT=True
-        entrypoint: celery -A redditrepostsleuth.common worker -Q pushshift_ingest -c 1
-
-    frontend_api:
-        container_name: frontend-api
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
-        environment:
-            LOG_LEVEL: INFO
-        restart: unless-stopped
-        entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:7777 --workers 10
-        ports:
-            - 7777:7777
 

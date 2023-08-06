@@ -3,34 +3,24 @@ from sqlalchemy import text, func
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
-from redditrepostsleuth.adminsvc.misc_admin_tasks import update_subreddit_access_level, update_ban_list, \
-    remove_expired_bans, update_stat_top_image_repost, send_reports_to_meme_voting, check_meme_template_potential_votes, \
-    queue_config_updates, queue_post_watch_cleanup
+from redditrepostsleuth.adminsvc.misc_admin_tasks import update_ban_list, \
+    remove_expired_bans, update_stat_top_image_repost, send_reports_to_meme_voting, check_meme_template_potential_votes
 from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMonitor
-from redditrepostsleuth.adminsvc.stats_updater import StatsUpdater
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask
+from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask, AdminTask
+from redditrepostsleuth.core.celery.task_logic.scheduled_task_logic import update_proxies, update_top_reposts, \
+    update_top_reposters
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount, StatsTopRepost
 from redditrepostsleuth.core.db.databasemodels import StatsTopReposters
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import configure_logger
-from redditrepostsleuth.core.util.reddithelpers import get_subscribers, is_sub_mod_praw, get_bot_permissions
+from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
     MONITORED_SUB_MOD_REMOVED_SUBJECT
 
 log = configure_logger(
     name='redditrepostsleuth',
 )
-
-
-@celery.task(bind=True, base=RedditTask)
-def update_subreddit_stats_task(self) -> None:
-    log.info('Scheduled Task: Update Subreddit Stats')
-    stats_updater = StatsUpdater(config=self.config)
-    try:
-        stats_updater.run_update()
-    except Exception as e:
-        log.exception('Failed to update subreddit stats')
 
 
 @celery.task(bind=True, base=RedditTask)
@@ -46,7 +36,12 @@ def check_inbox_task(self) -> None:
 @celery.task(bind=True, base=RedditTask)
 def check_new_activations_task(self) -> None:
     log.info('Scheduled Task: Checking For Activations')
-    activation_monitor = NewActivationMonitor(self.uowm, self.reddit, notification_svc=self.notification_svc)
+    activation_monitor = NewActivationMonitor(
+        self.uowm,
+        self.reddit,
+        self.response_handler,
+        notification_svc=self.notification_svc
+    )
     try:
         activation_monitor.check_for_new_invites()
     except Exception as e:
@@ -61,20 +56,6 @@ def check_comments_for_downvotes_task(self) -> None:
         comment_monitor.check_comments()
     except Exception as e:
         log.exception('Failed to update subreddit stats')
-
-
-@celery.task(bind=True, base=RedditTask)
-def update_subreddit_access_level_task(self) -> None:
-    """
-        Go through all monitored subs and update their is_private status
-        :return:
-        """
-    log.info('Starting Job: Post watch cleanup')
-    try:
-        update_subreddit_access_level(self.uowm, self.reddit)
-    except Exception as e:
-        log.exception('Problem in scheduled task')
-
 
 @celery.task(bind=True, base=RedditTask)
 def update_ban_list_task(self) -> None:
@@ -111,6 +92,7 @@ def remove_expired_bans_task(self) -> None:
 
 @celery.task(bind=True, base=RedditTask)
 def update_top_image_reposts_task(self) -> None:
+    # TODO: Remove
     log.info('Starting Job: Remove Expired Bans')
     try:
         update_stat_top_image_repost(self.uowm, self.reddit)
@@ -135,21 +117,22 @@ def check_meme_template_potential_votes_task(self):
     except Exception as e:
         log.exception('Problem in scheduled task')
 
+@celery.task(bind=True, base=AdminTask)
+def check_for_subreddit_config_update_task(self, monitored_sub: MonitoredSub) -> None:
+    self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)
 
 @celery.task(bind=True, base=RedditTask)
 def queue_config_updates_task(self):
     log.info('Starting Job: Config Update Check')
     try:
-        queue_config_updates(self.uowm, self.config)
-    except Exception as e:
-        log.exception('Problem in scheduled task')
+        print('[Scheduled Job] Queue config update check')
 
+        with self.uowm.start() as uow:
+            monitored_subs = uow.monitored_sub.get_all()
+            for monitored_sub in monitored_subs:
+                check_for_subreddit_config_update_task.apply_async((monitored_sub,))
 
-@celery.task(bind=True, base=RedditTask)
-def queue_post_watch_cleanup_task(self):
-    log.info('Starting Job: Post watch cleanup')
-    try:
-        queue_post_watch_cleanup(self.uowm, self.config)
+        print('[Scheduled Job Complete] Queue config update check')
     except Exception as e:
         log.exception('Problem in scheduled task')
 
@@ -159,10 +142,15 @@ def update_daily_stats(self):
     daily_stats = StatsDailyCount()
     try:
         with self.uowm.start() as uow:
-            daily_stats.summons = uow.summons.get_count(hours=24)
-            daily_stats.comments = uow.bot_comment.get_count(hours=24)
-            daily_stats.link_reposts = uow.repost.get_count(hours=24, post_type=3)
-            daily_stats.image_reposts = uow.repost.get_count(hours=24, post_type=2)
+            daily_stats.summons_24 = uow.summons.get_count(hours=24)
+            daily_stats.summons_total = uow.summons.get_count()
+            daily_stats.comments_24h = uow.bot_comment.get_count(hours=24)
+            daily_stats.comments_total = uow.bot_comment.get_count()
+            daily_stats.link_reposts_24h = uow.repost.get_count(hours=24, post_type=3)
+            daily_stats.link_reposts_total = uow.repost.get_count(post_type=3)
+            daily_stats.image_reposts_24h = uow.repost.get_count(hours=24, post_type=2)
+            daily_stats.image_reposts_total = uow.repost.get_count(hours=24, post_type=2)
+            daily_stats.monitored_subreddit_count = uow.monitored_sub.count()
             uow.stat_daily_count.add(daily_stats)
             uow.commit()
             log.info('Updated daily stats')
@@ -170,62 +158,23 @@ def update_daily_stats(self):
         log.exception('')
 
 
-def update_top_reposters(uowm: UnitOfWorkManager):
-    post_types = [2, 3]
-    day_ranges = [1, 7, 14, 30, None]
-    range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 1 ORDER BY c DESC LIMIT 1000"
-    all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 1 ORDER BY c DESC LIMIT 1000"
-    with uowm.start() as uow:
-        for post_type in post_types:
-            for days in day_ranges:
-                log.info('Getting top repostors for post type %s with range %s', post_type, days)
-                if days:
-                    query = range_query
-                else:
-                    query = all_time_query
-                uow.session.execute(text('DELETE FROM stat_top_reposters WHERE post_type_id=:posttype AND day_range=:days'), {'posttype': post_type, 'days': days})
-                uow.commit()
-                result = uow.session.execute(text(query), {'posttype': post_type, 'days': days})
-                for row in result:
-                    stat = StatsTopReposters()
-                    stat.author = row[0]
-                    stat.post_type_id = post_type
-                    stat.day_range = days
-                    stat.repost_count = row[1]
-                    stat.updated_at = func.utc_timestamp()
-                    uow.stat_top_reposter.add(stat)
-                    uow.commit()
-
-def update_top_reposts(uowm: UnitOfWorkManager):
-    post_types = [2, 3]
-    day_ranges = [1, 7, 14, 30, 365, None]
-    range_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY AND post_type_id=:posttype GROUP BY repost_of_id HAVING c > 1 ORDER BY c DESC LIMIT 1000"
-    all_time_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE post_type_id=:posttype GROUP BY repost_of_id HAVING c > 1 ORDER BY c DESC LIMIT 1000"
-    with uowm.start() as uow:
-        for post_type in post_types:
-            for days in day_ranges:
-                log.info('Getting top reposts for post type %s with range %s', post_type, days)
-                if days:
-                    query = range_query
-                else:
-                    query = all_time_query
-                uow.session.execute(text('DELETE FROM stat_top_repost WHERE post_type_id=:posttype AND day_range=:days'), {'posttype': post_type, 'days': days})
-                uow.commit()
-                result = uow.session.execute(text(query), {'posttype': post_type, 'days': days})
-                for row in result:
-                    stat = StatsTopRepost()
-                    stat.post_id = row[0]
-                    stat.post_type_id = post_type
-                    stat.day_range = days
-                    stat.repost_count = row[1]
-                    stat.updated_at = func.utc_timestamp()
-                    stat.nsfw = False
-                    uow.stat_top_repost.add(stat)
-                    uow.commit()
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 def update_top_reposters_task(self):
-    pass
+    try:
+        update_top_reposters(self.uowm)
+    except Exception as e:
+        log.exception('Unknown task error')
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def update_top_reposts_task(self):
+    try:
+        update_top_reposts(self.uowm)
+    except Exception as e:
+        log.exception('Unknown task exception')
+
+
+
 @celery.task(bind=True, base=RedditTask)
 def update_monitored_sub_stats(self, sub_name: str) -> None:
     with self.uowm.start() as uow:
@@ -233,12 +182,13 @@ def update_monitored_sub_stats(self, sub_name: str) -> None:
         if not monitored_sub:
             log.error('Failed to find subreddit %s', sub_name)
             return
-
-        monitored_sub.subscribers = get_subscribers(monitored_sub.name, self.reddit)
-
+        subreddit = self.reddit.subreddit(monitored_sub.name)
+        monitored_sub.subscribers = subreddit.subscribers
+        monitored_sub.is_private = True if subreddit.subreddit_type == 'private' else False
+        monitored_sub.nsfw = True if subreddit.over18 else False
         log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
         monitored_sub.is_mod = is_sub_mod_praw(monitored_sub.name, 'repostsleuthbot', self.reddit)
-        perms = get_bot_permissions(monitored_sub.name, self.reddit) if monitored_sub.is_mod else []
+        perms = get_bot_permissions(subreddit) if monitored_sub.is_mod else []
         monitored_sub.post_permission = True if 'all' in perms or 'posts' in perms else None
         monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
         log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission, monitored_sub.wiki_permission)
@@ -257,7 +207,7 @@ def update_monitored_sub_stats(self, sub_name: str) -> None:
             monitored_sub.failed_admin_check_count += 1
             monitored_sub.active = False
             self.notification_svc.send_notification(
-                f'Failed admin check for r/{monitored_sub.name} increased to {monitored_sub.failed_admin_check_count}.',
+                f'Failed admin check for https://reddit.com/r/{monitored_sub.name} increased to {monitored_sub.failed_admin_check_count}.',
                 subject='Failed Admin Check Increased'
             )
 
@@ -265,9 +215,11 @@ def update_monitored_sub_stats(self, sub_name: str) -> None:
             subreddit = self.reddit.subreddit(monitored_sub.name)
             message = MONITORED_SUB_MOD_REMOVED_CONTENT.format(hours='72', subreddit=monitored_sub.name)
             try:
-                subreddit.message(
+                self.response_handler.send_mod_mail(
+                    subreddit.display_name,
+                    message,
                     MONITORED_SUB_MOD_REMOVED_SUBJECT,
-                    message
+                    source='mod_check'
                 )
             except PRAWException:
                 pass
@@ -279,3 +231,12 @@ def update_monitored_sub_stats(self, sub_name: str) -> None:
             uow.monitored_sub.remove(monitored_sub)
 
         uow.commit()
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def update_proxies_task(self) -> None:
+    log.info('Starting proxy update')
+    try:
+        update_proxies(self.uowm)
+        log.info('Completed proxy update')
+    except Exception as e:
+        log.exception('Failed to update proxies')

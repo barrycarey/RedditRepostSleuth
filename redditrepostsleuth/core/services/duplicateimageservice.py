@@ -191,8 +191,7 @@ class DuplicateImageService:
         search_results.search_times.stop_timer('total_search_time')
         self._log_search_time(search_results, source)
 
-        logged_search = log_search(self.uowm, search_results, source)
-        search_results.logged_search = logged_search
+        log_search(self.uowm, search_results, source)
 
         log.info('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results

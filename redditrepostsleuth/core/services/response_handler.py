@@ -1,11 +1,11 @@
 import logging
 import os
 from time import perf_counter
-from typing import Text, NoReturn, Optional
+from typing import Text, NoReturn, Optional, Union
 
 from praw import Reddit
 from praw.exceptions import APIException, RedditAPIException
-from praw.models import Comment, Redditor, Message
+from praw.models import Comment, Redditor, Message, Subreddit
 from prawcore import Forbidden
 from sqlalchemy import func
 
@@ -46,7 +46,7 @@ class ResponseHandler:
         else:
             self.test_mode = False
 
-    def _reply_to_submission(self, submission_id: str, comment_body) -> Optional[Comment]:
+    def reply_to_submission(self, submission_id: str, comment_body, source: str) -> Optional[Comment]:
         submission = self.reddit.submission(submission_id)
         if not submission:
             log.error('Failed to get submission %s', submission_id)
@@ -68,7 +68,7 @@ class ResponseHandler:
             )
             log.info('Left comment at: https://reddit.com%s', comment.permalink)
             log.debug(comment_body)
-            self._log_response(comment)
+            self._log_response(comment, source)
             return comment
         except APIException as e:
             if e.error_type == 'RATELIMIT':
@@ -84,17 +84,14 @@ class ResponseHandler:
             log.exception('Unknown exception leaving comment on post https://redd.it/%s', submission_id, exc_info=True)
             raise
 
-    def reply_to_submission(self, submission_id: str, comment_body) -> Optional[Comment]:
-        return self._reply_to_submission(submission_id, comment_body)
-
-    def _reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
+    def reply_to_comment(self, comment_id: str, comment_body: str, source: str, subreddit: Text = None) -> Optional[Comment]:
         """
-        Post a given reply to a given comment ID
-        :rtype: Optional[Comment]
-        :param comment_id: ID of comment to reply to
-        :param comment_body: Body of the comment to leave in reply
-        :return:
-        """
+                Post a given reply to a given comment ID
+                :rtype: Optional[Comment]
+                :param comment_id: ID of comment to reply to
+                :param comment_body: Body of the comment to leave in reply
+                :return:
+                """
         if self.test_mode:
             comment_body = REPLY_TEST_MODE + comment_body
 
@@ -115,7 +112,7 @@ class ResponseHandler:
             )
 
             log.info('Left comment at: https://reddit.com%s', reply_comment.permalink)
-            return self._log_response_to_db(reply_comment)
+            return self._log_response_to_db(reply_comment, source)
 
         except Forbidden:
             log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
@@ -127,24 +124,18 @@ class ResponseHandler:
             log.exception('Problem leaving comment', exc_info=True)
             raise
 
-    def reply_to_comment(self, comment_id: Text, comment_body: Text, subreddit: Text = None) -> Optional[Comment]:
-        return self._reply_to_comment(comment_id, comment_body, subreddit=subreddit)
-
-    def _send_private_message(
+    def send_private_message(
             self,
-            user: Redditor,
+            user: Union[Redditor, Subreddit],
             message_body,
-            subject: Text = 'Repost Check',
-            source: Text = None,
-            comment_id: Text = None
+            subject: str,
+            source: str,
+            comment_id: str = None
     ) -> Optional[BotPrivateMessage]:
 
         if not user:
             log.error('No user provided to send private message')
             return
-
-        if self.test_mode:
-            comment_body = REPLY_TEST_MODE + message_body
 
         try:
             start_time = perf_counter()
@@ -161,51 +152,38 @@ class ResponseHandler:
             raise
 
         bot_message = BotPrivateMessage(
-                subject=subject,
-                body=message_body,
-                in_response_to_comment=comment_id,
-                triggered_from=source,
-                recipient=user.name
-            )
+            subject=subject,
+            body=message_body,
+            in_response_to_comment=comment_id,
+            triggered_from=source,
+            recipient=user.name
+        )
         self._save_private_message(bot_message)
         return bot_message
 
-    def send_private_message(
-            self,
-            user: Redditor,
-            message_body,
-            subject: Text = 'Repost Check',
-            source: Text = None,
-            post_id: Text = None,
-            comment_id: Text = None
-    ) -> Optional[BotPrivateMessage]:
-
-        return self._send_private_message(user, message_body, subject, source=source, comment_id=comment_id)
-
-
-    def reply_to_private_message(self, message: Message, body: Text) -> NoReturn:
+    def reply_to_private_message(self, message: Message, body: str) -> NoReturn:
         log.debug('Replying to private message from %s with subject %s', message.dest.name, message.subject)
         try:
-            message.reply(body)
+            if self.live_response:
+                message.reply(body)
             self._save_private_message(
                 BotPrivateMessage(
                     subject=message.subject,
                     body=body,
                     triggered_from='inbox_reply',
-                    recipient=message.dest.name
+                    recipient=message.author.name
                 )
             )
         except RedditAPIException:
             log.exception('Problem replying to private message', exc_info=True)
 
-
-    def send_mod_mail(self, subreddit_name: Text, subject: Text, body: Text, triggered_from: Text = None) -> NoReturn:
+    def send_mod_mail(self, subreddit_name: str, message_body: str, subject: str, source: str = None) -> None:
         """
         Send a modmail message
         :rtype: NoReturn
         :param subreddit_name: name of subreddit
         :param subject: Message Subject
-        :param body: Message Body
+        :param message_body: Message Body
         """
         subreddit = self.reddit.subreddit(subreddit_name)
         if not subreddit:
@@ -213,16 +191,17 @@ class ResponseHandler:
             return
 
         if self.test_mode:
-            body = REPLY_TEST_MODE + body
+            message_body = REPLY_TEST_MODE + message_body
 
         try:
-            subreddit.message(subject, body)
+            if self.live_response:
+                subreddit.message(subject, message_body)
             self._save_private_message(
                 BotPrivateMessage(
                     subject=subject,
-                    body=body,
-                    triggered_from=triggered_from,
-                    recipient=subreddit_name
+                    body=message_body,
+                    triggered_from=source,
+                    recipient=f'r/{subreddit_name}'
                 )
             )
         except RedditAPIException:
@@ -247,27 +226,27 @@ class ResponseHandler:
         api_event = RedditApiEvent(request_type, response_time, remaining_limit, event_type='api_response')
         self.event_logger.save_event(api_event)
 
-    def _log_response(self, comment: Comment):
-        self._log_response_to_db(comment)
-        self._log_response_to_influxdb(comment)
+    def _log_response(self, comment: Comment, source: str):
+        self._log_response_to_db(comment, source)
+        self._log_response_to_influxdb(comment, source)
 
-    def _log_response_to_influxdb(self, comment: Comment):
+    def _log_response_to_influxdb(self, comment: Comment, source: str):
         """
         Take a given response and log it to InfluxDB
         :param response:
         """
         self.event_logger.save_event(
-            ResponseEvent(comment.subreddit.display_name, self.source, event_type='response')
+            ResponseEvent(comment.subreddit.display_name, source, event_type='response')
         )
 
-    def _log_response_to_db(self, comment: Comment) -> Optional[BotComment]:
+    def _log_response_to_db(self, comment: Comment, source: str) -> Optional[BotComment]:
         """
         Take a given response and log it to the database
         :param response:
         """
         with self.uowm.start() as uow:
             bot_comment = BotComment(
-                    source=self.source,
+                    source=source,
                     comment_id=comment.id,
                     comment_body=comment.body,
                     reddit_post_id=comment.submission.id,
@@ -281,7 +260,7 @@ class ResponseHandler:
             except Exception as e:
                 log.exception('Failed to log comment to DB', exc_info=True)
 
-    def _save_banned_sub(self, subreddit: Text) -> NoReturn:
+    def _save_banned_sub(self, subreddit: str) -> None:
         with self.uowm.start() as uow:
             banned = uow.banned_subreddit.get_by_subreddit(subreddit)
             if banned:

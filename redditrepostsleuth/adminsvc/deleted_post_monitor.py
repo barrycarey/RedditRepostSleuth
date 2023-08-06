@@ -20,7 +20,6 @@ log = get_configured_logger(__name__)
 
 
 async def fetch_page(job: BatchedPostRequestJob, session: ClientSession) -> BatchedPostRequestJob:
-    proxy = f'http://{job.proxy.address}'
 
     try:
         async with session.get(job.url, timeout=ClientTimeout(total=10)) as resp:

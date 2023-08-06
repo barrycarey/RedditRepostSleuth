@@ -78,14 +78,14 @@ def log_search(uowm: UnitOfWorkManager, search_results: SearchResults, source: s
             set_repost_search_params_from_search_settings(search_results.search_settings, logged_search)
             uow.repost_search.add(logged_search)
             uow.commit()
+            search_results.logged_search = logged_search
     except Exception as e:
         log.exception('Failed to save repost search')
 
 def get_link_reposts(
-        url: Text,
+        url: str,
         uowm: UnitOfWorkManager,
         search_settings: SearchSettings,
-        source: str,
         post: Post = None,
         get_total: bool = False,
         ) -> LinkSearchResults:
@@ -102,10 +102,7 @@ def get_link_reposts(
         search_results.matches = [SearchMatch(url, post) for post in raw_results]
 
         if get_total:
-            search_results.total_searched = uow.posts.count_by_type('link')
-
-    logged_search = log_search(uowm, search_results, source)
-    search_results.logged_search = logged_search
+            search_results.total_searched = uow.posts.count_by_type(3)
 
     return search_results
 
