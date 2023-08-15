@@ -161,7 +161,7 @@ class SubMonitor:
         else:
             self._mark_post_as_oc(monitored_sub, submission)
 
-        if reply_comment:
+        if reply_comment and self.config.live_responses:
             self._sticky_reply(monitored_sub, reply_comment)
             self._lock_comment(monitored_sub, reply_comment)
         self._create_checked_post(search_results, monitored_sub)

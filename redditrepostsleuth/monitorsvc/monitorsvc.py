@@ -14,7 +14,7 @@ log = get_configured_logger(__name__)
 
 
 def log_queue_size(event_logger):
-    skip_keys = ['unacked_index', 'unacked_mutex', 'unacked']
+    skip_keys = ['unacked_index', 'unacked_mutex', 'unacked', 'prof_token']
     while True:
         try:
             client = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_database, password=config.redis_password)

@@ -48,12 +48,12 @@ def process_image_post(post: Post) -> Post:
         try: # Make sure URL is still valid
             r = requests.head(post.url, allow_redirects=True)
         except ConnectionError as e:
-            log.error('Failed to verify image URL at %s', post.post_id, post.url)
+            log.error('Failed to verify image URL at %s', post.url)
             raise
 
         if r.status_code != 200:
             if r.status_code == 404:
-                log.error('Image no longer exists %s', post.url)
+                log.info('Image no longer exists %s', post.url)
                 raise ImageRemovedException(f'Post {post.post_id} has been deleted')
             elif r.status_code == 403:
                 log.error('Unauthorized (%s): https://redd.it/%s', post.subreddit, post.post_id)

@@ -9,7 +9,7 @@ from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMoni
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask, AdminTask
 from redditrepostsleuth.core.celery.task_logic.scheduled_task_logic import update_proxies, update_top_reposts, \
-    update_top_reposters
+    update_top_reposters, token_checker
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount, StatsTopRepost
 from redditrepostsleuth.core.db.databasemodels import StatsTopReposters
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -240,3 +240,7 @@ def update_proxies_task(self) -> None:
         log.info('Completed proxy update')
     except Exception as e:
         log.exception('Failed to update proxies')
+
+@celery.task
+def update_profile_token_task():
+    token_checker()
