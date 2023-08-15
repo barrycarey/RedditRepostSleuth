@@ -39,7 +39,7 @@ def load_posts(start_date: datetime, end_date: datetime):
         #query = f"SELECT * FROM reddit_post WHERE (created_at BETWEEN '{start_date.year}-{start_date.month}-{start_date.day}' AND '{end_date.year}-{end_date.month}-{end_date.day}')"
 
         # Last real import 1694610999
-        query = f"SELECT * FROM reddit_post WHERE id > {int(os.getenv('START_ID', 1694610999))}"
+        query = f"SELECT * FROM reddit_post WHERE id > {int(os.getenv('START_ID', 1708868667))}"
         cur.execute(query)
         batch = []
         count = 0

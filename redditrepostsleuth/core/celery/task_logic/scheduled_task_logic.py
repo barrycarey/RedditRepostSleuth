@@ -1,14 +1,21 @@
+import html
 import json
 import logging
 import os
+import time
 
+import jwt
+import redis
 import requests
 from sqlalchemy import text, func
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import HttpProxy, StatsTopRepost, StatsTopReposters
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.logging import get_configured_logger
 
 log = logging.getLogger(__name__)
+log = get_configured_logger(__name__)
 def update_proxies(uowm: UnitOfWorkManager) -> None:
     with uowm.start() as uow:
         auth_token = os.getenv('WEBSHARE_AUTH')
@@ -93,3 +100,34 @@ def update_top_reposters(uowm: UnitOfWorkManager):
                     stat.updated_at = func.utc_timestamp()
                     uow.stat_top_reposter.add(stat)
                     uow.commit()
+
+
+def token_checker() -> None:
+    config = Config()
+    redis_client = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_database,
+                         password=config.redis_password, decode_responses=True)
+    token = redis_client.get('prof_token')
+    if token:
+        r = requests.get(f'{config.util_api}/validate-token?token={token}')
+        if r.status_code == 200:
+            response = json.loads(r.text)
+            if response['token_status'] == 'valid':
+                log.info('Existing token is valid')
+                return
+        else:
+            log.error('Problem validating existing token')
+
+    token_res = requests.get(f'{config.util_api}/token')
+    if token_res.status_code != 200:
+        log.error('Failed to get new token')
+        return
+    decoded_token = jwt.decode(json.loads(token_res.text), '', algorithms=["HS256"], options={"verify_signature": False})
+    redis_client.set('prof_token', decoded_token['sub'])
+    log.info('New token set in Redis')
+
+
+if __name__ == '__main__':
+
+    while True:
+        token_checker()
+        time.sleep(240)

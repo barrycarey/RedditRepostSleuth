@@ -25,7 +25,9 @@ task_routes = {
     'redditrepostsleuth.core.celery.admin_tasks.bulk_delete': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.tasks.scheduled_tasks.*': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.admin_tasks.update_proxies_job': {'queue': 'scheduled_tasks'},
-    'redditrepostsleuth.core.celery.response_tasks.process_summons':  {'queue': 'summons'}
+    'redditrepostsleuth.core.celery.response_tasks.process_summons':  {'queue': 'summons'},
+    'redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans': {'queue': 'onlyfans_check'},
+
 
 }
 
@@ -39,14 +41,10 @@ beat_schedule = {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_inbox_task',
         'schedule': 300
     },
-    'check-new-activations': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_new_activations_task',
-        'schedule': 60
-    },
-    'check-downvote-comments': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_comments_for_downvotes_task',
-        'schedule': 43200
-    },
+    # 'check-new-activations': {
+    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_new_activations_task',
+    #     'schedule': 60
+    # },
     'update-subreddit-ban-list': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_ban_list_task',
         'schedule': 86400
@@ -76,6 +74,10 @@ beat_schedule = {
         'schedule': 1800
     },
     'monitored-sub-config-update': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
+        'schedule': 120
+    },
+    'update-profile-token': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
         'schedule': 120
     },

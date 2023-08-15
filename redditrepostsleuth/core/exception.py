@@ -55,3 +55,7 @@ class LoadSubredditException(RepostSleuthException):
 class NoProxyException(RepostSleuthException):
     def __init__(self, message):
         super(NoProxyException, self).__init__(message)
+
+class UtilApiException(RepostSleuthException):
+    def __init__(self, message):
+        super(UtilApiException, self).__init__(message)

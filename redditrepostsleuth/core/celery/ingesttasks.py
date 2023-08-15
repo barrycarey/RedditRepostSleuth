@@ -24,6 +24,10 @@ log = configure_logger(
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post: Post):
+    # TODO: temp fix until I can fix imgur gifs
+    if 'imgur' in post.url and 'gifv' in post.url:
+        return
+
     try:
         update_log_context_data(log, {'post_type': post.post_type, 'post_id': post.post_id,
                                       'subreddit': post.subreddit, 'service': 'Ingest',
@@ -50,14 +54,9 @@ def save_new_post(self, post: Post):
         elif post.post_type_id == 3 and self.config.repost_link_check_on_ingest:
             celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]])
 
-        if monitored_sub:
-            with self.uowm.start() as uow:
-                user_review = uow.user_review.get_by_username(post.author)
-                if not user_review:
-                    user_review = UserReview()
-                    user_review.username = post.author
-                    uow.user_review.add(user_review)
-                    uow.commit()
+
+
+        celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
 
     except Exception as e:
         log.exception('')

@@ -1,18 +1,14 @@
 import asyncio
 import itertools
 import json
-import os
 import time
 from asyncio import ensure_future, gather, run, TimeoutError
 from datetime import datetime
 from typing import List, Optional
 
-import sentry_sdk
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
-from sentry_sdk.integrations.logging import LoggingIntegration
 
-from redditrepostsleuth.core.util.utils import build_reddit_query_string
 from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
@@ -23,13 +19,13 @@ from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, Job
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
     base36decode, generate_next_ids
 from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
+from redditrepostsleuth.core.util.utils import build_reddit_query_string
 
-
-sentry_sdk.init(
-    dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
-    traces_sample_rate=1.0,
-    environment=os.getenv('RUN_ENV', 'dev')
-)
+# sentry_sdk.init(
+#     dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
+#     traces_sample_rate=1.0,
+#     environment=os.getenv('RUN_ENV', 'dev')
+# )
 
 
 log = configure_logger(name='redditrepostsleuth')
@@ -125,6 +121,11 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                     for j in results:
                         if j.status == JobStatus.SUCCESS:
                             res_data = json.loads(j.resp_data)
+                            if not res_data:
+                                continue
+                            if 'data' not in res_data:
+                                log.error('No data in response')
+                                continue
                             for post in res_data['data']['children']:
                                 if post['data']['removed_by_category'] in REMOVAL_REASONS_TO_SKIP:
                                     continue
@@ -170,7 +171,7 @@ async def main() -> None:
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
             try:
                 results = await fetch_page(url, session)
-            except (ServerDisconnectedError, ClientConnectorError, ClientOSError):
+            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError):
                 log.error('Error during fetch')
                 await asyncio.sleep(2)
                 continue

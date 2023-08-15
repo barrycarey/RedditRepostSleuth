@@ -4,14 +4,17 @@ from time import perf_counter
 from typing import NoReturn, Dict, List
 
 import pymysql
-
+from sqlalchemy.exc import IntegrityError
+from requests.exceptions import ConnectionError
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AdminTask, SqlAlchemyTask, PyMysqlTask
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch, Post
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch, Post, UserReview
+from redditrepostsleuth.core.exception import UtilApiException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.util.helpers import batch_check_urls
+from redditrepostsleuth.core.util.onlyfans_handling import check_user
 
 log = configure_logger(
     name='redditrepostsleuth',
@@ -105,3 +108,27 @@ def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, use
     )
 
 
+@celery.task(bind=True, base=SqlAlchemyTask, autoretry_for=(UtilApiException,ConnectionError), retry_kwards={'max_retries': 3})
+def check_user_for_only_fans(self, username: str) -> None:
+    skip_names = ['[deleted]']
+
+    if username in skip_names:
+        log.info('Skipping name %s', username)
+        return
+    try:
+        with self.uowm.start() as uow:
+            existing_user = uow.user_review.get_by_username(username)
+            if existing_user:
+                log.info('Skipping existing user %s', username)
+                return
+            log.info('Checking user %s', username)
+            user = UserReview(username=username)
+            check_user(user)
+            uow.user_review.add(user)
+            uow.commit()
+    except (UtilApiException, ConnectionError) as e:
+        raise e
+    except IntegrityError:
+        pass
+    except Exception as e:
+        log.exception('')
