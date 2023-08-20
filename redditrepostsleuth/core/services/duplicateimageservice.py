@@ -10,6 +10,7 @@ from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
+from redditrepostsleuth.core.celery.admin_tasks import delete_post_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager

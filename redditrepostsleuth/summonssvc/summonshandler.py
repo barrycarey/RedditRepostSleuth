@@ -263,7 +263,7 @@ class SummonsHandler:
             response.message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
 
         if search_results.matches:
-            save_link_repost(post, search_results.matches[0].post, self.uowm, 'summons')
+            save_link_repost(search_results.checked_post, search_results.matches[0].post, self.uowm, 'summons')
 
         self._send_response(response)
 
