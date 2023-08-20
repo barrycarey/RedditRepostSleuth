@@ -2,9 +2,9 @@ FROM python:3.11.3-buster
 MAINTAINER Barry Carey <mcarey66@gmail.com>
 
 VOLUME /src/
-COPY sleuth_config.json /src/
-COPY redditrepostsleuth/ingestsvc/requirements.txt /src/
-COPY redditrepostsleuth/ingestsvc/ingestsvc.py /src/
+ADD sleuth_config_dev.json /src/sleuth_config.json
+ADD redditrepostsleuth/ingestsvc/requirements.txt /src/
+ADD redditrepostsleuth/ingestsvc/ingestsvc.py /src/
 ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src
 

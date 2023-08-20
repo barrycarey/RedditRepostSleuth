@@ -2,7 +2,6 @@ import os
 import time
 from datetime import datetime
 
-import sentry_sdk
 from praw import Reddit
 from praw.exceptions import APIException
 from prawcore import ResponseException, TooManyRequests
@@ -41,11 +40,11 @@ log = get_configured_logger(
     format='%(asctime)s | Summons Monitor |  %(module)s:%(funcName)s:%(lineno)d | [%(process)d][%(threadName)s] | %(levelname)s: %(message)s'
 )
 
-sentry_sdk.init(
-    dsn=os.getenv('SENTRY_DSN', None),
-    traces_sample_rate=1.0,
-    environment=os.getenv('RUN_ENV', 'dev')
-)
+# sentry_sdk.init(
+#     dsn=os.getenv('SENTRY_DSN', None),
+#     traces_sample_rate=1.0,
+#     environment=os.getenv('RUN_ENV', 'dev')
+# )
 
 
 def handle_summons(summons: Summons) -> None:

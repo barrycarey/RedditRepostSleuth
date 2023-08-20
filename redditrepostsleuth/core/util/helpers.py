@@ -6,12 +6,11 @@ from logging import Logger
 from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
-from falcon import Request
 from praw import Reddit
 from redis import Redis
 from redlock import RedLockFactory
-from sqlalchemy.exc import IntegrityError
 from requests.exceptions import ConnectionError
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
@@ -19,6 +18,7 @@ from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
     from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
+    from falcon import Request
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
@@ -269,7 +269,7 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 
     )
 
-def get_image_search_settings_from_request(req: Request, config: Config) -> ImageSearchSettings:
+def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
         req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
         config.default_image_target_annoy_distance,

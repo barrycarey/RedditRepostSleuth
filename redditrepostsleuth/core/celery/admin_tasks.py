@@ -1,19 +1,22 @@
 import os
 from datetime import datetime
 from time import perf_counter
-from typing import NoReturn, Dict, List
+from typing import NoReturn
 
 import pymysql
-from sqlalchemy.exc import IntegrityError
+from celery import Task
 from requests.exceptions import ConnectionError
+from sqlalchemy.exc import IntegrityError
+
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AdminTask, SqlAlchemyTask, PyMysqlTask
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, RepostWatch, Post, UserReview
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Post, UserReview
+from redditrepostsleuth.core.db.db_utils import get_db_engine
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import UtilApiException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
-from redditrepostsleuth.core.util.helpers import batch_check_urls
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.onlyfans_handling import check_user
 
 log = configure_logger(
@@ -23,6 +26,23 @@ log = configure_logger(
 )
 
 config = Config()
+
+class AdminTask(Task):
+    def __init__(self):
+        self.config = Config()
+        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
+        self.event_logger = EventLogging()
+
+class PyMysqlTask(Task):
+    def __init__(self):
+        self.config = Config()
+
+    def get_conn(self):
+        return pymysql.connect(host=self.config.db_host,
+                        user=self.config.db_user,
+                        password=self.config.db_password,
+                        db=self.config.db_name,
+                        cursorclass=pymysql.cursors.SSDictCursor)
 
 def get_conn():
     return pymysql.connect(host=os.getenv('DB_HOST'),
@@ -76,7 +96,7 @@ def bulk_delete(self, post_ids: list[str]):
     finally:
         db_conn.close()
 
-@celery.task(bind=True, base=SqlAlchemyTask)
+@celery.task(bind=True, base=AdminTask)
 def delete_post_task(self, post_id: str) -> None:
     cleanup_post(post_id, self.uowm)
 
@@ -88,7 +108,7 @@ def update_last_delete_check(ids: list[int], uowm) -> None:
         uow.session.bulk_update_mappings(Post, batch)
         uow.commit()
 
-@celery.task(bind=True, base=SqlAlchemyTask)
+@celery.task(bind=True, base=AdminTask)
 def update_last_deleted_check(self, post_ids: list[int]) -> None:
     try:
         log.info('Updating last deleted check timestamp for %s posts', len(post_ids))
@@ -108,7 +128,7 @@ def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, use
     )
 
 
-@celery.task(bind=True, base=SqlAlchemyTask, autoretry_for=(UtilApiException,ConnectionError), retry_kwards={'max_retries': 3})
+@celery.task(bind=True, base=AdminTask, autoretry_for=(UtilApiException,ConnectionError), retry_kwards={'max_retries': 3})
 def check_user_for_only_fans(self, username: str) -> None:
     skip_names = ['[deleted]']
 
