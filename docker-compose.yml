@@ -9,6 +9,8 @@ services:
             dockerfile: docker/IngestSvcDockerfile
         environment:
             - LOG_LEVEL=INFO
+        env_file:
+            - .env
         entrypoint: python -u /src/ingestsvc.py
 
     scheduled_task_worker:
@@ -18,6 +20,8 @@ services:
         build:
             context: .
             dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.tasks.scheduled_tasks

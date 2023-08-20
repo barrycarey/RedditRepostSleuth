@@ -5,7 +5,7 @@ from unittest.mock import Mock
 from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MonitoredSub, PostType
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
@@ -18,7 +18,7 @@ from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, 
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url, \
     build_image_report_link, get_default_link_search_settings, batch_check_urls, reddit_post_id_from_url, is_image_url, \
-    base36encode, base36decode, get_next_ids, build_ingest_query_params
+    base36encode, base36decode, get_next_ids
 
 
 class TestHelpers(TestCase):
@@ -29,25 +29,25 @@ class TestHelpers(TestCase):
         self.assertEqual(len(chunks), 3)
 
     def test_searched_post_str_valid_count(self):
-        post = Post(post_type='image')
+        post = Post(post_type=PostType(name='image'))
         r = searched_post_str(post, 10)
         expected = '**Searched Images:** 10'
         self.assertEqual(expected, r)
 
     def test_searched_post_str_link_valid_count(self):
-        post = Post(post_type='link')
+        post = Post(post_type=PostType(name='link'))
         r = searched_post_str(post, 10)
         expected = '**Searched Links:** 10'
         self.assertEqual(expected, r)
 
     def test_searched_post_str_unknowntype_valid_count(self):
-        post = Post(post_type='video')
+        post = Post(post_type=PostType(name='video'))
         r = searched_post_str(post, 10)
         expected = '**Searched:** 10'
         self.assertEqual(expected, r)
 
     def test_searched_post_str_formatting(self):
-        post = Post(post_type='image')
+        post = Post(post_type=PostType(name='image'))
         r = searched_post_str(post, 1000000)
         expected = '**Searched Images:** 1,000,000'
         self.assertEqual(expected, r)
@@ -348,14 +348,14 @@ class TestHelpers(TestCase):
 
     def _get_image_search_results_no_match(self):
         search_results = ImageSearchResults('test.com', self._get_image_search_settings(),
-                                            checked_post=Post(post_id='abc123', post_type='image', subreddit='test'))
+                                            checked_post=Post(post_id='abc123', post_type=PostType(name='image'), subreddit='test'))
         search_results.search_times = ImageSearchTimes()
         search_results.search_times.total_search_time = 10
         return search_results
 
     def _get_image_search_results_one_match(self):
         search_results = ImageSearchResults('test.com', self._get_image_search_settings(),
-                                            checked_post=Post(post_id='abc123', post_type='image', subreddit='test'))
+                                            checked_post=Post(post_id='abc123', post_type=PostType(name='image'), subreddit='test'))
         search_results.search_times = ImageSearchTimes()
         search_results.search_times.total_search_time = 10
         search_results.matches.append(
@@ -372,7 +372,7 @@ class TestHelpers(TestCase):
 
     def _get_image_search_results_multi_match(self):
         search_results = ImageSearchResults('test.com', self._get_image_search_settings(),
-                                            checked_post=Post(post_id='abc123', post_type='image', subreddit='test'))
+                                            checked_post=Post(post_id='abc123', post_type=PostType(name='image'), subreddit='test'))
         search_results.search_times = ImageSearchTimes()
         search_results.search_times.total_search_time = 10
         search_results.matches.append(
@@ -441,20 +441,15 @@ class TestHelpers(TestCase):
 
     def test_get_next_ids_valid_values(self):
         expected = [
-            't3_pkx41m',
-            't3_pkx41n',
-            't3_pkx41o',
-            't3_pkx41p',
-            't3_pkx41q'
+            'pkx41m',
+            'pkx41n',
+            'pkx41o',
+            'pkx41p',
+            'pkx41q'
 
         ]
-        self.assertListEqual(expected, get_next_ids('pkx41m', 5)[0])
+        self.assertListEqual(expected, get_next_ids('pkx41m', 5))
 
     def test_get_next_ids_invalid_id(self):
         with self.assertRaises(TypeError):
             get_next_ids(1111, 5)
-
-    def test_build_ingest_query_params(self):
-        expected = {'submission_ids': 't3_pmfkfs,t3_pmfkft,t3_pmfkfu,t3_pmfkfv,t3_pmfkfw'}
-        print(build_ingest_query_params('pmfkfs', limit=5))
-        self.assertDictEqual(expected, build_ingest_query_params('pmfkfs', limit=5))

@@ -1,4 +1,6 @@
-from celery import Celery
+import os
+
+from celery import Celery, signals
 from celery.signals import after_setup_logger
 from kombu.serialization import registry
 
@@ -6,17 +8,24 @@ registry.enable('pickle')
 celery = Celery('tasks')
 celery.config_from_object('redditrepostsleuth.core.celery.celeryconfig')
 
-# @signals.celeryd_init.connect
-# def init_sentry(**_kwargs):
-#     sentry_sdk.init(
-#         dsn=os.getenv('SENTRY_DNS', None),
-#         environment=os.getenv('RUN_ENV', 'dev'),
-#         integrations=[
-#             CeleryIntegration(
-#                 monitor_beat_tasks=True,
-#             ),
-#         ],
-#     )
+
+
+if os.getenv('SENTRY_DNS', None):
+    print('Sentry DNS set, loading Sentry module')
+
+    @signals.celeryd_init.connect
+    def init_sentry(**_kwargs):
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=os.getenv('SENTRY_DNS', None),
+            environment=os.getenv('RUN_ENV', 'dev'),
+            integrations=[
+                CeleryIntegration(
+                    monitor_beat_tasks=True,
+                ),
+            ],
+        )
 
 @after_setup_logger.connect
 def setup_loggers(logger, *args, **kwargs):

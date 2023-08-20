@@ -40,11 +40,14 @@ log = get_configured_logger(
     format='%(asctime)s | Summons Monitor |  %(module)s:%(funcName)s:%(lineno)d | [%(process)d][%(threadName)s] | %(levelname)s: %(message)s'
 )
 
-# sentry_sdk.init(
-#     dsn=os.getenv('SENTRY_DSN', None),
-#     traces_sample_rate=1.0,
-#     environment=os.getenv('RUN_ENV', 'dev')
-# )
+if os.getenv('SENTRY_DNS', None):
+    log.info('Sentry DNS set, loading Sentry module')
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DNS'),
+        environment=os.getenv('RUN_ENV', 'dev')
+    )
+
 
 
 def handle_summons(summons: Summons) -> None:

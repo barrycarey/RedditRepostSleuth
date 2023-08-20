@@ -1,6 +1,7 @@
 import asyncio
 import itertools
 import json
+import os
 import time
 from asyncio import ensure_future, gather, run, TimeoutError
 from datetime import datetime
@@ -21,14 +22,18 @@ from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest
 from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
 from redditrepostsleuth.core.util.utils import build_reddit_query_string
 
-# sentry_sdk.init(
-#     dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
-#     traces_sample_rate=1.0,
-#     environment=os.getenv('RUN_ENV', 'dev')
-# )
-
-
 log = configure_logger(name='redditrepostsleuth')
+
+if os.getenv('SENTRY_DNS', None):
+    log.info('Sentry DNS set, loading Sentry module')
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DNS'),
+        environment=os.getenv('RUN_ENV', 'dev')
+    )
+
+
+
 config = Config()
 REMOVAL_REASONS_TO_SKIP = ['deleted', 'author', 'reddit', 'copyright_takedown']
 

@@ -72,17 +72,17 @@ class SubMonitor:
         :param title_keyword_filter: Optional list of keywords to skip if in title
         :return: bool
         """
-        if post.post_type not in self.config.supported_post_types:
+        if post.post_type.name not in self.config.supported_post_types:
             return False
 
-        if post.post_type == 'image' and not check_image:
+        if post.post_type.name == 'image' and not check_image:
             return False
 
-        if post.post_type == 'link' and not check_link:
+        if post.post_type.name == 'link' and not check_link:
             log.info('Skipping link post')
             return False
 
-        if post.crosspost_parent:
+        if post.is_crosspost:
             log.debug('Skipping crosspost')
             return False
 

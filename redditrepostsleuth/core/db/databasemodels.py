@@ -618,6 +618,7 @@ class ImageIndexMap(Base):
     __tablename__ = 'image_index_map'
     __table_args__ = (
         Index('id_map', 'annoy_index_id', 'index_name'),
+        Index('idx_name', 'index_name')
     )
     id = Column(Integer, primary_key=True)
     annoy_index_id = Column(Integer, nullable=False)

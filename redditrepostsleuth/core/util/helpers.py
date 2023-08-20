@@ -81,9 +81,9 @@ def get_post_type(submission: dict) -> str:
 
 def searched_post_str(post: Post, count: int) -> str:
     output = '**Searched'
-    if post.post_type == 'image':
+    if post.post_type.name == 'image':
         output = output + f' Images:** {count:,}'
-    elif post.post_type == 'link':
+    elif post.post_type.name == 'link':
         output = output + f' Links:** {count:,}'
     else:
         output = output + f':** {count:,}'
@@ -471,16 +471,6 @@ def get_newest_praw_post_id(reddit: Reddit) -> str:
     newest_submissions = list(reddit.subreddit('all').new(limit=10))[0]
     return newest_submissions.id
 
-
-def build_ingest_query_params(starting_id: int, limit: int = 100) -> Dict[str, str]:
-    """
-    Take a starting ID and build the dict used as a param for the ingest request
-    :rtype: Dict
-    """
-    ids_to_get = get_next_ids(starting_id, limit)[0]
-    return {
-        'submission_ids': ','.join(ids_to_get)
-    }
 
 def get_post_type_id(post_type: str) -> int:
     if post_type == 'text':
