@@ -97,7 +97,6 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
         self.blacklisted_posts = []
 
 
-
 @celery.task(bind=True, base=SubMonitorTask, serializer='pickle', ignore_results=True, autoretry_for=(LoadSubredditException,), retry_kwards={'max_retries': 3})
 def process_monitored_sub(self, monitored_sub):
 

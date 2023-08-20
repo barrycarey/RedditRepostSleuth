@@ -58,11 +58,11 @@ class SubredditConfigUpdater:
     def check_for_config_update(self, monitored_sub: MonitoredSub, notify_missing_keys=True):
 
         if not monitored_sub.is_mod:
-            log.error('Bot is not a mod on %s, skipping config update', monitored_sub.name)
+            log.warning('Bot is not a mod on %s, skipping config update', monitored_sub.name)
             return
 
         if not monitored_sub.wiki_permission:
-            log.error('Bot does not have wiki permissions on %s', monitored_sub.name)
+            log.warning('Bot does not have wiki permissions on %s', monitored_sub.name)
             return
 
         subreddit = self.reddit.subreddit(monitored_sub.name)

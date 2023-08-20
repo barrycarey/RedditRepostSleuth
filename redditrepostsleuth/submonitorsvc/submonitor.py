@@ -103,7 +103,7 @@ class SubMonitor:
             elif post.post_type.name == 'link':
                 search_results = self._check_for_link_repost(post, monitored_sub)
             else:
-                log.error('Unsupported post type %s', post.post_type.name)
+                log.warning('Unsupported post type %s', post.post_type.name)
                 return
         except NoIndexException:
             log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)

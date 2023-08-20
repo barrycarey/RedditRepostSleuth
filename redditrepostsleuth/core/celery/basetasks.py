@@ -1,16 +1,14 @@
-import pymysql
 from celery import Task
 
-from redditrepostsleuth.core import logging
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.notification.notification_service import NotificationService
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
-from redditrepostsleuth.core.services.eventlogging import EventLogging
 
 
 class EventLoggerTask(Task):
@@ -24,16 +22,6 @@ class SqlAlchemyTask(Task):
         self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging()
 
-class PyMysqlTask(Task):
-    def __init__(self):
-        self.config = Config()
-
-    def get_conn(self):
-        return pymysql.connect(host=self.config.db_host,
-                        user=self.config.db_user,
-                        password=self.config.db_password,
-                        db=self.config.db_name,
-                        cursorclass=pymysql.cursors.SSDictCursor)
 
 class RepostTask(SqlAlchemyTask):
     def __init__(self):

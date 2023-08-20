@@ -3,8 +3,6 @@ import os
 import sys
 from typing import Text
 
-from discord_logging.handler import DiscordHandler
-
 from redditrepostsleuth.core.logfilters import SingleLevelFilter
 
 default_format = '%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [%(process)d][%(threadName)s] - %(levelname)s: %(message)s'
@@ -27,14 +25,6 @@ def get_configured_logger(name: Text = None, format: Text = None) -> logging.Log
     error_handler.setFormatter(formatter)
     error_handler.addFilter(error_filter)
     log.addHandler(error_handler)
-
-    if os.getenv('DISCORD_LOG_HOOK', None):
-        discord_handler = DiscordHandler("Log Bot", os.getenv('DISCORD_LOG_HOOK'), emojis={})
-        discord_filter = SingleLevelFilter(logging.ERROR)
-        discord_handler.setFormatter(formatter)
-        discord_handler.addFilter(discord_filter)
-        log.addHandler(discord_handler)
-
     log.propagate = False
     return log
 

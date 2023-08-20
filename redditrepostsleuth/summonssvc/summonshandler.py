@@ -81,7 +81,7 @@ class SummonsHandler:
             self._send_summons_disable_msg(summons)
 
         if summons.post.post_type.name is None or summons.post.post_type.name not in self.config.supported_post_types:
-            log.error('Post %s: Type %s not supported', f'https://redd.it/{summons.post.post_id}', summons.post.post_type.name)
+            log.warning('Post %s: Type %s not supported', f'https://redd.it/{summons.post.post_id}', summons.post.post_type.name)
             self._send_unsupported_msg(summons)
             return
 
