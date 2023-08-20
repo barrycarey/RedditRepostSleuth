@@ -53,6 +53,7 @@ class BotStats:
     def on_get_top_image_reposts(self, req: Request, resp: Response):
         limit = req.get_param_as_int('limit', default=100, required=False, max_value=2000)
         nsfw = req.get_param_as_bool('nsfw', default=False, required=False)
+        days = req.get_param_as_int('days', default=30, required=False)
         results = []
         with self.uowm.start() as uow:
             result = uow.stat_top_repost.get_all(days=days, nsfw=nsfw)
