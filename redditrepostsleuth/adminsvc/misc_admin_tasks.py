@@ -183,9 +183,3 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                 continue
             uow.commit()
 
-if __name__ == '__main__':
-    config = Config(r'/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config_dev.json')
-    notification_svc = NotificationService(config)
-    reddit = get_reddit_instance(config)
-    uowm = UnitOfWorkManager(get_db_engine(config))
-    update_stat_daily_count(uowm, reddit)
