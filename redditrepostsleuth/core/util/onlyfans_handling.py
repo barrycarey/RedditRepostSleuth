@@ -10,7 +10,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import UserReview
 from redditrepostsleuth.core.exception import UtilApiException
 
-config = Config()
+
 log = logging.getLogger(__name__)
 
 known_domains = [
@@ -57,6 +57,7 @@ def check_page_source_for_flagged_words(page_source: str) -> str:
             return domain
 
 def process_landing_link(url: str) -> Optional[str]:
+    config = Config()
     url_to_fetch = f'{config.util_api}/page-source?url={url}'
     parsed_url = urlparse(url)
     all_urls = flagged_words + known_domains + landing_domains
@@ -64,17 +65,18 @@ def process_landing_link(url: str) -> Optional[str]:
         log.error('---------------------------------------> %s', url)
     response = requests.get(url_to_fetch)
     if response.status_code != 200:
-        log.error('No page text return for %s', url)
+        log.warning('No page text return for %s', url)
         raise UtilApiException(f'Failed to fetch beacons page source.  URL {url}')
 
     return check_page_source_for_flagged_words(response.text)
 
 
 def check_user(user: UserReview) -> UserReview:
+    config = Config()
     url = f'{config.util_api}/profile?username={user.username}'
     response = requests.get(url)
     if response.status_code != 200:
-        log.error('No response from util API')
+        log.warning('No response from util API')
         raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
     profile_links = json.loads(response.text)

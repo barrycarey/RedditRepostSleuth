@@ -25,7 +25,7 @@ log = configure_logger(
     filters=[ContextFilter()]
 )
 
-config = Config()
+
 
 class AdminTask(Task):
     def __init__(self):

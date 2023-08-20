@@ -169,7 +169,7 @@ class ResponseBuilder:
             message += f'\n\n{REPORT_POST_LINK}'
 
         # Checking post type is temp until the site supports everything
-        if search_link and search_results.checked_post.post_type in ['image']:
+        if search_link and search_results.checked_post.post_type.name in ['image']:
             message += f'\n\n{SEARCH_URL}'
 
         if search_settings or stats:

@@ -4,8 +4,9 @@ from typing import Text, Optional
 
 import requests
 from requests.exceptions import ConnectionError
+from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.db.databasemodels import Post, PostHash
+from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import ImageConversionException, InvalidImageUrlException, ImageRemovedException
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -35,7 +36,9 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Optional[Post]:
         try:
             uow.posts.add(post)
             uow.commit()
-            log.debug('Committed post to database')
+        except IntegrityError:
+            log.warning('Post already exists in database. %s', post.post_id)
+            return
         except Exception as e:
             log.exception('Database save failed: %s', str(e), exc_info=False)
             return
