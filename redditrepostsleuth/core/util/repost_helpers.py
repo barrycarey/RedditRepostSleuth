@@ -26,19 +26,6 @@ from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter
 log = logging.getLogger(__name__)
 
 
-def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
-    """
-    Take a raw list if matched images.  Filter one ones meeting the following criteria.
-        Same Author as post being checked - Gets rid of people posting to multiple subreddits
-        If it has a crosspost parent - A cross post isn't considered a respost
-        Same post ID as post being checked - The image list will contain the original image being checked
-    :param raw_list: List of all matches
-    :param post_being_checked: The posts we're checking is a repost
-    """
-    # TODO - Clean this up
-    return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
-
-
 def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> List[RepostMatch]:
     """
     Take a list of reposts and sort them by date
