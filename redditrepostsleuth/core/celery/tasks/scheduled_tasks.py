@@ -1,4 +1,5 @@
 from praw.exceptions import PRAWException
+from prawcore import TooManyRequests
 from sqlalchemy import text, func
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
@@ -25,6 +26,7 @@ log = configure_logger(
 
 @celery.task(bind=True, base=RedditTask)
 def check_inbox_task(self) -> None:
+    print("Checking inbox")
     log.info('Scheduled Task: Check Inbox')
     inbox_monitor = InboxMonitor(self.uowm, self.reddit, self.response_handler)
     try:
@@ -117,7 +119,7 @@ def check_meme_template_potential_votes_task(self):
     except Exception as e:
         log.exception('Problem in scheduled task')
 
-@celery.task(bind=True, base=AdminTask)
+@celery.task(bind=True, base=AdminTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
 def check_for_subreddit_config_update_task(self, monitored_sub: MonitoredSub) -> None:
     self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)
 
@@ -243,4 +245,5 @@ def update_proxies_task(self) -> None:
 
 @celery.task
 def update_profile_token_task():
+    print('Staring token checker')
     token_checker()

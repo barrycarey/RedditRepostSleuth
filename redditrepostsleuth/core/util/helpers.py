@@ -230,19 +230,17 @@ def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
 def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
-def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
+def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: str) -> None:
     with uowm.start() as uow:
         new_repost = Repost(
             post_id=post.post_id,
             repost_of=repost_of.post_id,
             author=post.author,
-            subreddit=post.subreddit, source
-            =source
+            subreddit=post.subreddit,
+            source=source
         )
 
-        post.checked_repost = True
-        uow.posts.update(post)
-        uow.link_repost.add(new_repost)
+        uow.repost.add(new_repost)
         try:
             uow.commit()
         except IntegrityError:

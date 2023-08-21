@@ -124,13 +124,14 @@ class SubMonitor:
             if monitored_sub.comment_on_repost:
                 reply_comment = self._leave_comment(search_results, monitored_sub)
         except RateLimitException:
+            # TODO: This doesn't trigger a retry of the check
             time.sleep(10)
             return
         except RedditAPIException:
             log.exception('Other API exception')
             return
         except TooManyRequests:
-            log.error('TooManyRequests exception')
+            log.warning('Getting rate limited')
             raise
         except APIException as e:
             error_type = None
@@ -304,7 +305,7 @@ class SubMonitor:
         message_body = REPOST_MODMAIL.format(post_id=search_results.checked_post.post_id,
                                              match_count=len(search_results.matches))
         self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body,
-                                            triggered_from='Submonitor')
+                                            source='Submonitor')
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)

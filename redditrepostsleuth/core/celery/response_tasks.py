@@ -64,7 +64,7 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
             log.info('Post %s does exist', post_id)
             return
         if not post.post_type:
-            log.error('Unknown post type for %s - https://redd.it/%s', post.post_id, post.post_id)
+            log.warning('Unknown post type for %s - https://redd.it/%s', post.post_id, post.post_id)
             return
 
     title_keywords = []

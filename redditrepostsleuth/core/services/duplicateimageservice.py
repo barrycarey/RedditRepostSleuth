@@ -221,7 +221,7 @@ class DuplicateImageService:
                 log.error('Failed to get meme hash. ')
                 if post_id:
                     # TODO - This can potentially start deleting images if we drop internet connection
-                    log.info('Sending post % to delete queue', post_id)
+                    log.info('Sending post %s to delete queue', post_id)
                     celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post_id,])
                 return
             except Exception:

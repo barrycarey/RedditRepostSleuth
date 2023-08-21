@@ -52,7 +52,7 @@ class NewActivationMonitor:
             subreddit.mod.accept_invite()
         except APIException as e:
             if e.error_type == 'NO_INVITE_FOUND':
-                log.error('No open invite to %s', msg.subreddit.display_name)
+                log.warning('No open invite to %s', msg.subreddit.display_name)
             return
         except Exception as e:
             log.exception('Failed to accept invite', exc_info=True)

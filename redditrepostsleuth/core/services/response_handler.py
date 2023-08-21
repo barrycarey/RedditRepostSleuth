@@ -6,7 +6,7 @@ from typing import Text, NoReturn, Optional, Union
 from praw import Reddit
 from praw.exceptions import APIException, RedditAPIException
 from praw.models import Comment, Redditor, Message, Subreddit
-from prawcore import Forbidden
+from prawcore import Forbidden, TooManyRequests
 from sqlalchemy import func
 
 from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddit, BotPrivateMessage
@@ -60,7 +60,7 @@ class ResponseHandler:
             if self.live_response:
                 comment = submission.reply(comment_body)
             else:
-                comment = DummyComment(comment_body, submission.subreddit.display_name)
+                comment = DummyComment(comment_body, submission.subreddit.display_name, submission_id)
             self._record_api_event(
                 float(round(perf_counter() - start_time, 2)),
                 'reply_to_submission',
@@ -80,6 +80,8 @@ class ResponseHandler:
             pass
         except Forbidden:
             self._save_banned_sub(submission.subreddit.display_name)
+        except TooManyRequests:
+            raise
         except Exception as e:
             log.exception('Unknown exception leaving comment on post https://redd.it/%s', submission_id, exc_info=True)
             raise

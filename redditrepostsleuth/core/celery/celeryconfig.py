@@ -23,6 +23,7 @@ task_routes = {
     'redditrepostsleuth.core.celery.admin_tasks.delete_post_task': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.admin_tasks.update_last_deleted_check': {'queue': 'post_delete'},
     'redditrepostsleuth.core.celery.admin_tasks.bulk_delete': {'queue': 'post_delete'},
+    'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_for_subreddit_config_update_task': {'queue': 'subreddit_config_updates'},
     'redditrepostsleuth.core.celery.tasks.scheduled_tasks.*': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.admin_tasks.update_proxies_job': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.response_tasks.process_summons':  {'queue': 'summons'},
@@ -41,10 +42,10 @@ beat_schedule = {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_inbox_task',
         'schedule': 300
     },
-    # 'check-new-activations': {
-    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_new_activations_task',
-    #     'schedule': 60
-    # },
+    'check-new-activations': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_new_activations_task',
+        'schedule': 60
+    },
     'update-subreddit-ban-list': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_ban_list_task',
         'schedule': 86400
@@ -73,12 +74,12 @@ beat_schedule = {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_meme_template_potential_votes_task',
         'schedule': 1800
     },
-    'monitored-sub-config-update': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
-        'schedule': 120
-    },
+    # 'monitored-sub-config-update': {
+    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
+    #     'schedule': 1800
+    # },
     'update-profile-token': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',
         'schedule': 120
     },
 
