@@ -59,7 +59,7 @@ class InboxMonitor:
             with self.uowm.start() as uow:
                 post = uow.posts.get_by_post_id(post_id)
                 if not post:
-                    log.error('Failed to find post %s for watch activation', post_id)
+                    log.warning('Failed to find post %s for watch activation', post_id)
                     return
 
                 existing_watch = uow.repostwatch.find_existing_watch(msg.dest.name, post.id)
@@ -123,18 +123,18 @@ class InboxMonitor:
         try:
             return json.loads(body)
         except JSONDecodeError:
-            log.error('Failed to load report data from body.  %s', body)
+            log.warning('Failed to load report data from body.  %s', body)
 
         opening = body.find('{')
         closing = body.find('}')
         if not opening and closing:
-            log.error('Failed to find opening and closing brackets in: %s', body)
+            log.warning('Failed to find opening and closing brackets in: %s', body)
             return
 
         try:
             return json.loads(body[opening:closing + 1])
         except JSONDecodeError:
-            log.error('Failed to load report data using opening and closing brackets')
+            log.warning('Failed to load report data using opening and closing brackets')
 
 if __name__ == '__main__':
     config = Config()

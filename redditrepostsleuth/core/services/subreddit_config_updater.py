@@ -5,7 +5,7 @@ from typing import Text, List, NoReturn
 
 from praw import Reddit
 from praw.models import WikiPage, Subreddit
-from prawcore import NotFound, Forbidden, ResponseException
+from prawcore import NotFound, Forbidden, ResponseException, TooManyRequests
 from sqlalchemy import func
 
 from redditrepostsleuth.core.config import Config
@@ -107,7 +107,7 @@ class SubredditConfigUpdater:
         :param monitored_sub: MonitoredSub obj
         """
         self._create_wiki_page(wiki_page.subreddit)
-        self._create_revision(wiki_page)
+        self._create_revision(wiki_page, monitored_sub)
         self.sync_config_from_wiki(monitored_sub, wiki_page)
         self._set_config_validity(wiki_page.revision_id, True)
         if self._notify_config_created(subreddit):
@@ -139,7 +139,7 @@ class SubredditConfigUpdater:
             log.info('Successfully loaded config from %s wiki', wiki_page.subreddit.display_name)
             return wiki_config
         except JSONDecodeError as e:
-            log.error('Failed to load JSON config for %s.  Error: %s', wiki_page.subreddit.display_name, e)
+            log.warning('Failed to load JSON config for %s.  Error: %s', wiki_page.subreddit.display_name, e)
             raise
 
     def sync_all_configs_from_wiki(self) -> NoReturn:
@@ -228,7 +228,7 @@ class SubredditConfigUpdater:
             return False
         self._update_wiki_page(wiki_page, new_config)
         wiki_page = subreddit.wiki['repost_sleuth_config']  # Force refresh so we can get latest revision ID
-        self._create_revision(wiki_page)
+        self._create_revision(wiki_page, monitored_sub)
         self._set_config_validity(wiki_page.revision_id, True)
         if notify:
             self._notify_successful_load(subreddit)
@@ -322,7 +322,7 @@ class SubredditConfigUpdater:
         :return: None
         """
         log.info('Attempting to load new config for %s', monitored_sub.name)
-        self._create_revision(wiki_page)
+        self._create_revision(wiki_page, monitored_sub)
         try:
             wiki_config = self.get_wiki_config(wiki_page)
         except JSONDecodeError as e:

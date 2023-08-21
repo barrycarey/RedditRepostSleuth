@@ -27,13 +27,13 @@ def check_for_high_match_meme(search_results: ImageSearchResults, uowm: UnitOfWo
             try:
                 meme_hashes = get_image_hashes(search_results.checked_post.url, hash_size=32)
             except Exception as e:
-                log.error('Failed to get meme hash for %s', search_results.checked_post.post_id)
+                log.warning('Failed to get meme hash for %s', search_results.checked_post.post_id)
                 return
 
             try:
 
                 meme_template = MemeTemplate(
-                    dhash_h=search_results.checked_post.dhash_h,
+                    dhash_h=next((post_hash.hash for post_hash in search_results.checked_post.hashes if post_hash.hash_type_id == 1), None),
                     dhash_256=meme_hashes['dhash_h'],
                     post_id=search_results.checked_post.id
                 )

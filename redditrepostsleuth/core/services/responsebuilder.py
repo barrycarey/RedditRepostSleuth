@@ -131,7 +131,7 @@ class ResponseBuilder:
         try:
             return self.build_default_comment(search_results, message, **kwargs)
         except KeyError:
-            log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
+            log.warning('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
             return self.build_default_comment(search_results, **kwargs)
 
     def build_default_comment(
@@ -204,6 +204,9 @@ class ResponseBuilder:
                 msg = monitored_sub.report_msg.format(**values)
                 log.debug('Build custom report message for sub %s: %s', msg, subreddit)
                 return msg
+            except KeyError as e:
+                log.warning('Problem building report message template: %s', str(e))
+                return DEFAULT_REPORT_MSG
             except Exception as e:
                 log.exception('Failed to build report msg', exc_info=True)
                 return DEFAULT_REPORT_MSG

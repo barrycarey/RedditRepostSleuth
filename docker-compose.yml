@@ -35,6 +35,8 @@ services:
             dockerfile: docker/WorkerDockerFile
         volumes:
             - /opt/repostsleuth-celery:/opt/repostsleuth-celery
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
@@ -46,6 +48,8 @@ services:
         build:
             context: .
             dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - QUERY_LIMIT=1000000
@@ -58,6 +62,8 @@ services:
         build:
             context: .
             dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
@@ -72,6 +78,8 @@ services:
         build:
             context: .
             dockerfile: docker/QueueMonitorDockerfile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=WARN
         entrypoint: python -u /src/queue_monitor.py
@@ -83,6 +91,8 @@ services:
         build:
             context: .
             dockerfile: docker/SummonsHandlerDockerfile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=WARN
         entrypoint: python -u /src/summons_monitor.py
@@ -94,6 +104,8 @@ services:
         build:
             context: .
             dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
@@ -106,10 +118,12 @@ services:
         build:
             context: .
             dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -c -n ingest_worker --autoscale=3,16
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=3,16
 
     link_repost_worker:
         container_name: link-repost-worker
@@ -118,10 +132,12 @@ services:
         build:
             context: .
             dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -n repost_link_worker --autoscale=8,5
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_link -n repost_link_worker --autoscale=6,1
 
     image_repost_worker:
         container_name: image-repost-worker
@@ -130,21 +146,39 @@ services:
         build:
             context: .
             dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -n repost_image_worker --autoscale=14,5
 
     only_fans_worker:
-        container_name: only_fans_worker
+        container_name: only-fans-worker
         restart: unless-stopped
         user: '1001'
         build:
             context: .
             dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=12,5
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=8,5
+
+    subreddit_config_update_worker:
+        container_name: subreddit-config-update-worker
+        restart: unless-stopped
+        user: '1001'
+        build:
+            context: .
+            dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
+        environment:
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.scheduled_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q subreddit_config_update_worker -n subreddit_config_updates --autoscale=8,1
 
 

@@ -447,7 +447,7 @@ class MonitoredSubConfigRevision(Base):
     id = Column(Integer, primary_key=True)
     revision_id = Column(String(36), nullable=False, unique=True)
     revised_by = Column(String(25), nullable=False)
-    config = Column(String(1000), nullable=False)
+    config = Column(String(1500), nullable=False)
     config_loaded_at = Column(DateTime)
     is_valid = Column(Boolean, default=False)
     notified = Column(Boolean, default=False)
@@ -630,7 +630,7 @@ class ImageIndexMap(Base):
 class MemeHash(Base):
     __tablename__ = 'meme_hash'
     id = Column(Integer, primary_key=True)
-    post_id = Column(String(6), nullable=False, unique=True)
+    post_id = Column(String(9), nullable=False, unique=True)
     hash = Column(String(256), nullable=False)
 
 class StatsDailyCount(Base):

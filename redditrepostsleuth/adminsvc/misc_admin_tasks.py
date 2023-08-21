@@ -164,7 +164,7 @@ def check_meme_template_potential_votes(uowm: UnitOfWorkManager) -> NoReturn:
                 try:
                     meme_hashes = get_image_hashes(post.searched_url, hash_size=32)
                 except Exception as e:
-                    log.error('Failed to get meme hash for %s', post.post_id)
+                    log.warning('Failed to get meme hash for %s', post.post_id)
                     uow.meme_template_potential.remove(potential_template)
                     uow.commit()
                     continue
