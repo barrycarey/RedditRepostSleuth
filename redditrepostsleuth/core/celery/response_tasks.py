@@ -46,7 +46,7 @@ class SubMonitorTask(Task):
         self.blacklisted_posts = []
 
 
-@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
+@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', autoretry_for=(TooManyRequests, RedditAPIException), retry_kwards={'max_retries': 3})
 def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': post_id,
                                   'subreddit': monitored_sub.name, 'service': 'Subreddit_Monitor'})

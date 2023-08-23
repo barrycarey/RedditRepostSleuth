@@ -35,7 +35,7 @@ class ImageSearchHistory:
                     'checked_post': None,
                     'search': search.to_dict(),
                 }
-                post = uow.posts.get_by_post_id(search.post_id)
+                post = uow.posts.get_by_id(search.post_id)
 
                 results.append({
                     'checked_post': post.to_dict(),

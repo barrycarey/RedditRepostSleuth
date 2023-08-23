@@ -24,6 +24,7 @@ log = configure_logger(
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post: Post):
+
     # TODO: temp fix until I can fix imgur gifs
     if 'imgur' in post.url and 'gifv' in post.url:
         return
@@ -36,7 +37,7 @@ def save_new_post(self, post: Post):
             existing = uow.posts.get_by_post_id(post.post_id)
             if existing:
                 return
-            log.debug('Post %s: Ingesting', post.post_id)
+
             post = pre_process_post(post, self.uowm)
 
             if not post:

@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 import requests
 from sqlalchemy import func
+from requests.exceptions import ConnectionError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import UserReview
@@ -74,9 +75,17 @@ def process_landing_link(url: str) -> Optional[str]:
 def check_user(user: UserReview) -> UserReview:
     config = Config()
     url = f'{config.util_api}/profile?username={user.username}'
-    response = requests.get(url)
+    try:
+        response = requests.get(url)
+    except ConnectionError:
+        log.error('Util API not responding')
+        raise UtilApiException(f'Util API failed to connect')
+    except Exception:
+        log.exception('Unexpected exception from Util API')
+        raise
+
     if response.status_code != 200:
-        log.warning('No response from util API')
+        log.warning('Non 200 return code %s from Util API')
         raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
     profile_links = json.loads(response.text)
