@@ -2,6 +2,7 @@ import html
 import json
 import logging
 import os
+import sys
 import time
 
 import jwt
@@ -11,6 +12,7 @@ from sqlalchemy import text, func
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import HttpProxy, StatsTopRepost, StatsTopReposters
+from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import get_configured_logger
 
@@ -127,7 +129,9 @@ def token_checker() -> None:
 
 
 if __name__ == '__main__':
-
+    uowm = UnitOfWorkManager(get_db_engine(Config()))
+    #update_proxies(uowm)
+    #sys.exit()
     while True:
         token_checker()
         time.sleep(240)

@@ -2,8 +2,9 @@ import json
 import logging
 
 from falcon import Request, Response, HTTPNotFound, HTTPBadRequest
-from matplotlib.text import Text
+
 from praw import Reddit
+from sqlalchemy import text
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
@@ -77,7 +78,7 @@ class BotStats:
     def on_get_banned_subs(self, req: Request, resp: Response):
         results = []
         with self.uowm.start() as uow:
-            for r in uow.session.execute('SELECT * FROM banned_subreddit'):
+            for r in uow.session.execute(text('SELECT * FROM banned_subreddit')):
                 results.append({
                     'subreddit': r[1],
                     'banned_at': r[2].timestamp() if r[2] else None,
@@ -85,7 +86,7 @@ class BotStats:
                 })
             resp.body = json.dumps(results)
 
-    def on_get_subreddit(self, req: Request, resp: Response, subreddit: Text):
+    def on_get_subreddit(self, req: Request, resp: Response, subreddit: str):
         with self.uowm.start() as uow:
             sub = uow.monitored_sub.get_by_sub(subreddit)
             if not sub:
