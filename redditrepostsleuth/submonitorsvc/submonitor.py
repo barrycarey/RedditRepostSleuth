@@ -1,18 +1,13 @@
 import logging
-import time
 from typing import List, Text, NoReturn, Optional
 
-from praw.exceptions import APIException, RedditAPIException
 from praw.models import Submission, Comment, Subreddit
-from prawcore import Forbidden, TooManyRequests
-from redlock import RedLockError
+from prawcore import Forbidden
 
 from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import NoIndexException, RateLimitException, InvalidImageUrlException
-from redditrepostsleuth.core.model.events.sub_monitor_event import SubMonitorEvent
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
@@ -22,10 +17,8 @@ from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
-from redditrepostsleuth.core.util.objectmapping import submission_to_post
 from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results, log_search
-from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 log = logging.getLogger(__name__)
 
@@ -97,55 +90,27 @@ class SubMonitor:
     def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
 
-        try:
-            if post.post_type.name == 'image':
-                search_results = self._check_for_repost(post, monitored_sub)
-            elif post.post_type.name == 'link':
-                search_results = self._check_for_link_repost(post, monitored_sub)
-            else:
-                log.warning('Unsupported post type %s', post.post_type.name)
-                return
-        except NoIndexException:
-            log.error('No search index available.  Cannot check post %s in %s', post.post_id, post.subreddit)
-            return
-        except RedLockError:
-            log.error('New search index is being loaded. Cannot check post %s in %s', post.post_id, post.subreddit)
+        if post.post_type.name == 'image':
+            search_results = self._check_for_repost(post, monitored_sub)
+        elif post.post_type.name == 'link':
+            search_results = self._check_for_link_repost(post, monitored_sub)
+        else:
+            log.warning('Unsupported post type %s', post.post_type.name)
             return
 
-        # TODO: Save repost if there are search results
         if not search_results.matches and not monitored_sub.comment_on_oc:
             log.debug('No matches for post %s and comment OC is disabled',
                      f'https://redd.it/{search_results.checked_post.post_id}')
-            self._create_checked_post(search_results, monitored_sub)
             return search_results
 
         reply_comment = None
-        try:
-            if monitored_sub.comment_on_repost:
-                reply_comment = self._leave_comment(search_results, monitored_sub)
-        except RateLimitException:
-            # TODO: This doesn't trigger a retry of the check
-            time.sleep(10)
-            return
-        except RedditAPIException:
-            log.exception('Other API exception')
-            return
-        except TooManyRequests:
-            log.warning('Getting rate limited')
-            raise
-        except APIException as e:
-            error_type = None
-            if hasattr(e, 'error_type'):
-                error_type = e.error_type
-            log.exception('Praw API Exception.  Error Type=%s', error_type, exc_info=False)
-            return
-        except Exception as e:
-            log.exception('Failed to leave comment on %s in %s', post.post_id, post.subreddit)
-            return
+
+        if monitored_sub.comment_on_repost:
+            reply_comment = self._leave_comment(search_results, monitored_sub)
 
         submission = self.reddit.submission(post.post_id)
         if not submission:
-            log.error('Failed to get submission %s for sub %s.  Cannot perform admin functions', post.post_id, post.subreddit)
+            log.warning('Failed to get submission %s for sub %s.  Cannot perform admin functions', post.post_id, post.subreddit)
             return
 
         if search_results.matches and self.config.live_responses:
@@ -165,9 +130,9 @@ class SubMonitor:
         if reply_comment and self.config.live_responses:
             self._sticky_reply(monitored_sub, reply_comment)
             self._lock_comment(monitored_sub, reply_comment)
-        self._create_checked_post(search_results, monitored_sub)
+        self.create_checked_post(search_results, monitored_sub)
 
-    def _create_checked_post(self, results: SearchResults, monitored_sub: MonitoredSub):
+    def create_checked_post(self, results: SearchResults, monitored_sub: MonitoredSub):
         try:
             with self.uowm.start() as uow:
                 uow.monitored_sub_checked.add(
@@ -200,7 +165,6 @@ class SubMonitor:
 
         return search_results
 
-
     def _check_for_repost(self, post: Post, monitored_sub: MonitoredSub) -> ImageSearchResults:
         """
         Check if provided post is a repost
@@ -221,7 +185,7 @@ class SubMonitor:
         log.debug(search_results)
         return search_results
 
-    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
+    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment) -> None:
         if monitored_sub.sticky_comment:
             try:
                 comment.mod.distinguish(sticky=True)
@@ -231,7 +195,7 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
 
-    def _lock_comment(self, monitored_sub: MonitoredSub, comment: Comment) -> NoReturn:
+    def _lock_comment(self, monitored_sub: MonitoredSub, comment: Comment) -> None:
         if monitored_sub.lock_response_comment:
             log.info('Attempting to lock comment %s on subreddit %s', comment.id, monitored_sub.name)
             try:
@@ -242,7 +206,7 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to lock comment', exc_info=True)
 
-    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission) -> NoReturn:
+    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission) -> None:
         """
         Check if given sub wants posts removed.  Remove is enabled
         @param monitored_sub: Monitored sub
@@ -258,7 +222,7 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
-    def _get_removal_reason_id(self, removal_reason: Text, subreddit: Subreddit) -> Optional[Text]:
+    def _get_removal_reason_id(self, removal_reason: str, subreddit: Subreddit) -> Optional[str]:
         if not removal_reason:
             return None
         for r in subreddit.mod.removal_reasons:
@@ -266,7 +230,7 @@ class SubMonitor:
                 return r.id
         return None
 
-    def _lock_post(self, monitored_sub: MonitoredSub, submission: Submission) -> NoReturn:
+    def _lock_post(self, monitored_sub: MonitoredSub, submission: Submission) -> None:
         if monitored_sub.lock_post:
             try:
                 submission.mod.lock()
@@ -275,7 +239,7 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to lock submission https://redd.it/%s', submission.id, exc_info=True)
 
-    def _mark_post_as_oc(self, monitored_sub: MonitoredSub, submission: Submission):
+    def _mark_post_as_oc(self, monitored_sub: MonitoredSub, submission: Submission) -> None:
         if monitored_sub.mark_as_oc:
             try:
                 submission.mod.set_original_content()
@@ -310,34 +274,4 @@ class SubMonitor:
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
         return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message, 'submonitor')
-
-    def save_unknown_post(self, post_id: str) -> Post:
-        """
-        If we received a request on a post we haven't ingest save it
-        :param submission: Reddit Submission
-        :return:
-        """
-        log.info('Post %s does not exist, attempting to ingest', post_id)
-        submission = self.reddit.submission(post_id)
-        post = None
-        try:
-            post = pre_process_post(submission_to_post(submission), self.uowm, None)
-        except InvalidImageUrlException:
-            log.error('Failed to ingest post %s.  URL appears to be bad', post_id)
-        if not post:
-            log.error('Problem ingesting post.  Either failed to save or it is not an image')
-            return
-
-        return post
-
-
-    def log_run(self, process_time: float, post_count: int, subreddit: str):
-        self.event_logger.save_event(
-            SubMonitorEvent(
-                event_type='subreddit_monitor',
-                process_time=process_time,
-                post_count=post_count,
-                subreddit=subreddit
-            )
-        )
 

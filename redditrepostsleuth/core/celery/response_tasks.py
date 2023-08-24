@@ -4,6 +4,7 @@ from random import randint
 
 import requests
 from celery import Task
+from praw.exceptions import RedditAPIException, APIException
 from prawcore import TooManyRequests
 from requests.exceptions import ConnectionError
 
@@ -12,7 +13,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import LoadSubredditException
+from redditrepostsleuth.core.exception import LoadSubredditException, NoIndexException, RateLimitException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
@@ -46,7 +47,13 @@ class SubMonitorTask(Task):
         self.blacklisted_posts = []
 
 
-@celery.task(bind=True, base=SubMonitorTask, serializer='pickle', autoretry_for=(TooManyRequests, RedditAPIException), retry_kwards={'max_retries': 3})
+@celery.task(
+    bind=True,
+    base=SubMonitorTask,
+    serializer='pickle',
+    autoretry_for=(TooManyRequests, RedditAPIException, NoIndexException, RateLimitException),
+    retry_kwards={'max_retries': 3}
+)
 def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': post_id,
                                   'subreddit': monitored_sub.name, 'service': 'Subreddit_Monitor'})
@@ -81,12 +88,22 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
 
     try:
         results = self.sub_monitor.check_submission(monitored_sub, post)
-    except TooManyRequests:
-        # TODO: This may cause issues since it is thrown after the checked post is created
+    except (TooManyRequests, RateLimitException):
+        log.warning('Currently out of API credits')
+        raise
+    except NoIndexException:
+        log.warning('No indexes available to do post check')
+        raise
+    except (APIException, RedditAPIException):
+        log.exception('Unexpected Reddit API error')
         raise
     except Exception as e:
         log.exception('')
         return
+
+    if results:
+        self.sub_monitor.create_checked_post(results, monitored_sub)
+
     total_check_time = round(time.perf_counter() - start, 5)
 
     if total_check_time > 20:
