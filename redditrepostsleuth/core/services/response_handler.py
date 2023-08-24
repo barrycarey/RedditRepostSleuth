@@ -49,7 +49,7 @@ class ResponseHandler:
     def reply_to_submission(self, submission_id: str, comment_body, source: str) -> Optional[Comment]:
         submission = self.reddit.submission(submission_id)
         if not submission:
-            log.error('Failed to get submission %s', submission_id)
+            log.warning('Failed to get submission %s', submission_id)
             return
 
         if self.test_mode:
@@ -72,12 +72,10 @@ class ResponseHandler:
             return comment
         except APIException as e:
             if e.error_type == 'RATELIMIT':
-                log.exception('Error Type=%s Message=Reddit rate limit', e.error_type, exc_info=False)
+                log.warning('Error Type=%s Message=Reddit rate limit', e.error_type, exc_info=False)
                 raise RateLimitException('Hit rate limit')
             else:
                 raise
-        except RedditAPIException:
-            pass
         except Forbidden:
             self._save_banned_sub(submission.subreddit.display_name)
         except TooManyRequests:
