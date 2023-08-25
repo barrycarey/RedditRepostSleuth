@@ -74,7 +74,7 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
                 job.status = JobStatus.SUCCESS
                 job.resp_data = await resp.text()
             else:
-                log.error('Unexpected request status %s - %s', resp.status, job.url)
+                log.warning('Unexpected request status %s - %s', resp.status, job.url)
                 job.status = JobStatus.ERROR
     except TimeoutError as e:
         log.error('Request Timeout')

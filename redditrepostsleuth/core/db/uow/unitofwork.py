@@ -18,6 +18,7 @@ from redditrepostsleuth.core.db.repository.monitored_sub_config_revision_repo im
 from redditrepostsleuth.core.db.repository.monitoredsubcheckrepository import MonitoredSubCheckRepository
 from redditrepostsleuth.core.db.repository.monitoredsubrepository import MonitoredSubRepository
 from redditrepostsleuth.core.db.repository.post_hash_repo import PostHashRepo
+from redditrepostsleuth.core.db.repository.post_type_repo import PostTypeRepo
 from redditrepostsleuth.core.db.repository.postrepository import PostRepository
 from redditrepostsleuth.core.db.repository.repost_repo import RepostRepo
 from redditrepostsleuth.core.db.repository.repost_search_repo import RepostSearchRepo
@@ -166,3 +167,7 @@ class UnitOfWork:
     @property
     def user_review(self) -> UserReviewRepo:
         return UserReviewRepo(self.session)
+
+    @property
+    def post_type(self) -> PostTypeRepo:
+        return PostTypeRepo(self.session)

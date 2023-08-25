@@ -233,10 +233,11 @@ def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
 def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: str) -> None:
     with uowm.start() as uow:
         new_repost = Repost(
-            post_id=post.post_id,
-            repost_of=repost_of.post_id,
+            post_id=post.id,
+            repost_of_id=repost_of.id,
             author=post.author,
             subreddit=post.subreddit,
+            post_type_id=3,
             source=source
         )
 

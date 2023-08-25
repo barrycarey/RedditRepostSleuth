@@ -94,8 +94,11 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     except NoIndexException:
         log.warning('No indexes available to do post check')
         raise
-    except (APIException, RedditAPIException):
+    except APIException:
         log.exception('Unexpected Reddit API error')
+        raise
+    except RedditAPIException:
+        log.exception('')
         raise
     except Exception as e:
         log.exception('')

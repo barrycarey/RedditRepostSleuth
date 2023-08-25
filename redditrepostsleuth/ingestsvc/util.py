@@ -53,6 +53,8 @@ def process_image_post(post: Post) -> Post:
         except ConnectionError as e:
             log.error('Failed to verify image URL at %s', post.url)
             raise
+        except Exception as e:
+            log.exception()
 
         if r.status_code != 200:
             if r.status_code == 404:

@@ -18,3 +18,4 @@ redlock==1.2.0
 celery[redis]==5.3.1
 pydantic==1.10.9
 sentry-sdk==1.29.2
+cryptography==41.0.3
