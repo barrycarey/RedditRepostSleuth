@@ -78,7 +78,7 @@ def link_repost_check(self, posts, ):
                     )
                     search_results.search_times.stop_timer('total_search_time')
                     log.info('Link Query Time: %s', search_results.search_times.query_time)
-                    log_search(self.uowm, search_results, 'ingest')
+                    log_search(self.uowm, search_results, 'ingest', 'link')
                     if not search_results.matches:
                         log.debug('Not matching links for post %s', post.post_id)
                         uow.commit()

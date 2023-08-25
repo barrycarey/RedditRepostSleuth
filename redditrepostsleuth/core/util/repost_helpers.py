@@ -51,16 +51,20 @@ def get_closest_image_match(
         return sorted_matches[0]
     return get_first_active_match(sorted_matches)
 
-def log_search(uowm: UnitOfWorkManager, search_results: SearchResults, source: str) -> Optional[RepostSearch]:
+
+def log_search(uowm: UnitOfWorkManager, search_results: SearchResults, source: str, post_type_name: str) -> Optional[RepostSearch]:
     try:
         with uowm.start() as uow:
+            post_type = uow.post_type.get_by_name(post_type_name)
+            if not post_type:
+                log.warning('Failed to find post_type %s for search from source %s', post_type, source)
             logged_search = RepostSearch(
-                post_id=search_results.checked_post.id,
+                post_id=search_results.checked_post.id if search_results.checked_post else None,
                 subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
                 source=source,
                 matches_found=len(search_results.matches),
                 search_time=search_results.search_times.total_search_time,
-                post_type_id=search_results.checked_post.post_type_id
+                post_type=post_type
             )
             set_repost_search_params_from_search_settings(search_results.search_settings, logged_search)
             uow.repost_search.add(logged_search)

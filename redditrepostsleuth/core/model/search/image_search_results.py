@@ -36,7 +36,7 @@ class ImageSearchResults(SearchResults):
         """
         if self._target_hash:
             return self._target_hash
-        log.error('No target hash set, attempting to get')
+        log.warning('No target hash set, attempting to get')
         hashes = get_image_hashes(self.checked_url, hash_size=16)
         self._target_hash = hashes['dhash_h']
         return self._target_hash

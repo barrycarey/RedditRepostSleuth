@@ -49,5 +49,5 @@ def check_image(
         log.error('No available index for image repost check.  Trying again later')
         raise HTTPServiceUnavailable('Search API is not available.', 'The search API is not currently available')
     except ImageConversionException as e:
-        log.error('Problem hashing the provided url: %s', str(e))
+        log.warning('Problem hashing the provided url: %s', str(e))
         raise HTTPBadRequest('Invalid URL', 'The provided URL is not a valid image')

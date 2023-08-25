@@ -2,7 +2,7 @@ FROM python:3.11.3-buster
 MAINTAINER Barry Carey <mcarey66@gmail.com>
 
 VOLUME /src/
-COPY sleuth_config.json /src/
+ADD sleuth_config_dev.json /src/sleuth_config.json
 COPY /redditrepostsleuth/repostsleuthsiteapi/requirements.txt /src/
 ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src

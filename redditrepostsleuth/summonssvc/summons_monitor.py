@@ -99,7 +99,7 @@ def monitor_for_mentions(reddit: Reddit, uowm: UnitOfWorkManager):
                     continue
             post = uow.posts.get_by_post_id(comment.submission.id)
             if not post:
-                log.error('Failed to find post %s for summons', comment.submission.id)
+                log.warning('Failed to find post %s for summons', comment.submission.id)
                 continue
 
             summons = Summons(
@@ -114,7 +114,7 @@ def monitor_for_mentions(reddit: Reddit, uowm: UnitOfWorkManager):
             try:
                 uow.commit()
             except DataError as e:
-                log.error('SQLAlchemy Data error saving comment')
+                log.warning('SQLAlchemy Data error saving comment')
                 continue
 
         handle_summons(summons)

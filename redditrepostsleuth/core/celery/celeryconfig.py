@@ -74,10 +74,10 @@ beat_schedule = {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_meme_template_potential_votes_task',
         'schedule': 1800
     },
-    # 'monitored-sub-config-update': {
-    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
-    #     'schedule': 1800
-    # },
+    'monitored-sub-config-update': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
+        'schedule': 3600
+    },
     'update-profile-token': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',
         'schedule': 120

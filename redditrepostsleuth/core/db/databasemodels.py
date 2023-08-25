@@ -46,7 +46,7 @@ class Post(Base):
     searches = relationship('RepostSearch', back_populates='post')
     reports = relationship('UserReport', back_populates='post')
     hashes = relationship('PostHash', back_populates='post')
-    post_type = relationship('PostType')
+    post_type = relationship('PostType', lazy='joined') # lazy has to be set to JSON encoders don't fail for unbound session
 
     def to_dict(self):
         return {
@@ -82,7 +82,7 @@ class PostHash(Base):
     post_created_at = Column(DateTime, nullable=False)  # TODO: change to default timestamp
 
     post = relationship("Post", back_populates='hashes')
-    hash_type = relationship("HashType")
+    hash_type = relationship("HashType", lazy='joined')
 
     def to_dict(self):
         return {
@@ -448,7 +448,7 @@ class MonitoredSubConfigRevision(Base):
     id = Column(Integer, primary_key=True)
     revision_id = Column(String(36), nullable=False, unique=True)
     revised_by = Column(String(25), nullable=False)
-    config = Column(String(1500), nullable=False)
+    config = Column(String(2500), nullable=False)
     config_loaded_at = Column(DateTime)
     is_valid = Column(Boolean, default=False)
     notified = Column(Boolean, default=False)

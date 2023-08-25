@@ -104,7 +104,7 @@ class ResponseHandler:
             if self.live_response:
                 reply_comment = comment.reply(comment_body)
             else:
-                reply_comment = DummyComment(comment_body, comment.submission.subreddit.display_name)
+                reply_comment = DummyComment(comment_body, comment.submission.subreddit.display_name, comment.submission.id)
             self._record_api_event(
                 float(round(perf_counter() - start_time, 2)),
                 'reply_to_comment',

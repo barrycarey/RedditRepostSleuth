@@ -125,7 +125,7 @@ class SummonsHandler:
             else:
                 base_command = self.command_parser.parse_root_command(stripped_comment)
         except InvalidCommandException:
-            log.error('Invalid command. Body=%s', summons.comment_body)
+            log.warning('Invalid command. Body=%s', summons.comment_body)
             base_command = 'repost'
 
         if base_command == 'watch':
@@ -142,7 +142,7 @@ class SummonsHandler:
         log.info('Attempting to delete mention %s', comment_id)
         comment = self.reddit.comment(comment_id)
         if not comment:
-            log.error('Failed to load comment %s', comment_id)
+            log.warning('Failed to load comment %s', comment_id)
             return
         try:
             comment.mod.remove()

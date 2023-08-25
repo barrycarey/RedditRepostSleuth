@@ -1,6 +1,7 @@
 import logging
 from typing import List, Text, NoReturn, Optional
 
+from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 
@@ -106,7 +107,13 @@ class SubMonitor:
         reply_comment = None
 
         if monitored_sub.comment_on_repost:
-            reply_comment = self._leave_comment(search_results, monitored_sub)
+            try:
+                reply_comment = self._leave_comment(search_results, monitored_sub)
+            except APIException as e:
+                if e.error_type == 'THREAD_LOCKED':
+                    log.warning('Thread locked, unable to leave comment')
+                else:
+                    raise
 
         submission = self.reddit.submission(post.post_id)
         if not submission:
@@ -161,7 +168,7 @@ class SubMonitor:
             uitl_api=f'{self.config.util_api}/maintenance/removed'
         )
         search_results.search_times.stop_timer('total_search_time')
-        log_search(self.uowm, search_results, 'submonitor')
+        log_search(self.uowm, search_results, 'submonitor', 'link')
 
         return search_results
 
@@ -268,8 +275,12 @@ class SubMonitor:
             return
         message_body = REPOST_MODMAIL.format(post_id=search_results.checked_post.post_id,
                                              match_count=len(search_results.matches))
-        self.resposne_handler.send_mod_mail(monitored_sub.name, f'Repost found in r/{monitored_sub.name}', message_body,
-                                            source='Submonitor')
+        self.resposne_handler.send_mod_mail(
+            monitored_sub.name,
+            message_body,
+            f'Repost found in r/{monitored_sub.name}',
+            source='Submonitor'
+        )
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:
         message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
