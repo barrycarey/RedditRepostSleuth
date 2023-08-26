@@ -150,7 +150,7 @@ class DuplicateImageService:
                 search_results.meme_hash = self._get_meme_hash(url, post_id=post.post_id if post else None)
                 search_results.search_times.stop_timer('set_meme_hash_time')
                 if not search_results.meme_hash:
-                    log.error('No meme hash, disabled meme filter')
+                    log.warning('No meme hash, disabled meme filter')
                     search_results.meme_template = None
                 else:
                     log.info('Using meme filter %s', search_results.meme_template.id)
@@ -218,11 +218,11 @@ class DuplicateImageService:
                 meme_hashes = get_image_hashes(url, hash_size=self.config.default_meme_filter_hash_size)
                 meme_hash = meme_hashes['dhash_h']
             except ImageConversionException:
-                log.error('Failed to get meme hash. ')
+                log.warning('Failed to get meme hash. ')
                 if post_id:
                     # TODO - This can potentially start deleting images if we drop internet connection
                     log.info('Sending post %s to delete queue', post_id)
-                    celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post_id,])
+                    #celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post_id,])
                 return
             except Exception:
                 log.exception('Failed to get meme hash for %s', url, exc_info=True)

@@ -8,6 +8,7 @@ services:
             context: .
             dockerfile: docker/IngestSvcDockerfile
         environment:
+            - db_user=ingest
             - LOG_LEVEL=INFO
         env_file:
             - .env
@@ -23,6 +24,7 @@ services:
         env_file:
             - .env
         environment:
+            - db_user=scheduled_task
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.tasks.scheduled_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q scheduled_tasks -n scheduled_task_worker --autoscale=15,2
@@ -107,6 +109,7 @@ services:
         env_file:
             - .env
         environment:
+            - db_user=sub_monitor
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=6,2
@@ -121,7 +124,8 @@ services:
         env_file:
             - .env
         environment:
-            - LOG_LEVEL=INFO
+            - db_user=ingest
+            - LOG_LEVEL=ERROR
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=3,16
 
@@ -135,6 +139,7 @@ services:
         env_file:
             - .env
         environment:
+            - db_user=repost_link
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_link -n repost_link_worker --autoscale=6,1
@@ -149,6 +154,7 @@ services:
         env_file:
             - .env
         environment:
+            - db_user=repost_image
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -n repost_image_worker --autoscale=14,5
@@ -179,6 +185,6 @@ services:
         environment:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.scheduled_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q subreddit_config_update_worker -n subreddit_config_updates --autoscale=8,1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q subreddit_config_updates,monitored_sub_config_update -n subreddit_config_update_worker --autoscale=8,1
 
 

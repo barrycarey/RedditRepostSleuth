@@ -123,7 +123,7 @@ class SubMonitor:
         if search_results.matches and self.config.live_responses:
             msg_values = build_msg_values_from_search(search_results, self.uowm,
                                                       target_days_old=monitored_sub.target_days_old)
-            if search_results.checked_post.post_type == 'image':
+            if search_results.checked_post.post_type.name == 'image':
                 msg_values = build_image_msg_values_from_search(search_results, self.uowm, **msg_values)
 
             report_msg = self.response_builder.build_report_msg(monitored_sub.name, msg_values)
@@ -198,7 +198,7 @@ class SubMonitor:
                 comment.mod.distinguish(sticky=True)
                 log.info('Made comment %s sticky', comment.id)
             except Forbidden:
-                log.error('Failed to sticky comment, no permissions')
+                log.warning('Failed to sticky comment, no permissions')
             except Exception as e:
                 log.exception('Failed to sticky comment', exc_info=True)
 

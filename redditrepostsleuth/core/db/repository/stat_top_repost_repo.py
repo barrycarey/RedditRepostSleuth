@@ -9,32 +9,5 @@ class StatTopRepostRepo:
     def add(self, item):
         self.db_session.add(item)
 
-    def get_top_image_all_time(self, limit: int = 100, nsfw: bool = False) -> List[StatsTopRepost]:
-        query = self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type == 2)
-        if not nsfw:
-            query = query.filter(StatsTopRepost.nsfw == False)
-        return query.order_by(StatsTopRepost.total_count.desc()).limit(limit).all()
-
-    def get_top_image_1_day(self, limit: int = 100, nsfw: bool = False) -> List[StatsTopRepost]:
-        query = self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type == 2)
-        if not nsfw:
-            query = query.filter(StatsTopRepost.nsfw == False)
-        return query.order_by(StatsTopRepost.day_count_1.desc()).limit(limit).all()
-
-    def get_top_image_7_day(self, limit: int = 100, nsfw: bool = False) -> List[StatsTopRepost]:
-        query = self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type == 2)
-        if not nsfw:
-            query = query.filter(StatsTopRepost.nsfw == False)
-        return query.order_by(StatsTopRepost.day_count_7.desc()).limit(limit).all()
-
-    def get_top_image_30_day(self, limit: int = 100, nsfw: bool = False) -> List[StatsTopRepost]:
-        query = self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type == 2)
-        if not nsfw:
-            query = query.filter(StatsTopRepost.nsfw == False)
-        return query.order_by(StatsTopRepost.day_count_30.desc()).limit(limit).all()
-
-    def get_top_image_365_day(self, limit: int = 100, nsfw: bool = False) -> List[StatsTopRepost]:
-        query = self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type == 2)
-        if not nsfw:
-            query = query.filter(StatsTopRepost.nsfw == False)
-        return query.order_by(StatsTopRepost.day_count_365.desc()).limit(limit).all()
+    def get_all(self, day_range: int, nsfw: bool = False) -> list[StatsTopRepost]:
+        return self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type_id == 2, StatsTopRepost.day_range == day_range, StatsTopRepost.nsfw == nsfw).all()

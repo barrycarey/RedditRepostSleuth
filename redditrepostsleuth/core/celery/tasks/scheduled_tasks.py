@@ -31,6 +31,8 @@ def check_inbox_task(self) -> None:
     inbox_monitor = InboxMonitor(self.uowm, self.reddit, self.response_handler)
     try:
         inbox_monitor.check_inbox()
+    except TooManyRequests:
+        log.warning('[Check Inbox] Out of API credits')
     except Exception as e:
         log.exception('Failed to update subreddit stats')
 
@@ -46,6 +48,8 @@ def check_new_activations_task(self) -> None:
     )
     try:
         activation_monitor.check_for_new_invites()
+    except TooManyRequests:
+        log.warning('[Activation Check] Out of API credits')
     except Exception as e:
         log.exception('Failed to update subreddit stats')
 
