@@ -55,8 +55,6 @@ def save_new_post(self, post: Post):
         elif post.post_type_id == 3 and self.config.repost_link_check_on_ingest:
             celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]])
 
-
-
         celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
 
     except Exception as e:

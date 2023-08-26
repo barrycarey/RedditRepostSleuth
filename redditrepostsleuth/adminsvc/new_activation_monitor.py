@@ -5,6 +5,7 @@ from typing import Text, NoReturn
 from praw import Reddit
 from praw.exceptions import APIException, RedditAPIException
 from praw.models import Subreddit, Message
+from prawcore import TooManyRequests
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
@@ -54,6 +55,8 @@ class NewActivationMonitor:
             if e.error_type == 'NO_INVITE_FOUND':
                 log.warning('No open invite to %s', msg.subreddit.display_name)
             return
+        except TooManyRequests:
+            raise
         except Exception as e:
             log.exception('Failed to accept invite', exc_info=True)
             return

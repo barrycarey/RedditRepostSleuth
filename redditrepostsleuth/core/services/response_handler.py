@@ -115,7 +115,7 @@ class ResponseHandler:
             return self._log_response_to_db(reply_comment, source)
 
         except Forbidden:
-            log.exception('Forbidden to respond to comment %s', comment_id, exc_info=False)
+            log.warning('Forbidden to respond to comment %s', comment_id, exc_info=False)
             # If we get Forbidden there's a chance we don't have hte comment data to get subreddit
             if subreddit:
                 self._save_banned_sub(subreddit)

@@ -4,6 +4,7 @@ import requests
 from redlock import RedLockError
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from requests.exceptions import ConnectTimeout
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
@@ -52,6 +53,8 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
 
     except (RedLockError, NoIndexException, IngestHighMatchMeme):
         raise
+    except (ConnectTimeout):
+        log.warning('Failed to validate image url at %s', post.url)
     except Exception as e:
         log.exception('')
 

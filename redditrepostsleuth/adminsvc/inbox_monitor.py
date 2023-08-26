@@ -95,7 +95,7 @@ class InboxMonitor:
 
             post = uow.posts.get_by_post_id(report_data['post_id'])
             if not post:
-                log.error('Failed to find post %s for report', report_data['post_id'])
+                log.warning('Failed to find post %s for report', report_data['post_id'])
                 return
 
             report = UserReport(
