@@ -29,7 +29,7 @@ class TestDuplicateImageService(TestCase):
     def test__get_matches_bad_status_code(self):
         with mock.patch('redditrepostsleuth.core.services.duplicateimageservice.requests.get') as mock_get:
             dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock(index_api='http://test.com'))
-            mock_get.return_value = SimpleNamespace(**{'status_code': 500})
+            mock_get.return_value = SimpleNamespace(**{'status_code': 500, 'text': 'result'})
             self.assertRaises(NoIndexException, dup_svc._get_matches, '111', 1, 1)
 
 

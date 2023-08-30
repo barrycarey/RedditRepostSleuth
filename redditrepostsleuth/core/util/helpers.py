@@ -6,24 +6,25 @@ from logging import Logger
 from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
-from falcon import Request
 from praw import Reddit
 from redis import Redis
 from redlock import RedLockFactory
-from sqlalchemy.exc import IntegrityError
 from requests.exceptions import ConnectionError
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
+from redditrepostsleuth.core.model.link_search_settings import TextSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
     from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
+    from falcon import Request
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, LinkRepost, MonitoredSub
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, Repost, RepostSearch
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -42,8 +43,14 @@ def chunk_list(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
-def get_post_type_pushshift(submission: Dict) -> str:
-    # TODO - Go over this whole function
+
+def get_post_type(submission: dict) -> str:
+    """
+    Take a raw submission dict from Reddit API and try to determine the post type.
+    Not all submissions have a post_hint so we have to also try and guess by extension
+    :param submission: Submission object from Reddit API
+    :return:
+    """
     if submission.get('is_self', None):
         return 'text'
 
@@ -57,30 +64,27 @@ def get_post_type_pushshift(submission: Dict) -> str:
             #log.debug('Post URL %s is an image', submission['url'])
             return 'image'
 
-    reddit = get_reddit_instance(config=Config())
-    is_video = submission.get('is_video', None)
-    if is_video:
-        #log.debug('Post %s has is_video value of %s. It is a video', submission['id'], is_video)
-        # Since the push push obj didn't have a post hint, we need to query reddit
-        print('Hitting Reddit API')
-        reddit_sub = reddit.submission(id=submission['id'])
-        post_hint = reddit_sub.__dict__.get('post_hint', None)
-        if post_hint:
-            #log.debug('Returning post hintg %s for post %s', post_hint, reddit_sub.id)
-            return post_hint
-        else:
-            #log.debug('Unable to determine video type for post %s', reddit_sub.id)
-            return 'video'
+    if submission.get('is_video', None):
+        return 'video'
+
+    if submission.get('is_gallery', None):
+        return 'gallery'
 
     # Last ditch to get post_hint
+    # TODO - I think we can remove this to save API hits
+    reddit = get_reddit_instance(config=Config())
     reddit_sub = reddit.submission(id=submission['id'])
-    return reddit_sub.__dict__.get('post_hint', None)
+    post_hint = reddit_sub.__dict__.get('post_hint', None)
+    log.debug('Returning post hint %s for post %s', post_hint, reddit_sub.id)
+
+    return post_hint
+
 
 def searched_post_str(post: Post, count: int) -> str:
     output = '**Searched'
-    if post.post_type == 'image':
+    if post.post_type.name == 'image':
         output = output + f' Images:** {count:,}'
-    elif post.post_type == 'link':
+    elif post.post_type.name == 'link':
         output = output + f' Links:** {count:,}'
     else:
         output = output + f':** {count:,}'
@@ -126,7 +130,7 @@ def build_msg_values_from_search(search_results: 'SearchResults', uowm: UnitOfWo
         'total_searched': f'{search_results.total_searched:,}',
         'total_posts': 0,
         'match_count': len(search_results.matches),
-        'post_type': search_results.checked_post.post_type,
+        'post_type': search_results.checked_post.post_type.name,
         'this_subreddit': search_results.checked_post.subreddit,
         'times_word': 'times' if len(search_results.matches) > 1 else 'time',
         'stats_searched_post_str': searched_post_str(search_results.checked_post, search_results.total_searched),
@@ -227,19 +231,18 @@ def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
 def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
-def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: Text) -> None:
+def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: str) -> None:
     with uowm.start() as uow:
-        new_repost = LinkRepost(
-            post_id=post.post_id,
-            repost_of=repost_of.post_id,
+        new_repost = Repost(
+            post_id=post.id,
+            repost_of_id=repost_of.id,
             author=post.author,
-            subreddit=post.subreddit, source
-            =source
+            subreddit=post.subreddit,
+            post_type_id=3,
+            source=source
         )
 
-        post.checked_repost = True
-        uow.posts.update(post)
-        uow.link_repost.add(new_repost)
+        uow.repost.add(new_repost)
         try:
             uow.commit()
         except IntegrityError:
@@ -266,7 +269,7 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 
     )
 
-def get_image_search_settings_from_request(req: Request, config: Config) -> ImageSearchSettings:
+def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
         req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
         config.default_image_target_annoy_distance,
@@ -304,6 +307,20 @@ def get_default_link_search_settings(config: Config) -> SearchSettings:
         only_older_matches=config.default_link_only_older_matches,
         filter_same_author=config.default_link_same_author_filter,
         filter_crossposts=config.default_link_crosspost_filter
+
+    )
+
+def get_default_text_search_settings(config: Config) -> SearchSettings:
+    return TextSearchSettings(
+        target_title_match=config.default_text_target_title_match,
+        same_sub=config.default_text_same_sub_filter,
+        max_days_old=config.default_text_max_days_old_filter,
+        filter_removed_matches=config.default_text_removed_match_filter,
+        filter_dead_matches=config.default_text_dead_matches_filter,
+        only_older_matches=config.default_text_only_older_matches,
+        filter_same_author=config.default_text_same_author_filter,
+        filter_crossposts=config.default_text_crosspost_filter,
+        target_distance=config.default_text_target_distance
 
     )
 
@@ -448,14 +465,19 @@ def base36decode(base36: str) -> int:
 def get_next_ids(start_id, count):
     start_num = base36decode(start_id)
     ids = []
-    id_num = -1
     for id_num in range(start_num, start_num + count):
-        ids.append("t3_"+base36encode(id_num))
-    return ids, base36encode(id_num)
+        ids.append(base36encode(id_num))
+    return ids
 
-def get_newest_praw_post_id(reddit: Reddit) -> int:
+def generate_next_ids(start_id, count):
+    start_num = base36decode(start_id)
+    for id_num in range(start_num, start_num + count):
+        yield base36encode(id_num)
+
+
+def get_newest_praw_post_id(reddit: Reddit) -> str:
     """
-    Grab the newest post available via Praw and return the decoded post_id
+    Grab the newest post available via Praw and return the ID
 
     This is used to guage if the manual ingest of IDs is falling behind
     :rtype: object
@@ -464,12 +486,25 @@ def get_newest_praw_post_id(reddit: Reddit) -> int:
     return newest_submissions.id
 
 
-def build_ingest_query_params(starting_id: int, limit: int = 100) -> Dict[str, str]:
-    """
-    Take a starting ID and build the dict used as a param for the ingest request
-    :rtype: Dict
-    """
-    ids_to_get = get_next_ids(starting_id, limit)[0]
-    return {
-        'submission_ids': ','.join(ids_to_get)
-    }
+def get_post_type_id(post_type: str) -> int:
+    if post_type == 'text':
+        return 1
+    elif post_type == 'image':
+        return 2
+    elif post_type == 'link':
+        return 3
+    elif post_type == 'hosted:video':
+        return 4
+    elif post_type == 'rich:video':
+        return 5
+    elif post_type == 'gallery':
+        return 6
+    elif post_type == 'video':
+        return 7
+
+
+def set_repost_search_params_from_search_settings(search_settings: SearchSettings, repost_search: RepostSearch) -> RepostSearch:
+    for attr in search_settings.__dict__.keys():
+        if hasattr(RepostSearch, attr):
+            setattr(repost_search, attr, getattr(search_settings, attr))
+    return repost_search

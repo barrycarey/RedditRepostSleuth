@@ -131,6 +131,7 @@ class Config:
             'redis_host',
             'redis_password',
             'redis_port',
+            'redis_database',
             'db_host',
             'db_port',
             'db_user',
@@ -143,10 +144,9 @@ class Config:
             'reddit_password',
             'influx_host',
             'influx_port',
-            'influx_user',
-            'influx_password',
-            'influx_database',
-            'influx_verify_ssl',
+            'influx_token',
+            'influx_org',
+            'influx_bucket',
             'log_level',
             'index_current_max_age',
             'index_current_skip_load_age',
@@ -204,7 +204,17 @@ class Config:
             'default_link_only_older_matches',
             'default_link_same_author_filter',
             'default_link_crosspost_filter',
-            'default_link_max_days_old_filter'
+            'default_link_max_days_old_filter',
+            'default_text_target_title_match',
+            'default_text_same_sub_filter',
+            'default_text_dead_matches_filter',
+            'default_text_removed_match_filter',
+            'default_text_only_older_matches',
+            'default_text_same_author_filter',
+            'default_text_crosspost_filter',
+            'default_text_max_days_old_filter',
+            'default_text_target_distance',
+            'discord_logging_hook'
 
         ]
 

@@ -15,7 +15,7 @@ from requests.exceptions import ConnectionError
 class TestRepostFilters(TestCase):
     def test_cross_post_filter__remove_crosspost(self):
         search_results = get_image_search_results_multi_match()
-        search_results.matches[1].post.crosspost_parent = 'abc'
+        search_results.matches[1].post.is_crosspost = True
         r = list(filter(cross_post_filter, search_results.matches))
         self.assertEqual(2, len(r))
         self.assertEqual(1, r[0].post.id)
@@ -137,7 +137,7 @@ class TestRepostFilters(TestCase):
             ImageSearchMatch(
                 'test.com',
                 1,
-                Post(id=2, author='steve', post_id='123abc', crosspost_parent='abc', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
+                Post(id=2, author='steve', post_id='123abc', is_crosspost=True, created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
                 10,
                 10,
                 32

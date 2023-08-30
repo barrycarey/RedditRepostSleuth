@@ -24,16 +24,13 @@ class PostsEndpoint:
     def on_get_all(self, req: Request, resp: Response):
         result = []
         with self.uowm.start() as uow:
-            image_posts = uow.image_post.get_all(
+            image_posts = uow.posts.get_newest_by_type(
+                2,
                 req.get_param_as_int('limit', default=20, required=False),
                 req.get_param_as_int('offset', default=None, required=False)
             )
-            for ip in image_posts:
-                post = uow.posts.get_by_post_id(ip.post_id)
-                result.append(post.to_dict())
 
-
-            resp.body = json.dumps(result)
+            resp.body = json.dumps([p.to_dict() for p in image_posts])
 
     def on_get_reddit(self, req: Request, resp: Response):
         post = self.reddit.submission(req.get_param('post_id', required=True))

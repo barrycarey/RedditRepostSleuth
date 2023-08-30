@@ -1,17 +1,16 @@
 import json
 import time
 from json import JSONDecodeError
-from typing import Text, List, NoReturn, Dict
+from typing import Text, List, NoReturn
 
 from praw import Reddit
 from praw.models import WikiPage, Subreddit
-from prawcore import NotFound, Forbidden, ResponseException
+from prawcore import NotFound, Forbidden, ResponseException, TooManyRequests
 from sqlalchemy import func
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MonitoredSubConfigRevision
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.notification_service import NotificationService
@@ -19,7 +18,7 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
-from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance, bot_has_permission
+from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
 class SubredditConfigUpdater:
@@ -59,11 +58,11 @@ class SubredditConfigUpdater:
     def check_for_config_update(self, monitored_sub: MonitoredSub, notify_missing_keys=True):
 
         if not monitored_sub.is_mod:
-            log.error('Bot is not a mod on %s, skipping config update', monitored_sub.name)
+            log.warning('Bot is not a mod on %s, skipping config update', monitored_sub.name)
             return
 
         if not monitored_sub.wiki_permission:
-            log.error('Bot does not have wiki permissions on %s', monitored_sub.name)
+            log.warning('Bot does not have wiki permissions on %s', monitored_sub.name)
             return
 
         subreddit = self.reddit.subreddit(monitored_sub.name)
@@ -108,13 +107,13 @@ class SubredditConfigUpdater:
         :param monitored_sub: MonitoredSub obj
         """
         self._create_wiki_page(wiki_page.subreddit)
-        self._create_revision(wiki_page)
+        self._create_revision(wiki_page, monitored_sub)
         self.sync_config_from_wiki(monitored_sub, wiki_page)
         self._set_config_validity(wiki_page.revision_id, True)
         if self._notify_config_created(subreddit):
             self._set_config_notified(wiki_page.revision_id)
 
-    def get_wiki_config(self, wiki_page: WikiPage) -> Dict:
+    def get_wiki_config(self, wiki_page: WikiPage) -> dict:
         """
         Take a config wiki  page and attempt to load and decode the JSON from it
         :rtype: dict
@@ -140,7 +139,7 @@ class SubredditConfigUpdater:
             log.info('Successfully loaded config from %s wiki', wiki_page.subreddit.display_name)
             return wiki_config
         except JSONDecodeError as e:
-            log.error('Failed to load JSON config for %s.  Error: %s', wiki_page.subreddit.display_name, e)
+            log.warning('Failed to load JSON config for %s.  Error: %s', wiki_page.subreddit.display_name, e)
             raise
 
     def sync_all_configs_from_wiki(self) -> NoReturn:
@@ -186,7 +185,7 @@ class SubredditConfigUpdater:
             except Exception as e:
                 pass
 
-    def compare_configs(self, config_one: Dict, config_two: Dict) -> List[Dict]:
+    def compare_configs(self, config_one: dict, config_two: dict) -> List[dict]:
         results = []
         for k,v in config_one.items():
             if k in config_two:
@@ -229,19 +228,19 @@ class SubredditConfigUpdater:
             return False
         self._update_wiki_page(wiki_page, new_config)
         wiki_page = subreddit.wiki['repost_sleuth_config']  # Force refresh so we can get latest revision ID
-        self._create_revision(wiki_page)
+        self._create_revision(wiki_page, monitored_sub)
         self._set_config_validity(wiki_page.revision_id, True)
         if notify:
             self._notify_successful_load(subreddit)
         return True
 
-    def _update_wiki_page(self, wiki_page: WikiPage, new_config: Dict) -> NoReturn:
+    def _update_wiki_page(self, wiki_page: WikiPage, new_config: dict) -> NoReturn:
         log.info('Writing new config to %s', wiki_page.subreddit.display_name)
         log.debug('New Config For %s: %s', wiki_page.subreddit.display_name, new_config)
         # TODO - Check what exceptions can be thrown here
         wiki_page.edit(json.dumps(new_config))
 
-    def _create_wiki_config_from_database(self, monitored_sub: MonitoredSub) -> Dict:
+    def _create_wiki_config_from_database(self, monitored_sub: MonitoredSub) -> dict:
         """
         Create a new dict config from a Monitored sub object
 
@@ -255,7 +254,7 @@ class SubredditConfigUpdater:
 
         return new_config
 
-    def _update_monitored_sub_from_wiki(self, monitored_sub: MonitoredSub, wiki_config: Dict) -> MonitoredSub:
+    def _update_monitored_sub_from_wiki(self, monitored_sub: MonitoredSub, wiki_config: dict) -> MonitoredSub:
         """
         Write the current wiki config to the database config.
 
@@ -273,7 +272,7 @@ class SubredditConfigUpdater:
 
         return monitored_sub
 
-    def _get_missing_config_values(self, config: Dict) -> List[Text]:
+    def _get_missing_config_values(self, config: dict) -> List[Text]:
         """
         Take a config, and check if it's missing any of the exposed keys.
         Exposed keys are set in the bot's config json
@@ -290,8 +289,8 @@ class SubredditConfigUpdater:
     def _create_revision(
             self,
             wiki_page: WikiPage,
+            monitored_sub: MonitoredSub,
             valid: bool = False,
-            config_loaded_at = None
     ) -> MonitoredSubConfigRevision:
         """
         Take a wiki page and create a revision in the database
@@ -303,7 +302,7 @@ class SubredditConfigUpdater:
                 revision_id=wiki_page.revision_id,
                 revised_by=wiki_page.revision_by.name,
                 config=wiki_page.content_md,
-                subreddit=wiki_page.subreddit.display_name,
+                monitored_sub_id=monitored_sub.id,
                 is_valid=valid,
                 config_loaded_at=func.utc_timestamp()
             )
@@ -323,7 +322,7 @@ class SubredditConfigUpdater:
         :return: None
         """
         log.info('Attempting to load new config for %s', monitored_sub.name)
-        self._create_revision(wiki_page)
+        self._create_revision(wiki_page, monitored_sub)
         try:
             wiki_config = self.get_wiki_config(wiki_page)
         except JSONDecodeError as e:
@@ -364,8 +363,11 @@ class SubredditConfigUpdater:
         """
         log.info('Sending config created notification to %s', subreddit.display_name)
         try:
-            subreddit.message('Repost Sleuth Has Loaded Your New Config!',
-                              'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
+            self.response_handler.send_mod_mail(
+                subreddit.display_name,
+                'Repost Sleuth Has Loaded Your New Config!',
+                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.'
+            )
             return True
         except Exception as e:
             log.exception('Failed to send config created notification')
@@ -382,7 +384,7 @@ class SubredditConfigUpdater:
                 'Please validate your changes and try again'
 
         try:
-            subreddit.message('Repost Sleuth Failed To Load Config', body)
+            self.response_handler.send_mod_mail(subreddit.display_name, body, 'Repost Sleuth Failed To Load Config', source='submonitor')
             return True
         except Exception as e:
             log.exception('Failed to send PM to %s', subreddit.display_name)
@@ -396,7 +398,12 @@ class SubredditConfigUpdater:
                 subject=f'Subreddit Config Load Success'
             )
         try:
-            subreddit.message('Repost Sleuth Has Loaded Your New Config!', 'I saw your config changes and have loaded them! \n\n I\'ll start using them now.')
+            self.response_handler.send_mod_mail(
+                subreddit.display_name,
+                'Repost Sleuth Has Loaded Your New Config!',
+                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.',
+                source='submonitor'
+            )
             return True
         except Exception as e:
             log.exception('Failed to send PM to %s', subreddit.display_name)
@@ -410,12 +417,8 @@ class SubredditConfigUpdater:
                 subject='New Config Options Notification Sent'
             )
         try:
-            subreddit.message(
-                'New Repost Sleuth Options Available!',
-                'Your Repost Sleuth config was missing some newly available options.\n\n '
-                f'I\'ve added the following options to your config: {config_keys}\n\n' 
-                'You can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth#wiki_config_value_explanation'
-            )
+            message = f'Your Repost Sleuth config was missing some newly available options.\n\n I\'ve added the following options to your config: {config_keys}\n\nYou can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth#wiki_config_value_explanation'
+            self.response_handler.send_mod_mail(subreddit.display_name, message, 'New Repost Sleuth Options Available!', source='submonitor')
             return True
         except Exception as e:
             log.exception('Failed to send PM to %s', subreddit.display_name)
@@ -451,7 +454,7 @@ if __name__ == '__main__':
     config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     reddit_manager = RedditManager(reddit)
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)

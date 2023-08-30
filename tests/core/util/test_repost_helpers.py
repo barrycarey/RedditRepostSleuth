@@ -51,5 +51,5 @@ class TestHelpers(TestCase):
         search_results.matches[0].hamming_distance = 98
         search_results.matches[1].hamming_distance = 2
         search_results.matches[2].hamming_distance = 25
-        r = get_closest_image_match(search_results.matches, check_url=False)
+        r = get_closest_image_match(search_results.matches, validate_url=False)
         self.assertEqual(2, r.post.id)

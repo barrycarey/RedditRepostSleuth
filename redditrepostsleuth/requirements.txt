@@ -13,7 +13,7 @@ eventlet
 ImageHash
 annoy
 RedLock
-influxdb
+
 requests
 gensim
 ffmpeg-python

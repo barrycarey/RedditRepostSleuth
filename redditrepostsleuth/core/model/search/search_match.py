@@ -6,7 +6,7 @@ from redditrepostsleuth.core.db.databasemodels import Post
 class SearchMatch:
     def __init__(
             self,
-            searched_url: Text,
+            searched_url: str,
             post: Post,
             title_similarity: int = 0,
     ):

@@ -1,4 +1,4 @@
-FROM python:3.8.7-buster
+FROM python:3.11.2-buster
 MAINTAINER Barry Carey <mcarey66@gmail.com>
 
 VOLUME /src/
@@ -11,5 +11,3 @@ ADD redditrepostsleuth /src/redditrepostsleuth/
 WORKDIR /src
 
 RUN pip install -r requirements.txt
-
-CMD ["python", "-u", "/src/redditrepostsleuth/adminsvc/adminsvc.py"]
