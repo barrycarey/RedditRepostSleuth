@@ -1,10 +1,11 @@
 import falcon
-from falcon_cors import CORS
-from falcon_multipart.middleware import MultipartMiddleware
+import sentry_sdk
+from falcon import CORSMiddleware
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
@@ -27,7 +28,7 @@ from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
 config = Config()
 event_logger = EventLogging(config=config)
-uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+uowm = UnitOfWorkManager(get_db_engine(config))
 reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
 dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
@@ -42,10 +43,18 @@ config_updater = SubredditConfigUpdater(
 )
 
 
+sentry_sdk.init(
+    dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
+    traces_sample_rate=1.0,
+)
 
-cors = CORS(allow_origins_list=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
+#cors = CORS(allow_origins_list=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
 
-api = application = falcon.API(middleware=[cors.middleware, MultipartMiddleware()])
+api = application = falcon.App(
+    middleware=[
+        CORSMiddleware(allow_origins=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'])
+    ]
+)
 api.req_options.auto_parse_form_urlencoded = True
 image_store = ImageStore('/opt/imageuploads')
 
@@ -82,4 +91,5 @@ api.add_route('/admin/message-templates/{id:int}', MessageTemplate(uowm))
 api.add_route('/admin/message-templates/all', MessageTemplate(uowm), suffix='all')
 api.add_route('/admin/users', GeneralAdmin(uowm))
 
+api = SentryWsgiMiddleware(api)
 #serve(api, host='localhost', port=8888, threads=15)

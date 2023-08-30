@@ -2,15 +2,16 @@ version: "3.7"
 services:
     api:
         container_name: api
+        user: "1001"
         build:
             context: .
             dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
         environment:
-            LOG_LEVEL: DEBUG
-        restart: always
-        entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10 --access-logfile - --log-file - --log-level DEBUG
+            LOG_LEVEL: INFO
+            db_user: api
+        restart: unless-stopped
+        entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10 --log-level DEBUG
         volumes:
             - /opt/letsencrypt/etc/letsencrypt/live/www.repostsleuth.com:/config/keys
             - /opt/imageuploads:/opt/imageuploads
-        ports:
-            - 8443:8443
+

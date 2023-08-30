@@ -5,18 +5,16 @@ import re
 import uuid
 from typing import Text
 
-from falcon import Response, Request, HTTPBadRequest, HTTPServiceUnavailable, falcon
+from falcon import Response, Request, HTTPBadRequest, HTTPServiceUnavailable
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
+from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
+from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request, reddit_post_id_from_url, \
     is_image_url
-from redditrepostsleuth.core.util.ocr import get_image_text_tesseract
-from redditrepostsleuth.core.util.repost_helpers import get_title_similarity
 from redditrepostsleuth.repostsleuthsiteapi.util.helpers import check_image
 from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
@@ -118,20 +116,20 @@ class ImageSearch:
             post_one = uow.posts.get_by_post_id(req.get_param('post_one', required=True))
             post_two = uow.posts.get_by_post_id(req.get_param('post_two', required=True))
 
-    def on_get_compare_image_text(self, req: Request, resp: Response):
-        image_one_text, _ = get_image_text_tesseract(req.get_param('image_one', required=True), self.config.ocr_east_model)
-        image_two_text, _ = get_image_text_tesseract(req.get_param('image_two', required=True), self.config.ocr_east_model)
-        result = {
-            'google': {
-                'image_one_text': None,
-                'image_two_text': None
-            },
-            'tesseract': {
-                'image_one_text': image_one_text,
-                'image_two_text': image_two_text
-            }
-        }
-        #result['google']['similarity'] = get_title_similarity(result['google']['image_one_text'], result['google']['image_two_text'])
-        result['tesseract']['similarity'] = get_title_similarity(result['tesseract']['image_one_text'],
-                                                              result['tesseract']['image_two_text'])
-        resp.body = json.dumps(result)
+    # def on_get_compare_image_text(self, req: Request, resp: Response):
+    #     image_one_text, _ = get_image_text_tesseract(req.get_param('image_one', required=True), self.config.ocr_east_model)
+    #     image_two_text, _ = get_image_text_tesseract(req.get_param('image_two', required=True), self.config.ocr_east_model)
+    #     result = {
+    #         'google': {
+    #             'image_one_text': None,
+    #             'image_two_text': None
+    #         },
+    #         'tesseract': {
+    #             'image_one_text': image_one_text,
+    #             'image_two_text': image_two_text
+    #         }
+    #     }
+    #     #result['google']['similarity'] = get_title_similarity(result['google']['image_one_text'], result['google']['image_two_text'])
+    #     result['tesseract']['similarity'] = get_title_similarity(result['tesseract']['image_one_text'],
+    #                                                           result['tesseract']['image_two_text'])
+    #     resp.body = json.dumps(result)

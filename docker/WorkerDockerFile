@@ -1,0 +1,10 @@
+FROM python:3.11.3-buster
+MAINTAINER Barry Carey <mcarey66@gmail.com>
+
+VOLUME /src
+COPY worker-requirements.txt /src/requirements.txt
+ADD sleuth_config_dev.json /src/sleuth_config.json
+ADD redditrepostsleuth /src/redditrepostsleuth
+WORKDIR /src
+
+RUN pip install -r requirements.txt

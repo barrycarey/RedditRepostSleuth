@@ -16,8 +16,8 @@ class CeleryTaskEvent(InfluxEvent):
         return event
 
 class CeleryQueueSize(InfluxEvent):
-    def __init__(self, queue_name, size, event_type=None):
-        super().__init__(event_type=event_type)
+    def __init__(self, queue_name, size, event_type=None, env: str = None):
+        super().__init__(event_type=event_type, env=env)
         self.queue_name = queue_name
         self.size = size
 

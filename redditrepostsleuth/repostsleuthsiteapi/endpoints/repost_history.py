@@ -48,26 +48,21 @@ class RepostHistoryEndpoint:
         limit = res.get_param_as_int('limit', required=False, default=20)
         offset = res.get_param_as_int('offset', required=False)
         with self.uowm.start() as uow:
-            reposts = uow.image_repost.get_all(limit=limit, offset=offset)
+            reposts = uow.repost.get_all_by_type(2, limit=limit, offset=offset)
             for rp in reposts:
-                post = uow.posts.get_by_post_id(rp.post_id)
-                repost_of = uow.posts.get_by_post_id(rp.repost_of)
-                search_data = uow.image_search.get_by_id(rp.trace_id)
-                if not post or not repost_of:
-                    continue
                 results.append({
                     'repost_data': rp.to_dict(),
-                    'post': post.to_dict(),
-                    'repost_of': repost_of.to_dict(),
-                    'search_data': search_data.to_dict()})
+                    'post': rp.post.to_dict(),
+                    'repost_of': rp.repost_of.to_dict(),
+                    'search_data': rp.search.to_dict() if rp.search else None})
         resp.body = json.dumps(results)
 
     def on_get_count(self, res: Request, resp: Response):
         subreddit = res.get_param('subreddit', required=False)
         with self.uowm.start() as uow:
             if subreddit:
-                image_count = uow.image_repost.get_count_by_subreddit(subreddit)[0]
-                link_count = uow.link_repost.get_count_by_subreddit(subreddit)[0]
+                image_count = uow.repost.get_count_by_subreddit(subreddit, 2)[0]
+                link_count = uow.repost.get_count_by_subreddit(subreddit, 3)[0]
             else:
                 image_count = uow.image_repost.get_count()
                 link_count = uow.link_repost.get_count()

@@ -2,10 +2,10 @@
 class RepostSleuthException(Exception):
     pass
 
-class ImageConversioinException(RepostSleuthException):
+class ImageConversionException(RepostSleuthException):
 
     def __init__(self, message):
-        super(ImageConversioinException, self).__init__(message)
+        super(ImageConversionException, self).__init__(message)
 
 class FutureDataRepostCheckException(RepostSleuthException):
     def __init__(self, message):
@@ -55,3 +55,11 @@ class LoadSubredditException(RepostSleuthException):
 class NoProxyException(RepostSleuthException):
     def __init__(self, message):
         super(NoProxyException, self).__init__(message)
+
+class UtilApiException(RepostSleuthException):
+    def __init__(self, message):
+        super(UtilApiException, self).__init__(message)
+
+class IndexApiException(RepostSleuthException):
+    def __init__(self, message):
+        super(IndexApiException, self).__init__(message)

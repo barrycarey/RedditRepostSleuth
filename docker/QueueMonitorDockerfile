@@ -1,0 +1,11 @@
+FROM python:3.11.2-buster
+MAINTAINER Barry Carey <mcarey66@gmail.com>
+
+VOLUME /src/
+ADD sleuth_config_dev.json /src/sleuth_config.json
+ADD redditrepostsleuth/queue_monitor_svc/requirements.txt /src
+ADD redditrepostsleuth/queue_monitor_svc/queue_monitor.py /src
+ADD redditrepostsleuth /src/redditrepostsleuth/
+WORKDIR /src
+
+RUN pip install -r requirements.txt

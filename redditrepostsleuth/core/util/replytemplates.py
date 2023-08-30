@@ -77,12 +77,13 @@ IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filt
 GENERIC_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'
 REPORT_RESPONSE = 'Thank you for your report. \n\nIt has been documented and will be reviewed further'
 
-MONITORED_SUB_MOD_REMOVED_SUBJECT = 'RepostSleuthBot Settings Being Removed'
-MONITORED_SUB_MOD_REMOVED_CONTENT = 'We are in the process of cleaning up our database and removing any Subreddits that no longer use the bot. \n\n' \
-                                    'Since ReportSleuthBot is no longer a mod on r/{subreddit} we have scheduled removal to happen in {hours} hours. No action is required on your part\n\n' \
-                                    'We understand the bot is not for everyone.  However, if you have any feedback or feature suggestions we would love to hear them on r/RepostSleuthBot.\n\n' \
-                                    'If it\'s been awhile since you used the bot, we recommend taking a look at the [available admin features](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub).\n\n' \
+MONITORED_SUB_MOD_REMOVED_SUBJECT = 'RepostSleuthBot Scheduled For Removal'
+MONITORED_SUB_MOD_REMOVED_CONTENT = 'We noticed Repost Sleuth is no longer a moderator on r/{subreddit}.  No hard feelings, we know the bot is\'nt for everyone\n\n' \
+                                    'We have deactivated your Subreddit on ourside and scheduled the removal to happen in {hours} hours. No action is required on your part\n\n' \
+                                    'If you have any feedback or feature suggestions we would love to hear them on r/RepostSleuthBot.\n\n' \
                                     'If you decide to use the bot again in the future, simply re-mod it and it will set itself back up.\n\n' \
                                     'If you believe this message is an error, please message u/barrycarey'
 
 REPOST_MODMAIL = 'Post [https://redd.it/{post_id}](https://redd.it/{post_id}) looks like a repost. I found {match_count} matches'
+
+REPLY_TEST_MODE = 'THIS MESSAGE WAS GENERATED FROM A TESTING INSTANCE OF REPOST SLEUTH. RESULTS ARE NOT ACCURATE. A RESPONSE FROM THE PRODUCTION INSTANCE SHOULD ALSO COME \n\n'

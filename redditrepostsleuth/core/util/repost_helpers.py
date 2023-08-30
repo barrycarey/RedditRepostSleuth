@@ -1,13 +1,14 @@
 import logging
+import logging
 import random
 from hashlib import md5
-from typing import List, Text
+from typing import List, Text, Optional
 
 import Levenshtein
 import requests
 from praw import Reddit
 
-from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.db.databasemodels import Post, RepostSearch
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.repostmatch import RepostMatch
@@ -17,24 +18,12 @@ from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.constants import USER_AGENTS
+from redditrepostsleuth.core.util.helpers import set_repost_search_params_from_search_settings
 from redditrepostsleuth.core.util.repost_filters import filter_same_post, filter_same_author, cross_post_filter, \
-    filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_dead_urls_remote, \
-    filter_removed_posts
+    filter_newer_matches, same_sub_filter, filter_title_distance, filter_days_old_matches, filter_removed_posts, \
+    filter_removed_posts_util_api
 
 log = logging.getLogger(__name__)
-
-
-def filter_matching_images(raw_list: List[RepostMatch], post_being_checked: Post) -> List[Post]:
-    """
-    Take a raw list if matched images.  Filter one ones meeting the following criteria.
-        Same Author as post being checked - Gets rid of people posting to multiple subreddits
-        If it has a crosspost parent - A cross post isn't considered a respost
-        Same post ID as post being checked - The image list will contain the original image being checked
-    :param raw_list: List of all matches
-    :param post_being_checked: The posts we're checking is a repost
-    """
-    # TODO - Clean this up
-    return [x for x in raw_list if x.post.crosspost_parent is None and post_being_checked.author != x.author]
 
 
 def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> List[RepostMatch]:
@@ -50,16 +39,42 @@ def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> 
         return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
 
 
-def get_closest_image_match(posts: List[ImageSearchMatch], reverse=True, check_url=True) -> ImageSearchMatch:
+def get_closest_image_match(
+        posts: list[ImageSearchMatch],
+        reverse: bool =True,
+        validate_url: bool =True
+) -> Optional[ImageSearchMatch]:
     if not posts:
-        return None
-    if not check_url:
-        return sorted(posts, key=lambda x: x.hamming_match_percent, reverse=reverse)[0]
+        return
     sorted_matches = sorted(posts, key=lambda x: x.hamming_match_percent, reverse=reverse)
+    if not validate_url:
+        return sorted_matches[0]
     return get_first_active_match(sorted_matches)
 
+
+def log_search(uowm: UnitOfWorkManager, search_results: SearchResults, source: str, post_type_name: str) -> Optional[RepostSearch]:
+    try:
+        with uowm.start() as uow:
+            post_type = uow.post_type.get_by_name(post_type_name)
+            if not post_type:
+                log.warning('Failed to find post_type %s for search from source %s', post_type, source)
+            logged_search = RepostSearch(
+                post_id=search_results.checked_post.id if search_results.checked_post else None,
+                subreddit=search_results.checked_post.subreddit if search_results.checked_post else None,
+                source=source,
+                matches_found=len(search_results.matches),
+                search_time=search_results.search_times.total_search_time,
+                post_type=post_type
+            )
+            set_repost_search_params_from_search_settings(search_results.search_settings, logged_search)
+            uow.repost_search.add(logged_search)
+            uow.commit()
+            search_results.logged_search = logged_search
+    except Exception as e:
+        log.exception('Failed to save repost search')
+
 def get_link_reposts(
-        url: Text,
+        url: str,
         uowm: UnitOfWorkManager,
         search_settings: SearchSettings,
         post: Post = None,
@@ -72,13 +87,13 @@ def get_link_reposts(
         search_results = LinkSearchResults(url, search_settings, checked_post=post, search_times=LinkSearchTimes())
         search_results.search_times.start_timer('query_time')
         search_results.search_times.start_timer('total_search_time')
-        raw_results = uow.posts.find_all_by_url_hash(url_hash)
+        raw_results: list[Post] = uow.posts.find_all_by_url(url_hash)
         search_results.search_times.stop_timer('query_time')
         log.debug('Query time: %s', search_results.search_times.query_time)
-        search_results.matches = [SearchMatch(url, match) for match in raw_results]
+        search_results.matches = [SearchMatch(url, post) for post in raw_results]
 
         if get_total:
-            search_results.total_searched = uow.posts.count_by_type('link')
+            search_results.total_searched = uow.posts.count_by_type(3)
 
     return search_results
 
@@ -121,7 +136,7 @@ def filter_search_results(
 
         if search_results.search_settings.filter_dead_matches and uitl_api:
             search_results.search_times.start_timer('filter_deleted_posts_time')
-            search_results.matches = filter_dead_urls_remote(
+            search_results.matches = filter_removed_posts_util_api(
                 uitl_api,
                 search_results.matches
             )

@@ -8,16 +8,18 @@ import requests
 from praw import Reddit
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
+from redditrepostsleuth.core.model.search.text_search_match import TextSearchMatch
+from redditrepostsleuth.core.util.utils import build_reddit_query_string
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
-from redditrepostsleuth.core.util.constants import USER_AGENTS
-from redditrepostsleuth.core.util.helpers import batch_check_urls
+from redditrepostsleuth.core.util.constants import USER_AGENTS, REDDIT_REMOVAL_REASONS
+from redditrepostsleuth.core.util.helpers import batch_check_urls, chunk_list
 
 log = logging.getLogger(__name__)
 
 
 def cross_post_filter(match: SearchMatch) -> bool:
-    if match.post.crosspost_parent:
+    if match.post.is_crosspost:
         log.debug('Crosspost Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
         return False
     else:
@@ -39,6 +41,15 @@ def annoy_distance_filter(target_annoy_distance: float):
         if match.annoy_distance <= target_annoy_distance:
             return True
         log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance,
+                  f'https://redd.it/{match.post.post_id}')
+        return False
+    return annoy_filter
+
+def text_distance_filter(target_distance: float):
+    def annoy_filter(match: TextSearchMatch):
+        if match.distance >= target_distance:
+            return True
+        log.debug('Text Distance Filter Reject - Target: %s Actual: %s - %s', target_distance, match.distance,
                   f'https://redd.it/{match.post.post_id}')
         return False
     return annoy_filter
@@ -119,7 +130,7 @@ def filter_title_keywords(keywords: List[Text]):
 
 
 def filter_no_dhash(match: ImageSearchMatch):
-    if not match.post.dhash_h:
+    if not match.post.hash_1:
         log.debug('Dhash Filter Reject - %s', f'https://redd.it/{match.post.post_id}')
         return False
     return True
@@ -186,4 +197,31 @@ def filter_dead_urls_remote(util_api: Text, matches: List[SearchMatch]) -> List[
         match = next((x for x in matches if x.post.post_id == url['id']), None)
         if match:
             results.append(match)
+    return results
+
+
+def filter_removed_posts_util_api(util_api: str, matches: List[SearchMatch]) -> List[SearchMatch]:
+    results = []
+    log.debug('Starting filter remove post with %s matches', len(matches))
+    for chunk in chunk_list(matches, 100):
+        url = f'{util_api}/reddit/info?submission_ids={build_reddit_query_string([p.post.post_id for p in chunk])}'
+        try:
+            response = requests.get(url)
+            if response.status_code != 200:
+                log.error('Bad status %s from util API.  Skipping check on this batch', response.status_code)
+                results += chunk
+                continue
+        except Exception as e:
+            log.exception('Problem reaching util API')
+            results += chunk
+            continue
+
+        res_data = json.loads(response.text)
+        for post in res_data['data']['children']:
+            if post['data']['removed_by_category'] in REDDIT_REMOVAL_REASONS:
+                continue
+            match_to_keep = next((m for m in chunk if m.post.post_id == post['data']['id']), None)
+            results.append(match_to_keep)
+
+    log.debug('Finished filter removed posts with %s results', len(results))
     return results
