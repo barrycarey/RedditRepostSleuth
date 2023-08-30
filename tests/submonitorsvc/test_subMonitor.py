@@ -49,4 +49,4 @@ class TestSubMonitor(TestCase):
         monitored_sub = MonitoredSub(name='testsubreddit', send_repost_modmail=True)
         sub_monitor._send_mod_mail(monitored_sub, Mock(matches=[], checked_post=Mock(post_id='abc123')))
         expected_message_body = 'Post [https://redd.it/abc123](https://redd.it/abc123) looks like a repost. I found 5 matches'
-        mock_response_handler.send_mod_mail.assert_called_with('testsubreddit', 'Repost found in r/testsubreddit', expected_message_body, triggered_from='Submonitor')
+        mock_response_handler.send_mod_mail.assert_called_with('testsubreddit', expected_message_body, 'Repost found in r/testsubreddit', source='Submonitor')
