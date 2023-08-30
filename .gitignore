@@ -3,3 +3,5 @@ venv
 .idea
 scratch_files
 __pycache__
+.ann
+.csv

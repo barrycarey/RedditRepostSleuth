@@ -16,7 +16,7 @@ class MemeTemplatePotentialRepo:
     def get_by_id(self, id: int) -> MemeTemplatePotential:
         return self.db_session.query(MemeTemplatePotential).filter(MemeTemplatePotential.id == id).first()
 
-    def get_by_post_id(self, id: Text) -> MemeTemplatePotential:
+    def get_by_post_id(self, id: int) -> MemeTemplatePotential:
         return self.db_session.query(MemeTemplatePotential).filter(MemeTemplatePotential.post_id == id).first()
 
     def get_with_more_votes_than(self, total: int) -> List[MemeTemplatePotential]:

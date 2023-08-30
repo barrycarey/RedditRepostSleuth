@@ -2,7 +2,7 @@
 import sys
 import time
 
-import redis
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 sys.path.append('./')
 from redditrepostsleuth.core.config import Config
@@ -12,7 +12,6 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_redis_client
@@ -22,7 +21,7 @@ from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 if __name__ == '__main__':
     config = Config()
     event_logger = EventLogging(config=config)
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     response_builder = ResponseBuilder(uowm)
     reddit = get_reddit_instance(config)
     reddit_manager = RedditManager(reddit)

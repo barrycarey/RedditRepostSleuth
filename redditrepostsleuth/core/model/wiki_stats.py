@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Text, Dict
+from typing import Text
 
 
 @dataclass
@@ -14,5 +14,5 @@ class WikiStats:
     total_link_posts: int = 0
     total_text_posts: int = 0
     total_video_posts: int = 0
-    top_5_active_users: Dict[Text, int] = None
-    top_5_active_subs: Dict[Text, int] = None
+    top_5_active_users: dict[Text, int] = None
+    top_5_active_subs: dict[Text, int] = None

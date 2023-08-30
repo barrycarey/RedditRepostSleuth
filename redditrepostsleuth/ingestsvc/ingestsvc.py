@@ -1,27 +1,39 @@
 import asyncio
 import itertools
 import json
+import os
 import time
-from asyncio import ensure_future, gather, run
+from asyncio import ensure_future, gather, run, TimeoutError
 from datetime import datetime
 from typing import List, Optional
 
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
 
-from redditrepostsleuth.adminsvc.utils import build_reddit_query_string
-from redditrepostsleuth.core.celery.ingesttasks import save_new_post
+from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, JobStatus
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
     base36decode, generate_next_ids
-from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
+from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
+from redditrepostsleuth.core.util.utils import build_reddit_query_string
 
 log = configure_logger(name='redditrepostsleuth')
+
+if os.getenv('SENTRY_DNS', None):
+    log.info('Sentry DNS set, loading Sentry module')
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DNS'),
+        environment=os.getenv('RUN_ENV', 'dev')
+    )
+
+
+
 config = Config()
 REMOVAL_REASONS_TO_SKIP = ['deleted', 'author', 'reddit', 'copyright_takedown']
 
@@ -39,9 +51,9 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
                 log.debug('Successful fetch')
                 return await resp.text()
             else:
-                log.error('Unexpected request status %s - %s', resp.status, url)
+                log.info('Unexpected request status %s - %s', resp.status, url)
                 return
-        except ClientOSError:
+        except (ClientOSError, TimeoutError):
             log.exception('')
 
 
@@ -62,7 +74,7 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
                 job.status = JobStatus.SUCCESS
                 job.resp_data = await resp.text()
             else:
-                log.error('Unexpected request status %s - %s', resp.status, job.url)
+                log.warning('Unexpected request status %s - %s', resp.status, job.url)
                 job.status = JobStatus.ERROR
     except TimeoutError as e:
         log.error('Request Timeout')
@@ -71,7 +83,7 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
         log.error('Client Connection Error')
         await asyncio.sleep(5)
         job.status = JobStatus.ERROR
-    except ServerDisconnectedError:
+    except ServerDisconnectedError as e:
         log.error('Server disconnect Error')
         job.status = JobStatus.ERROR
     except Exception as e:
@@ -104,7 +116,7 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(chunk)}'
             job = BatchedPostRequestJob(url, chunk, JobStatus.STARTED)
             tasks.append(ensure_future(fetch_page_as_job(job, session)))
-            if len(tasks) >= 25 or len(chunk) == 0:
+            if len(tasks) >= 50 or len(chunk) == 0:
                 posts_to_save = []
                 while tasks:
                     log.info('Gathering %s task results', len(tasks))
@@ -114,6 +126,11 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                     for j in results:
                         if j.status == JobStatus.SUCCESS:
                             res_data = json.loads(j.resp_data)
+                            if not res_data:
+                                continue
+                            if 'data' not in res_data:
+                                log.error('No data in response')
+                                continue
                             for post in res_data['data']['children']:
                                 if post['data']['removed_by_category'] in REMOVAL_REASONS_TO_SKIP:
                                     continue
@@ -123,7 +140,8 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                             tasks.append(ensure_future(fetch_page_as_job(j, session)))
 
                 log.info('Sending %s posts to save queue', len(posts_to_save))
-                queue_posts_for_ingest([pushshift_to_post(submission) for submission in posts_to_save])
+                #queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
+                save_new_posts.apply_async(([reddit_submission_to_post(submission) for submission in posts_to_save],))
             if len(chunk) == 0:
                 break
 
@@ -137,14 +155,14 @@ def queue_posts_for_ingest(posts: List[Post]):
     """
     log.info('Sending batch of %s posts to ingest queue', len(posts))
     for post in posts:
-        save_new_post.apply_async((post,), queue='post_ingest')
+        save_new_post.apply_async((post,))
 
 
 async def main() -> None:
     log.info('Starting post ingestor')
     reddit = get_reddit_instance(config)
     newest_id = get_newest_praw_post_id(reddit)
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
 
     with uowm.start() as uow:
         oldest_post = uow.posts.get_newest_post()
@@ -158,7 +176,7 @@ async def main() -> None:
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
             try:
                 results = await fetch_page(url, session)
-            except (ServerDisconnectedError, ClientConnectorError):
+            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError):
                 log.error('Error during fetch')
                 await asyncio.sleep(2)
                 continue
@@ -187,7 +205,7 @@ async def main() -> None:
                 posts_to_save.append(post['data'])
 
             log.info('Sending %s posts to save queue', len(posts_to_save))
-            queue_posts_for_ingest([pushshift_to_post(submission) for submission in posts_to_save])
+            queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
 
             ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(
                 res_data['data']['children'][0]['data']['created_utc'])

@@ -1,7 +1,7 @@
 import json
 from typing import List, Text, Optional
 
-from redditrepostsleuth.core.db.databasemodels import MemeTemplate, ImageSearch, Post
+from redditrepostsleuth.core.db.databasemodels import MemeTemplate, Post, RepostSearch
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
@@ -21,11 +21,11 @@ class ImageSearchResults(SearchResults):
         self.checked_post = checked_post
         self._target_hash = None
         if self.checked_post:
-            self._target_hash = self.checked_post.dhash_h
+            # TODO: This only ever gives us the first dhash and will cause issues when we support galleries
+            self._target_hash = next((post_hash.hash for post_hash in checked_post.hashes if post_hash.hash_type_id == 1), None)
         self.meme_template: Optional[MemeTemplate] = None
         self.closest_match: Optional[ImageSearchMatch] = None
         self.matches: List[ImageSearchMatch] = []
-        self.logged_search: Optional[ImageSearch] = None
         self.meme_hash: Optional[Text] = None
 
     @property
@@ -36,7 +36,7 @@ class ImageSearchResults(SearchResults):
         """
         if self._target_hash:
             return self._target_hash
-        log.error('No target hash set, attempting to get')
+        log.warning('No target hash set, attempting to get')
         hashes = get_image_hashes(self.checked_url, hash_size=16)
         self._target_hash = hashes['dhash_h']
         return self._target_hash
