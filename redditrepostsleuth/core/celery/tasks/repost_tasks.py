@@ -11,11 +11,14 @@ from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, Repo
 from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result, \
     repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost
-from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
+from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, IndexApiException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
-from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings
+from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings, \
+    get_default_text_search_settings
+from redditrepostsleuth.core.util.repost.text_repost import get_text_post_matches
+from redditrepostsleuth.core.util.repost_filters import text_distance_filter
 from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results, log_search
 
 log = configure_logger(
@@ -61,6 +64,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
 def link_repost_check(self, posts, ):
+    # TODO - We don't need to pass in a list of posts
     try:
         with self.uowm.start() as uow:
             for post in posts:
@@ -114,6 +118,53 @@ def link_repost_check(self, posts, ):
 
     except Exception as e:
         log.exception('')
+
+
+@celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
+def check_for_text_repost_task(self, post: Post) -> None:
+    log.debug('Checking post for repost: %s', post.post_id)
+    try:
+        with self.uowm.start() as uow:
+            search_results = get_text_post_matches(post, uow, get_default_text_search_settings(self.config))
+            search_results.matches = list(filter(text_distance_filter(self.config.default_text_target_distance), search_results.matches))
+            search_results = filter_search_results(
+                search_results,
+                uitl_api=f'{self.config.util_api}/maintenance/removed'
+            )
+            log_search(self.uowm, search_results, 'ingest', 'text')
+            if not search_results.matches:
+                log.debug('Not matching links for post %s', post.post_id)
+                uow.commit()
+                return
+
+            log.info('Found %s matching text posts', len(search_results.matches))
+            log.info('Creating Repost. Post %s is a repost of %s', post.post_id,
+                     search_results.matches[0].post.post_id)
+
+            repost_of = search_results.matches[0].post
+
+            new_repost = Repost(
+                post_id=post.id,
+                repost_of_id=repost_of.id,
+                author=post.author,
+                source='ingest',
+                subreddit=post.subreddit,
+                search_id=search_results.logged_search.id,
+                post_type_id=post.post_type_id
+            )
+            uow.repost.add(new_repost)
+
+            try:
+                uow.commit()
+            except IntegrityError as e:
+                uow.rollback()
+                log.exception('Error saving text repost', exc_info=False)
+
+    except IndexApiException as e:
+        log.warning(e, exc_info=False)
+        raise
+    except Exception as e:
+        log.exception('Unknown exception during test repost check')
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)

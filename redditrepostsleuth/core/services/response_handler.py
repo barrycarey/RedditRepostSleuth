@@ -12,7 +12,7 @@ from sqlalchemy import func
 from redditrepostsleuth.core.db.databasemodels import BotComment, BannedSubreddit, BotPrivateMessage
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import RateLimitException
-from redditrepostsleuth.core.model.DummyComment import DummyComment
+from redditrepostsleuth.core.model.dummy_comment import DummyComment
 from redditrepostsleuth.core.model.events.reddit_api_event import RedditApiEvent
 from redditrepostsleuth.core.model.events.response_event import ResponseEvent
 from redditrepostsleuth.core.notification.notification_service import NotificationService

@@ -13,6 +13,7 @@ from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
+from redditrepostsleuth.core.model.link_search_settings import TextSearchSettings
 from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
 
@@ -306,6 +307,20 @@ def get_default_link_search_settings(config: Config) -> SearchSettings:
         only_older_matches=config.default_link_only_older_matches,
         filter_same_author=config.default_link_same_author_filter,
         filter_crossposts=config.default_link_crosspost_filter
+
+    )
+
+def get_default_text_search_settings(config: Config) -> SearchSettings:
+    return TextSearchSettings(
+        target_title_match=config.default_text_target_title_match,
+        same_sub=config.default_text_same_sub_filter,
+        max_days_old=config.default_text_max_days_old_filter,
+        filter_removed_matches=config.default_text_removed_match_filter,
+        filter_dead_matches=config.default_text_dead_matches_filter,
+        only_older_matches=config.default_text_only_older_matches,
+        filter_same_author=config.default_text_same_author_filter,
+        filter_crossposts=config.default_text_crosspost_filter,
+        target_distance=config.default_text_target_distance
 
     )
 

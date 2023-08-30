@@ -141,7 +141,7 @@ services:
         environment:
             - db_user=repost_link
             - LOG_LEVEL=INFO
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.repost_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_link -n repost_link_worker --autoscale=6,1
 
     image_repost_worker:
@@ -156,7 +156,7 @@ services:
         environment:
             - db_user=repost_image
             - LOG_LEVEL=INFO
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.reposttasks
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.repost_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -n repost_image_worker --autoscale=14,5
 
     only_fans_worker:

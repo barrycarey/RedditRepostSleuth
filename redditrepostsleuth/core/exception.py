@@ -59,3 +59,7 @@ class NoProxyException(RepostSleuthException):
 class UtilApiException(RepostSleuthException):
     def __init__(self, message):
         super(UtilApiException, self).__init__(message)
+
+class IndexApiException(RepostSleuthException):
+    def __init__(self, message):
+        super(IndexApiException, self).__init__(message)

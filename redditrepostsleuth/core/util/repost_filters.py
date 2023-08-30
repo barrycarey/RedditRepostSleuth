@@ -8,6 +8,7 @@ import requests
 from praw import Reddit
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
+from redditrepostsleuth.core.model.search.text_search_match import TextSearchMatch
 from redditrepostsleuth.core.util.utils import build_reddit_query_string
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
@@ -40,6 +41,15 @@ def annoy_distance_filter(target_annoy_distance: float):
         if match.annoy_distance <= target_annoy_distance:
             return True
         log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance,
+                  f'https://redd.it/{match.post.post_id}')
+        return False
+    return annoy_filter
+
+def text_distance_filter(target_distance: float):
+    def annoy_filter(match: TextSearchMatch):
+        if match.distance >= target_distance:
+            return True
+        log.debug('Text Distance Filter Reject - Target: %s Actual: %s - %s', target_distance, match.distance,
                   f'https://redd.it/{match.post.post_id}')
         return False
     return annoy_filter
