@@ -25,6 +25,7 @@ class ImageSearchMatch(SearchMatch):
         :param hash_size: Hash size used in search
         """
         super().__init__(searched_url, post, title_similarity)
+        # TODO - Don't need to set attrbs used in super
         self.hash_size = hash_size
         self.annoy_distance = annoy_distance
         self.hamming_distance = hamming_distance

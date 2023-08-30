@@ -10,7 +10,7 @@ from redditrepostsleuth.core.model.search_times import SearchTimes
 class SearchResults:
     def __init__(
             self,
-            checked_url: Text,
+            checked_url: str,
             search_settings: SearchSettings,
             checked_post: Post = None,
             search_times: SearchTimes = None

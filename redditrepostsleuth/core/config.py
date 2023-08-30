@@ -205,6 +205,15 @@ class Config:
             'default_link_same_author_filter',
             'default_link_crosspost_filter',
             'default_link_max_days_old_filter',
+            'default_text_target_title_match',
+            'default_text_same_sub_filter',
+            'default_text_dead_matches_filter',
+            'default_text_removed_match_filter',
+            'default_text_only_older_matches',
+            'default_text_same_author_filter',
+            'default_text_crosspost_filter',
+            'default_text_max_days_old_filter',
+            'default_text_target_distance',
             'discord_logging_hook'
 
         ]

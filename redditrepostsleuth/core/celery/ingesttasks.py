@@ -50,10 +50,12 @@ def save_new_post(self, post: Post):
                                  args=[post.post_id, monitored_sub],
                                  queue='submonitor')
 
-        if post.post_type_id == 2 and self.config.repost_image_check_on_ingest:
-            celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post])
-        elif post.post_type_id == 3 and self.config.repost_link_check_on_ingest:
-            celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]])
+        if post.post_type_id == 1:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_for_text_repost_task', args=[post])
+        elif post.post_type_id == 2:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_image_repost_save', args=[post])
+        elif post.post_type_id == 3:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check', args=[[post]])
 
         celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
 

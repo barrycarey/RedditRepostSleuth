@@ -148,7 +148,7 @@ def is_bot_banned(sub_name: Text, reddit: Reddit) -> Optional[bool]:
     except Forbidden:
         banned = True
     except APIException as e:
-        if e.error_type == 'SUBREDDIT_NOTALLOWED':
+        if e.error_type in ['SUBREDDIT_NOTALLOWED', 'SUBREDDIT_NOTALLOWED_BANNED']:
             banned = True
     if banned:
         log.info('Bot is banned from %s', subreddit.display_name)
