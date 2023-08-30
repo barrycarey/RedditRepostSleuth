@@ -3,7 +3,7 @@ from datetime import datetime
 from unittest import TestCase, mock
 from unittest.mock import MagicMock, Mock
 
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Post
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Post, PostType
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
@@ -153,14 +153,14 @@ class TestResponseBuilder(TestCase):
 
     def _get_image_search_results_no_match(self):
         search_results = ImageSearchResults('test.com', self._get_image_search_settings(),
-                                            checked_post=Post(post_id='abc123', post_type='image', subreddit='test'))
+                                            checked_post=Post(post_id='abc123', post_type=PostType(name='image'), subreddit='test'))
         search_results.search_times = ImageSearchTimes()
         search_results.search_times.total_search_time = 10
         return search_results
 
     def _get_image_search_results_one_match(self):
         search_results = ImageSearchResults('test.com', self._get_image_search_settings(),
-                                            checked_post=Post(post_id='abc123', post_type='image', subreddit='test'))
+                                            checked_post=Post(post_id='abc123', post_type=PostType(name='image'), subreddit='test'))
         search_results.search_times = ImageSearchTimes()
         search_results.search_times.total_search_time = 10
         search_results.matches.append(
@@ -177,7 +177,7 @@ class TestResponseBuilder(TestCase):
 
     def _get_image_search_results_multi_match(self):
         search_results = ImageSearchResults('test.com', self._get_image_search_settings(),
-                                            checked_post=Post(post_id='abc123', post_type='image', subreddit='test'))
+                                            checked_post=Post(post_id='abc123', post_type=PostType(name='image'), subreddit='test'))
         search_results.search_times = ImageSearchTimes()
         search_results.search_times.total_search_time = 10
         search_results.matches.append(
@@ -208,7 +208,7 @@ class TestResponseBuilder(TestCase):
         return SearchResults(
             'test.com',
             self._get_search_settings(),
-            checked_post=Post(post_id='abc123', post_type='link', subreddit='test'),
+            checked_post=Post(post_id='abc123', post_type=PostType(name='link'), subreddit='test'),
             search_times=search_times
         )
 
@@ -218,7 +218,7 @@ class TestResponseBuilder(TestCase):
         search_results = SearchResults(
             'test.com',
             self._get_search_settings(),
-            checked_post=Post(post_id='abc123', post_type='link', subreddit='test'),
+            checked_post=Post(post_id='abc123', post_type=PostType(name='link'), subreddit='test'),
             search_times=search_times
         )
         search_results.matches.append(

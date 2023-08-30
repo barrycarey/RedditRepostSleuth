@@ -1,11 +1,10 @@
 import logging
 from functools import singledispatchmethod
-from typing import Dict, Text, Optional
+from typing import Text, Optional
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
@@ -14,8 +13,8 @@ from redditrepostsleuth.core.util.helpers import build_image_msg_values_from_sea
     build_msg_values_from_search
 from redditrepostsleuth.core.util.replytemplates import DEFAULT_REPOST_IMAGE_COMMENT, \
     DEFAULT_REPOST_IMAGE_COMMENT_ONE_MATCH, \
-    DEFAULT_COMMENT_OC, COMMENT_STATS, DEFAULT_REPOST_LINK_COMMENT, \
-    CLOSEST_MATCH, SEARCH_URL, REPORT_POST_LINK, IMAGE_SEARCH_SETTINGS, GENERIC_SEARCH_SETTINGS, \
+    DEFAULT_COMMENT_OC, COMMENT_STATS, CLOSEST_MATCH, SEARCH_URL, REPORT_POST_LINK, IMAGE_SEARCH_SETTINGS, \
+    GENERIC_SEARCH_SETTINGS, \
     COMMENT_SIGNATURE, LINK_REPOST, LINK_OC
 
 DEFAULT_REPORT_MSG = 'RepostSleuthBot-Repost'
@@ -47,7 +46,7 @@ class ResponseBuilder:
         :param search_results: Search results
         """
         msg_template = ''
-        if search_results.checked_post.post_type == 'image':
+        if search_results.checked_post.post_type.name == 'image':
             if len(search_results.matches) == 0:
                 msg_template = DEFAULT_COMMENT_OC
             elif len(search_results.matches) == 1:
@@ -55,7 +54,7 @@ class ResponseBuilder:
             else:
                 msg_template = DEFAULT_REPOST_IMAGE_COMMENT
 
-        if search_results.checked_post.post_type == 'link':
+        if search_results.checked_post.post_type.name == 'link':
             if len(search_results.matches) == 0:
                 msg_template = LINK_OC
             else:
@@ -132,7 +131,7 @@ class ResponseBuilder:
         try:
             return self.build_default_comment(search_results, message, **kwargs)
         except KeyError:
-            log.error('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
+            log.warning('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
             return self.build_default_comment(search_results, **kwargs)
 
     def build_default_comment(
@@ -170,7 +169,7 @@ class ResponseBuilder:
             message += f'\n\n{REPORT_POST_LINK}'
 
         # Checking post type is temp until the site supports everything
-        if search_link and search_results.checked_post.post_type in ['image']:
+        if search_link and search_results.checked_post.post_type.name in ['image']:
             message += f'\n\n{SEARCH_URL}'
 
         if search_settings or stats:
@@ -192,7 +191,7 @@ class ResponseBuilder:
         log.debug('Final Message: %s', message)
         return message
 
-    def build_report_msg(self, subreddit: Text, values: Dict) -> Text:
+    def build_report_msg(self, subreddit: Text, values: dict) -> Text:
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
             if not monitored_sub:
@@ -205,11 +204,14 @@ class ResponseBuilder:
                 msg = monitored_sub.report_msg.format(**values)
                 log.debug('Build custom report message for sub %s: %s', msg, subreddit)
                 return msg
+            except KeyError as e:
+                log.warning('Problem building report message template: %s', str(e))
+                return DEFAULT_REPORT_MSG
             except Exception as e:
                 log.exception('Failed to build report msg', exc_info=True)
                 return DEFAULT_REPORT_MSG
 
 if __name__ == '__main__':
     config = Config(r'C:\Users\mcare\PycharmProjects\RedditRepostSleuth\sleuth_config.json')
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     resp = ResponseBuilder(uowm)

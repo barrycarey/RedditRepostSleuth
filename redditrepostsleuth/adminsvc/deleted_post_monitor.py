@@ -1,28 +1,25 @@
 import json
 import os
-import sys
 import time
 from asyncio import run, ensure_future, gather
 
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError, ClientConnectorError, TCPConnector
 
-from redditrepostsleuth.adminsvc.utils import build_reddit_query_string, build_reddit_req_url
+from redditrepostsleuth.core.util.utils import build_reddit_query_string
 from redditrepostsleuth.core.celery.admin_tasks import update_last_deleted_check, bulk_delete
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.model.misc_models import DeleteCheckResult, JobStatus, BatchedPostRequestJob
 from redditrepostsleuth.core.proxy_manager import ProxyManager
-from redditrepostsleuth.core.util.constants import GENERIC_REQ_HEADERS
 from redditrepostsleuth.core.util.helpers import chunk_list
 
 log = get_configured_logger(__name__)
 
 
 async def fetch_page(job: BatchedPostRequestJob, session: ClientSession) -> BatchedPostRequestJob:
-    proxy = f'http://{job.proxy.address}'
 
     try:
         async with session.get(job.url, timeout=ClientTimeout(total=10)) as resp:
@@ -107,7 +104,7 @@ def db_ids_from_post_ids(post_ids: list[str], posts: list[Post]) -> list[int]:
 
 async def main():
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     proxy_manager = ProxyManager(uowm, 600)
     query_limit = int(os.getenv('QUERY_LIMIT', 20000))
 

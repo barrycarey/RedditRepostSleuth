@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import Dict, Text, Optional
+from typing import Text, Optional
 
 import requests
 from praw.reddit import Comment
@@ -9,8 +9,8 @@ from requests.exceptions import ConnectionError
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import BotComment
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -67,7 +67,7 @@ class BotCommentMonitor:
             bot_comment.needs_review = True
 
 
-    def _get_comment_data(self, permalink: Text) -> Optional[Dict]:
+    def _get_comment_data(self, permalink: Text) -> Optional[dict]:
         try:
             log.debug('Fetching Comment https://reddit.com%s', permalink)
             r = requests.get(f'{self.config.util_api}/reddit/comment', params={'permalink': permalink})
@@ -99,7 +99,7 @@ class BotCommentMonitor:
 
 if __name__ == '__main__':
     config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     reddit = get_reddit_instance(config)
     reddit_manager = RedditManager(reddit)
     comment_monitor = BotCommentMonitor(reddit_manager, uowm, config)

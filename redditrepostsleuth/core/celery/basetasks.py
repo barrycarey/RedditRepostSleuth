@@ -1,18 +1,14 @@
-import pymysql
 from celery import Task
 
-from redditrepostsleuth.core import logging
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
+from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.notification.notification_service import NotificationService
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
 from redditrepostsleuth.core.util.helpers import get_reddit_instance
-
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
-
-from redditrepostsleuth.core.services.eventlogging import EventLogging
 
 
 class EventLoggerTask(Task):
@@ -23,19 +19,9 @@ class EventLoggerTask(Task):
 class SqlAlchemyTask(Task):
     def __init__(self):
         self.config = Config()
-        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging()
 
-class PyMysqlTask(Task):
-    def __init__(self):
-        self.config = Config()
-
-    def get_conn(self):
-        return pymysql.connect(host=self.config.db_host,
-                        user=self.config.db_user,
-                        password=self.config.db_password,
-                        db=self.config.db_name,
-                        cursorclass=pymysql.cursors.SSDictCursor)
 
 class RepostTask(SqlAlchemyTask):
     def __init__(self):
@@ -49,7 +35,7 @@ class AnnoyTask(Task):
     def __init__(self):
         self.config = Config()
         from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
-        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.notification_svc = NotificationService(self.config)
         self.event_logger = EventLogging()
         self.reddit = get_reddit_instance(self.config)
@@ -58,8 +44,8 @@ class AnnoyTask(Task):
 class RedditTask(Task):
     def __init__(self):
         self.config = Config()
-        self.reddit = RedditManager(get_reddit_instance(self.config))
-        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.reddit = get_reddit_instance(self.config)
+        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
         self.notification_svc = NotificationService(self.config)
         self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger, live_response=self.config.live_responses)
@@ -68,7 +54,7 @@ class AdminTask(Task):
     def __init__(self):
         self.config = Config()
         self.reddit = RedditManager(get_reddit_instance(self.config))
-        self.uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(self.config))
+        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
         self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger,
                                                 live_response=self.config.live_responses)

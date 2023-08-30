@@ -1,3 +1,4 @@
+
 <div align="center">
 	<img width="600" height="auto" src="hero.png" alt="hero">
 	<br>
@@ -63,7 +64,7 @@ All data is stored in a MySQL database and we use SQLAlchemy to interact with th
 
 The bot is split into roughly 9 Docker containers with various instances. 
 
-Hardware wise, the bot runs on a Dell r620 with 2x Xeon 2670v2 CPUs and 256gb of RAM. Storage is an all flash array consisting of 8 Samsung Evo 500gb SSDs in RAID 10.
+Hardware wise, the bot runs on a Dell r720 with 2x Xeon 2680v2 CPUs and 512gb of RAM. Storage is an all flash array consisting of 8 Samsung Evo 500gb SSDs in RAID 10.
 
 It currently consumes around 70% of these resources. 
 
@@ -105,23 +106,20 @@ The bot continually learns meme templates.  The more it sees a template the more
 #### How do I summon the bot?
 Tag the user as a comment to an image post.  u/repostsleuthbot
 
-#### I summoned the bot but it never responded
-The bot is still 'Beta'.  I'm continually working on stuff and it might crash from time to time. It will be a couple weeks before it's completely stable. 
-
 #### Hey asshole, posting something to another sub isn't a repost
 If you properly crosspost something the bot will ignore it. If you take an image and upload it to a new sub you get flagged.
 
 #### How far back do you search?
-We're working on indexing older posts.  We are currently back to March 2018. Depending on storage space we may go back another year or 2. 
+All Reddit posts from 2018 forward are indexed
 
 #### How does it search so many images so quickly?
 It uses a binary tree search for similar image hashes.  This allows it to perform fast, accurate searches without checking each individual image
 
 #### Can I use this bot on my sub?
-Yes! We're currently looking for communities to Beta test this feature.  Enabled communities will have realtime checking of all new posts with configurable options. Send a PM u/barrycarey
+Yes! Visit www.repostsleuth.com and signin with your Reddit account.  Click My Subreddits in the menu then click Add under the sub you wish to activate the bot on. 
 
 #### Does it support other types of posts besides images?
-Not yet.  However, we will be support all post types in the future. We want to focus on images first and get it right.
+Currently Images and Link posts are support.  This may change in the future however resource usage for videos and text is an issue. 
 
 #### What kind of hardware does the bot run on? 
-Currently the bot is running on 3 machines. A Dell r710 server with 2x Xeon X5670 12 core CPUs w/ 96gb RAM, a Ryzen 2700x w/ 32gb RAM, an i7 3770k w/ 32gb of RAM. All of these systems are running Docker containers to deal with the different pieces of the bot. 
+A Dell R720 with 512gb of RAM and dual Xeon E5 2680v2
