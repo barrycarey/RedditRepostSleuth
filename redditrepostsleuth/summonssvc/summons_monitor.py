@@ -49,7 +49,6 @@ if os.getenv('SENTRY_DNS', None):
     )
 
 
-
 def handle_summons(summons: Summons) -> None:
     log.info('Starting summons %s ', summons.id)
     with uowm.start() as uow:

@@ -45,7 +45,6 @@ config_updater = SubredditConfigUpdater(
 
 sentry_sdk.init(
     dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
-    traces_sample_rate=1.0,
 )
 
 #cors = CORS(allow_origins_list=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
