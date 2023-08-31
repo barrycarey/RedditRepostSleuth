@@ -1,17 +1,16 @@
-from typing import Dict, Text
+from typing import Text
 
 from falcon import HTTPBadRequest, Request, HTTPServiceUnavailable
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
+from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request
 
 
-def is_site_admin(user_data: Dict, uowm: UnitOfWorkManager) -> bool:
+def is_site_admin(user_data: dict, uowm: UnitOfWorkManager) -> bool:
     if not user_data:
         return False;
     if 'name' not in user_data:
@@ -49,6 +48,6 @@ def check_image(
     except NoIndexException:
         log.error('No available index for image repost check.  Trying again later')
         raise HTTPServiceUnavailable('Search API is not available.', 'The search API is not currently available')
-    except ImageConversioinException as e:
-        log.error('Problem hashing the provided url: %s', str(e))
+    except ImageConversionException as e:
+        log.warning('Problem hashing the provided url: %s', str(e))
         raise HTTPBadRequest('Invalid URL', 'The provided URL is not a valid image')

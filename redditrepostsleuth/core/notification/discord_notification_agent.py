@@ -1,6 +1,6 @@
 import re
 from functools import singledispatchmethod
-from typing import Text, Dict
+from typing import Text
 
 import requests
 from requests.exceptions import ConnectionError, Timeout
@@ -49,7 +49,7 @@ class DiscordAgent(NotificationAgent):
     def _(self, body: Text, **kwargs):
         self._send_to_hook(self._build_payload(body, **kwargs))
 
-    def _send_to_hook(self, payload: Dict):
+    def _send_to_hook(self, payload: dict):
         try:
             r = requests.post(self.hook, headers={'Content-Type': 'application/json'},
                           json=payload)
@@ -60,7 +60,7 @@ class DiscordAgent(NotificationAgent):
         if r.status_code != 204:
             log.error('Unexpected status code %s from Discord webhook: %s', r.status_code, r.text)
 
-    def _build_payload(self, body: Text, **kwargs) -> Dict:
+    def _build_payload(self, body: Text, **kwargs) -> dict:
         if self.include_subject:
             text = f"**{kwargs.get('subject', '')}**\r\n{body}"
         else:
@@ -76,12 +76,12 @@ class DiscordAgent(NotificationAgent):
 
         return payload
 
-    def _build_image_repost_attachment(self, search_results: ImageSearchResults) -> Dict:
+    def _build_image_repost_attachment(self, search_results: ImageSearchResults) -> dict:
         """
         Take a set of image search results and build the attachment to send to Discord
-        :rtype: Dict
+        :rtype: dict
         :param search_results: Image Search Results
-        :return: Dict representation of attachment
+        :return: dict representation of attachment
         """
         notification_attachment = {}
         notification_attachment['image'] = {"url": search_results.checked_post.url}

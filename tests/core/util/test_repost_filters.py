@@ -8,14 +8,14 @@ from redditrepostsleuth.core.model.search.image_search_match import ImageSearchM
 from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_sub_filter, annoy_distance_filter, \
     hamming_distance_filter, filter_newer_matches, filter_days_old_matches, filter_same_author, filter_same_post, \
     filter_title_keywords, filter_title_distance, filter_dead_urls_remote
-from redditrepostsleuth.core.util.repost_helpers import filter_search_results
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
 from tests.core.helpers import get_image_search_results_multi_match
 from requests.exceptions import ConnectionError
 
 class TestRepostFilters(TestCase):
     def test_cross_post_filter__remove_crosspost(self):
         search_results = get_image_search_results_multi_match()
-        search_results.matches[1].post.crosspost_parent = 'abc'
+        search_results.matches[1].post.is_crosspost = True
         r = list(filter(cross_post_filter, search_results.matches))
         self.assertEqual(2, len(r))
         self.assertEqual(1, r[0].post.id)
@@ -137,7 +137,7 @@ class TestRepostFilters(TestCase):
             ImageSearchMatch(
                 'test.com',
                 1,
-                Post(id=2, author='steve', post_id='123abc', crosspost_parent='abc', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
+                Post(id=2, author='steve', post_id='123abc', is_crosspost=True, created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
                 10,
                 10,
                 32

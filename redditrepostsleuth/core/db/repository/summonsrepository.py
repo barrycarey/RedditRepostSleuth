@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Text, Optional
 
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.databasemodels import Summons
@@ -32,7 +33,7 @@ class SummonsRepository:
         return self.db_session.query(Summons).filter(Summons.comment_id == id).first()
 
     def get_unreplied(self, limit: int = 10) -> Summons:
-        return self.db_session.query(Summons).filter(Summons.summons_replied_at == None).order_by(Summons.summons_received_at.desc()).limit(limit).all()
+        return self.db_session.query(Summons).options(joinedload(Summons.post)).filter(Summons.summons_replied_at == None).order_by(Summons.summons_received_at.desc()).limit(limit).all()
 
     def get_count(self, hours: int = None):
         query = self.db_session.query(func.count(Summons.id))

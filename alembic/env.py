@@ -40,7 +40,9 @@ fileConfig(config.config_file_name)
 target_metadata = Base.metadata
 
 def get_conn_string():
-    return f'mysql+pymysql://{bot_config.db_user}:{quote_plus(bot_config.db_password)}@{bot_config.db_host}/{bot_config.db_name}'
+    conn_str = r'mysql+pymysql://barry:Tovalu88!@192.168.1.194/reddit_dev'
+    return conn_str
+    #return f'mysql+pymysql://{bot_config.db_user}:{quote_plus(bot_config.db_password)}@{bot_config.db_host}/{bot_config.db_name}'
 
 
 # other values from the config, defined by the needs of env.py,

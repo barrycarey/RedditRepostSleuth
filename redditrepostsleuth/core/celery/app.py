@@ -1,21 +1,38 @@
 import os
 
+from celery import Celery, signals
 from celery.signals import after_setup_logger
-
-print(os.getcwd())
-# Celery is broken on windows
-import sys
-sys.setrecursionlimit(10000)
-from celery import Celery
 from kombu.serialization import registry
 
+from redditrepostsleuth.core.exception import IngestHighMatchMeme
 
 registry.enable('pickle')
 celery = Celery('tasks')
 celery.config_from_object('redditrepostsleuth.core.celery.celeryconfig')
 
+
+
+if os.getenv('SENTRY_DNS', None):
+    print('Sentry DNS set, loading Sentry module')
+
+    @signals.celeryd_init.connect
+    def init_sentry(**_kwargs):
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=os.getenv('SENTRY_DNS', None),
+            environment=os.getenv('RUN_ENV', 'dev'),
+            integrations=[
+                CeleryIntegration(
+                    monitor_beat_tasks=True,
+                ),
+            ],
+            ignore_errors=[IngestHighMatchMeme]
+        )
+
 @after_setup_logger.connect
 def setup_loggers(logger, *args, **kwargs):
     logger.handlers = []
+
 if __name__ == '__main__':
     celery.start()

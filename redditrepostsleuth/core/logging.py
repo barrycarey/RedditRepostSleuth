@@ -1,15 +1,15 @@
 import logging
 import os
 import sys
-from typing import Text, List
+from typing import Text
 
 from redditrepostsleuth.core.logfilters import SingleLevelFilter
 
 default_format = '%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [%(process)d][%(threadName)s] - %(levelname)s: %(message)s'
 image_search_trace_format = '%(asctime)s - %(module)s:%(funcName)s:%(lineno)d - [Search ID: %(search_id)d] - %(levelname)s: %(message)s'
 
-def get_configured_logger(name: Text = None, format: Text = None) -> logging.Logger:
 
+def get_configured_logger(name: Text = None, format: Text = None) -> logging.Logger:
     log = logging.getLogger(name or __name__)
     log.setLevel(os.getenv('LOG_LEVEL', 'DEBUG'))
     formatter = logging.Formatter(format or default_format)
@@ -28,7 +28,8 @@ def get_configured_logger(name: Text = None, format: Text = None) -> logging.Log
     log.propagate = False
     return log
 
-def configure_logger(name: Text = None, format: Text = None, filters: List[logging.Filter] = []) -> logging.Logger:
+
+def configure_logger(name: Text = None, format: Text = None, filters: list[logging.Filter] = []) -> logging.Logger:
     log = logging.getLogger(name or '')
     log.setLevel(os.getenv('LOG_LEVEL', 'DEBUG'))
     log.handlers = []
@@ -47,5 +48,6 @@ def configure_logger(name: Text = None, format: Text = None, filters: List[loggi
     log.addHandler(general_handler)
     log.addHandler(error_handler)
     return log
+
 
 log = get_configured_logger(__name__)
