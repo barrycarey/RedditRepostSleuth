@@ -114,7 +114,7 @@ class Summons(Base):
     reply_pm_id = Column(Integer, ForeignKey('bot_private_message.id'))
     reply_failure_reason = Column(String(20))
     requestor = Column(String(25))
-    comment_id = Column(String(11), unique=True)
+    comment_id = Column(String(100), unique=True)
     comment_body = Column(String(1000, collation='utf8mb4_general_ci'))
     subreddit = Column(String(25), nullable=False)
     summons_received_at = Column(DateTime)
@@ -305,8 +305,8 @@ class MonitoredSub(Base):
     removal_reason = Column(String(200))
     lock_post = Column(Boolean, default=False)
     mark_as_oc = Column(Boolean, default=False)
-    repost_response_template = Column(String(2000))
-    oc_response_template = Column(String(2000))
+    repost_response_template = Column(String(4000))
+    oc_response_template = Column(String(4000))
     meme_filter = Column(Boolean, default=False)
     title_ignore_keywords = Column(String(200))
     disable_summons_after_auto_response = Column(Boolean, default=False)
@@ -327,8 +327,8 @@ class MonitoredSub(Base):
     check_video_posts = Column(Boolean, default=False)
     target_image_match = Column(Integer, default=92)
     target_image_meme_match = Column(Integer, default=97)
+    target_text_distance = Column(Float, default=.91)
     meme_filter_check_text = Column(Boolean, default=False)
-    meme_filter_text_target_match = Column(Integer, default=90)
     only_comment_on_repost = Column(Boolean, default=True)
     report_reposts = Column(Boolean, default=False)
     failed_admin_check_count = Column(Integer, default=0)
@@ -382,7 +382,6 @@ class MonitoredSub(Base):
             'target_image_match': self.target_image_match,
             'target_image_meme_match': self.target_image_meme_match,
             'meme_filter_check_text': self.meme_filter_check_text,
-            'meme_filter_text_target_match': self.meme_filter_text_target_match,
             'subscribers': self.subscribers,
             'is_mod': self.is_mod,
             'wiki_permission': self.wiki_permission,

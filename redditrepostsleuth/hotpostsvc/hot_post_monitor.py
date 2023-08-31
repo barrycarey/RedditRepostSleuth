@@ -20,7 +20,8 @@ from redditrepostsleuth.core.util.helpers import get_default_link_search_setting
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_BODY, \
     TOP_POST_WATCH_SUBJECT
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
+from redditrepostsleuth.core.util.repost.repost_search import link_search
 
 
 class TopPostMonitor:
@@ -105,7 +106,7 @@ class TopPostMonitor:
                 return
 
         elif post.post_type == 'link':
-            search_results = get_link_reposts(
+            search_results = link_search(
                 post.url,
                 self.uowm,
                 get_default_link_search_settings(self.config),
