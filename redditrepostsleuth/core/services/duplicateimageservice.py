@@ -9,7 +9,6 @@ from praw import Reddit
 from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.admin_tasks import delete_post_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash
@@ -24,7 +23,7 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.helpers import get_default_image_search_settings
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter
-from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
+from redditrepostsleuth.core.util.repost.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
     filter_search_results, log_search
 
 log = logging.getLogger(__name__)
@@ -63,11 +62,7 @@ class DuplicateImageService:
 
         log.debug('Starting result filters with %s matches', len(search_results.matches))
 
-        search_results = filter_search_results(
-            search_results,
-            reddit=self.reddit,
-            uitl_api=f'{self.config.util_api}/maintenance/removed'
-        )
+        search_results = filter_search_results(search_results)
 
         search_results.search_times.start_timer('get_closest_match_time')
         # Since we regenerate the hash for memes we have to make sure the match is alive regardless of setting
@@ -191,8 +186,8 @@ class DuplicateImageService:
             )
         search_results.search_times.stop_timer('total_search_time')
         self._log_search_time(search_results, source)
-
-        log_search(self.uowm, search_results, source, 'image')
+        with self.uowm.start() as uow:
+            log_search(uow, search_results, source, 'image')
 
         log.info('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results

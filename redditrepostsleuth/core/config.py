@@ -93,8 +93,8 @@ class Config:
         self.custom = Config._flatten_config(dict(Config.CONFIG, **settings))
 
         if not self.custom:
-            log.critical('No config values defined.  Aborting')
-            sys.exit(1)
+            log.error('No config values defined.  Aborting')
+
 
         self._initialize_attributes()
 

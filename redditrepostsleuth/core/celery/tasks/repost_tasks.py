@@ -2,24 +2,22 @@ from typing import NoReturn
 
 import requests
 from redlock import RedLockError
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 from requests.exceptions import ConnectTimeout
+from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
-from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result, \
-    repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost
+from redditrepostsleuth.core.celery.task_logic.repost_image import repost_watch_notify, check_for_post_watch
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, IndexApiException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings, \
     get_default_text_search_settings
-from redditrepostsleuth.core.util.repost.text_repost import get_text_post_matches
-from redditrepostsleuth.core.util.repost_filters import text_distance_filter
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results, log_search
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
+from redditrepostsleuth.core.util.repost.repost_search import text_search_by_post, image_search_by_post, \
+    link_search
 
 log = configure_logger(
     name='redditrepostsleuth',
@@ -46,13 +44,20 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
             search_settings=search_settings,
             source='ingest'
         )
+        with self.uowm.start() as uow:
+            search_results = image_search_by_post(
+                post,
+                uow,
+                self.dup_service,
+                search_settings,
+                'ingest',
+                high_match_meme_check=True
+            )
 
-        save_image_repost_result(search_results, self.uowm, source='ingest', high_match_check=True)
-
-        if search_results.matches:
-            watches = check_for_post_watch(search_results.matches, self.uowm)
-            if watches and self.config.enable_repost_watch:
-                notify_watch.apply_async((watches, post), queue='watch_notify')
+            if search_results.matches:
+                watches = check_for_post_watch(search_results.matches, uow)
+                if watches and self.config.enable_repost_watch:
+                    notify_watch.apply_async((watches, post), queue='watch_notify')
 
     except (RedLockError, NoIndexException, IngestHighMatchMeme):
         raise
@@ -63,58 +68,23 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
 
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
-def link_repost_check(self, posts, ):
-    # TODO - We don't need to pass in a list of posts
+def link_repost_check(self, post):
+
     try:
         with self.uowm.start() as uow:
-            for post in posts:
 
-                try:
-                    log.debug('Checking URL for repost: %s', post.url_hash)
-                    search_results = get_link_reposts(post.url, self.uowm,
-                                                      get_default_link_search_settings(self.config),
-                                                      post=post)
+            log.debug('Checking URL for repost: %s', post.url)
+            search_results = link_search(post.url, uow,
+                                         get_default_link_search_settings(self.config),
+                                         'ingest',
+                                         post=post,
+                                         filter_function=filter_search_results
+                                         )
 
-                    if len(search_results.matches) > 10000:
-                        log.info('Link hash %s shared %s times. Search time was %s', post.url_hash,
-                                 len(search_results.matches), search_results.search_times.total_search_time)
+            search_results.search_times.stop_timer('total_search_time')
+            log.info('Link Query Time: %s', search_results.search_times.query_time)
 
-                    search_results = filter_search_results(
-                        search_results,
-                        uitl_api=f'{self.config.util_api}/maintenance/removed'
-                    )
-                    search_results.search_times.stop_timer('total_search_time')
-                    log.info('Link Query Time: %s', search_results.search_times.query_time)
-                    log_search(self.uowm, search_results, 'ingest', 'link')
-                    if not search_results.matches:
-                        log.debug('Not matching links for post %s', post.post_id)
-                        uow.commit()
-                        continue
 
-                    log.info('Found %s matching links', len(search_results.matches))
-                    log.info('Creating Link Repost. Post %s is a repost of %s', post.post_id,
-                             search_results.matches[0].post.post_id)
-                    repost_of = search_results.matches[0].post
-
-                    new_repost = Repost(
-                        post_id=post.id,
-                        repost_of_id=repost_of.id,
-                        author=post.author,
-                        source='ingest',
-                        subreddit=post.subreddit,
-                        search_id=search_results.logged_search.id,
-                        post_type_id=post.post_type_id
-                    )
-                    uow.repost.add(new_repost)
-
-                    try:
-                        uow.commit()
-                    except IntegrityError as e:
-                        uow.rollback()
-                        log.exception('Error saving link repost', exc_info=True)
-
-                except Exception as e:
-                    log.exception('')
 
     except Exception as e:
         log.exception('')
@@ -125,41 +95,14 @@ def check_for_text_repost_task(self, post: Post) -> None:
     log.debug('Checking post for repost: %s', post.post_id)
     try:
         with self.uowm.start() as uow:
-            search_results = get_text_post_matches(post, uow, get_default_text_search_settings(self.config))
-            search_results.matches = list(filter(text_distance_filter(self.config.default_text_target_distance), search_results.matches))
-            search_results = filter_search_results(
-                search_results,
-                uitl_api=f'{self.config.util_api}/maintenance/removed'
+            search_results = text_search_by_post(
+                post,
+                uow,
+                get_default_text_search_settings(self.config),
+                filter_function=filter_search_results,
+                source='ingest'
             )
-            log_search(self.uowm, search_results, 'ingest', 'text')
-            if not search_results.matches:
-                log.debug('Not matching links for post %s', post.post_id)
-                uow.commit()
-                return
-
             log.info('Found %s matching text posts', len(search_results.matches))
-            log.info('Creating Repost. Post %s is a repost of %s', post.post_id,
-                     search_results.matches[0].post.post_id)
-
-            repost_of = search_results.matches[0].post
-
-            new_repost = Repost(
-                post_id=post.id,
-                repost_of_id=repost_of.id,
-                author=post.author,
-                source='ingest',
-                subreddit=post.subreddit,
-                search_id=search_results.logged_search.id,
-                post_type_id=post.post_type_id
-            )
-            uow.repost.add(new_repost)
-
-            try:
-                uow.commit()
-            except IntegrityError as e:
-                uow.rollback()
-                log.exception('Error saving text repost', exc_info=False)
-
     except IndexApiException as e:
         log.warning(e, exc_info=False)
         raise
