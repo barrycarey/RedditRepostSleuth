@@ -5,7 +5,6 @@ from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 
-from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -19,7 +18,8 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results, log_search
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, log_search
+from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class SubMonitor:
                 return True
         return False
 
-    def should_check_post(self, post: Post, check_image: bool, check_link: bool, title_keyword_filter: List[Text] = None) -> bool:
+    def should_check_post(self, post: Post, monitored_sub: MonitoredSub, title_keyword_filter: List[Text] = None) -> bool:
         """
         Check if a given post should be checked
         :rtype: bool
@@ -69,10 +69,14 @@ class SubMonitor:
         if post.post_type.name not in self.config.supported_post_types:
             return False
 
-        if post.post_type.name == 'image' and not check_image:
+        if post.post_type.name == 'image' and not monitored_sub.check_image_posts:
             return False
 
-        if post.post_type.name == 'link' and not check_link:
+        if post.post_type.name == 'link' and not monitored_sub.check_link_posts:
+            log.info('Skipping link post')
+            return False
+
+        if post.post_type.name == 'text' and not monitored_sub.check_text_posts:
             log.info('Skipping link post')
             return False
 
@@ -155,20 +159,17 @@ class SubMonitor:
             log.exception('Failed to create checked post for submission %s', results.checked_post.post_id, exc_info=True)
 
     def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub) -> SearchResults:
-        search_results = get_link_reposts(
-            post.url,
-            self.uowm,
-            get_link_search_settings_for_monitored_sub(monitored_sub),
-            post=post,
-            get_total=False,
-        )
-        search_results = filter_search_results(
-            search_results,
-            reddit=self.reddit.reddit,
-            uitl_api=f'{self.config.util_api}/maintenance/removed'
-        )
-        search_results.search_times.stop_timer('total_search_time')
-        log_search(self.uowm, search_results, 'submonitor', 'link')
+        with self.uowm.start() as uow:
+            search_results = link_search(
+                post.url,
+                uow,
+                get_link_search_settings_for_monitored_sub(monitored_sub),
+        'sub_monitor',
+                post=post,
+                filter_function=filter_search_results
+            )
+            search_results.search_times.stop_timer('total_search_time')
+
 
         return search_results
 
@@ -178,16 +179,17 @@ class SubMonitor:
         :param post: DB Post obj
         :return: None
         """
+        search_settings = get_image_search_settings_for_monitored_sub(monitored_sub,
+                                                                      target_annoy_distance=self.config.default_image_target_annoy_distance)
 
-        search_results = self.image_service.check_image(
-            post.url,
-            post=post,
-            source='sub_monitor',
-            search_settings=get_image_search_settings_for_monitored_sub(monitored_sub,
-                                                                        target_annoy_distance=self.config.default_image_target_annoy_distance)
-        )
-        if search_results.matches:
-            save_image_repost_result(search_results ,self.uowm, source='sub_monitor')
+        with self.uowm.start() as uow:
+            search_results = image_search_by_post(
+                post,
+                uow,
+                self.image_service,
+                search_settings,
+                'sub_monitor',
+            )
 
         log.debug(search_results)
         return search_results

@@ -8,7 +8,6 @@ from praw.exceptions import APIException
 from prawcore import Forbidden
 from sqlalchemy.exc import InternalError
 
-from redditrepostsleuth.core.celery.task_logic.repost_image import save_image_repost_result
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons, RepostWatch, BannedUser, MonitoredSub
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -20,12 +19,14 @@ from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImag
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
-from redditrepostsleuth.core.util.helpers import save_link_repost, get_default_image_search_settings, \
+from redditrepostsleuth.core.util.helpers import get_default_image_search_settings, \
     get_default_link_search_settings
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, \
+    save_image_repost_result, save_link_repost
+from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
 log = logging.getLogger(__name__)
@@ -243,27 +244,21 @@ class SummonsHandler:
 
     def process_link_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None):
         response = SummonsResponse(summons=summons)
+        with self.uowm.start() as uow:
+            search_results = link_search(
+                summons.post.url,
+                uow,
+                get_default_link_search_settings(self.config),
+                'summons',
+                post=summons.post,
+                get_total=True,
+                filter_function=filter_search_results
+            )
 
-        search_results = get_link_reposts(
-            summons.post.url,
-            self.uowm,
-            get_default_link_search_settings(self.config),
-            post=summons.post,
-            get_total=True
-        )
-        search_results = filter_search_results(
-            search_results,
-            reddit=self.reddit,
-            uitl_api=f'{self.config.util_api}/maintenance/removed'
-        )
-
-        if not monitored_sub:
-            response.message = self.response_builder.build_default_comment(search_results, signature=False)
-        else:
-            response.message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
-
-        if search_results.matches:
-            save_link_repost(search_results.checked_post, search_results.matches[0].post, self.uowm, 'summons')
+            if not monitored_sub:
+                response.message = self.response_builder.build_default_comment(search_results, signature=False)
+            else:
+                response.message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
 
         self._send_response(response)
 
@@ -279,12 +274,14 @@ class SummonsHandler:
         search_settings.target_meme_match_percent = target_meme_match
 
         try:
-            search_results = self.image_service.check_image(
-                summons.post.url,
-                post=summons.post,
-                search_settings=search_settings,
-                source='summons'
-            )
+            with self.uowm.start() as uow:
+                search_results = image_search_by_post(
+                    summons.post,
+                    uow,
+                    self.image_service,
+                    search_settings,
+                    'summons'
+                )
         except NoIndexException:
             log.error('No available index for image repost check.  Trying again later')
             time.sleep(10)

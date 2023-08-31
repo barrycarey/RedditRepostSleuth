@@ -10,7 +10,6 @@ from praw import Reddit
 from redis import Redis
 from redlock import RedLockFactory
 from requests.exceptions import ConnectionError
-from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.link_search_settings import TextSearchSettings
@@ -19,12 +18,11 @@ from redditrepostsleuth.core.util.replytemplates import IMAGE_REPORT_TEXT
 
 if TYPE_CHECKING:
     from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults, SearchResults
-    from falcon import Request
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, Repost, RepostSearch
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, RepostSearch
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
 
@@ -231,24 +229,6 @@ def build_markdown_table(rows: List[List], headers: List[Text]) -> Text:
 def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
-def save_link_repost(post: Post, repost_of: Post, uowm: UnitOfWorkManager, source: str) -> None:
-    with uowm.start() as uow:
-        new_repost = Repost(
-            post_id=post.id,
-            repost_of_id=repost_of.id,
-            author=post.author,
-            subreddit=post.subreddit,
-            post_type_id=3,
-            source=source
-        )
-
-        uow.repost.add(new_repost)
-        try:
-            uow.commit()
-        except IntegrityError:
-            log.error('Failed to save link repost, it already exists')
-        except Exception as e:
-            log.exception('Failed to save link repost', exc_info=True)
 
 def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
