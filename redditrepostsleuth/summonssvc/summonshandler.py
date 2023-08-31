@@ -20,13 +20,13 @@ from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import get_default_image_search_settings, \
-    get_default_link_search_settings
+    get_default_link_search_settings, get_default_text_search_settings
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, \
     save_image_repost_result
-from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search
+from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
 log = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ class SummonsHandler:
             log.error('Unable to find summons tag in: %s', comment_body)
             return
 
-    def process_summons(self, summons: Summons):
+    def process_summons(self, summons: Summons) -> None:
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
 
@@ -183,7 +183,7 @@ class SummonsHandler:
         self._send_response(response)
         return
 
-    def _disable_watch(self, summons: Summons) -> NoReturn:
+    def _disable_watch(self, summons: Summons) -> None:
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
             existing_watch = uow.repostwatch.find_existing_watch(summons.requestor, summons.post.id)
@@ -201,7 +201,7 @@ class SummonsHandler:
                 response.message = 'An error prevented me from removing your watch on this post.  Please try again'
             self._send_response(response)
 
-    def _enable_watch(self, summons: Summons) -> NoReturn:
+    def _enable_watch(self, summons: Summons) -> None:
 
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
@@ -236,13 +236,34 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def process_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None):
+    def process_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None) -> None:
         if summons.post.post_type.name == 'image':
             self.process_image_repost_request(summons, monitored_sub=monitored_sub)
         elif summons.post.post_type.name == 'link':
             self.process_link_repost_request(summons)
+        elif summons.post.post_type.name == 'text':
+            self.process_text_repost_request(summons, monitored_sub=monitored_sub)
 
-    def process_link_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None):
+    def process_text_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None)  -> None:
+        response = SummonsResponse(summons=summons)
+        with self.uowm.start() as uow:
+            search_results = text_search_by_post(
+                summons.post,
+                uow,
+                get_default_text_search_settings(self.config),
+                'summons',
+                filter_function=filter_search_results
+            )
+
+            if not monitored_sub:
+                response.message = self.response_builder.build_default_comment(search_results, signature=False)
+            else:
+                response.message = self.response_builder.build_sub_comment(monitored_sub, search_results,
+                                                                           signature=False)
+
+        self._send_response(response)
+
+    def process_link_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None) -> None:
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
             search_results = link_search(
@@ -293,7 +314,8 @@ class SummonsHandler:
             response.message = self.response_builder.build_default_comment(search_results, signature=False)
 
         if search_results.matches:
-            save_image_repost_result(search_results, self.uowm, source='summons')
+            with self.uowm.start() as uow:
+                save_image_repost_result(search_results, uow, 'summons')
 
         self._send_response(response)
 
@@ -311,7 +333,7 @@ class SummonsHandler:
             return target_match_percent, target_meme_match_percent, target_annoy_distance
         return self.config.default_image_target_match, self.config.default_image_target_meme_match, self.config.default_image_target_annoy_distance
 
-    def _send_response(self, response: SummonsResponse) -> NoReturn:
+    def _send_response(self, response: SummonsResponse) -> None:
         """
         Take a response object and send a response to the summons.  If we're banned on the sub send a PM instead
         :param response: SummonsResponse Object
@@ -399,7 +421,7 @@ class SummonsHandler:
         if self.event_logger:
             self.event_logger.save_event(event)
 
-    def _send_ban_notification(self, summons: Summons) -> NoReturn:
+    def _send_ban_notification(self, summons: Summons) -> None:
         response = SummonsResponse(summons=summons)
         response.status = 'success'
         response.message = OVER_LIMIT_BAN.format(ban_expires=datetime.utcnow() + timedelta(hours=1))
@@ -407,7 +429,7 @@ class SummonsHandler:
         reply_message = self.response_handler.send_private_message(redditor, response.message, 'Temporary RepostSleuth Ban', 'summons')
         self._save_response(response)
 
-    def _ban_user(self, requestor: Text) -> NoReturn:
+    def _ban_user(self, requestor: str) -> None:
         ban_expires = datetime.utcnow() + timedelta(hours=1)
         log.info('Banning user %s until %s', requestor, ban_expires)
         with self.uowm.start() as uow:
@@ -423,7 +445,7 @@ class SummonsHandler:
         if self.notification_svc:
             self.notification_svc.send_notification(f'User banned until {ban_expires}', subject=f'Banned {requestor}')
 
-    def _has_user_exceeded_limit(self, requestor: Text) -> bool:
+    def _has_user_exceeded_limit(self, requestor: str) -> bool:
         with self.uowm.start() as uow:
             summons_last_hour = uow.summons.get_by_user_interval(requestor, 1)
             log.debug('Summons Per Hour: User - %s | Summons: %s', requestor, len(summons_last_hour))
@@ -433,7 +455,7 @@ class SummonsHandler:
                 return True
             return False
 
-    def _is_banned(self, requestor: Text) -> bool:
+    def _is_banned(self, requestor: str) -> bool:
         """
         Check if a given requestor is allowed to summon the bot.  First by checking the ban list and then seeing if
         they have exceeded the summons count
