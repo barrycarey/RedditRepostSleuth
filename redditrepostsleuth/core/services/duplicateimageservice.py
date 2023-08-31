@@ -1,36 +1,30 @@
 import json
 import logging
-from collections import Counter
-from logging import LoggerAdapter
 from time import perf_counter
 from typing import List, Text, Optional
 
 import requests
-from celery import group
 from distance import hamming
 from praw import Reddit
 from requests.exceptions import ConnectionError
-from celery.exceptions import TimeoutError
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery.admin_tasks import delete_post_task
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, ImageSearch, MemeTemplate, MemeHash
+from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import NoIndexException, ImageConversioinException
-from redditrepostsleuth.core.logging import get_configured_logger
+from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
 from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
-from redditrepostsleuth.core.model.image_index_api_result import APISearchResults, ImageMatch
+from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import create_search_result_json, get_default_image_search_settings
-from redditrepostsleuth.core.util.imagehashing import get_image_hashes, get_image_hashes_from_pil
-from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter, \
-    filter_no_dhash
-from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
-    filter_search_results
+from redditrepostsleuth.core.util.helpers import get_default_image_search_settings
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes
+from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter
+from redditrepostsleuth.core.util.repost.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
+    filter_search_results, log_search
 
 log = logging.getLogger(__name__)
 
@@ -68,21 +62,15 @@ class DuplicateImageService:
 
         log.debug('Starting result filters with %s matches', len(search_results.matches))
 
-        search_results.matches = list(filter(filter_no_dhash, search_results.matches))
-
-        search_results = filter_search_results(
-            search_results,
-            reddit=self.reddit,
-            uitl_api=f'{self.config.util_api}/maintenance/removed'
-        )
+        search_results = filter_search_results(search_results)
 
         search_results.search_times.start_timer('get_closest_match_time')
         # Since we regenerate the hash for memes we have to make sure the match is alive regardless of setting
         if search_results.meme_template:
-            closest_check_url = True
+            validate_checked_url = True
         else:
-            closest_check_url = search_results.search_settings.filter_dead_matches
-        closest_match = get_closest_image_match(search_results.matches, check_url=closest_check_url)
+            validate_checked_url = search_results.search_settings.filter_dead_matches #
+        closest_match = get_closest_image_match(search_results.matches, validate_url=validate_checked_url)
         search_results.search_times.stop_timer('get_closest_match_time')
 
         if closest_match and closest_match.hamming_match_percent > 40: # TODO - Move to config
@@ -157,7 +145,7 @@ class DuplicateImageService:
                 search_results.meme_hash = self._get_meme_hash(url, post_id=post.post_id if post else None)
                 search_results.search_times.stop_timer('set_meme_hash_time')
                 if not search_results.meme_hash:
-                    log.error('No meme hash, disabled meme filter')
+                    log.warning('No meme hash, disabled meme filter')
                     search_results.meme_template = None
                 else:
                     log.info('Using meme filter %s', search_results.meme_template.id)
@@ -191,21 +179,17 @@ class DuplicateImageService:
             search_results.matches = set_all_title_similarity(search_results.checked_post.title, search_results.matches)
             search_results.search_times.stop_timer('set_title_similarity_time')
 
-        search_results = self._filter_results_for_reposts(
-            search_results,
-            sort_by=sort_by
-        )
+        if search_results.matches:
+            search_results = self._filter_results_for_reposts(
+                search_results,
+                sort_by=sort_by
+            )
         search_results.search_times.stop_timer('total_search_time')
         self._log_search_time(search_results, source)
+        with self.uowm.start() as uow:
+            log_search(uow, search_results, source, 'image')
 
-        search_results = self._log_search(
-            search_results,
-            source,
-            False,  # TODO - Remove once DB column is removed
-            False, # TODO - Remove once DB column is removed
-        )
-
-        log.info('Seached %s items and found %s matches', search_results.total_searched, len(search_results.matches))
+        log.info('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
     def _get_meme_hash(self, url: str, post_id=None) -> Optional[Text]:
@@ -228,12 +212,12 @@ class DuplicateImageService:
             try:
                 meme_hashes = get_image_hashes(url, hash_size=self.config.default_meme_filter_hash_size)
                 meme_hash = meme_hashes['dhash_h']
-            except ImageConversioinException:
-                log.error('Failed to get meme hash. ')
+            except ImageConversionException:
+                log.warning('Failed to get meme hash. ')
                 if post_id:
                     # TODO - This can potentially start deleting images if we drop internet connection
-                    log.info('Sending post % to delete queue', post_id)
-                    delete_post_task.apply_async((post_id,))
+                    log.info('Sending post %s to delete queue', post_id)
+                    #celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post_id,])
                 return
             except Exception:
                 log.exception('Failed to get meme hash for %s', url, exc_info=True)
@@ -286,8 +270,8 @@ class DuplicateImageService:
             raise
 
         if r.status_code != 200:
-            log.error('Unexpected status from index API: %s', r.status_code)
-            raise NoIndexException(f'Unexpected status: {r.status_code}')
+            log.error('Unexpected status from index API: %s | %s', r.status_code, r.text)
+            raise NoIndexException(f'Unexpected status {r.status_code}')
 
         res_data = json.loads(r.text)
 
@@ -314,32 +298,21 @@ class DuplicateImageService:
             result_map = {}
             for r in api_search_results.results:
                 index_matches = uow.image_index_map.get_all_in_by_ids_and_index([m.id for m in r.matches], r.index_name)
-                posts = uow.posts.get_all_by_ids(im.reddit_post_db_id for im in index_matches)
+
                 for im in index_matches:
                     search_result = next((x for x in r.matches if x.id == im.annoy_index_id), None)
-                    result_map[im.reddit_post_db_id] = {'image_match': im, 'distance': search_result.distance}
-
-                for post in posts:
-                    sr = result_map[post.id]
-                    if not search_result:
-                        log.error('Failed to match search result to post ID %s', post.id)
-                        continue
+                    image_match_hash = image_hash = next((i for i in im.post.hashes if i.hash_type_id == 1), None) # get dhash_h
                     results.append(
                         ImageSearchMatch(
                             url,
-                            post.id,
-                            post,
-                            hamming(searched_hash, post.dhash_h),
-                            sr['distance'],
-                            len(post.dhash_h)
+                            im.post_id,
+                            im.post,
+                            hamming(searched_hash, image_match_hash.hash),
+                            search_result.distance,
+                            len(image_match_hash.hash)
                         )
                     )
-                """
-                for match in r.matches:
-                    image_match = self._get_image_search_match_from_index_result(match, r.index_name, url, searched_hash)
-                    if image_match:
-                        results.append(image_match)
-                """
+
         log.debug('%s results built', len(results))
         return results
 
@@ -352,47 +325,6 @@ class DuplicateImageService:
             )
         )
 
-    def _log_search(
-            self,
-            search_results: ImageSearchResults,
-            source: str,
-            used_current_index: bool,
-            used_historical_index: bool,
-    ) -> ImageSearchResults:
-        image_search = ImageSearch(
-            post_id=search_results.checked_post.post_id if search_results.checked_post else 'url',
-            used_historical_index=used_historical_index,
-            used_current_index=used_current_index,
-            target_hamming_distance=search_results.target_hamming_distance,
-            target_annoy_distance=search_results.search_settings.target_annoy_distance,
-            same_sub=search_results.search_settings.same_sub,
-            max_days_old=search_results.search_settings.max_days_old,
-            filter_dead_matches=search_results.search_settings.filter_dead_matches,
-            only_older_matches=search_results.search_settings.only_older_matches,
-            meme_filter=search_results.search_settings.meme_filter,
-            meme_template_used=search_results.meme_template.id if search_results.meme_template else None,
-            search_time=search_results.search_times.total_search_time,
-            index_search_time=search_results.search_times.index_search_time,
-            total_filter_time=search_results.search_times.total_filter_time,
-            target_title_match=search_results.search_settings.target_title_match,
-            matches_found=len(search_results.matches),
-            source=source,
-            subreddit=search_results.checked_post.subreddit if search_results.checked_post else 'url',
-            target_image_meme_match=search_results.search_settings.target_meme_match_percent,
-            target_image_match=search_results.search_settings.target_match_percent,
-            filter_crossposts=search_results.search_settings.filter_crossposts,
-            filter_same_author=search_results.search_settings.filter_same_author
-        )
-
-        with self.uowm.start() as uow:
-            uow.image_search.add(image_search)
-            try:
-                uow.commit()
-                search_results.logged_search = image_search
-            except Exception as e:
-                log.exception('Failed to save image search', exc_info=False)
-
-        return search_results
 
     def _remove_duplicates(self, matches: List[ImageSearchMatch]) -> List[ImageSearchMatch]:
         log.debug('Remove duplicates from %s matches', len(matches))
@@ -450,7 +382,7 @@ class DuplicateImageService:
                 try:
                     meme_hashes = get_image_hashes(match.post.url, hash_size=self.config.default_meme_filter_hash_size)
                     match_hash = meme_hashes['dhash_h']
-                except ImageConversioinException:
+                except ImageConversionException:
                     log.error('Failed to get meme hash for %s.  Sending to delete queue', match.post.post_id)
                     delete_post_task.apply_async((match.post.post_id,))
                     continue

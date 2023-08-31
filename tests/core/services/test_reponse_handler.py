@@ -31,10 +31,10 @@ class TestResponseHandler(TestCase):
             reddit_mock,
             Mock(),
             Mock(),
-            Mock()
+            live_response=True
         )
         response_handler._save_private_message = Mock(return_value=None)
-        response_handler.send_mod_mail('test subreddit', 'test subject', 'test body')
+        response_handler.send_mod_mail('test subreddit', 'test body', 'test subject')
         get_subreddit.assert_called_with('test subreddit')
         message_mock.assert_called_with('test subject', 'test body')
         response_handler._save_private_message.assert_called()

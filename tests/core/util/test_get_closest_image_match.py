@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
-from redditrepostsleuth.core.util.repost_helpers import get_closest_image_match
+from redditrepostsleuth.core.util.repost.repost_helpers import get_closest_image_match
 
 
 class Test_Repost_Helpers(TestCase):
@@ -15,7 +15,7 @@ class Test_Repost_Helpers(TestCase):
         matches.append(match2)
         matches.append(match3)
 
-        r = get_closest_image_match(matches, check_url=False)
+        r = get_closest_image_match(matches, validate_url=False)
         self.assertEqual(r, match1)
 
     def test_get_closest_image_match__empty_list(self):

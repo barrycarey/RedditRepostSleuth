@@ -85,6 +85,7 @@ def is_sub_mod_praw(sub_name: Text, useranme: Text, reddit: Reddit) -> bool:
     return False
 
 def get_subscribers(sub_name: Text, reddit: Reddit) -> Optional[int]:
+    # TODO - Remove
     subreddit = reddit.subreddit(sub_name)
     try:
         return subreddit.subscribers
@@ -119,12 +120,8 @@ def bot_has_permission(sub_name: Text, permission_name: Text, reddit: Reddit) ->
     except (Forbidden, NotFound):
         return None
 
-def get_bot_permissions(sub_name: Text, reddit: Reddit) -> List[Text]:
-    log.debug('Getting bot permissions on %s', sub_name)
-    subreddit = reddit.subreddit(sub_name)
-    if not subreddit:
-        log.error('Failed to locate subreddit %s', sub_name)
-        return None
+def get_bot_permissions(subreddit: Subreddit) -> List[Text]:
+    log.debug('Getting bot permissions on %s', subreddit.display_name)
     try:
         for mod in subreddit.moderator():
             if mod.name == 'RepostSleuthBot':
@@ -151,7 +148,7 @@ def is_bot_banned(sub_name: Text, reddit: Reddit) -> Optional[bool]:
     except Forbidden:
         banned = True
     except APIException as e:
-        if e.error_type == 'SUBREDDIT_NOTALLOWED':
+        if e.error_type in ['SUBREDDIT_NOTALLOWED', 'SUBREDDIT_NOTALLOWED_BANNED']:
             banned = True
     if banned:
         log.info('Bot is banned from %s', subreddit.display_name)

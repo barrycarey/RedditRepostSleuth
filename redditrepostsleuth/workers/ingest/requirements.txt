@@ -1,9 +1,0 @@
-celery[redis]
-praw
-redlock
-sqlalchemy
-pymysql
-imagehash
-influxdb-client
-falcon
-redlock

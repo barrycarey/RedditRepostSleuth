@@ -7,7 +7,6 @@ from praw.models import Comment, Submission
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, BotComment
 from redditrepostsleuth.core.db.db_utils import get_db_engine
-from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import log
@@ -21,7 +20,8 @@ from redditrepostsleuth.core.util.helpers import get_default_link_search_setting
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.core.util.replytemplates import TOP_POST_WATCH_BODY, \
     TOP_POST_WATCH_SUBJECT
-from redditrepostsleuth.core.util.repost_helpers import get_link_reposts, filter_search_results
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
+from redditrepostsleuth.core.util.repost.repost_search import link_search
 
 
 class TopPostMonitor:
@@ -106,7 +106,7 @@ class TopPostMonitor:
                 return
 
         elif post.post_type == 'link':
-            search_results = get_link_reposts(
+            search_results = link_search(
                 post.url,
                 self.uowm,
                 get_default_link_search_settings(self.config),
@@ -152,7 +152,7 @@ class TopPostMonitor:
         msg = self.response_builder.build_default_comment(search_results)
 
         try:
-            self.response_handler.reply_to_submission(post.post_id, msg)
+            self.response_handler.reply_to_submission(post.post_id, msg, 'hotpost')
         except APIException:
             log.error('Failed to leave comment on %s in %s. ', post.post_id, post.subreddit)
         except Exception:
@@ -189,9 +189,8 @@ class TopPostMonitor:
             self.response_handler.send_private_message(
                 submission.author,
                 TOP_POST_WATCH_BODY.format(shortlink=f'https://redd.it/{submission.id}'),
-                subject=TOP_POST_WATCH_SUBJECT,
-                source='toppost',
-                post_id=submission.id
+                TOP_POST_WATCH_SUBJECT,
+                'toppost',
             )
         except APIException as e:
             if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
@@ -230,7 +229,7 @@ class TopPostMonitor:
 
 if __name__ == '__main__':
     config = Config()
-    uowm = SqlAlchemyUnitOfWorkManager(get_db_engine(config))
+    uowm = UnitOfWorkManager(get_db_engine(config))
     event_logger = EventLogging(config=config)
     dup = DuplicateImageService(uowm, event_logger, config=config)
     response_builder = ResponseBuilder(uowm)

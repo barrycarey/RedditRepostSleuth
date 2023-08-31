@@ -1,0 +1,11 @@
+FROM python:3.11.3-buster
+MAINTAINER Barry Carey <mcarey66@gmail.com>
+
+VOLUME /src/
+ADD redditrepostsleuth /src/redditrepostsleuth/
+ADD sleuth_config_dev.json /src/sleuth_config.json
+ADD /redditrepostsleuth/summonssvc/requirements.txt /src
+ADD redditrepostsleuth/summonssvc/summons_monitor.py /src
+WORKDIR /src
+
+RUN pip install -r requirements.txt

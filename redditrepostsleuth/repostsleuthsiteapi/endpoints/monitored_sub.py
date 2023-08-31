@@ -125,7 +125,7 @@ class MonitoredSub:
                         uow.monitored_sub_config_change.add(
                             MonitoredSubConfigChange(
                                 source='site',
-                                subreddit=subreddit,
+                                monitored_sub=monitored_sub,
                                 config_key=k,
                                 old_value=str(getattr(monitored_sub, k)),
                                 new_value=str(v),

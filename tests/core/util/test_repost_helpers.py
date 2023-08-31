@@ -6,8 +6,7 @@ from redditrepostsleuth.core.model.repostmatch import RepostMatch
 from datetime import datetime
 
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
-from redditrepostsleuth.core.util.repost_helpers import sort_reposts, get_first_active_match, get_closest_image_match, \
-    filter_search_results
+from redditrepostsleuth.core.util.repost.repost_helpers import sort_reposts, get_first_active_match, get_closest_image_match
 from tests.core.helpers import get_image_search_results_multi_match
 
 
@@ -35,7 +34,7 @@ class TestHelpers(TestCase):
                 return Mock(status_code=400)
             else:
                 return Mock(status_code=200)
-        with mock.patch('redditrepostsleuth.core.util.repost_helpers.requests.head') as mock_head:
+        with mock.patch('redditrepostsleuth.core.util.repost.repost_helpers.requests.head') as mock_head:
             mock_head.side_effect = get_dummy_res
             matches = [
                 SearchMatch('www.dummy.com', Post(id=1, url='www.bad.com')),
@@ -51,5 +50,5 @@ class TestHelpers(TestCase):
         search_results.matches[0].hamming_distance = 98
         search_results.matches[1].hamming_distance = 2
         search_results.matches[2].hamming_distance = 25
-        r = get_closest_image_match(search_results.matches, check_url=False)
+        r = get_closest_image_match(search_results.matches, validate_url=False)
         self.assertEqual(2, r.post.id)

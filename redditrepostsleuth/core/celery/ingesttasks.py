@@ -1,18 +1,17 @@
-import json
 import logging
+from hashlib import md5
 from random import randint
-from time import perf_counter
 
-import requests
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
-from redditrepostsleuth.core.db.databasemodels import RedditImagePostCurrent, Post
+from redditrepostsleuth.core.db.databasemodels import Post, PostHash, UserReview
 from redditrepostsleuth.core.exception import InvalidImageUrlException
 from redditrepostsleuth.core.logfilters import IngestContextFilter
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.util.helpers import update_log_context_data
-from redditrepostsleuth.core.util.objectmapping import pushshift_to_post
+from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
 from redditrepostsleuth.ingestsvc.util import pre_process_post
 
 log = logging.getLogger('redditrepostsleuth')
@@ -22,8 +21,14 @@ log = configure_logger(
     filters=[IngestContextFilter()]
 )
 
+
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,InvalidImageUrlException), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def save_new_post(self, post: Post):
+
+    # TODO: temp fix until I can fix imgur gifs
+    if 'imgur' in post.url and 'gifv' in post.url:
+        return
+
     try:
         update_log_context_data(log, {'post_type': post.post_type, 'post_id': post.post_id,
                                       'subreddit': post.subreddit, 'service': 'Ingest',
@@ -32,27 +37,36 @@ def save_new_post(self, post: Post):
             existing = uow.posts.get_by_post_id(post.post_id)
             if existing:
                 return
-            log.debug('Post %s: Ingesting', post.post_id)
-            post = pre_process_post(post, self.uowm, self.config.image_hash_api)
-            if post:
-                monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
-                if monitored_sub and monitored_sub.active:
-                    log.info('Sending ingested post to monitored sub queue')
-                    celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post',
-                                     args=[post.post_id, monitored_sub],
-                                     queue='submonitor')
-                ingest_repost_check.apply_async((post, self.config), queue='repost')
-                log.debug('Sent post to repost queue', )
+
+            post = pre_process_post(post, self.uowm)
+
+            if not post:
+                return
+
+            monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
+            if monitored_sub and monitored_sub.active:
+                log.info('Sending ingested post to monitored sub queue')
+                celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post',
+                                 args=[post.post_id, monitored_sub],
+                                 queue='submonitor')
+
+        if post.post_type_id == 1:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_for_text_repost_task', args=[post])
+        elif post.post_type_id == 2:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_image_repost_save', args=[post])
+        elif post.post_type_id == 3:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check', args=[post])
+
+        celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
+
     except Exception as e:
         log.exception('')
 
 
-@celery.task(ignore_results=True)
-def ingest_repost_check(post, config):
-    if post.post_type == 'image' and config.repost_image_check_on_ingest:
-        celery.send_task('redditrepostsleuth.core.celery.reposttasks.check_image_repost_save', args=[post], queue='repost_image')
-    elif post.post_type == 'link' and config.repost_link_check_on_ingest:
-        celery.send_task('redditrepostsleuth.core.celery.reposttasks.link_repost_check', args=[[post]], queue='repost_link')
+@celery.task
+def save_new_posts(posts: list[Post]) -> None:
+    for post in posts:
+        save_new_post.apply_async((post,))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results(self, data):
@@ -62,9 +76,10 @@ def save_pushshift_results(self, data):
             if existing:
                 log.debug('Skipping pushshift post: %s', submission['id'])
                 continue
-            post = pushshift_to_post(submission)
+            post = reddit_submission_to_post(submission)
             log.debug('Saving pushshift post: %s', submission['id'])
             save_new_post.apply_async((post,), queue='postingest')
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results_archive(self, data):
@@ -74,51 +89,105 @@ def save_pushshift_results_archive(self, data):
             if existing:
                 log.debug('Skipping pushshift post: %s', submission['id'])
                 continue
-            post = pushshift_to_post(submission)
+            post = reddit_submission_to_post(submission)
             log.debug('Saving pushshift post: %s', submission['id'])
             save_new_post.apply_async((post,), queue='pushshift_ingest')
 
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def set_image_post_created_at(self, data):
-    start = perf_counter()
-    with self.uowm.start() as uow:
-        for image_post in data:
 
-            post = uow.posts.get_by_post_id(image_post.post_id)
-            if not post:
-                continue
-            image_post.created_at = post.created_at
-            #uow.image_post.update(image_post)
+def get_type_id(post_type: str) -> int:
+    if post_type == 'text':
+        return 1
+    elif post_type == 'image':
+        return 2
+    elif post_type == 'link':
+        return 3
+    elif post_type == 'hosted:video':
+        return 4
+    elif post_type == 'rich:video':
+        return 5
+    elif post_type == 'gallery':
+        return 6
+    elif post_type == 'video':
+        return 7
 
-        uow.image_post.bulk_save(data)
 
-        uow.commit()
-        print(f'Last ID {data[-1].id} - Time: {perf_counter() - start}')
-    #print('Finished Batch')
+def post_from_row(row: dict):
+    post =  Post(
+            post_id=row['post_id'],
+            url=row['url'],
+            perma_link=row['perma_link'],
+            author=row['author'],
+            selftext=row['selftext'],
+            created_at=row['created_at'],
+            ingested_at=row['ingested_at'],
+            subreddit=row['subreddit'],
+            title=row['title'],
+            is_crosspost=True if row['crosspost_parent'] else False,
+            last_deleted_check=row['last_deleted_check']
+        )
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def populate_image_post_current(self, data):
-    batch = []
-    with self.uowm.start() as uow:
-        for post in data:
-            existing = uow.image_post_current.get_by_post_id(post.post_id)
-            if existing:
-                continue
-            new = RedditImagePostCurrent(
-                post_id=post.post_id,
-                created_at=post.created_at,
-                dhash_h=post.dhash_h,
-                dhash_v=post.dhash_v
-            )
-            batch.append(new)
+    post.post_type_id = get_type_id(row['post_type'])
 
-        uow.image_post_current.bulk_save(batch)
-        uow.commit()
-        print('Saved batch')
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
-def ingest_id_batch(self, ids_to_get):
-    r = requests.get(f'{self.config.util_api}/reddit/submissions', params={'submission_ids': ','.join(ids_to_get)})
-    results = json.loads(r.text)
-    save_pushshift_results.apply_async((results,), queue='pushshift')
+    if post.post_type_id == 2:
+        post.hashes.append(
+            PostHash(hash=row['dhash_h'], hash_type_id=1, post_created_at=row['created_at'])
+        )
+        post.hashes.append(
+            PostHash(hash=row['dhash_v'], hash_type_id=2, post_created_at=row['created_at'])
+        )
+
+    return post
+
+
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
+def import_post(self, rows: list[dict]):
+    print('running')
+    try:
+        with self.uowm.start() as uow:
+            for row in rows:
+                if len(row['title']) > 400:
+                    row['title'] = row['title'][0:399]
+
+                if row['selftext']:
+                    if '[deleted]' in row['selftext']:
+                        continue
+                    if '[removed]' in row['selftext']:
+                        continue
+
+                if row['post_type'] == 'image' and not row['dhash_h']:
+                    log.info('Skipping image without hash: %s - %s', row['post_id'], row['url'])
+                    continue
+                post = post_from_row(row)
+
+                if row['url_hash']:
+                    post.url_hash = row['url_hash']
+                else:
+                    temp_hash = md5(post.url.encode('utf-8'))
+                    post.url_hash = temp_hash.hexdigest()
+
+                if post.post_type_id == 2 and not row['dhash_h']:
+                        log.info('Skipping missing hash')
+                        continue
+
+                try:
+                    uow.posts.add(post)
+
+                except Exception as e:
+                    log.exception('')
+
+            try:
+                uow.commit()
+                log.info('Batch saved')
+            except IntegrityError as e:
+                log.exception('duplicate')
+            except Exception as e:
+                log.exception('')
+
+    except Exception as e:
+        log.exception('')
+        return
+
+if __name__ == '__main__':
+    print("")
