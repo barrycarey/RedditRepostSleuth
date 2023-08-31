@@ -16,10 +16,11 @@ from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
-    get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub
+    get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub, \
+    get_text_search_settings_for_monitored_sub
 from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, log_search
-from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search
+from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +100,8 @@ class SubMonitor:
             search_results = self._check_for_repost(post, monitored_sub)
         elif post.post_type.name == 'link':
             search_results = self._check_for_link_repost(post, monitored_sub)
+        elif post.post_type.name == 'text':
+            search_results = self._check_for_text_repost(post, monitored_sub)
         else:
             log.warning('Unsupported post type %s', post.post_type.name)
             return
@@ -143,6 +146,7 @@ class SubMonitor:
             self._lock_comment(monitored_sub, reply_comment)
         self.create_checked_post(search_results, monitored_sub)
 
+
     def create_checked_post(self, results: SearchResults, monitored_sub: MonitoredSub):
         try:
             with self.uowm.start() as uow:
@@ -158,6 +162,19 @@ class SubMonitor:
         except Exception as e:
             log.exception('Failed to create checked post for submission %s', results.checked_post.post_id, exc_info=True)
 
+
+    def _check_for_text_repost(self, post, monitored_sub: MonitoredSub):
+        with self.uowm.start() as uow:
+            search_results = text_search_by_post(
+                post,
+                uow,
+                get_text_search_settings_for_monitored_sub(monitored_sub),
+                'sub_monitor',
+                filter_function=filter_search_results
+            )
+
+            return search_results
+
     def _check_for_link_repost(self, post: Post, monitored_sub: MonitoredSub) -> SearchResults:
         with self.uowm.start() as uow:
             search_results = link_search(
@@ -168,8 +185,6 @@ class SubMonitor:
                 post=post,
                 filter_function=filter_search_results
             )
-            search_results.search_times.stop_timer('total_search_time')
-
 
         return search_results
 

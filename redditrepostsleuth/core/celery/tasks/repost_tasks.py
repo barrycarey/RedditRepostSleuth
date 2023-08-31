@@ -4,22 +4,20 @@ import requests
 from redlock import RedLockError
 from requests.exceptions import ConnectTimeout
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.task_logic.repost_image import repost_watch_notify, check_for_post_watch
-from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch, Repost
+from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch
 from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, IndexApiException
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.util.helpers import get_default_link_search_settings, get_default_image_search_settings, \
     get_default_text_search_settings
-from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, log_search, save_repost
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
 from redditrepostsleuth.core.util.repost.repost_search import text_search_by_post, image_search_by_post, \
     link_search
-from redditrepostsleuth.core.util.repost_filters import text_distance_filter
 
 log = configure_logger(
     name='redditrepostsleuth',
@@ -97,38 +95,14 @@ def check_for_text_repost_task(self, post: Post) -> None:
     log.debug('Checking post for repost: %s', post.post_id)
     try:
         with self.uowm.start() as uow:
-            search_results = text_search_by_post(post, uow, get_default_text_search_settings(self.config))
-            search_results.matches = list(filter(text_distance_filter(self.config.default_text_target_distance), search_results.matches))
-            search_results = filter_search_results(search_results)
-            log_search(self.uowm, search_results, 'ingest', 'text')
-            if not search_results.matches:
-                log.debug('Not matching links for post %s', post.post_id)
-                uow.commit()
-                return
-
-            log.info('Found %s matching text posts', len(search_results.matches))
-            log.info('Creating Repost. Post %s is a repost of %s', post.post_id,
-                     search_results.matches[0].post.post_id)
-
-            repost_of = search_results.matches[0].post
-
-            new_repost = Repost(
-                post_id=post.id,
-                repost_of_id=repost_of.id,
-                author=post.author,
-                source='ingest',
-                subreddit=post.subreddit,
-                search_id=search_results.logged_search.id,
-                post_type_id=post.post_type_id
+            search_results = text_search_by_post(
+                post,
+                uow,
+                get_default_text_search_settings(self.config),
+                filter_function=filter_search_results,
+                source='ingest'
             )
-            uow.repost.add(new_repost)
-
-            try:
-                uow.commit()
-            except IntegrityError as e:
-                uow.rollback()
-                log.exception('Error saving text repost', exc_info=False)
-
+            log.info('Found %s matching text posts', len(search_results.matches))
     except IndexApiException as e:
         log.warning(e, exc_info=False)
         raise

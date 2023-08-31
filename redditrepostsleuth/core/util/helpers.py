@@ -290,7 +290,7 @@ def get_default_link_search_settings(config: Config) -> SearchSettings:
 
     )
 
-def get_default_text_search_settings(config: Config) -> SearchSettings:
+def get_default_text_search_settings(config: Config) -> TextSearchSettings:
     return TextSearchSettings(
         target_title_match=config.default_text_target_title_match,
         same_sub=config.default_text_same_sub_filter,
@@ -313,6 +313,19 @@ def get_link_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> S
         filter_same_author=monitored_sub.filter_same_author,
         filter_crossposts=monitored_sub.filter_crossposts,
         filter_removed_matches=monitored_sub.filter_removed_matches,
+
+    )
+
+def get_text_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> TextSearchSettings:
+    return TextSearchSettings(
+        target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
+        same_sub=monitored_sub.same_sub_only,
+        max_days_old=monitored_sub.target_days_old,
+        only_older_matches=True,
+        filter_same_author=monitored_sub.filter_same_author,
+        filter_crossposts=monitored_sub.filter_crossposts,
+        filter_removed_matches=monitored_sub.filter_removed_matches,
+        target_distance=monitored_sub.target_text_distance
 
     )
 

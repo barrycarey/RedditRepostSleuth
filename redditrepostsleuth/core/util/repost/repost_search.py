@@ -14,6 +14,7 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import IndexApiException
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
+from redditrepostsleuth.core.model.link_search_settings import TextSearchSettings
 from redditrepostsleuth.core.model.link_search_times import LinkSearchTimes
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.link_search_results import LinkSearchResults
@@ -24,6 +25,7 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.util.helpers import get_default_text_search_settings
 from redditrepostsleuth.core.util.repost.repost_helpers import save_image_repost_result, log, log_search, save_repost
+from redditrepostsleuth.core.util.repost_filters import text_distance_filter
 
 config = Config()
 log = logging.getLogger(__name__)
@@ -45,7 +47,10 @@ def get_text_matches(text: str) -> APISearchResults:
 def text_search_by_post(
         post: Post,
         uow: UnitOfWork,
-        search_settings: SearchSettings
+        search_settings: TextSearchSettings,
+        source: str,
+        filter_function: Callable[[SearchResults], SearchResults] = None
+
 ) -> Optional[SearchResults]:
 
     search_results = SearchResults(post.url, checked_post=post, search_settings=search_settings)
@@ -58,7 +63,15 @@ def text_search_by_post(
                 continue
             search_results.matches.append(TextSearchMatch(post, match.distance))
 
+    if filter_function:
+        search_results = filter_function(search_results)
+
+    search_results.matches = list(
+        filter(text_distance_filter(search_settings.target_distance), search_results.matches))
     search_results.search_times.total_search_time = api_results.total_search_time
+
+    log_search(uow, search_results, source, 'text')
+    save_repost(search_results, uow, source)
 
     return search_results
 
@@ -83,12 +96,7 @@ def image_search_by_post(
     log.debug(search_results)
     return search_results
 
-if __name__ == '__main__':
-    uowm = UnitOfWorkManager(get_db_engine(config))
-    with uowm.start() as uow:
-        post = uow.posts.get_by_id(1043928780)
 
-    text_search_by_post(post, uow, get_default_text_search_settings(config))
 
 
 def link_search(
@@ -118,7 +126,16 @@ def link_search(
     if filter_function:
         search_results = filter_function(search_results)
 
+    search_results.search_times.stop_timer('total_search_time')
     log_search(uow, search_results, source, 'link')
     save_repost(search_results, uow, source)
 
     return search_results
+
+
+if __name__ == '__main__':
+    uowm = UnitOfWorkManager(get_db_engine(config))
+    with uowm.start() as uow:
+        post = uow.posts.get_by_id(1043928780)
+
+    text_search_by_post(post, uow, get_default_text_search_settings(config))
