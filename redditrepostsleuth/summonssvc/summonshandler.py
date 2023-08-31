@@ -333,6 +333,7 @@ class SummonsHandler:
             return target_match_percent, target_meme_match_percent, target_annoy_distance
         return self.config.default_image_target_match, self.config.default_image_target_meme_match, self.config.default_image_target_annoy_distance
 
+
     def _send_response(self, response: SummonsResponse) -> None:
         """
         Take a response object and send a response to the summons.  If we're banned on the sub send a PM instead
@@ -354,6 +355,7 @@ class SummonsHandler:
                 log.info('Banned on %s, sending PM', response.summons.post.subreddit)
                 self._send_private_message(response)
         self._save_response(response)
+
 
     def _reply_to_comment(self, response: SummonsResponse) -> SummonsResponse:
         log.debug('Sending response to summons comment %s. MESSAGE: %s', response.summons.comment_id, response.message)
@@ -386,6 +388,7 @@ class SummonsHandler:
 
         return response
 
+
     def _send_private_message(self, response: SummonsResponse) -> SummonsResponse:
         redditor = self.reddit.redditor(response.summons.requestor)
         log.info('Sending private message to %s', response.summons.requestor)
@@ -403,6 +406,7 @@ class SummonsHandler:
             response.pm_reply_id = reply_pm.id
         return response
 
+
     def _save_response(self, response: SummonsResponse):
         with self.uowm.start() as uow:
             summons = uow.summons.get_by_id(response.summons.id)
@@ -417,9 +421,11 @@ class SummonsHandler:
                 except InternalError:
                     log.exception('Failed to save response to summons', exc_info=True)
 
+
     def _send_event(self, event: InfluxEvent):
         if self.event_logger:
             self.event_logger.save_event(event)
+
 
     def _send_ban_notification(self, summons: Summons) -> None:
         response = SummonsResponse(summons=summons)
@@ -428,6 +434,7 @@ class SummonsHandler:
         redditor = self.reddit.redditor(summons.requestor)
         reply_message = self.response_handler.send_private_message(redditor, response.message, 'Temporary RepostSleuth Ban', 'summons')
         self._save_response(response)
+
 
     def _ban_user(self, requestor: str) -> None:
         ban_expires = datetime.utcnow() + timedelta(hours=1)
@@ -445,6 +452,7 @@ class SummonsHandler:
         if self.notification_svc:
             self.notification_svc.send_notification(f'User banned until {ban_expires}', subject=f'Banned {requestor}')
 
+
     def _has_user_exceeded_limit(self, requestor: str) -> bool:
         with self.uowm.start() as uow:
             summons_last_hour = uow.summons.get_by_user_interval(requestor, 1)
@@ -454,6 +462,7 @@ class SummonsHandler:
                          len(summons_last_hour))
                 return True
             return False
+
 
     def _is_banned(self, requestor: str) -> bool:
         """
