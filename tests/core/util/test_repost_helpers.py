@@ -34,7 +34,7 @@ class TestHelpers(TestCase):
                 return Mock(status_code=400)
             else:
                 return Mock(status_code=200)
-        with mock.patch('redditrepostsleuth.core.util.repost_helpers.requests.head') as mock_head:
+        with mock.patch('redditrepostsleuth.core.util.repost.repost_helpers.requests.head') as mock_head:
             mock_head.side_effect = get_dummy_res
             matches = [
                 SearchMatch('www.dummy.com', Post(id=1, url='www.bad.com')),

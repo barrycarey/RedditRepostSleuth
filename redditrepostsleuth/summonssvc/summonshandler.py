@@ -25,7 +25,7 @@ from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, W
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
     SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, \
-    save_image_repost_result, save_link_repost
+    save_image_repost_result
 from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search
 from redditrepostsleuth.summonssvc.commandparsing.command_parser import CommandParser
 
