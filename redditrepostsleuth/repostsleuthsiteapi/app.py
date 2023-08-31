@@ -48,8 +48,6 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
 )
 
-#cors = CORS(allow_origins_list=['http://localhost:8081', 'https://repostsleuth.com', 'https://www.repostsleuth.com'], allow_all_methods=True, allow_all_headers=True, log_level='DEBUG')
-
 api = application = falcon.App(
     middleware=[
         CORSMiddleware(allow_origins=['http://localhost:8080', 'https://repostsleuth.com', 'https://www.repostsleuth.com'])
