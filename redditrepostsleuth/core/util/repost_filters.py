@@ -8,6 +8,7 @@ import requests
 from praw import Reddit
 from requests.exceptions import SSLError, ConnectionError, ReadTimeout
 
+from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.model.search.text_search_match import TextSearchMatch
 from redditrepostsleuth.core.util.utils import build_reddit_query_string
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
@@ -16,7 +17,7 @@ from redditrepostsleuth.core.util.constants import USER_AGENTS, REDDIT_REMOVAL_R
 from redditrepostsleuth.core.util.helpers import batch_check_urls, chunk_list
 
 log = logging.getLogger(__name__)
-
+config = Config()
 
 def cross_post_filter(match: SearchMatch) -> bool:
     if match.post.is_crosspost:
@@ -200,11 +201,11 @@ def filter_dead_urls_remote(util_api: Text, matches: List[SearchMatch]) -> List[
     return results
 
 
-def filter_removed_posts_util_api(util_api: str, matches: List[SearchMatch]) -> List[SearchMatch]:
+def filter_removed_posts_util_api(matches: list[SearchMatch]) -> list[SearchMatch]:
     results = []
     log.debug('Starting filter remove post with %s matches', len(matches))
     for chunk in chunk_list(matches, 100):
-        url = f'{util_api}/reddit/info?submission_ids={build_reddit_query_string([p.post.post_id for p in chunk])}'
+        url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string([p.post.post_id for p in chunk])}'
         try:
             response = requests.get(url)
             if response.status_code != 200:
