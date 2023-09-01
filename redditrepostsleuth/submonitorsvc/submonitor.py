@@ -1,12 +1,14 @@
 import logging
 from typing import List, Text, NoReturn, Optional
 
+from praw import Reddit
 from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, UserReview
+from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
@@ -31,7 +33,7 @@ class SubMonitor:
             self,
             image_service: DuplicateImageService,
             uowm: UnitOfWorkManager,
-            reddit: RedditManager,
+            reddit: Reddit,
             response_builder: ResponseBuilder,
             response_handler: ResponseHandler,
             event_logger: EventLogging = None,
@@ -47,6 +49,44 @@ class SubMonitor:
             self.config = config
         else:
             self.config = Config()
+
+    def _ban_user(self, username: str, subreddit_name: str, ban_reason: str, note: str = None) -> None:
+        log.info('Banning user %s from %s', username, subreddit_name)
+        subreddit = self.reddit.subreddit(subreddit_name)
+        subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+
+    def _handle_only_fans_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> Optional[UserReview]:
+        """
+        Check if a given username has been flagged as an adult content promoter.  If it has take action per
+        the monitored subreddit settings
+        :param post: Post in question
+        :param uow: database connection
+        :param monitored_sub: Subreddit the post is from
+        :return:
+        """
+
+        if not monitored_sub.adult_promoter_remove_post and not monitored_sub.adult_promoter_ban_user:
+            log.debug('No adult promoter settings active, skipping check')
+            return
+
+        log.info('Checking user %s is flagged', post.author)
+        user = uow.user_review.get_by_username(post.author)
+        if not user:
+            log.info('No user review record for %s', post.author)
+            return
+
+        if not user.content_links_found:
+            log.info('User %s has no adult content links', post.author)
+            return
+
+        log.info('User %s is flagged as an adult promoter, taking action', user.username)
+        if monitored_sub.adult_promoter_remove_post:
+            self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
+
+        if monitored_sub.adult_promoter_ban_user:
+            self._ban_user(post.author, monitored_sub.name, user.notes)
+
+        return user
 
     def has_post_been_checked(self, post_id: Text) -> bool:
         """
@@ -95,6 +135,12 @@ class SubMonitor:
 
     def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
+
+        with self.uowm.start() as uow:
+            user = self._handle_only_fans_check(post, uow, monitored_sub)
+            if user and monitored_sub.adult_promoter_remove_post:
+                log.info('Adult promoter post removed, skipping check')
+                return
 
         if post.post_type.name == 'image':
             search_results = self._check_for_repost(post, monitored_sub)
@@ -154,7 +200,7 @@ class SubMonitor:
                     MonitoredSubChecks(
                         post_id=results.checked_post.id,
                         post_type_id=results.checked_post.post_type_id,
-                        monitored_sub=monitored_sub,
+                        monitored_sub_id=monitored_sub.id,
                         search=results.logged_search
                     )
                 )
