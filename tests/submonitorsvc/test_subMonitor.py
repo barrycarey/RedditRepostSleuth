@@ -1,8 +1,8 @@
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch, ANY
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, PostType
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, PostType, UserReview
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
 
@@ -54,3 +54,67 @@ class TestSubMonitor(TestCase):
         sub_monitor._send_mod_mail(monitored_sub, Mock(matches=[], checked_post=Mock(post_id='abc123')))
         expected_message_body = 'Post [https://redd.it/abc123](https://redd.it/abc123) looks like a repost. I found 5 matches'
         mock_response_handler.send_mod_mail.assert_called_with('testsubreddit', expected_message_body, 'Repost found in r/testsubreddit', source='Submonitor')
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_only_fans_normal_user_no_action(self, mock_ban_user, mock_remove_post):
+        user_review = UserReview(content_links_found=0, username='test_user')
+        post = Post(subreddit='test_subreddit', author='test_user')
+        monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=True, adult_promoter_ban_user=True)
+        mock_uow = MagicMock(user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)))
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+
+        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+
+        mock_ban_user.assert_not_called()
+        mock_remove_post.assert_not_called()
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_only_fans_user_not_found_no_action(self, mock_ban_user, mock_remove_post):
+        post = Post(subreddit='test_subreddit', author='test_user')
+        monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=True, adult_promoter_ban_user=True)
+        mock_uow = MagicMock(user_review=MagicMock(get_by_username=MagicMock(return_value=None)))
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+
+        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+
+        mock_uow.user_review.get_by_username.assert_called_once_with('test_user')
+        mock_ban_user.assert_not_called()
+        mock_remove_post.assert_not_called()
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_only_fans_flagged_user_ban_user(self, mock_ban_user, mock_remove_post):
+        user_review = UserReview(content_links_found=1, username='test_user', notes='Profile links match onlyfans.com')
+        post = Post(subreddit='test_subreddit', author='test_user')
+        monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=False, adult_promoter_ban_user=True)
+        mock_uow = MagicMock(user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)))
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+
+        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+
+        mock_ban_user.assert_called_once_with('test_user', 'test_subreddit', 'Profile links match onlyfans.com')
+        mock_remove_post.assert_not_called()
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_only_fans_flagged_user_remove_post(self, mock_ban_user, mock_remove_post):
+        user_review = UserReview(content_links_found=1, username='test_user', notes='Profile links match onlyfans.com')
+        post = Post(subreddit='test_subreddit', author='test_user')
+        monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=True, adult_promoter_ban_user=False)
+        mock_uow = MagicMock(user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)))
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+
+        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+
+        mock_ban_user.assert_not_called()
+        mock_remove_post.assert_called_once_with(monitored_sub, ANY)

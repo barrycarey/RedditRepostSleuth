@@ -29,7 +29,7 @@ if __name__ == '__main__':
     monitor = SubMonitor(
         dup,
         uowm,
-        reddit_manager,
+        reddit,
         response_builder,
         ResponseHandler(reddit_manager, uowm, event_logger, source='submonitor', live_response=config.live_responses),
         event_logger=event_logger,

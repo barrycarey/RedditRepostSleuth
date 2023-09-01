@@ -340,6 +340,8 @@ class MonitoredSub(Base):
     send_repost_modmail = Column(Boolean, default=False)
     nsfw = Column(Boolean, default=False)
     is_private = Column(Boolean, default=False)
+    adult_promoter_remove_post = Column(Boolean, default=False)
+    adult_promoter_ban_user = Column(Boolean, default=False)
 
     post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub')
     config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub')
