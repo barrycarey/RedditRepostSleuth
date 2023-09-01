@@ -43,7 +43,7 @@ class SubMonitorTask(Task):
         response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor', live_response=self.config.live_responses)
         dup_image_svc = DuplicateImageService(self.uowm, event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
-        self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit_manager, response_builder, response_handler, event_logger=event_logger, config=self.config)
+        self.sub_monitor = SubMonitor(dup_image_svc, self.uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
         self.blacklisted_posts = []
 
 

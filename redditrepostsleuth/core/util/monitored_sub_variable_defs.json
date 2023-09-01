@@ -1,0 +1,149 @@
+{
+  "variables": [
+    {
+      "name": "active",
+      "description": "Bot is enabled on Subreddit",
+      "type": "boolean"
+    },
+    {
+      "name": "report_submission",
+      "description": "Report reports via the report function",
+      "type": "string"
+    },
+    {
+      "name": "report_msg",
+      "description": "The message template to use when reporting a post",
+      "type": "string"
+    },
+    {
+      "name": "target_days_old",
+      "description": "Only search results created less than this number of days are included in results.  Older posts are dropped",
+      "type": "integer"
+    },
+    {
+      "name": "same_sub_only",
+      "description": "Only include search results from this subreddit.  All other results are dropped",
+      "type": "boolean"
+    },
+    {
+      "name": "filter_crossposts",
+      "description": "Drop any crossposts from the search results",
+      "type": "boolean"
+    },
+    {
+      "name": "filter_same_author",
+      "description": "Do not include search results from the same author as the submission being checked",
+      "type": "boolean"
+    },
+    {
+      "name": "remove_repost",
+      "description": "If a given submission has more than 0 search results, remove the post",
+      "type": "boolean"
+    },
+    {
+      "name": "lock_post",
+      "description": "Lock the checked submission if it is considered a repost",
+      "type": "boolean"
+    },
+    {
+      "name": "mark_as_oc",
+      "description": "Mark the submission as OC if there are no search results",
+      "type": "boolean"
+    },
+    {
+      "name": "title_ignore_keywords",
+      "description": "A comma seperated list of keywords.  If any are in the title the post will not be checked",
+      "type": "string"
+    },
+    {
+      "name": "disable_summons_after_auto_response",
+      "description": "Once the bot checks a submission, it will prevent other users from calling the bot again",
+      "type": "boolean"
+    },
+    {
+      "name": "disable_bot_summons",
+      "description": "Prevents users from manually calling the bot in the Subreddit",
+      "type": "boolean"
+    },
+    {
+      "name": "only_allow_one_summons",
+      "description": "Only allows users to manually call the bot once per submission.",
+      "type": "boolean"
+    },
+    {
+      "name": "check_title_similarity",
+      "description": "Consider the title when determining if something is a repost. If enabled, title must meet target_title_match for it to be considered a repost",
+      "type": "boolean"
+    },
+    {
+      "name": "sticky_comment",
+      "description": "Sticky the comment left by the bot",
+      "type": "boolean"
+    },
+    {
+      "name": "meme_filter",
+      "description": "Users a larger hash when checking for image matches.  Useful if your subreddit gets lots of meme submissions since templates are very similar",
+      "type": "boolean"
+    },
+    {
+      "name": "check_image_posts",
+      "description": "Check all image submissions",
+      "type": "boolean"
+    },
+    {
+      "name": "check_link_posts",
+      "description": "Check all link submissions",
+      "type": "boolean"
+    },
+    {
+      "name": "check_text_posts",
+      "description": "Check all text submissions",
+      "type": "boolean"
+    },
+    {
+      "name": "target_image_match",
+      "description": "The % match an image must be to be considered a repost",
+      "type": "integer"
+    },
+    {
+      "name": "target_image_meme_match",
+      "description": "An image must meet this % when the meme filter is enabled.  ",
+      "type": "integer"
+    },
+    {
+      "name": "report_reposts",
+      "description": "Report a submission when a repost is detected",
+      "type": "boolean"
+    },
+    {
+      "name": "comment_on_repost",
+      "description": "Leave a comment with the search results on confirmed reposts",
+      "type": "boolean"
+    },
+    {
+      "name": "comment_on_oc",
+      "description": "Leave a comment on a post that is considered OC",
+      "type": "boolean"
+    },
+    {
+      "name": "lock_response_comment",
+      "description": "Lock the comment left by the bot",
+      "type": "boolean"
+    },
+    {
+      "name": "filter_removed_matches",
+      "description": "Drop any search results that have had their submissions removed from Reddit",
+      "type": "boolean"
+    },
+    {
+      "name": "filter_removed_matches",
+      "description": "Drop any search results that have had their submissions removed from Reddit",
+      "type": "boolean"
+    },
+    {
+      "name": "send_repost_modmail",
+      "description": "Send a modmail when a repost is found",
+      "type": "boolean"
+    }
+  ]
+}
