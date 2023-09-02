@@ -413,7 +413,7 @@ class SubredditConfigUpdater:
         log.info('Sending notification for new config keys being added to %s.  %s', config_keys, subreddit.display_name)
         if self.notification_svc:
             self.notification_svc.send_notification(
-                f'Added now config keys to r/{subreddit.display_name}\n{config_keys}',
+                f'Added now config keys to r/{subreddit.display_name}\n{config_keys}\nhttps://reddit.com/r/{subreddit.display_name}',
                 subject='New Config Options Notification Sent'
             )
         try:
@@ -451,7 +451,7 @@ class SubredditConfigUpdater:
         pass
 
 if __name__ == '__main__':
-    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config_dev.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = UnitOfWorkManager(get_db_engine(config))
@@ -459,6 +459,4 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config, notification_svc=notification_svc)
-    with uowm.start() as uow:
-        sub = uow.monitored_sub.get_by_sub('SelfAwarewolves')
-    updater.update_wiki_config_from_database(sub, notify=False)
+    updater.update_configs(notify_missing_keys=True)
