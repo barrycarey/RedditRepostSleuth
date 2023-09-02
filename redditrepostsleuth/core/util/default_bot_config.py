@@ -29,5 +29,7 @@ DEFAULT_CONFIG_VALUES = {
               "comment_on_oc": False,
               "lock_response_comment": False,
               "filter_removed_matches": False,
-              "send_repost_modmail": False
+              "send_repost_modmail": False,
+                "adult_promoter_remove_post": False,
+                "adult_promoter_ban_user": False
 }

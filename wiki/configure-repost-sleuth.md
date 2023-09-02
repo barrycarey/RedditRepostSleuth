@@ -124,6 +124,10 @@ To change settings simply update the JSON and save.  The bot will load the new c
 
 **send_repost_modmail:** Sends a message to modmail when a repost is found
 
+**adult_promoter_remove_post:** Remove posts created by users confirmed to promote Only Fans for Fansly Links
+
+**adult_promoter_ban_user:** Ban users confirmed to promote Only Fans for Fansly Links
+
 ### Comment Templates
 ---
 Must be in markdown format.  You have a number of variables you can use in the template.  [Click here for a list](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/repost-message-template)
