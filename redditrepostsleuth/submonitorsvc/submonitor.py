@@ -68,7 +68,7 @@ class SubMonitor:
                 source='sub_monitor'
             )
 
-    def _handle_only_fans_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> Optional[UserReview]:
+    def handle_only_fans_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub):
         """
         Check if a given username has been flagged as an adult content promoter.  If it has take action per
         the monitored subreddit settings
@@ -82,7 +82,7 @@ class SubMonitor:
             log.debug('No adult promoter settings active, skipping check')
             return
 
-        log.info('Checking user %s is flagged', post.author)
+        log.info('Checking if user %s is flagged', post.author)
         user = uow.user_review.get_by_username(post.author)
         if not user:
             log.info('No user review record for %s', post.author)
@@ -99,7 +99,6 @@ class SubMonitor:
         if monitored_sub.adult_promoter_ban_user:
             self._ban_user(post.author, monitored_sub.name, user.notes)
 
-        return user
 
     def has_post_been_checked(self, post_id: Text) -> bool:
         """
@@ -148,12 +147,6 @@ class SubMonitor:
 
     def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
-
-        with self.uowm.start() as uow:
-            user = self._handle_only_fans_check(post, uow, monitored_sub)
-            if user and monitored_sub.adult_promoter_remove_post:
-                log.info('Adult promoter post removed, skipping check')
-                return
 
         if post.post_type.name == 'image':
             search_results = self._check_for_repost(post, monitored_sub)
@@ -354,14 +347,14 @@ class SubMonitor:
             match_count=len(search_results.matches),
             author=search_results.checked_post.author,
             perma_link=search_results.checked_post.perma_link,
-            oldest_match=search_results.matches[0].post.perma_link,
+            oldest_match=search_results.matches[0].post.perma_link if search_results.matches else None,
             title=search_results.checked_post.title
         )
         self.resposne_handler.send_mod_mail(
             monitored_sub.name,
             message_body,
             f'Repost found in r/{monitored_sub.name}',
-            source='Submonitor'
+            source='sub_monitor'
         )
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:

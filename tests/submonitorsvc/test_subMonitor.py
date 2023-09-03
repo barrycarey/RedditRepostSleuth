@@ -53,7 +53,7 @@ class TestSubMonitor(TestCase):
         monitored_sub = MonitoredSub(name='testsubreddit', send_repost_modmail=True)
         sub_monitor._send_mod_mail(monitored_sub, Mock(matches=[], checked_post=Mock(post_id='abc123')))
         expected_message_body = 'Post [https://redd.it/abc123](https://redd.it/abc123) looks like a repost. I found 5 matches'
-        mock_response_handler.send_mod_mail.assert_called_with('testsubreddit', expected_message_body, 'Repost found in r/testsubreddit', source='Submonitor')
+        mock_response_handler.send_mod_mail.assert_called_with('testsubreddit', ANY, 'Repost found in r/testsubreddit', source='sub_monitor')
 
     @patch.object(SubMonitor, '_remove_post')
     @patch.object(SubMonitor, '_ban_user')
@@ -66,7 +66,7 @@ class TestSubMonitor(TestCase):
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
                                  config=MagicMock())
 
-        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+        sub_monitor.handle_only_fans_check(post, mock_uow, monitored_sub)
 
         mock_ban_user.assert_not_called()
         mock_remove_post.assert_not_called()
@@ -81,7 +81,7 @@ class TestSubMonitor(TestCase):
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
                                  config=MagicMock())
 
-        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+        sub_monitor.handle_only_fans_check(post, mock_uow, monitored_sub)
 
         mock_uow.user_review.get_by_username.assert_called_once_with('test_user')
         mock_ban_user.assert_not_called()
@@ -98,7 +98,7 @@ class TestSubMonitor(TestCase):
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
                                  config=MagicMock())
 
-        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+        sub_monitor.handle_only_fans_check(post, mock_uow, monitored_sub)
 
         mock_ban_user.assert_called_once_with('test_user', 'test_subreddit', 'Profile links match onlyfans.com')
         mock_remove_post.assert_not_called()
@@ -114,7 +114,7 @@ class TestSubMonitor(TestCase):
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
                                  config=MagicMock())
 
-        sub_monitor._handle_only_fans_check(post, mock_uow, monitored_sub)
+        sub_monitor.handle_only_fans_check(post, mock_uow, monitored_sub)
 
         mock_ban_user.assert_not_called()
         mock_remove_post.assert_called_once_with(monitored_sub, ANY)
