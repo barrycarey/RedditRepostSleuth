@@ -84,7 +84,14 @@ MONITORED_SUB_MOD_REMOVED_CONTENT = 'We noticed Repost Sleuth is no longer a mod
                                     'If you decide to use the bot again in the future, simply re-mod it and it will set itself back up.\n\n' \
                                     'If you believe this message is an error, please message u/barrycarey'
 
-REPOST_MODMAIL = 'Post [https://redd.it/{post_id}](https://redd.it/{post_id}) looks like a repost. I found {match_count} matches'
+REPOST_MODMAIL_OLD = 'Post [https://redd.it/{post_id}](https://redd.it/{post_id}) looks like a repost. I found {match_count} matches'
+
+REPOST_MODMAIL = 'I found a repost in [r/{subreddit}](https://reddit.com/r/{subreddit})\n\n' \
+                  '**Matches:** {match_count}\n\n' \
+                 '**Author:** [u/{author}](https://reddit.com/u/{author})\n\n' \
+                 '**Title:** {title}\n\n' \
+                 '**Permalink:** https://reddit.com{perma_link}\n\n' \
+                 '**Oldest Match:** https://reddit.com{oldest_match}\n\n'
 
 REPLY_TEST_MODE = 'THIS MESSAGE WAS GENERATED FROM A TESTING INSTANCE OF REPOST SLEUTH. RESULTS ARE NOT ACCURATE. A RESPONSE FROM THE PRODUCTION INSTANCE SHOULD ALSO COME \n\n'
 

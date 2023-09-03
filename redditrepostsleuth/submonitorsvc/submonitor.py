@@ -349,8 +349,14 @@ class SubMonitor:
         """
         if not monitored_sub.send_repost_modmail:
             return
-        message_body = REPOST_MODMAIL.format(post_id=search_results.checked_post.post_id,
-                                             match_count=len(search_results.matches))
+        message_body = REPOST_MODMAIL.format(
+            subreddit=monitored_sub.name,
+            match_count=len(search_results.matches),
+            author=search_results.checked_post.author,
+            perma_link=search_results.checked_post.perma_link,
+            oldest_match=search_results.matches[0].post.perma_link,
+            title=search_results.checked_post.title
+        )
         self.resposne_handler.send_mod_mail(
             monitored_sub.name,
             message_body,
