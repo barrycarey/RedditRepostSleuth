@@ -64,8 +64,12 @@ beat_schedule = {
         'schedule': 86400
     },
     'update-top-reposters': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_top_reposters_task',
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_all_top_reposters_task',
         'schedule': 86400
+    },
+    'update-daily-reposters': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_daily_top_reposters_task',
+        'schedule': 900
     },
     'send-reports-to-meme-voting': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.send_reports_to_meme_voting_task',
@@ -82,6 +86,10 @@ beat_schedule = {
     'update-profile-token': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',
         'schedule': 120
+    },
+    'update-daily-stats': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_daily_stats',
+        'schedule': 86400
     },
 
 }
