@@ -74,6 +74,8 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
             log.warning('Unknown post type for %s - https://redd.it/%s', post.post_id, post.post_id)
             return
 
+        self.sub_monitor.handle_only_fans_check(post, uow, monitored_sub)
+
     title_keywords = []
     if monitored_sub.title_ignore_keywords:
         title_keywords = monitored_sub.title_ignore_keywords.split(',')
