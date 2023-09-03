@@ -87,3 +87,5 @@ MONITORED_SUB_MOD_REMOVED_CONTENT = 'We noticed Repost Sleuth is no longer a mod
 REPOST_MODMAIL = 'Post [https://redd.it/{post_id}](https://redd.it/{post_id}) looks like a repost. I found {match_count} matches'
 
 REPLY_TEST_MODE = 'THIS MESSAGE WAS GENERATED FROM A TESTING INSTANCE OF REPOST SLEUTH. RESULTS ARE NOT ACCURATE. A RESPONSE FROM THE PRODUCTION INSTANCE SHOULD ALSO COME \n\n'
+
+NO_BAN_PERMISSIONS = 'I attempted to ban user {username} but I do not have the permissions to do so.  Please add the Manage Users permission to u/RepostSleuthBot on r/{subreddit}'

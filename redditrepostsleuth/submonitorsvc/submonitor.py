@@ -20,7 +20,7 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub, \
     get_text_search_settings_for_monitored_sub
-from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
+from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, NO_BAN_PERMISSIONS
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, log_search
 from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
 
@@ -53,7 +53,20 @@ class SubMonitor:
     def _ban_user(self, username: str, subreddit_name: str, ban_reason: str, note: str = None) -> None:
         log.info('Banning user %s from %s', username, subreddit_name)
         subreddit = self.reddit.subreddit(subreddit_name)
-        subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+        try:
+            subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+        except Forbidden:
+            log.warning('Unable to ban user %s on %s.  No permissions', username, subreddit_name)
+            message_body = NO_BAN_PERMISSIONS.format(
+                username=username,
+                subreddit=subreddit_name
+            )
+            self.resposne_handler.send_mod_mail(
+                subreddit_name,
+                message_body,
+                f'Unable To Ban User, No Permissions',
+                source='sub_monitor'
+            )
 
     def _handle_only_fans_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> Optional[UserReview]:
         """
