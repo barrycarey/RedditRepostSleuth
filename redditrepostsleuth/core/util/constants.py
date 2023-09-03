@@ -16,3 +16,8 @@ GENERIC_REQ_HEADERS = {
 }
 
 REDDIT_REMOVAL_REASONS = ['deleted', 'author', 'reddit', 'copyright_takedown', 'content_takedown']
+
+EXCLUDE_FROM_TOP_REPOSTERS = [
+    'AutoModerator',
+    'AutoNewspaperAdmin',
+]

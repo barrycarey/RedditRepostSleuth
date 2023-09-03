@@ -1,6 +1,5 @@
 from praw.exceptions import PRAWException
 from prawcore import TooManyRequests
-from sqlalchemy import text, func
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -10,10 +9,8 @@ from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMoni
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask, AdminTask
 from redditrepostsleuth.core.celery.task_logic.scheduled_task_logic import update_proxies, update_top_reposts, \
-    update_top_reposters, token_checker
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount, StatsTopRepost
-from redditrepostsleuth.core.db.databasemodels import StatsTopReposters
-from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+    token_checker, run_update_top_reposters, update_top_reposters
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
@@ -166,9 +163,20 @@ def update_daily_stats(self):
 
 
 @celery.task(bind=True, base=SqlAlchemyTask)
-def update_top_reposters_task(self):
+def update_all_top_reposters_task(self):
     try:
-        update_top_reposters(self.uowm)
+        with self.uowm.start() as uow:
+            run_update_top_reposters(uow)
+    except Exception as e:
+        log.exception('Unknown task error')
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def update_daily_top_reposters_task(self):
+    post_types = [1, 2, 3]
+    try:
+        with self.uowm.start() as uow:
+            for post_type_id in post_types:
+                update_top_reposters(uow, post_type_id, 1)
     except Exception as e:
         log.exception('Unknown task error')
 
