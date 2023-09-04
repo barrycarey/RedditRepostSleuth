@@ -141,7 +141,7 @@ class MonitoredSub:
                 raise HTTPInternalServerError(title='Problem Saving Config', description='Something went tits up when saving the config')
 
         celery.send_task('redditrepostsleuth.core.celery.admin_tasks.update_subreddit_config_from_database', args=[monitored_sub, user_data],
-                         queue='monitored_sub_config_update')
+                         queue='update_wiki_from_database')
 
 
 

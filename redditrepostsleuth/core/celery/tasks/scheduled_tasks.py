@@ -1,5 +1,5 @@
 from praw.exceptions import PRAWException
-from prawcore import TooManyRequests, Redirect
+from prawcore import TooManyRequests, Redirect, ServerError
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -166,8 +166,8 @@ def update_daily_stats(self):
             daily_stats.link_reposts_24h = uow.repost.get_count(hours=24, post_type=3)
             daily_stats.link_reposts_total = uow.repost.get_count(post_type=3)
             daily_stats.image_reposts_24h = uow.repost.get_count(hours=24, post_type=2)
-            daily_stats.image_reposts_total = uow.repost.get_count(hours=24, post_type=2)
-            daily_stats.monitored_subreddit_count = uow.monitored_sub.count()
+            daily_stats.image_reposts_total = uow.repost.get_count(post_type=2)
+            daily_stats.monitored_subreddit_count = uow.monitored_sub.get_count()
             uow.stat_daily_count.add(daily_stats)
             uow.commit()
             log.info('[Daily Stat Update] Finished')
@@ -216,6 +216,8 @@ def update_monitored_sub_stats_task(self, sub_name: str) -> None:
             )
     except TooManyRequests:
         raise
+    except ServerError as e:
+        log.warning('Server error checking %s', sub_name)
     except Exception as e:
         log.exception('')
 
