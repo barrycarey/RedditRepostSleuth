@@ -87,8 +87,12 @@ def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = No
         query = range_query
     else:
         query = all_time_query
-    uow.session.execute(text('DELETE FROM stat_top_reposters WHERE post_type_id=:posttype AND day_range=:days'),
-                        {'posttype': post_type_id, 'days': day_range})
+    if day_range:
+        uow.session.execute(text('DELETE FROM stat_top_reposters WHERE post_type_id=:posttype AND day_range=:days'),
+                            {'posttype': post_type_id, 'days': day_range})
+    else:
+        uow.session.execute(text('DELETE FROM stat_top_reposters WHERE post_type_id=:posttype AND day_range IS NULL'),
+                            {'posttype': post_type_id})
     uow.commit()
     result = uow.session.execute(text(query), {'posttype': post_type_id, 'days': day_range})
     for row in result:
