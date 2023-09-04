@@ -10,7 +10,7 @@ import redis
 import requests
 from praw import Reddit
 from praw.exceptions import PRAWException
-from prawcore import NotFound, Forbidden
+from prawcore import NotFound, Forbidden, Redirect
 from sqlalchemy import text, func
 
 from redditrepostsleuth.core.config import Config
@@ -168,7 +168,7 @@ def update_monitored_sub_data(
     if monitored_sub.is_mod:
         if monitored_sub.failed_admin_check_count > 0:
             notification_svc.send_notification(
-                f'Failed admin check for r/{monitored_sub.name} reset',
+                f'Failed admin check for [r/{monitored_sub.name}](https://reddit.com/r/{monitored_sub.name}) reset',
                 subject='Failed Admin Check Reset'
             )
         monitored_sub.failed_admin_check_count = 0
@@ -178,10 +178,10 @@ def update_monitored_sub_data(
         monitored_sub.active = False
         uow.commit()
         notification_svc.send_notification(
-            f'Failed admin check for https://reddit.com/r/{monitored_sub.name} increased to {monitored_sub.failed_admin_check_count}.',
+            f'Failed admin check for [r/{monitored_sub.name}](https://reddit.com/r/{monitored_sub.name}) increased to {monitored_sub.failed_admin_check_count}.',
             subject='Failed Admin Check Increased'
         )
-        return
+
 
     if monitored_sub.failed_admin_check_count == 2:
         subreddit = reddit.subreddit(monitored_sub.name)
@@ -198,12 +198,14 @@ def update_monitored_sub_data(
         return
     elif monitored_sub.failed_admin_check_count >= 4 and monitored_sub.name.lower() != 'dankmemes':
         notification_svc.send_notification(
-            f'Sub r/{monitored_sub.name} failed admin check 4 times.  Removing',
+            f'[r/{monitored_sub.name}](https://reddit.com/r/{monitored_sub.name}) failed admin check {monitored_sub.failed_admin_check_count} times',
             subject='Removing Monitored Subreddit'
         )
         uow.monitored_sub.remove(monitored_sub)
         uow.commit()
         return
+    elif monitored_sub.failed_admin_check_count > 0:
+        log.info('Subreddit %s failed admin check, skipping remaining checks', monitored_sub.name)
 
     try:
         monitored_sub.subscribers = subreddit.subscribers
@@ -212,6 +214,8 @@ def update_monitored_sub_data(
         uow.monitored_sub.remove(monitored_sub)
         uow.commit()
         return
+    except Redirect as e:
+        log.exception('')
 
     monitored_sub.is_private = True if subreddit.subreddit_type == 'private' else False
     monitored_sub.nsfw = True if subreddit.over18 else False
