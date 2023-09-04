@@ -46,7 +46,7 @@ class Post(Base):
     searches = relationship('RepostSearch', back_populates='post')
     reports = relationship('UserReport', back_populates='post')
     hashes = relationship('PostHash', back_populates='post')
-    post_type = relationship('PostType') # lazy has to be set to JSON encoders don't fail for unbound session
+    post_type = relationship('PostType', lazy='joined') # lazy has to be set to JSON encoders don't fail for unbound session
 
     def to_dict(self):
         return {
@@ -82,7 +82,7 @@ class PostHash(Base):
     post_created_at = Column(DateTime, nullable=False)  # TODO: change to default timestamp
 
     post = relationship("Post", back_populates='hashes')
-    hash_type = relationship("HashType")
+    hash_type = relationship("HashType", lazy='joined')
 
     def to_dict(self):
         return {
@@ -342,6 +342,8 @@ class MonitoredSub(Base):
     is_private = Column(Boolean, default=False)
     adult_promoter_remove_post = Column(Boolean, default=False)
     adult_promoter_ban_user = Column(Boolean, default=False)
+    #high_volume_reposter_ban_user = Column(Boolean, default=False)
+    #high_volume_reposter_threshold = Column(Integer, default=100)
 
     post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub', cascade='all, delete', )
     config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub', cascade='all, delete')

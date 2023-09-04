@@ -244,7 +244,7 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
         same_sub=config.default_image_same_sub_filter,
         max_days_old=config.default_image_max_days_old_filter,
         target_annoy_distance=config.default_image_target_annoy_distance,
-        max_depth=-1,
+        max_depth=10000,
         max_matches=config.default_image_max_matches
 
     )
@@ -273,6 +273,7 @@ def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSe
                               default=None) or config.default_image_same_sub_filter,
         max_days_old=req.get_param_as_int('max_days_old', required=False,
                              default=None) or config.default_link_max_days_old_filter,
+        max_depth=10000
 
     )
 
@@ -341,7 +342,7 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         filter_same_author=monitored_sub.filter_same_author,
         filter_crossposts=monitored_sub.filter_crossposts,
         filter_removed_matches=monitored_sub.filter_removed_matches,
-        max_depth=-1,
+        max_depth=10000,
         max_matches=200
 
     )
