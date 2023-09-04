@@ -8,6 +8,9 @@ import time
 import jwt
 import redis
 import requests
+from praw import Reddit
+from praw.exceptions import PRAWException
+from prawcore import NotFound, Forbidden
 from sqlalchemy import text, func
 
 from redditrepostsleuth.core.config import Config
@@ -16,7 +19,12 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import get_configured_logger
+from redditrepostsleuth.core.notification.notification_service import NotificationService
+from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.util.constants import EXCLUDE_FROM_TOP_REPOSTERS
+from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_praw, get_bot_permissions
+from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
+    MONITORED_SUB_MOD_REMOVED_SUBJECT
 
 log = logging.getLogger(__name__)
 log = get_configured_logger(__name__)
@@ -139,6 +147,85 @@ def token_checker() -> None:
     redis_client.set('prof_token', decoded_token['sub'])
     log.info('New token set in Redis')
 
+def update_monitored_sub_data(
+        uow: UnitOfWork,
+        subreddit_name: str,
+        reddit: Reddit,
+        notification_svc: NotificationService,
+        response_handler: ResponseHandler
+) -> None:
+    monitored_sub = uow.monitored_sub.get_by_sub(subreddit_name)
+    if not monitored_sub:
+        log.error('Failed to find subreddit %s', subreddit_name)
+        return
+    subreddit = reddit.subreddit(monitored_sub.name)
+
+    monitored_sub.is_mod = is_sub_mod_praw(monitored_sub.name, 'repostsleuthbot', reddit)
+
+    if not monitored_sub.failed_admin_check_count:
+        monitored_sub.failed_admin_check_count = 0
+
+    if monitored_sub.is_mod:
+        if monitored_sub.failed_admin_check_count > 0:
+            notification_svc.send_notification(
+                f'Failed admin check for r/{monitored_sub.name} reset',
+                subject='Failed Admin Check Reset'
+            )
+        monitored_sub.failed_admin_check_count = 0
+        uow.commit()
+    else:
+        monitored_sub.failed_admin_check_count += 1
+        monitored_sub.active = False
+        uow.commit()
+        notification_svc.send_notification(
+            f'Failed admin check for https://reddit.com/r/{monitored_sub.name} increased to {monitored_sub.failed_admin_check_count}.',
+            subject='Failed Admin Check Increased'
+        )
+        return
+
+    if monitored_sub.failed_admin_check_count == 2:
+        subreddit = reddit.subreddit(monitored_sub.name)
+        message = MONITORED_SUB_MOD_REMOVED_CONTENT.format(hours='72', subreddit=monitored_sub.name)
+        try:
+            response_handler.send_mod_mail(
+                subreddit.display_name,
+                message,
+                MONITORED_SUB_MOD_REMOVED_SUBJECT,
+                source='mod_check'
+            )
+        except PRAWException:
+            pass
+        return
+    elif monitored_sub.failed_admin_check_count >= 4 and monitored_sub.name.lower() != 'dankmemes':
+        notification_svc.send_notification(
+            f'Sub r/{monitored_sub.name} failed admin check 4 times.  Removing',
+            subject='Removing Monitored Subreddit'
+        )
+        uow.monitored_sub.remove(monitored_sub)
+        uow.commit()
+        return
+
+    try:
+        monitored_sub.subscribers = subreddit.subscribers
+    except NotFound as e:
+        log.warning('Subreddit %s has been banned.  Removing', monitored_sub.name)
+        uow.monitored_sub.remove(monitored_sub)
+        uow.commit()
+        return
+
+    monitored_sub.is_private = True if subreddit.subreddit_type == 'private' else False
+    monitored_sub.nsfw = True if subreddit.over18 else False
+    log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
+
+    perms = get_bot_permissions(subreddit) if monitored_sub.is_mod else []
+    monitored_sub.post_permission = True if 'all' in perms or 'posts' in perms else None
+    monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
+    log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission,
+             monitored_sub.wiki_permission)
+
+
+
+    uow.commit()
 
 if __name__ == '__main__':
     uowm = UnitOfWorkManager(get_db_engine(Config()))

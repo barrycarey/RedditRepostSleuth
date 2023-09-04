@@ -13,7 +13,7 @@ class MonitoredSubRepository:
         self.db_session.add(item)
 
     def get_all(self, limit: int = None) -> List[MonitoredSub]:
-        return self.db_session.query(MonitoredSub).order_by(MonitoredSub.subscribers.desc()).limit(limit).all()
+        return self.db_session.query(MonitoredSub).order_by(MonitoredSub.subscribers.asc()).limit(limit).all()
 
     def get_all_active(self, limit: int = None) -> List[MonitoredSub]:
         return self.db_session.query(MonitoredSub).filter(MonitoredSub.active == True).order_by(MonitoredSub.subscribers.desc()).limit(limit).all()

@@ -185,7 +185,7 @@ async def main() -> None:
                 continue
 
             res_data = json.loads(results)
-            if not len(res_data['data']['children']):
+            if not res_data or not len(res_data['data']['children']):
                 log.info('No results')
                 continue
 

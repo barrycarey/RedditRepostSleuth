@@ -4,6 +4,7 @@ from json import JSONDecodeError
 from typing import Text, List, NoReturn
 
 from praw import Reddit
+from praw.exceptions import RedditAPIException
 from praw.models import WikiPage, Subreddit
 from prawcore import NotFound, Forbidden, ResponseException, TooManyRequests
 from sqlalchemy import func
@@ -226,7 +227,10 @@ class SubredditConfigUpdater:
         if not new_config:
             log.error('Failed to generate new config for %s', monitored_sub.name)
             return False
-        self._update_wiki_page(wiki_page, new_config)
+        try:
+            self._update_wiki_page(wiki_page, new_config)
+        except RedditAPIException as e:
+            log.exception('')
         wiki_page = subreddit.wiki['repost_sleuth_config']  # Force refresh so we can get latest revision ID
         self._create_revision(wiki_page, monitored_sub)
         self._set_config_validity(wiki_page.revision_id, True)
@@ -346,7 +350,7 @@ class SubredditConfigUpdater:
         try:
             subreddit.wiki.create(self.config.wiki_config_name, json.dumps(DEFAULT_CONFIG_VALUES))
         except NotFound:
-            log.exception('Failed to create wiki page', exc_info=False)
+            log.warning('Failed to create wiki page for %s', subreddit.display_name)
             raise
 
         self.notification_svc.send_notification(
