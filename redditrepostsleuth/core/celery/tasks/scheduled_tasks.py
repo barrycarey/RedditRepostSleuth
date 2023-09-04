@@ -1,5 +1,5 @@
 from praw.exceptions import PRAWException
-from prawcore import TooManyRequests
+from prawcore import TooManyRequests, Redirect
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -9,7 +9,7 @@ from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMoni
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask, AdminTask
 from redditrepostsleuth.core.celery.task_logic.scheduled_task_logic import update_proxies, update_top_reposts, \
-    token_checker, run_update_top_reposters, update_top_reposters
+    token_checker, run_update_top_reposters, update_top_reposters, update_monitored_sub_data
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_praw, get_bot_permissions
@@ -77,9 +77,9 @@ def update_monitored_sub_data_task(self) -> None:
     log.info('Starting Job: Update Subreddit Data')
     try:
         with self.uowm.start() as uow:
-            subs = uow.monitored_sub.get_all_active()
+            subs = uow.monitored_sub.get_all()
             for sub in subs:
-                update_monitored_sub_stats.apply_async((sub.name,))
+                update_monitored_sub_stats_task.apply_async((sub.name,))
     except Exception as e:
         log.exception('Problem with scheduled task')
 
@@ -121,8 +121,21 @@ def check_meme_template_potential_votes_task(self):
         log.exception('Problem in scheduled task')
 
 @celery.task(bind=True, base=AdminTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
-def check_for_subreddit_config_update_task(self, monitored_sub: MonitoredSub) -> None:
-    self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)
+def check_for_subreddit_config_update_task(self, subreddit_name: str) -> None:
+    with self.uowm.start() as uow:
+
+        try:
+            monitored_sub = uow.monitored_sub.get_by_sub(subreddit_name)
+            self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)
+        except TooManyRequests:
+            raise
+        except Redirect as e:
+            if str(e) == 'Redirect to /subreddits/search':
+                log.warning('Subreddit %s no longer exists.  Setting to inactive in database', monitored_sub.name)
+                monitored_sub.active = False
+                uow.commit()
+        except Exception as e:
+            log.exception('')
 
 @celery.task(bind=True, base=RedditTask)
 def queue_config_updates_task(self):
@@ -131,9 +144,9 @@ def queue_config_updates_task(self):
         print('[Scheduled Job] Queue config update check')
 
         with self.uowm.start() as uow:
-            monitored_subs = uow.monitored_sub.get_all()
+            monitored_subs = uow.monitored_sub.get_all_active()
             for monitored_sub in monitored_subs:
-                check_for_subreddit_config_update_task.apply_async((monitored_sub,))
+                check_for_subreddit_config_update_task.apply_async((monitored_sub.name,))
 
         print('[Scheduled Job Complete] Queue config update check')
     except Exception as e:
@@ -142,6 +155,7 @@ def queue_config_updates_task(self):
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 def update_daily_stats(self):
+    log.info('[Daily Stat Update] Started')
     daily_stats = StatsDailyCount()
     try:
         with self.uowm.start() as uow:
@@ -156,9 +170,9 @@ def update_daily_stats(self):
             daily_stats.monitored_subreddit_count = uow.monitored_sub.count()
             uow.stat_daily_count.add(daily_stats)
             uow.commit()
-            log.info('Updated daily stats')
+            log.info('[Daily Stat Update] Finished')
     except Exception as e:
-        log.exception('')
+        log.exception('Problem updating stats')
 
 
 
@@ -189,62 +203,21 @@ def update_top_reposts_task(self):
 
 
 
-@celery.task(bind=True, base=RedditTask)
-def update_monitored_sub_stats(self, sub_name: str) -> None:
-    with self.uowm.start() as uow:
-        monitored_sub: MonitoredSub = uow.monitored_sub.get_by_sub(sub_name)
-        if not monitored_sub:
-            log.error('Failed to find subreddit %s', sub_name)
-            return
-        subreddit = self.reddit.subreddit(monitored_sub.name)
-        monitored_sub.subscribers = subreddit.subscribers
-        monitored_sub.is_private = True if subreddit.subreddit_type == 'private' else False
-        monitored_sub.nsfw = True if subreddit.over18 else False
-        log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
-        monitored_sub.is_mod = is_sub_mod_praw(monitored_sub.name, 'repostsleuthbot', self.reddit)
-        perms = get_bot_permissions(subreddit) if monitored_sub.is_mod else []
-        monitored_sub.post_permission = True if 'all' in perms or 'posts' in perms else None
-        monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
-        log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission, monitored_sub.wiki_permission)
-
-        if not monitored_sub.failed_admin_check_count:
-            monitored_sub.failed_admin_check_count = 0
-
-        if monitored_sub.is_mod:
-            if monitored_sub.failed_admin_check_count > 0:
-                self.notification_svc.send_notification(
-                    f'Failed admin check for r/{monitored_sub.name} reset',
-                    subject='Failed Admin Check Reset'
-                )
-            monitored_sub.failed_admin_check_count = 0
-        else:
-            monitored_sub.failed_admin_check_count += 1
-            monitored_sub.active = False
-            self.notification_svc.send_notification(
-                f'Failed admin check for https://reddit.com/r/{monitored_sub.name} increased to {monitored_sub.failed_admin_check_count}.',
-                subject='Failed Admin Check Increased'
+@celery.task(bind=True, base=RedditTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
+def update_monitored_sub_stats_task(self, sub_name: str) -> None:
+    try:
+        with self.uowm.start() as uow:
+            update_monitored_sub_data(
+                uow,
+                sub_name,
+                self.reddit,
+                self.notification_svc,
+                self.response_handler
             )
-
-        if monitored_sub.failed_admin_check_count == 2:
-            subreddit = self.reddit.subreddit(monitored_sub.name)
-            message = MONITORED_SUB_MOD_REMOVED_CONTENT.format(hours='72', subreddit=monitored_sub.name)
-            try:
-                self.response_handler.send_mod_mail(
-                    subreddit.display_name,
-                    message,
-                    MONITORED_SUB_MOD_REMOVED_SUBJECT,
-                    source='mod_check'
-                )
-            except PRAWException:
-                pass
-        elif monitored_sub.failed_admin_check_count >= 4 and monitored_sub.name.lower() != 'dankmemes':
-            self.notification_svc.send_notification(
-                f'Sub r/{monitored_sub.name} failed admin check 4 times.  Removing',
-                subject='Removing Monitored Subreddit'
-            )
-            uow.monitored_sub.remove(monitored_sub)
-
-        uow.commit()
+    except TooManyRequests:
+        raise
+    except Exception as e:
+        log.exception('')
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 def update_proxies_task(self) -> None:

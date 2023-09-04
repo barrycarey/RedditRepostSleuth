@@ -73,6 +73,8 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
         dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
         post.hashes.append(PostHash(hash=str(dhash_h), hash_type_id=1, post_created_at=post.created_at))
         post.hashes.append(PostHash(hash=str(dhash_v), hash_type_id=2, post_created_at=post.created_at))
+    except OSError as e:
+        log.warning('Problem hashing image: %s', e)
     except Exception as e:
         # TODO: Specific exception
         log.exception('Error creating hash', exc_info=True)

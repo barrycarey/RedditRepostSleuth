@@ -46,7 +46,7 @@ class Post(Base):
     searches = relationship('RepostSearch', back_populates='post')
     reports = relationship('UserReport', back_populates='post')
     hashes = relationship('PostHash', back_populates='post')
-    post_type = relationship('PostType', lazy='joined') # lazy has to be set to JSON encoders don't fail for unbound session
+    post_type = relationship('PostType') # lazy has to be set to JSON encoders don't fail for unbound session
 
     def to_dict(self):
         return {
@@ -82,7 +82,7 @@ class PostHash(Base):
     post_created_at = Column(DateTime, nullable=False)  # TODO: change to default timestamp
 
     post = relationship("Post", back_populates='hashes')
-    hash_type = relationship("HashType", lazy='joined')
+    hash_type = relationship("HashType")
 
     def to_dict(self):
         return {
