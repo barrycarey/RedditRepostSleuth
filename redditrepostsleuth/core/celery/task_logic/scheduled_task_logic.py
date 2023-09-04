@@ -89,12 +89,13 @@ def update_top_reposts(uowm: UnitOfWorkManager):
 
 def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = None) -> None:
     log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
-    range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 5 ORDER BY c DESC"
-    all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 5 ORDER BY c DESC"
+    range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC"
+    all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC"
     if day_range:
         query = range_query
     else:
         query = all_time_query
+
     if day_range:
         uow.session.execute(text('DELETE FROM stat_top_reposters WHERE post_type_id=:posttype AND day_range=:days'),
                             {'posttype': post_type_id, 'days': day_range})
@@ -118,10 +119,9 @@ def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = No
 def run_update_top_reposters(uow: UnitOfWork):
     post_types = [1, 2, 3]
     day_ranges = [1, 7, 14, 30, None]
-    with uowm.start() as uow:
-        for post_type_id in post_types:
-            for days in day_ranges:
-                update_top_reposters(uow, post_type_id, days)
+    for post_type_id in post_types:
+        for days in day_ranges:
+            update_top_reposters(uow, post_type_id, days)
 
 
 def token_checker() -> None:
