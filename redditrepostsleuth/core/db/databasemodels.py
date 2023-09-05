@@ -350,6 +350,7 @@ class MonitoredSub(Base):
     post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub', cascade='all, delete', )
     config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub', cascade='all, delete')
     config_changes = relationship('MonitoredSubConfigChange', back_populates='monitored_sub', cascade='all, delete')
+    user_whitelist = relationship('UserWhitelist', back_populates='monitored_sub', cascade='all, delete')
 
     def __repr__(self):
         return f'{self.name} | Active: {self.active}'
@@ -416,6 +417,17 @@ class MonitoredSub(Base):
         }
 
 
+class UserWhitelist(Base):
+    __tablename__ = 'user_whitelist'
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(25), nullable=False)
+    monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
+    ignore_of_detection = Column(Boolean, default=False)
+    ignore_high_volume_detection = Column(Boolean, default=False)
+    ignore_repost_detection = Column(Boolean, default=False)
+
+    monitored_sub = relationship("MonitoredSub", back_populates='user_whitelist', cascade='all, delete')
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'monitored_sub_checked'
