@@ -20,7 +20,7 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub, \
     get_text_search_settings_for_monitored_sub
-from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, NO_BAN_PERMISSIONS
+from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, NO_BAN_PERMISSIONS, HIGH_VOLUME_REPOSTER_FOUND
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, log_search
 from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
 
@@ -99,6 +99,45 @@ class SubMonitor:
         if monitored_sub.adult_promoter_ban_user:
             self._ban_user(post.author, monitored_sub.name, user.notes)
 
+
+    def handle_high_volume_reposter_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> None:
+        """
+        Check if a submission was created by someone flagged as a high volume reposter
+        :param post: Submission in question
+        :param uow: Database connection
+        :param monitored_sub: Monitored sub the submission is from
+        :return: None
+        """
+        if not monitored_sub.high_volume_reposter_remove_post and not monitored_sub.high_volume_reposter_ban_user and not monitored_sub.high_volume_reposter_notify_mod_mail:
+            log.info('No High Volume Repost settings enabled for %s, skipping', monitored_sub.name)
+            return
+
+        repost_count = uow.stat_top_reposter.get_total_reposts_by_author_and_day_range(post.author, 7)
+
+        if repost_count < monitored_sub.high_volume_reposter_threshold:
+            log.info('User %s has %s reposts which is under the threshold of %s', post.author, repost_count,
+                     monitored_sub.high_volume_reposter_threshold)
+            return
+
+        if monitored_sub.high_volume_reposter_remove_post:
+            self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
+
+        if monitored_sub.high_volume_reposter_ban_user:
+            self._ban_user(post.author, monitored_sub.name, 'High volume of reposts detected by Repost Sleuth')
+
+        if monitored_sub.high_volume_reposter_notify_mod_mail:
+            message_body = HIGH_VOLUME_REPOSTER_FOUND.format(
+                username=post.author,
+                subreddit=monitored_sub.name,
+                post_id=post.post_id,
+                repost_count=repost_count
+            )
+            self.resposne_handler.send_mod_mail(
+                monitored_sub.name,
+                message_body,
+                f'New Submission From High Volume Reposter',
+                source='sub_monitor'
+            )
 
     def has_post_been_checked(self, post_id: Text) -> bool:
         """

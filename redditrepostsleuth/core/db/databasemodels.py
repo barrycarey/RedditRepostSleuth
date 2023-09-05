@@ -342,8 +342,10 @@ class MonitoredSub(Base):
     is_private = Column(Boolean, default=False)
     adult_promoter_remove_post = Column(Boolean, default=False)
     adult_promoter_ban_user = Column(Boolean, default=False)
-    #high_volume_reposter_ban_user = Column(Boolean, default=False)
-    #high_volume_reposter_threshold = Column(Integer, default=100)
+    high_volume_reposter_ban_user = Column(Boolean, default=False)
+    high_volume_reposter_remove_post = Column(Boolean, default=False)
+    high_volume_reposter_threshold = Column(Integer, default=100)
+    high_volume_reposter_notify_mod_mail = Column(Boolean, default=False)
 
     post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub', cascade='all, delete', )
     config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub', cascade='all, delete')
@@ -405,7 +407,11 @@ class MonitoredSub(Base):
             'nsfw': self.nsfw,
             'is_private': self.is_private,
             'adult_promoter_remove_post': self.adult_promoter_remove_post,
-            'adult_promoter_ban_user': self.adult_promoter_ban_user
+            'adult_promoter_ban_user': self.adult_promoter_ban_user,
+            'high_volume_reposter_ban_user': self.high_volume_reposter_ban_user,
+            'high_volume_reposter_remove_post': self.high_volume_reposter_remove_post,
+            'high_volume_reposter_threshold': self.high_volume_reposter_threshold,
+            'high_volume_reposter_notify_mod_mail': self.high_volume_reposter_notify_mod_mail
 
         }
 
@@ -662,7 +668,7 @@ class StatsDailyCount(Base):
     text_reposts_24h = Column(Integer)
     monitored_subreddit_count = Column(Integer)
 
-class StatsTopReposters(Base):
+class StatsTopReposter(Base):
     __tablename__ = 'stat_top_reposters'
     __table_args__ = (
         Index('idx_existing_stat', 'author', 'post_type_id', 'day_range'),

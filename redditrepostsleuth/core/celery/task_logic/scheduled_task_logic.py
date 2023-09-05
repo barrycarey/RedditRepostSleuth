@@ -14,7 +14,7 @@ from prawcore import NotFound, Forbidden, Redirect
 from sqlalchemy import text, func
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import HttpProxy, StatsTopRepost, StatsTopReposters
+from redditrepostsleuth.core.db.databasemodels import HttpProxy, StatsTopRepost, StatsTopReposter
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -106,7 +106,7 @@ def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = No
     for row in result:
         if row[0] in EXCLUDE_FROM_TOP_REPOSTERS:
             continue
-        stat = StatsTopReposters()
+        stat = StatsTopReposter()
         stat.author = row[0]
         stat.post_type_id = post_type_id
         stat.day_range = day_range

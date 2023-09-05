@@ -118,3 +118,92 @@ class TestSubMonitor(TestCase):
 
         mock_ban_user.assert_not_called()
         mock_remove_post.assert_called_once_with(monitored_sub, ANY)
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_high_volume_reposter_check_under_threshold_no_action(self, mock_ban_user, mock_remove_post):
+        mock_uow = MagicMock(
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=50))
+        )
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+        monitored_sub = MonitoredSub(
+            name='test_subreddit',
+            high_volume_reposter_ban_user=True,
+            high_volume_reposter_threshold=100,
+            high_volume_reposter_notify_mod_mail=False,
+            high_volume_reposter_remove_post=False
+        )
+        post = Post(subreddit='test_subreddit', author='test_user')
+        sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
+        mock_ban_user.assert_not_called()
+        mock_remove_post.assert_not_called()
+        mock_response_handler.send_mod_mail.assert_not_called()
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_high_volume_reposter_check_over_threshold_remove(self, mock_ban_user, mock_remove_post):
+        mock_uow = MagicMock(
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200))
+        )
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+        monitored_sub = MonitoredSub(
+            name='test_subreddit',
+            high_volume_reposter_ban_user=False,
+            high_volume_reposter_threshold=100,
+            high_volume_reposter_notify_mod_mail=False,
+            high_volume_reposter_remove_post=True
+        )
+        post = Post(subreddit='test_subreddit', author='test_user')
+        sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
+        mock_ban_user.assert_not_called()
+        mock_remove_post.assert_called_once_with(monitored_sub, ANY)
+        mock_response_handler.send_mod_mail.assert_not_called()
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_high_volume_reposter_check_over_threshold_remove_and_ban(self, mock_ban_user, mock_remove_post):
+        mock_uow = MagicMock(
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200))
+        )
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+        monitored_sub = MonitoredSub(
+            name='test_subreddit',
+            high_volume_reposter_ban_user=True,
+            high_volume_reposter_threshold=100,
+            high_volume_reposter_notify_mod_mail=False,
+            high_volume_reposter_remove_post=True
+        )
+        post = Post(subreddit='test_subreddit', author='test_user')
+        sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
+        mock_ban_user.assert_called_once_with('test_user', 'test_subreddit', 'High volume of reposts detected by Repost Sleuth')
+        mock_remove_post.assert_called_once_with(monitored_sub, ANY)
+        mock_response_handler.send_mod_mail.assert_not_called()
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_high_volume_reposter_check_over_threshold_send_mod_mail(self, mock_ban_user, mock_remove_post):
+        mock_uow = MagicMock(
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200))
+        )
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+        monitored_sub = MonitoredSub(
+            name='test_subreddit',
+            high_volume_reposter_ban_user=False,
+            high_volume_reposter_threshold=100,
+            high_volume_reposter_notify_mod_mail=True,
+            high_volume_reposter_remove_post=False
+        )
+        post = Post(subreddit='test_subreddit', author='test_user')
+        sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
+        mock_ban_user.assert_not_called()
+        mock_remove_post.assert_not_called()
+        mock_response_handler.send_mod_mail.assert_called_with(
+            'test_subreddit', ANY, 'New Submission From High Volume Reposter', source='sub_monitor')
