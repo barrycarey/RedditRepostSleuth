@@ -11,9 +11,14 @@ class UserWhitelistRepo:
     def add(self, item):
         self.db_session.add(item)
 
+    def remove(self, item: UserWhitelist):
+        self.db_session.remove(item)
+
+    def get_by_id(self, id: int) -> Optional[UserWhitelist]:
+        return self.db_session.query(UserWhitelist).filter(UserWhitelist.id == id).first()
+
     def get_by_username_and_subreddit(self, username: str, monitored_sub_id: int) -> Optional[UserWhitelist]:
         return self.db_session.query(UserWhitelist).filter(UserWhitelist.username == username, UserWhitelist.monitored_sub_id == monitored_sub_id).first()
-
 
     def get_by_username(self, username: str) -> Optional[UserWhitelist]:
         return self.db_session.query(UserWhitelist).filter(UserWhitelist.username == username).first()

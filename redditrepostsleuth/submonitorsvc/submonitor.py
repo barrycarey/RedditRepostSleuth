@@ -78,6 +78,12 @@ class SubMonitor:
         :return:
         """
 
+        whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
+
+        if whitelisted and whitelisted.ignore_high_volume_repost_detection:
+            log.info('User %s is whitelisted, skipping adult promoter check')
+            return
+
         if not monitored_sub.adult_promoter_remove_post and not monitored_sub.adult_promoter_ban_user:
             log.debug('No adult promoter settings active, skipping check')
             return
@@ -110,6 +116,12 @@ class SubMonitor:
         """
         if not monitored_sub.high_volume_reposter_remove_post and not monitored_sub.high_volume_reposter_ban_user and not monitored_sub.high_volume_reposter_notify_mod_mail:
             log.info('No High Volume Repost settings enabled for %s, skipping', monitored_sub.name)
+            return
+
+        whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
+
+        if whitelisted and whitelisted.ignore_high_volume_repost_detection:
+            log.info('User %s is whitelisted, skipping high volume check')
             return
 
         repost_count = uow.stat_top_reposter.get_total_reposts_by_author_and_day_range(post.author, 7)

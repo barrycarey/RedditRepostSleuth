@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch, ANY
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, PostType, UserReview
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, PostType, UserReview, UserWhitelist
 from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
 
 
@@ -207,3 +207,27 @@ class TestSubMonitor(TestCase):
         mock_remove_post.assert_not_called()
         mock_response_handler.send_mod_mail.assert_called_with(
             'test_subreddit', ANY, 'New Submission From High Volume Reposter', source='sub_monitor')
+
+    @patch.object(SubMonitor, '_remove_post')
+    @patch.object(SubMonitor, '_ban_user')
+    def test__handle_high_volume_reposter_check_over_threshold_ignore_whitelist(self, mock_ban_user, mock_remove_post):
+        user_whitelist = UserWhitelist(username='test_user', ignore_high_volume_repost_detection=True)
+        mock_uow = MagicMock(
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200)),
+            user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=user_whitelist))
+        )
+        mock_response_handler = Mock(send_mod_mail=Mock())
+        sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+                                 config=MagicMock())
+        monitored_sub = MonitoredSub(
+            name='test_subreddit',
+            high_volume_reposter_ban_user=False,
+            high_volume_reposter_threshold=100,
+            high_volume_reposter_notify_mod_mail=True,
+            high_volume_reposter_remove_post=False
+        )
+        post = Post(subreddit='test_subreddit', author='test_user')
+        sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
+        mock_ban_user.assert_not_called()
+        mock_remove_post.assert_not_called()
+        mock_response_handler.send_mod_mail.assert_not_called()

@@ -423,11 +423,21 @@ class UserWhitelist(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(25), nullable=False)
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
-    ignore_of_detection = Column(Boolean, default=False)
-    ignore_high_volume_detection = Column(Boolean, default=False)
+    ignore_adult_promoter_detection = Column(Boolean, default=False)
+    ignore_high_volume_repost_detection = Column(Boolean, default=False)
     ignore_repost_detection = Column(Boolean, default=False)
 
     monitored_sub = relationship("MonitoredSub", back_populates='user_whitelist', cascade='all, delete')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'monitored_sub_id': self.monitored_sub_id,
+            'ignore_adult_promoter_detection': self.ignore_adult_promoter_detection,
+            'ignore_high_volume_repost_detection': self.ignore_high_volume_repost_detection,
+            'ignore_repost_detection': self.ignore_repost_detection
+        }
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'monitored_sub_checked'

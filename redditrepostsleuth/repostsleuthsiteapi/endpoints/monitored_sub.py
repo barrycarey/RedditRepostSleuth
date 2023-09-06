@@ -143,9 +143,6 @@ class MonitoredSub:
         celery.send_task('redditrepostsleuth.core.celery.admin_tasks.update_subreddit_config_from_database', args=[monitored_sub, user_data],
                          queue='update_wiki_from_database')
 
-
-
-
     def on_delete(self, req: Request, resp: Response, subreddit: Text):
         token = req.get_param('token', required=True)
         user_data = get_user_data(token)
