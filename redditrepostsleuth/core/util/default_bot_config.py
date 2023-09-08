@@ -36,12 +36,5 @@ DEFAULT_CONFIG_VALUES = {
             "high_volume_reposter_remove_post": False,
             "high_volume_reposter_threshold": False,
             "high_volume_reposter_notify_mod_mail": False,
-            "userWhitelist": [
-                {
-                    "username": "example_user",
-                    "ignore_adult_promoter_detection": False,
-                    "ignore_high_volume_repost_detection": False,
-                    "ignore_repost_detection": False
-                }
-            ]
+
 }

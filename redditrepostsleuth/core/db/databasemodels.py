@@ -342,6 +342,7 @@ class MonitoredSub(Base):
     is_private = Column(Boolean, default=False)
     adult_promoter_remove_post = Column(Boolean, default=False)
     adult_promoter_ban_user = Column(Boolean, default=False)
+    adult_promoter_notify_mod_mail = Column(Boolean, default=False)
     high_volume_reposter_ban_user = Column(Boolean, default=False)
     high_volume_reposter_remove_post = Column(Boolean, default=False)
     high_volume_reposter_threshold = Column(Integer, default=100)
@@ -409,6 +410,7 @@ class MonitoredSub(Base):
             'is_private': self.is_private,
             'adult_promoter_remove_post': self.adult_promoter_remove_post,
             'adult_promoter_ban_user': self.adult_promoter_ban_user,
+            'adult_promoter_notify_mod_mail': self.adult_promoter_notify_mod_mail,
             'high_volume_reposter_ban_user': self.high_volume_reposter_ban_user,
             'high_volume_reposter_remove_post': self.high_volume_reposter_remove_post,
             'high_volume_reposter_threshold': self.high_volume_reposter_threshold,

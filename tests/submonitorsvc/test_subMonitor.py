@@ -76,7 +76,10 @@ class TestSubMonitor(TestCase):
     def test__handle_only_fans_user_not_found_no_action(self, mock_ban_user, mock_remove_post):
         post = Post(subreddit='test_subreddit', author='test_user')
         monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=True, adult_promoter_ban_user=True)
-        mock_uow = MagicMock(user_review=MagicMock(get_by_username=MagicMock(return_value=None)))
+        mock_uow = MagicMock(
+            user_review=MagicMock(get_by_username=MagicMock(return_value=None)),
+            user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
+        )
         mock_response_handler = Mock(send_mod_mail=Mock())
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
                                  config=MagicMock())
@@ -93,7 +96,10 @@ class TestSubMonitor(TestCase):
         user_review = UserReview(content_links_found=1, username='test_user', notes='Profile links match onlyfans.com')
         post = Post(subreddit='test_subreddit', author='test_user')
         monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=False, adult_promoter_ban_user=True)
-        mock_uow = MagicMock(user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)))
+        mock_uow = MagicMock(
+            user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)),
+            user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
+        )
         mock_response_handler = Mock(send_mod_mail=Mock())
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
                                  config=MagicMock())
@@ -109,7 +115,10 @@ class TestSubMonitor(TestCase):
         user_review = UserReview(content_links_found=1, username='test_user', notes='Profile links match onlyfans.com')
         post = Post(subreddit='test_subreddit', author='test_user')
         monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=True, adult_promoter_ban_user=False)
-        mock_uow = MagicMock(user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)))
+        mock_uow = MagicMock(
+            user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)),
+            user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
+        )
         mock_response_handler = Mock(send_mod_mail=Mock())
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
                                  config=MagicMock())
@@ -145,7 +154,8 @@ class TestSubMonitor(TestCase):
     @patch.object(SubMonitor, '_ban_user')
     def test__handle_high_volume_reposter_check_over_threshold_remove(self, mock_ban_user, mock_remove_post):
         mock_uow = MagicMock(
-            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200))
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200)),
+            user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
         )
         mock_response_handler = Mock(send_mod_mail=Mock())
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
@@ -167,7 +177,8 @@ class TestSubMonitor(TestCase):
     @patch.object(SubMonitor, '_ban_user')
     def test__handle_high_volume_reposter_check_over_threshold_remove_and_ban(self, mock_ban_user, mock_remove_post):
         mock_uow = MagicMock(
-            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200))
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200)),
+            user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
         )
         mock_response_handler = Mock(send_mod_mail=Mock())
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
@@ -189,7 +200,8 @@ class TestSubMonitor(TestCase):
     @patch.object(SubMonitor, '_ban_user')
     def test__handle_high_volume_reposter_check_over_threshold_send_mod_mail(self, mock_ban_user, mock_remove_post):
         mock_uow = MagicMock(
-            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200))
+            stat_top_reposter=MagicMock(get_total_reposts_by_author_and_day_range=MagicMock(return_value=200)),
+            user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
         )
         mock_response_handler = Mock(send_mod_mail=Mock())
         sub_monitor = SubMonitor(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
