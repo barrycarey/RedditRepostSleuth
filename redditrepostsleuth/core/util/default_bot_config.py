@@ -32,6 +32,7 @@ DEFAULT_CONFIG_VALUES = {
               "send_repost_modmail": False,
             "adult_promoter_remove_post": False,
             "adult_promoter_ban_user": False,
+            "adult_promoter_notify_mod_mail": False,
             "high_volume_reposter_ban_user": False,
             "high_volume_reposter_remove_post": False,
             "high_volume_reposter_threshold": False,

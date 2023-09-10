@@ -12,7 +12,7 @@ class UserWhitelistRepo:
         self.db_session.add(item)
 
     def remove(self, item: UserWhitelist):
-        self.db_session.remove(item)
+        self.db_session.delete(item)
 
     def get_by_id(self, id: int) -> Optional[UserWhitelist]:
         return self.db_session.query(UserWhitelist).filter(UserWhitelist.id == id).first()

@@ -121,7 +121,7 @@ class SubMonitor:
         whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
 
         if whitelisted and whitelisted.ignore_high_volume_repost_detection:
-            log.info('User %s is whitelisted, skipping high volume check')
+            log.info('User %s is whitelisted, skipping high volume check', post.author)
             return
 
         repost_count = uow.stat_top_reposter.get_total_reposts_by_author_and_day_range(post.author, 7)

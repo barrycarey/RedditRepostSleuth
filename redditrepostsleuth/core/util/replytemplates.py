@@ -98,5 +98,5 @@ REPLY_TEST_MODE = 'THIS MESSAGE WAS GENERATED FROM A TESTING INSTANCE OF REPOST 
 NO_BAN_PERMISSIONS = 'I attempted to ban user {username} but I do not have the permissions to do so.  Please add the Manage Users permission to u/RepostSleuthBot on r/{subreddit}'
 
 HIGH_VOLUME_REPOSTER_FOUND = 'User [u/{username}](https://reddit.com/u/{username}) has been flagged as a high volume reposter.\n\n' \
-                             'They just created [this submission](https://redd.it/{post_id}) on [r/{subreddit}](https://reddit.com/r/{subreddit} \n\n' \
+                             'They just created [this submission](https://redd.it/{post_id}) on [r/{subreddit}](https://reddit.com/r/{subreddit}) \n\n' \
                              'In the last 7 days I have detected {repost_count} reposts created by them'

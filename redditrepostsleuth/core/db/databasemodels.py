@@ -429,7 +429,7 @@ class UserWhitelist(Base):
     ignore_high_volume_repost_detection = Column(Boolean, default=False)
     ignore_repost_detection = Column(Boolean, default=False)
 
-    monitored_sub = relationship("MonitoredSub", back_populates='user_whitelist', cascade='all, delete')
+    monitored_sub = relationship("MonitoredSub", back_populates='user_whitelist')
 
     def to_dict(self):
         return {

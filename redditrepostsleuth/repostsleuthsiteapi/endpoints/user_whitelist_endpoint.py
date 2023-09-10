@@ -83,7 +83,7 @@ class UserWhitelistEndpoint:
 
             existing_whitelist = uow.user_whitelist.get_by_username_and_subreddit(user_json['username'],
                                                                                   monitored_sub.id)
-            if existing_whitelist:
+            if not existing_whitelist:
                 raise HTTPBadRequest(title='Nothing to modify',
                                      description=f'User {user_json["username"]} does not have an existing whitelist in {subreddit}')
 
@@ -98,15 +98,10 @@ class UserWhitelistEndpoint:
 
     def on_delete(self, req: Request, resp: Response, subreddit: str):
         token = req.get_param('token', required=True)
-        user_json = json.load(req.bounded_stream)
+        id_to_delete = req.get_param_as_int('id', required=True)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}',
                                    f'You\'re not a moderator on {subreddit}')
-
-        if 'id' not in user_json:
-            log.error('No id included, cannot delete whitelist')
-            raise HTTPBadRequest(title='Missing id',
-                                 description='ID must be provided to delete a whitelist')
 
         with self.uowm.start() as uow:
             monitored_sub = uow.monitored_sub.get_by_sub(subreddit)
@@ -114,10 +109,10 @@ class UserWhitelistEndpoint:
                 raise HTTPNotFound(title=f'Subreddit {subreddit} Not Found',
                                    description=f'Subreddit {subreddit} Not Found')
 
-            existing_whitelist = uow.user_whitelist.get_by_id(user_json['id'])
+            existing_whitelist = uow.user_whitelist.get_by_id(id_to_delete)
             if not existing_whitelist:
-                raise HTTPNotFound(title=f'Cannot find whitelist with ID {user_json["id"]}',
-                                   description=f'Cannot find whitelist with ID {user_json["id"]}')
+                raise HTTPNotFound(title=f'Cannot find whitelist with ID {id_to_delete}',
+                                   description=f'Cannot find whitelist with ID {id_to_delete}')
 
             uow.user_whitelist.remove(existing_whitelist)
             uow.commit()
