@@ -126,6 +126,10 @@ class SubMonitor:
 
         repost_count = uow.stat_top_reposter.get_total_reposts_by_author_and_day_range(post.author, 7)
 
+        if monitored_sub.high_volume_reposter_threshold < 10:
+            log.info('High volume threshold failsafe.  Skipping check')
+            return
+
         if repost_count < monitored_sub.high_volume_reposter_threshold:
             log.info('User %s has %s reposts which is under the threshold of %s', post.author, repost_count,
                      monitored_sub.high_volume_reposter_threshold)
