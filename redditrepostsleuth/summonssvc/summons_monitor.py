@@ -122,7 +122,7 @@ def monitor_for_mentions(reddit: Reddit, uowm: UnitOfWorkManager):
             try:
                 uow.commit()
             except DataError as e:
-                log.warning('SQLAlchemy Data error saving comment')
+                log.warning('SQLAlchemy Data error saving comment %s: %s', comment.id, e)
                 continue
 
         handle_summons(summons)
