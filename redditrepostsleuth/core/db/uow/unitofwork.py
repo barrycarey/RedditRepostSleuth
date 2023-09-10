@@ -30,6 +30,7 @@ from redditrepostsleuth.core.db.repository.stats_top_reposter_repo import StatTo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
 from redditrepostsleuth.core.db.repository.user_review_repo import UserReviewRepo
+from redditrepostsleuth.core.db.repository.user_whitelist_repo import UserWhitelistRepo
 
 
 class UnitOfWork:
@@ -171,3 +172,7 @@ class UnitOfWork:
     @property
     def post_type(self) -> PostTypeRepo:
         return PostTypeRepo(self.session)
+
+    @property
+    def user_whitelist(self) -> UserWhitelistRepo:
+        return UserWhitelistRepo(self.session)

@@ -75,6 +75,7 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
             return
 
         self.sub_monitor.handle_only_fans_check(post, uow, monitored_sub)
+        self.sub_monitor.handle_high_volume_reposter_check(post, uow, monitored_sub)
 
     title_keywords = []
     if monitored_sub.title_ignore_keywords:

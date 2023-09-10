@@ -348,12 +348,19 @@ class SummonsHandler:
             except APIException as e:
                 if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
                     response.message = 'NOT_WHITELISTED_BY_USER_MESSAGE'
+                elif e.error_type == 'SOMETHING_IS_BROKEN':
+                    response.reply_failure_reason = 'SOMETHING_IS_BROKEN'
+                    self._save_response(response)
         else:
             try:
                 self._reply_to_comment(response)
             except Forbidden:
                 log.info('Banned on %s, sending PM', response.summons.post.subreddit)
                 self._send_private_message(response)
+            except APIException as e:
+                if e.error_type == 'SOMETHING_IS_BROKEN':
+                    response.reply_failure_reason = 'SOMETHING_IS_BROKEN'
+                    self._save_response(response)
         self._save_response(response)
 
 

@@ -463,4 +463,4 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config, notification_svc=notification_svc)
-    updater.update_configs(notify_missing_keys=True)
+    updater.update_configs(notify_missing_keys=False)

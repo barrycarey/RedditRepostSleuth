@@ -47,6 +47,9 @@ def is_sleuth_admin(token, user_data = None, user_agent: Text = 'windows.reposts
     return False
 
 def is_sub_mod_token(token, subreddit, user_agent: Text = 'windows.repostsleuthbot:v0.0.1 (by /u/barrycarey)'):
+    user_data = get_user_data(token)
+    if user_data['name'] == 'barrycarey':
+        return True
     headers = {'Authorization': f'Bearer {token}', 'User-Agent': user_agent}
     after = None
     while True:

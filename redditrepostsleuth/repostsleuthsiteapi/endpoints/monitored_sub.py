@@ -31,7 +31,12 @@ class MonitoredSub:
         self.config = config
         self.uowm = uowm
 
-    def on_get(self, req: Request, resp: Response, subreddit: Text):
+    def on_get(self, req: Request, resp: Response, subreddit: str):
+        token = req.get_param('token', required=True)
+
+        if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
+            raise HTTPUnauthorized(f'You are not a moderator on {subreddit}',
+                                   f'You\'re not a moderator on {subreddit}')
         with self.uowm.start() as uow:
             sub = uow.monitored_sub.get_by_sub(subreddit)
             if not sub:
@@ -57,7 +62,7 @@ class MonitoredSub:
     def on_get_default_config(self, req: Request, resp: Response):
         resp.body = json.dumps(DEFAULT_CONFIG_VALUES)
 
-    def on_post_refresh(self, req: Request, resp: Response, subreddit: Text):
+    def on_post_refresh(self, req: Request, resp: Response, subreddit: str):
         log.info('Refreshing %s', subreddit)
         with self.uowm.start() as uow:
             sub = uow.monitored_sub.get_by_sub(subreddit)
@@ -72,7 +77,7 @@ class MonitoredSub:
             uow.commit()
         resp.body = json.dumps(sub.to_dict())
 
-    def on_post(self, req: Request, resp: Response, subreddit: Text):
+    def on_post(self, req: Request, resp: Response, subreddit: str):
         log.info('Attempting to create monitored sub %s', subreddit)
         token = req.get_param('token', required=True)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
@@ -142,9 +147,6 @@ class MonitoredSub:
 
         celery.send_task('redditrepostsleuth.core.celery.admin_tasks.update_subreddit_config_from_database', args=[monitored_sub, user_data],
                          queue='update_wiki_from_database')
-
-
-
 
     def on_delete(self, req: Request, resp: Response, subreddit: Text):
         token = req.get_param('token', required=True)
