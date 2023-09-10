@@ -40,7 +40,7 @@ class PostWatch:
         with self.uowm.start() as uow:
             watches = uow.repostwatch.get_all_by_user(user_data['name'])
             for watch in watches:
-                post = uow.posts.get_by_post_id(watch.post_id)
+                post = uow.posts.get_by_id(watch.post_id)
                 if not post:
                     continue
                 results.append({

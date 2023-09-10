@@ -61,18 +61,19 @@ class ImageSearch:
         resp.stream, resp.content_length = self._image_store.open(name)
 
     def on_post(self, req: Request, resp: Response):
-        # TODO - 2/16/2021 - This is super hacky until I switch to FastAPI
         allowed_img_ext = ['jpg', 'jpeg', 'png', 'gif']
-        file = req.get_param('image', required=True)
-        file_ext = file.filename.split('.')[-1]
+        form = req.get_media()
+        file = next((x for x in form if x.name == 'image'), None)
+        file_ext = file.secure_filename.split('.')[-1]
         if file_ext not in allowed_img_ext:
             raise HTTPBadRequest(title='Invalid file type', description=f'File type {file_ext} is not allowed')
 
         saved_file_name = f'{uuid.uuid4()}.{file_ext}'
         with open(os.path.join('/opt/imageuploads', saved_file_name), 'wb') as f:
-            f.write(file.file.read())
+            file.stream.pipe(f)
 
         search_settings = get_image_search_settings_from_request(req, self.config)
+        # TODO - This is hacky as fuck.  Dup image service needs to be rewritten to take hash and search
         search_results = check_image(search_settings, self.uowm, self.image_svc, url=f'http://localhost:8443/imageserve/{saved_file_name}')
         os.remove(os.path.join('/opt/imageuploads', saved_file_name))
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
