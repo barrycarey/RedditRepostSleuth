@@ -53,7 +53,7 @@ class Post(Base):
             'post_id': self.post_id,
             'url': self.url,
             'perma_link': self.perma_link,
-            'post_type': self.post_type.name,
+            'post_type_id': self.post_type_id,
             'title': self.title,
             'created_at': self.created_at.timestamp(),
             'author': self.author,
@@ -88,7 +88,7 @@ class PostHash(Base):
         return {
             'hash': self.hash,
             'post_id': self.post_id,
-            'hash_type': self.hash_type.to_dict()
+            'hash_type_id': self.hash_type_id
         }
 
 class HashType(Base):
@@ -220,6 +220,9 @@ class RepostSearch(Base):
 
     post = relationship("Post", back_populates='searches')
     post_type = relationship('PostType')
+
+    def __repr__(self):
+        return f'Post ID: {self.post_id} - Source: {self.source}'
 
     def to_dict(self):
         return {

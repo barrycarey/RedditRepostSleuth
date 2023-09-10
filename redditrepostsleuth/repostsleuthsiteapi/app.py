@@ -1,3 +1,5 @@
+import os
+
 import falcon
 import sentry_sdk
 from falcon import CORSMiddleware
@@ -43,11 +45,12 @@ config_updater = SubredditConfigUpdater(
     notification_svc=notification_svc
 )
 
-
-sentry_sdk.init(
-    dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
-    traces_sample_rate=1.0,
-)
+if os.getenv('SENTRY_DNS', None):
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DNS'),
+        environment=os.getenv('RUN_ENV', 'dev')
+    )
 
 api = application = falcon.App(
     middleware=[

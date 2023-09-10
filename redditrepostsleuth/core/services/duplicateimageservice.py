@@ -301,7 +301,7 @@ class DuplicateImageService:
 
                 for im in index_matches:
                     search_result = next((x for x in r.matches if x.id == im.annoy_index_id), None)
-                    image_match_hash = image_hash = next((i for i in im.post.hashes if i.hash_type_id == 1), None) # get dhash_h
+                    image_match_hash = next((i for i in im.post.hashes if i.hash_type_id == 1), None) # get dhash_h
                     results.append(
                         ImageSearchMatch(
                             url,
