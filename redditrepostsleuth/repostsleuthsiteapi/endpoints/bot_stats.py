@@ -94,17 +94,17 @@ class BotStats:
 
         stat_name = req.get_param('stat_name', required=True)
         if stat_name.lower() == 'link_reposts_all':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 'link')[0], 'stat_name': stat_name})
+            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 3)[0], 'stat_name': stat_name})
         elif stat_name.lower() == 'image_reposts_all':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 'image')[0], 'stat_name': stat_name})
+            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 2)[0], 'stat_name': stat_name})
         elif stat_name.lower() == 'link_reposts_month':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 'link', hours=720)[0], 'stat_name': stat_name})
+            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 3, hours=720)[0], 'stat_name': stat_name})
         elif stat_name.lower() == 'image_reposts_month':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 'image', hours=720)[0], 'stat_name': stat_name})
+            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 2, hours=720)[0], 'stat_name': stat_name})
         elif stat_name.lower() == 'link_reposts_day':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 'link', hours=24)[0], 'stat_name': stat_name})
+            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 3, hours=24)[0], 'stat_name': stat_name})
         elif stat_name.lower() == 'image_reposts_day':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 'image', hours=24)[0], 'stat_name': stat_name})
+            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 2, hours=24)[0], 'stat_name': stat_name})
         elif stat_name.lower() == 'checked_post_all':
             resp.body = json.dumps({'count': uow.monitored_sub_checked.get_count_by_subreddit(sub.id)[0], 'stat_name': stat_name})
         elif stat_name.lower() == 'checked_post_month':

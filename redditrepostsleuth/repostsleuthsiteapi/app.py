@@ -1,3 +1,5 @@
+import os
+
 import falcon
 import sentry_sdk
 from falcon import CORSMiddleware
@@ -24,6 +26,7 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub import Monit
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.posts import PostsEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.repost_history import RepostHistoryEndpoint
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.user_whitelist_endpoint import UserWhitelistEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
 config = Config()
@@ -42,11 +45,12 @@ config_updater = SubredditConfigUpdater(
     notification_svc=notification_svc
 )
 
-
-sentry_sdk.init(
-    dsn="https://d74e4d0150474e4a9cd0cf09ff30afaa@o4505570099986432.ingest.sentry.io/4505570102411264",
-    traces_sample_rate=1.0,
-)
+if os.getenv('SENTRY_DNS', None):
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DNS'),
+        environment=os.getenv('RUN_ENV', 'dev')
+    )
 
 api = application = falcon.App(
     middleware=[
@@ -88,6 +92,7 @@ api.add_route('/admin/message-templates', MessageTemplate(uowm))
 api.add_route('/admin/message-templates/{id:int}', MessageTemplate(uowm))
 api.add_route('/admin/message-templates/all', MessageTemplate(uowm), suffix='all')
 api.add_route('/admin/users', GeneralAdmin(uowm))
+api.add_route('/user-whitelist/{subreddit}', UserWhitelistEndpoint(uowm, config, reddit))
 
 api = SentryWsgiMiddleware(api)
 #serve(api, host='localhost', port=8888, threads=15)

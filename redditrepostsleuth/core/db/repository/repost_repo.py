@@ -43,7 +43,7 @@ class RepostRepo:
         r = query.first()
         return r[0] if r else None
 
-    def get_count_by_subreddit(self, subreddit: str, post_type_id: str, hours: int = None):
+    def get_count_by_subreddit(self, subreddit: str, post_type_id: int, hours: int = None):
         query = self.db_session.query(func.count(Repost.id)).filter(Repost.subreddit == subreddit, Repost.post_type_id == post_type_id)
         if hours:
             query = query.filter(Repost.detected_at > (datetime.now() - timedelta(hours=hours)))

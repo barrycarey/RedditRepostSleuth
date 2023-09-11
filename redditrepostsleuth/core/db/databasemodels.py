@@ -53,7 +53,7 @@ class Post(Base):
             'post_id': self.post_id,
             'url': self.url,
             'perma_link': self.perma_link,
-            'post_type': self.post_type.name,
+            'post_type_id': self.post_type_id,
             'title': self.title,
             'created_at': self.created_at.timestamp(),
             'author': self.author,
@@ -88,7 +88,7 @@ class PostHash(Base):
         return {
             'hash': self.hash,
             'post_id': self.post_id,
-            'hash_type': self.hash_type.to_dict()
+            'hash_type_id': self.hash_type_id
         }
 
 class HashType(Base):
@@ -221,6 +221,9 @@ class RepostSearch(Base):
     post = relationship("Post", back_populates='searches')
     post_type = relationship('PostType')
 
+    def __repr__(self):
+        return f'Post ID: {self.post_id} - Source: {self.source}'
+
     def to_dict(self):
         return {
             'post': self.post.to_dict(),
@@ -342,9 +345,19 @@ class MonitoredSub(Base):
     is_private = Column(Boolean, default=False)
     adult_promoter_remove_post = Column(Boolean, default=False)
     adult_promoter_ban_user = Column(Boolean, default=False)
+    adult_promoter_notify_mod_mail = Column(Boolean, default=False)
+    high_volume_reposter_ban_user = Column(Boolean, default=False)
+    high_volume_reposter_remove_post = Column(Boolean, default=False)
+    high_volume_reposter_threshold = Column(Integer, default=100)
+    high_volume_reposter_notify_mod_mail = Column(Boolean, default=False)
 
-    post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub')
-    config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub')
+    post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub', cascade='all, delete', )
+    config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub', cascade='all, delete')
+    config_changes = relationship('MonitoredSubConfigChange', back_populates='monitored_sub', cascade='all, delete')
+    user_whitelist = relationship('UserWhitelist', back_populates='monitored_sub', cascade='all, delete')
+
+    def __repr__(self):
+        return f'{self.name} | Active: {self.active}'
 
     def to_dict(self):
         return {
@@ -397,10 +410,39 @@ class MonitoredSub(Base):
             'filter_removed_matches': self.filter_removed_matches,
             'send_repost_modmail': self.send_repost_modmail,
             'nsfw': self.nsfw,
-            'is_private': self.is_private
+            'is_private': self.is_private,
+            'adult_promoter_remove_post': self.adult_promoter_remove_post,
+            'adult_promoter_ban_user': self.adult_promoter_ban_user,
+            'adult_promoter_notify_mod_mail': self.adult_promoter_notify_mod_mail,
+            'high_volume_reposter_ban_user': self.high_volume_reposter_ban_user,
+            'high_volume_reposter_remove_post': self.high_volume_reposter_remove_post,
+            'high_volume_reposter_threshold': self.high_volume_reposter_threshold,
+            'high_volume_reposter_notify_mod_mail': self.high_volume_reposter_notify_mod_mail
+
         }
 
 
+class UserWhitelist(Base):
+    __tablename__ = 'user_whitelist'
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(25), nullable=False)
+    monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
+    ignore_adult_promoter_detection = Column(Boolean, default=False)
+    ignore_high_volume_repost_detection = Column(Boolean, default=False)
+    ignore_repost_detection = Column(Boolean, default=False)
+
+    monitored_sub = relationship("MonitoredSub", back_populates='user_whitelist')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'monitored_sub_id': self.monitored_sub_id,
+            'ignore_adult_promoter_detection': self.ignore_adult_promoter_detection,
+            'ignore_high_volume_repost_detection': self.ignore_high_volume_repost_detection,
+            'ignore_repost_detection': self.ignore_repost_detection
+        }
 
 class MonitoredSubChecks(Base):
     __tablename__ = 'monitored_sub_checked'
@@ -412,7 +454,7 @@ class MonitoredSubChecks(Base):
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
     search_id = Column(Integer, ForeignKey('repost_search.id'))
 
-    monitored_sub = relationship("MonitoredSub", back_populates='post_checks')
+    monitored_sub = relationship("MonitoredSub", back_populates='post_checks', cascade='all, delete')
     search = relationship("RepostSearch")
     post_type = relationship('PostType')
     post = relationship("Post", foreign_keys=[post_id])
@@ -442,7 +484,7 @@ class MonitoredSubConfigChange(Base):
     new_value = Column(String(2000))
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
 
-    monitored_sub = relationship("MonitoredSub")
+    monitored_sub = relationship("MonitoredSub", cascade='all, delete', back_populates='config_changes')
 
 class MonitoredSubConfigRevision(Base):
     __tablename__ = 'monitored_sub_config_revision'
@@ -455,7 +497,7 @@ class MonitoredSubConfigRevision(Base):
     notified = Column(Boolean, default=False)
     monitored_sub_id = Column(Integer, ForeignKey('monitored_sub.id'))
 
-    monitored_sub = relationship("MonitoredSub", back_populates='config_revisions')
+    monitored_sub = relationship("MonitoredSub", cascade='all, delete', back_populates='config_revisions')
 
 
 class MemeTemplate(Base):
@@ -653,7 +695,7 @@ class StatsDailyCount(Base):
     text_reposts_24h = Column(Integer)
     monitored_subreddit_count = Column(Integer)
 
-class StatsTopReposters(Base):
+class StatsTopReposter(Base):
     __tablename__ = 'stat_top_reposters'
     __table_args__ = (
         Index('idx_existing_stat', 'author', 'post_type_id', 'day_range'),

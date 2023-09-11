@@ -20,7 +20,7 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub, \
     get_text_search_settings_for_monitored_sub
-from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL
+from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, NO_BAN_PERMISSIONS, HIGH_VOLUME_REPOSTER_FOUND
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, log_search
 from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
 
@@ -53,9 +53,22 @@ class SubMonitor:
     def _ban_user(self, username: str, subreddit_name: str, ban_reason: str, note: str = None) -> None:
         log.info('Banning user %s from %s', username, subreddit_name)
         subreddit = self.reddit.subreddit(subreddit_name)
-        subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+        try:
+            subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+        except Forbidden:
+            log.warning('Unable to ban user %s on %s.  No permissions', username, subreddit_name)
+            message_body = NO_BAN_PERMISSIONS.format(
+                username=username,
+                subreddit=subreddit_name
+            )
+            self.resposne_handler.send_mod_mail(
+                subreddit_name,
+                message_body,
+                f'Unable To Ban User, No Permissions',
+                source='sub_monitor'
+            )
 
-    def _handle_only_fans_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> Optional[UserReview]:
+    def handle_only_fans_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub):
         """
         Check if a given username has been flagged as an adult content promoter.  If it has take action per
         the monitored subreddit settings
@@ -65,11 +78,17 @@ class SubMonitor:
         :return:
         """
 
+        whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
+
+        if whitelisted and whitelisted.ignore_high_volume_repost_detection:
+            log.info('User %s is whitelisted, skipping adult promoter check')
+            return
+
         if not monitored_sub.adult_promoter_remove_post and not monitored_sub.adult_promoter_ban_user:
             log.debug('No adult promoter settings active, skipping check')
             return
 
-        log.info('Checking user %s is flagged', post.author)
+        log.info('Checking if user %s is flagged', post.author)
         user = uow.user_review.get_by_username(post.author)
         if not user:
             log.info('No user review record for %s', post.author)
@@ -86,7 +105,55 @@ class SubMonitor:
         if monitored_sub.adult_promoter_ban_user:
             self._ban_user(post.author, monitored_sub.name, user.notes)
 
-        return user
+
+    def handle_high_volume_reposter_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> None:
+        """
+        Check if a submission was created by someone flagged as a high volume reposter
+        :param post: Submission in question
+        :param uow: Database connection
+        :param monitored_sub: Monitored sub the submission is from
+        :return: None
+        """
+        if not monitored_sub.high_volume_reposter_remove_post and not monitored_sub.high_volume_reposter_ban_user and not monitored_sub.high_volume_reposter_notify_mod_mail:
+            log.info('No High Volume Repost settings enabled for %s, skipping', monitored_sub.name)
+            return
+
+        whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
+
+        if whitelisted and whitelisted.ignore_high_volume_repost_detection:
+            log.info('User %s is whitelisted, skipping high volume check', post.author)
+            return
+
+        repost_count = uow.stat_top_reposter.get_total_reposts_by_author_and_day_range(post.author, 7)
+
+        if monitored_sub.high_volume_reposter_threshold < 10:
+            log.info('High volume threshold failsafe.  Skipping check')
+            return
+
+        if repost_count < monitored_sub.high_volume_reposter_threshold:
+            log.info('User %s has %s reposts which is under the threshold of %s', post.author, repost_count,
+                     monitored_sub.high_volume_reposter_threshold)
+            return
+
+        if monitored_sub.high_volume_reposter_remove_post:
+            self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
+
+        if monitored_sub.high_volume_reposter_ban_user:
+            self._ban_user(post.author, monitored_sub.name, 'High volume of reposts detected by Repost Sleuth')
+
+        if monitored_sub.high_volume_reposter_notify_mod_mail:
+            message_body = HIGH_VOLUME_REPOSTER_FOUND.format(
+                username=post.author,
+                subreddit=monitored_sub.name,
+                post_id=post.post_id,
+                repost_count=repost_count
+            )
+            self.resposne_handler.send_mod_mail(
+                monitored_sub.name,
+                message_body,
+                f'New Submission From High Volume Reposter',
+                source='sub_monitor'
+            )
 
     def has_post_been_checked(self, post_id: Text) -> bool:
         """
@@ -135,12 +202,6 @@ class SubMonitor:
 
     def check_submission(self, monitored_sub: MonitoredSub, post: Post) -> Optional[SearchResults]:
         log.info('Checking %s', post.post_id)
-
-        with self.uowm.start() as uow:
-            user = self._handle_only_fans_check(post, uow, monitored_sub)
-            if user and monitored_sub.adult_promoter_remove_post:
-                log.info('Adult promoter post removed, skipping check')
-                return
 
         if post.post_type.name == 'image':
             search_results = self._check_for_repost(post, monitored_sub)
@@ -285,7 +346,7 @@ class SubMonitor:
         if monitored_sub.remove_repost:
             try:
                 removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
-                log.info('Attempting to remove post %s with removal ID %s', submission.id, removal_reason_id)
+                log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
                 submission.mod.remove(reason_id=removal_reason_id)
             except Forbidden:
                 log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
@@ -336,13 +397,19 @@ class SubMonitor:
         """
         if not monitored_sub.send_repost_modmail:
             return
-        message_body = REPOST_MODMAIL.format(post_id=search_results.checked_post.post_id,
-                                             match_count=len(search_results.matches))
+        message_body = REPOST_MODMAIL.format(
+            subreddit=monitored_sub.name,
+            match_count=len(search_results.matches),
+            author=search_results.checked_post.author,
+            perma_link=search_results.checked_post.perma_link,
+            oldest_match=search_results.matches[0].post.perma_link if search_results.matches else None,
+            title=search_results.checked_post.title
+        )
         self.resposne_handler.send_mod_mail(
             monitored_sub.name,
             message_body,
             f'Repost found in r/{monitored_sub.name}',
-            source='Submonitor'
+            source='sub_monitor'
         )
 
     def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:

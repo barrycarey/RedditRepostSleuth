@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.0.3] - 9/10/2023
+* [feature] Adult promoter detection.  Auto ban or remove posts from users that have share OnlyFans and Fansly links
+* [feature] Take action on high volume repost accounts.
+* [feature] User whitelist added.  Allows certain users to be except from repost, high volume and adult promoter filters
+* [feature] Added support for Text post checking.  Not active yet, pending search models builds finishing
+* [feature] Add all post types of search history list on the website for monitored subreddits
+* [bugfix] Fixed searching by uploaded image on repostsleuth.com
+* [bugfix] Fixed the post watch section on the website
+* [backend] Refactored all scheduled tasks to use Celery Beat
+* [backend] Migrated all backend code to use the new database schema
+
 ## [1.0.2] - 1/30/2021
 * [bugfix] - Bot was failing to check posts on monitored subreddit if subreddit was private
 * [enhancement] - If a post is ingested from a monitored subreddit repost check is performed at ingest time

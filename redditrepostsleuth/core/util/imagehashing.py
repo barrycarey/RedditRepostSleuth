@@ -33,13 +33,17 @@ def generate_img_by_post(post: Post) -> Image:
 
 def generate_img_by_url(url: str) -> Image:
 
-    req = request.Request(
-        url,
-        data=None,
-        headers={
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
-        }
-    )
+    try:
+        req = request.Request(
+            url,
+            data=None,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+            }
+        )
+    except ValueError as e:
+        log.warning('Problem with URL: %s', e)
+        raise ImageConversionException(str(e))
 
     try:
         response = request.urlopen(req, timeout=10)
@@ -73,6 +77,8 @@ def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
         dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
         post.hashes.append(PostHash(hash=str(dhash_h), hash_type_id=1, post_created_at=post.created_at))
         post.hashes.append(PostHash(hash=str(dhash_v), hash_type_id=2, post_created_at=post.created_at))
+    except OSError as e:
+        log.warning('Problem hashing image: %s', e)
     except Exception as e:
         # TODO: Specific exception
         log.exception('Error creating hash', exc_info=True)

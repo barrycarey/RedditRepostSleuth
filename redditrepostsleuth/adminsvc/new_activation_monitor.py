@@ -45,6 +45,8 @@ class NewActivationMonitor:
         # TODO: API Reduction - No need to call Reddit API after seeing int exists in DB
         try:
             monitored_sub = self._create_monitored_sub_in_db(msg)
+        except ValueError:
+            return
         except Exception as e:
             log.exception('Failed to save new monitored sub', exc_info=True)
             return
@@ -98,7 +100,8 @@ class NewActivationMonitor:
         with self.uowm.start() as uow:
             existing = uow.monitored_sub.get_by_sub(msg.subreddit.display_name)
             if existing:
-                return existing
+                log.info('Monitored sub %s already exists, skipping activation', msg.subreddit.display_name)
+                raise ValueError(f'Monitored Sub already in database: {msg.subreddit.display_name}')
             monitored_sub = MonitoredSub(**{**DEFAULT_CONFIG_VALUES, **{'name': msg.subreddit.display_name}})
             uow.monitored_sub.add(monitored_sub)
             try:

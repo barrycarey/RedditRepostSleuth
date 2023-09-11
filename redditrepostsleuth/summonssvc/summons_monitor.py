@@ -67,9 +67,17 @@ def handle_summons(summons: Summons) -> None:
                 time.sleep(30)
                 return
         except APIException as e:
-            if hasattr(e, 'error_type') and e.error_type == 'RATELIMIT':
-                log.error('Hit API rate limit for summons %s on sub %s.', summons.id, summons.post.subreddit)
-                return
+            if hasattr(e, 'error_type'):
+                if e.error_type == 'RATELIMIT':
+                    log.error('Hit API rate limit for summons %s on sub %s.', summons.id, summons.post.subreddit)
+                    return
+                elif e.error_type == 'SOMETHING_IS_BROKEN':
+                    summons.reply_failure_reason = 'SOMETHING_IS_BROKEN'
+                    uow.commit()
+                else:
+                    log.error('APIException with unknown error code: %s', e.error_type)
+            else:
+                log.error('APIException without error_type')
         except Exception as e:
             log.exception('Unknown error')
 
@@ -114,7 +122,7 @@ def monitor_for_mentions(reddit: Reddit, uowm: UnitOfWorkManager):
             try:
                 uow.commit()
             except DataError as e:
-                log.warning('SQLAlchemy Data error saving comment')
+                log.warning('SQLAlchemy Data error saving comment %s: %s', comment.id, e)
                 continue
 
         handle_summons(summons)

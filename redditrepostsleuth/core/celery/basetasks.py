@@ -53,7 +53,7 @@ class RedditTask(Task):
 class AdminTask(Task):
     def __init__(self):
         self.config = Config()
-        self.reddit = RedditManager(get_reddit_instance(self.config))
+        self.reddit = get_reddit_instance(self.config)
         self.uowm = UnitOfWorkManager(get_db_engine(self.config))
         self.event_logger = EventLogging(config=self.config)
         self.response_handler = ResponseHandler(self.reddit, self.uowm, self.event_logger,
@@ -61,7 +61,7 @@ class AdminTask(Task):
         self.notification_svc = NotificationService(self.config)
         self.config_updater = SubredditConfigUpdater(
             self.uowm,
-            self.reddit.reddit,
+            self.reddit,
             self.response_handler,
             self.config,
             notification_svc=self.notification_svc

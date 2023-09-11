@@ -301,7 +301,7 @@ class DuplicateImageService:
 
                 for im in index_matches:
                     search_result = next((x for x in r.matches if x.id == im.annoy_index_id), None)
-                    image_match_hash = image_hash = next((i for i in im.post.hashes if i.hash_type_id == 1), None) # get dhash_h
+                    image_match_hash = next((i for i in im.post.hashes if i.hash_type_id == 1), None) # get dhash_h
                     results.append(
                         ImageSearchMatch(
                             url,
@@ -383,7 +383,7 @@ class DuplicateImageService:
                     meme_hashes = get_image_hashes(match.post.url, hash_size=self.config.default_meme_filter_hash_size)
                     match_hash = meme_hashes['dhash_h']
                 except ImageConversionException:
-                    log.error('Failed to get meme hash for %s.  Sending to delete queue', match.post.post_id)
+                    log.warning('Failed to get meme hash for %s.  Sending to delete queue', match.post.post_id)
                     delete_post_task.apply_async((match.post.post_id,))
                     continue
                 except Exception:

@@ -4,6 +4,7 @@ from json import JSONDecodeError
 from typing import Text, List, NoReturn
 
 from praw import Reddit
+from praw.exceptions import RedditAPIException
 from praw.models import WikiPage, Subreddit
 from prawcore import NotFound, Forbidden, ResponseException, TooManyRequests
 from sqlalchemy import func
@@ -226,7 +227,10 @@ class SubredditConfigUpdater:
         if not new_config:
             log.error('Failed to generate new config for %s', monitored_sub.name)
             return False
-        self._update_wiki_page(wiki_page, new_config)
+        try:
+            self._update_wiki_page(wiki_page, new_config)
+        except RedditAPIException as e:
+            log.exception('')
         wiki_page = subreddit.wiki['repost_sleuth_config']  # Force refresh so we can get latest revision ID
         self._create_revision(wiki_page, monitored_sub)
         self._set_config_validity(wiki_page.revision_id, True)
@@ -346,7 +350,7 @@ class SubredditConfigUpdater:
         try:
             subreddit.wiki.create(self.config.wiki_config_name, json.dumps(DEFAULT_CONFIG_VALUES))
         except NotFound:
-            log.exception('Failed to create wiki page', exc_info=False)
+            log.warning('Failed to create wiki page for %s', subreddit.display_name)
             raise
 
         self.notification_svc.send_notification(
@@ -413,7 +417,7 @@ class SubredditConfigUpdater:
         log.info('Sending notification for new config keys being added to %s.  %s', config_keys, subreddit.display_name)
         if self.notification_svc:
             self.notification_svc.send_notification(
-                f'Added now config keys to r/{subreddit.display_name}\n{config_keys}',
+                f'Added now config keys to r/{subreddit.display_name}\n{config_keys}\nhttps://reddit.com/r/{subreddit.display_name}',
                 subject='New Config Options Notification Sent'
             )
         try:
@@ -451,7 +455,7 @@ class SubredditConfigUpdater:
         pass
 
 if __name__ == '__main__':
-    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config.json')
+    config = Config('/home/barry/PycharmProjects/RedditRepostSleuth/sleuth_config_dev.json')
     notification_svc = NotificationService(config)
     reddit = get_reddit_instance(config)
     uowm = UnitOfWorkManager(get_db_engine(config))
@@ -459,6 +463,4 @@ if __name__ == '__main__':
     event_logger = EventLogging(config=config)
     response_handler = ResponseHandler(reddit_manager, uowm, event_logger, live_response=config.live_responses)
     updater = SubredditConfigUpdater(uowm, reddit, response_handler, config, notification_svc=notification_svc)
-    with uowm.start() as uow:
-        sub = uow.monitored_sub.get_by_sub('SelfAwarewolves')
-    updater.update_wiki_config_from_database(sub, notify=False)
+    updater.update_configs(notify_missing_keys=False)

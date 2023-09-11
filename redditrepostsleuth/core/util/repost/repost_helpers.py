@@ -216,7 +216,7 @@ def save_image_repost_result(
         subreddit=search_results.checked_post.subreddit,
         source=source,
         post_type_id=search_results.checked_post.post_type_id,
-        hamming_distance=search_results.closest_match.hamming_distance
+        hamming_distance=search_results.closest_match.hamming_distance if search_results.closest_match else None
     )
 
     uow.repost.add(new_repost)
