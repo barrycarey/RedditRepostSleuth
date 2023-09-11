@@ -10,6 +10,7 @@ services:
         environment:
             - db_user=ingest
             - LOG_LEVEL=INFO
+            - RUN_ENV=production
         env_file:
             - .env
         entrypoint: python -u /src/ingestsvc.py
@@ -24,6 +25,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - db_user=scheduled_task
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.tasks.scheduled_tasks
@@ -40,6 +42,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - LOG_LEVEL=INFO
             - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
@@ -53,6 +56,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - LOG_LEVEL=INFO
             - QUERY_LIMIT=1000000
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
@@ -67,6 +71,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -n deleted_post_worker -c 16
@@ -83,6 +88,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - LOG_LEVEL=WARN
         entrypoint: python -u /src/queue_monitor.py
 
@@ -96,6 +102,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - LOG_LEVEL=WARN
         entrypoint: python -u /src/summons_monitor.py
 
@@ -109,6 +116,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - db_user=sub_monitor
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.response_tasks
@@ -124,6 +132,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - db_user=ingest
             - LOG_LEVEL=ERROR
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
@@ -140,7 +149,8 @@ services:
             - .env
         environment:
             - db_user=repost_link
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARN
+            - RUN_ENV=production
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.repost_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_link -n repost_link_worker --autoscale=6,1
 
@@ -154,6 +164,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - db_user=repost_image
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.repost_tasks
@@ -169,6 +180,7 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=8,5
@@ -183,8 +195,9 @@ services:
         env_file:
             - .env
         environment:
+            - RUN_ENV=production
             - LOG_LEVEL=INFO
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.scheduled_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q subreddit_config_updates,monitored_sub_config_update -n subreddit_config_update_worker --autoscale=8,1
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.scheduled_tasks,redditrepostsleuth.core.celery.admin_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q subreddit_config_updates,update_wiki_from_database -n subreddit_config_update_worker --autoscale=8,1
 
 

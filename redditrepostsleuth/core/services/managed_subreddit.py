@@ -20,6 +20,7 @@ def create_monitored_sub_in_db(subreddit_name: Text, uow: UnitOfWork, wiki_manag
         uow.commit()
         log.info('Sub %s added as monitored sub', subreddit_name)
     except IntegrityError as e:
+        # TODO - This can be pulled since we're checking during activation
         log.error('Failed to create monitored sub for %s.  It already exists', subreddit_name, exc_info=True)
     except Exception as e:
         log.exception('Unknown exception saving monitored sub', exc_info=True)

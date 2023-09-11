@@ -9,6 +9,7 @@ from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
+from redditrepostsleuth.core.celery.basetasks import AdminTask
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Post, UserReview
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -25,13 +26,6 @@ log = configure_logger(
     filters=[ContextFilter()]
 )
 
-
-
-class AdminTask(Task):
-    def __init__(self):
-        self.config = Config()
-        self.uowm = UnitOfWorkManager(get_db_engine(self.config))
-        self.event_logger = EventLogging()
 
 class PyMysqlTask(Task):
     def __init__(self):
@@ -121,10 +115,13 @@ def update_last_deleted_check(self, post_ids: list[int]) -> None:
 
 @celery.task(bind=True, base=AdminTask)
 def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, user_data: dict) -> NoReturn:
-    self.config_updater.update_wiki_config_from_database(monitored_sub, notify=True)
+    try:
+        self.config_updater.update_wiki_config_from_database(monitored_sub, notify=False)
+    except Exception as e:
+        log.exception('')
     self.config_updater.notification_svc.send_notification(
-        f'r/{monitored_sub.name} config updated on site by {user_data["name"]}',
-        subject='**Config updated on repostsleuth.com**'
+        f'[r/{monitored_sub.name}](https://reddit.com/r/{monitored_sub.name}) config updated on site by [u/{user_data["name"]}](https://reddit.com/u/{user_data["name"]})',
+        subject='Config updated on repostsleuth.com'
     )
 
 

@@ -29,6 +29,7 @@ task_routes = {
     'redditrepostsleuth.core.celery.admin_tasks.update_proxies_job': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.response_tasks.process_summons':  {'queue': 'summons'},
     'redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans': {'queue': 'onlyfans_check'},
+    'redditrepostsleuth.core.celery.admin_tasks.update_subreddit_config_from_database': {'queue': 'update_wiki_from_database'}
 
 
 }
@@ -64,8 +65,12 @@ beat_schedule = {
         'schedule': 86400
     },
     'update-top-reposters': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_top_reposters_task',
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_all_top_reposters_task',
         'schedule': 86400
+    },
+    'update-daily-reposters': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_daily_top_reposters_task',
+        'schedule': 900
     },
     'send-reports-to-meme-voting': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.send_reports_to_meme_voting_task',
@@ -82,6 +87,10 @@ beat_schedule = {
     'update-profile-token': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',
         'schedule': 120
+    },
+    'update-daily-stats': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_daily_stats',
+        'schedule': 86400
     },
 
 }

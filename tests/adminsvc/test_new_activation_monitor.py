@@ -60,8 +60,9 @@ class TestNewActivationMonitor(TestCase):
         uow.commit.return_value = None
         uowm.start.return_value = uow
         monitor = NewActivationMonitor(uowm, Mock(), response_handler)
-        result = monitor._create_monitored_sub_in_db(Mock(subreddit=Mock(display_name='testsub')))
-        self.assertEqual(123, result.id)
+        with self.assertRaises(ValueError):
+            result = monitor._create_monitored_sub_in_db(Mock(subreddit=Mock(display_name='testsub')))
+
 
     def test__create_monitored_sub_in_db_create(self):
         sub_repo = MagicMock()
