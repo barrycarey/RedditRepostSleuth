@@ -26,7 +26,7 @@ def pre_process_post(post: Post, uowm: UnitOfWorkManager) -> Optional[Post]:
 
             image_hash = next((i for i in post.hashes if i.hash_type_id == 1), None)
             if not image_hash:
-                log.error('No hash created for image post %s, skipping ingest', post.post_id)
+                log.warning('No hash created for image post %s, skipping ingest', post.post_id)
                 return
 
         url_hash = md5(post.url.encode('utf-8'))
