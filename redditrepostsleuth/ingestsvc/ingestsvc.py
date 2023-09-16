@@ -10,7 +10,7 @@ from typing import List, Optional
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
 
-from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_new_posts
+from redditrepostsleuth.core.celery.tasks.ingest_tasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
