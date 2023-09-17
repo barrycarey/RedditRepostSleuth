@@ -63,7 +63,7 @@ class TestIngestTasks(TestCase):
     def test_image_links_from_gallery_meta_data_image_still_processing_raises(self):
         meta_data = {
             'abcd123': {
-                'status': 'processing',
+                'status': 'unprocessed',
                 'm': 'image/test'
             },
         }
