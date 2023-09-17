@@ -10,7 +10,7 @@ from typing import List, Optional
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
 
-from redditrepostsleuth.core.celery.ingesttasks import save_new_post, save_new_posts
+from redditrepostsleuth.core.celery.tasks.ingest_tasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -140,8 +140,9 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                             tasks.append(ensure_future(fetch_page_as_job(j, session)))
 
                 log.info('Sending %s posts to save queue', len(posts_to_save))
-                #queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
-                save_new_posts.apply_async(([reddit_submission_to_post(submission) for submission in posts_to_save],))
+
+                # save_new_posts.apply_async(([reddit_submission_to_post(submission) for submission in posts_to_save],))
+                save_new_posts.apply_async((posts_to_save,))
             if len(chunk) == 0:
                 break
 
@@ -205,7 +206,8 @@ async def main() -> None:
                 posts_to_save.append(post['data'])
 
             log.info('Sending %s posts to save queue', len(posts_to_save))
-            queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
+            # queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
+            queue_posts_for_ingest(posts_to_save)
 
             ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(
                 res_data['data']['children'][0]['data']['created_utc'])

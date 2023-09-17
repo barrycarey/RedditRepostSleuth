@@ -1,11 +1,10 @@
-import time
 from datetime import datetime
 import os
 
 import pymysql
 import redis
 
-from redditrepostsleuth.core.celery.ingesttasks import import_post
+from redditrepostsleuth.core.celery.tasks.migrate_tasks import import_post
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 

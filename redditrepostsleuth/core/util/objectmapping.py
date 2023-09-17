@@ -39,7 +39,7 @@ def submission_to_post(submission: Submission, source: str = 'praw') -> Post:
     return post
 
 
-def reddit_submission_to_post(submission: dict) -> Post:
+def reddit_submission_to_post(submission: dict, post_type: str = None) -> Post:
     post = Post()
     post.post_id = submission.get('id', None)
     post.url = submission.get('url', None)
@@ -53,7 +53,9 @@ def reddit_submission_to_post(submission: dict) -> Post:
     if crosspost_parent:
         post.crosspost_parent = post.is_crosspost = True
 
-    post_type = get_post_type(submission)
+    if not post_type:
+        post_type = get_post_type(submission)
+
     post.post_type_id = get_post_type_id(post_type)
     post.nsfw = submission.get('over_18', None)
 
