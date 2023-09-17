@@ -67,6 +67,9 @@ class PostType(Base):
     id = Column(TINYINT(), primary_key=True)
     name = Column(String(12, collation='latin1_bin'), nullable=False)
 
+    def __repr__(self):
+        return self.name
+
 class PostHash(Base):
     __tablename__ = 'post_hash'
     __table_args__ = (

@@ -58,12 +58,12 @@ def handle_summons(summons: Summons) -> None:
             summons_handler.process_summons(summons)
         except ResponseException as e:
             if e.response.status_code == 429:
-                log.error('IP Rate limit hit.  Waiting', exc_info=False)
+                log.warning('IP Rate limit hit.  Waiting', exc_info=False)
                 time.sleep(30)
                 return
         except AssertionError as e:
             if 'code: 429' in str(e):
-                log.error('Too many requests from IP.  Waiting')
+                log.warning('Too many requests from IP.  Waiting')
                 time.sleep(30)
                 return
         except APIException as e:

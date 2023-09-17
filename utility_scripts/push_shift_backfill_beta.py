@@ -1,12 +1,11 @@
 import json
-import os
 import time
 from datetime import datetime
 from typing import Text
 
 import requests
 
-from redditrepostsleuth.core.celery.ingesttasks import save_pushshift_results
+from redditrepostsleuth.core.celery.tasks.ingest_tasks import save_pushshift_results
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.sqlalchemyunitofworkmanager import SqlAlchemyUnitOfWorkManager
