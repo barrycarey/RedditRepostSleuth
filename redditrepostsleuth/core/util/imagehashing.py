@@ -8,7 +8,7 @@ from urllib import request
 from urllib.error import HTTPError
 
 import imagehash
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from PIL.Image import DecompressionBombError
 
 from redditrepostsleuth.core.exception import ImageConversionException, ImageRemovedException, InvalidImageUrlException
@@ -58,8 +58,13 @@ def generate_img_by_url_requests(url: str) -> Optional[Image]:
     :param url: URL to get
     :return: PIL image
     """
+    if 'redd.it' in url:
+        useragent = 'repostsleuthbot:v1.0.3 Image Hasher (by /u/barrycarey)'
+    else:
+        useragent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+        'User-Agent': useragent
     }
 
     try:
@@ -76,7 +81,12 @@ def generate_img_by_url_requests(url: str) -> Optional[Image]:
             raise InvalidImageUrlException
         raise ImageConversionException(f'Status {res.status_code}')
 
-    return Image.open(BytesIO(res.content))
+    try:
+        return Image.open(BytesIO(res.content))
+    except UnidentifiedImageError as e:
+        log.warning('Failed to hash image %s: %s', url, e)
+        raise ImageConversionException(e)
+
 
 def generate_img_by_file(path: str) -> Image:
 

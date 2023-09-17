@@ -3,20 +3,16 @@ from hashlib import md5
 from typing import Optional
 
 import imagehash
-import requests
-from requests import ConnectionError
-from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.db.databasemodels import Post, PostHash
-from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.exception import ImageRemovedException, ImageConversionException, InvalidImageUrlException, \
     GalleryNotProcessed
-from redditrepostsleuth.core.util.imagehashing import log, generate_img_by_url, generate_img_by_url_requests
+from redditrepostsleuth.core.util.imagehashing import log, generate_img_by_url_requests
 from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
 
 log = logging.getLogger(__name__)
 
-def pre_process_post(submission: dict, uow: UnitOfWork) -> Optional[Post]:
+def pre_process_post(submission: dict) -> Optional[Post]:
 
     post = reddit_submission_to_post(submission)
 
@@ -28,16 +24,6 @@ def pre_process_post(submission: dict, uow: UnitOfWork) -> Optional[Post]:
     url_hash = md5(post.url.encode('utf-8'))
     url_hash = url_hash.hexdigest()
     post.url_hash = url_hash
-
-    try:
-        uow.posts.add(post)
-        uow.commit()
-    except IntegrityError:
-        log.warning('Post already exists in database. %s', post.post_id)
-        return
-    except Exception as e:
-        log.exception('Database save failed: %s', str(e), exc_info=False)
-        return
 
     return post
 
