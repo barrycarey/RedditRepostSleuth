@@ -14,9 +14,9 @@ worker_hijack_root_logger = False
 worker_redirect_stdouts = False
 worker_log_color = None
 task_routes = {
-    'redditrepostsleuth.core.celery.ingesttasks.save_new_post': {'queue': 'post_ingest'},
-    'redditrepostsleuth.core.celery.ingesttasks.save_new_posts': {'queue': 'post_ingest'},
-    'redditrepostsleuth.core.celery.ingesttasks.ingest_repost_check': {'queue': 'repost'},
+    'redditrepostsleuth.core.celery.tasks.ingest_tasks.save_new_post': {'queue': 'post_ingest'},
+    'redditrepostsleuth.core.celery.tasks.ingest_tasks.save_new_posts': {'queue': 'post_ingest'},
+    'redditrepostsleuth.core.celery.tasks.ingest_tasks.ingest_repost_check': {'queue': 'repost'},
     'redditrepostsleuth.core.celery.tasks.repost_tasks.check_image_repost_save': {'queue': 'repost_image'},
     'redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check': {'queue': 'repost_link'},
     'redditrepostsleuth.core.celery.tasks.repost_tasks.check_for_text_repost_task': {'queue': 'repost_text'},

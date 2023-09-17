@@ -104,7 +104,7 @@ class DuplicateImageService:
 
     def check_image(
             self,
-            url: Text,
+            url: str,
             post: Post = None,
             source='unknown',
             sort_by='created',
@@ -191,6 +191,17 @@ class DuplicateImageService:
 
         log.info('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
+
+    def check_gallery(
+            self,
+            url: str,
+            post: Post = None,
+            source='unknown',
+            sort_by='created',
+            search_settings: ImageSearchSettings = None,
+
+    ) -> ImageSearchResults:
+        pass
 
     def _get_meme_hash(self, url: str, post_id=None) -> Optional[Text]:
         """
