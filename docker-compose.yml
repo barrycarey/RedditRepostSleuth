@@ -135,7 +135,7 @@ services:
             - RUN_ENV=production
             - db_user=ingest
             - LOG_LEVEL=ERROR
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.ingesttasks
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.ingest_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=3,16
 
     link_repost_worker:

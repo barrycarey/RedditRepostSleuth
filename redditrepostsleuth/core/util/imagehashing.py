@@ -1,20 +1,18 @@
 import json
 import logging
-import os
-from typing import Dict, Text
+from typing import Dict, Text, Optional
 
 import requests
-from collections import Counter
 from io import BytesIO
 from urllib import request
 from urllib.error import HTTPError
 
 import imagehash
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from PIL.Image import DecompressionBombError
 
-from redditrepostsleuth.core.exception import ImageConversionException
-from redditrepostsleuth.core.db.databasemodels import Post, PostHash
+from redditrepostsleuth.core.exception import ImageConversionException, ImageRemovedException, InvalidImageUrlException
+from redditrepostsleuth.core.db.databasemodels import Post
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +52,42 @@ def generate_img_by_url(url: str) -> Image:
 
     return img if img else None
 
+def generate_img_by_url_requests(url: str) -> Optional[Image]:
+    """
+    Take a URL and generate a PIL image
+    :param url: URL to get
+    :return: PIL image
+    """
+    if 'redd.it' in url:
+        useragent = 'repostsleuthbot:v1.0.3 Image Hasher (by /u/barrycarey)'
+    else:
+        useragent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+
+    headers = {
+        'User-Agent': useragent
+    }
+
+    try:
+        res = requests.get(url, headers=headers)
+    except (ConnectionError) as e:
+        raise ImageConversionException(str(e))
+
+    if res.status_code != 200:
+        log.warning('Status %s from image URL %s', res.status_code, url)
+        if res.status_code == 404:
+            raise ImageRemovedException('Image removed')
+        elif res.status_code == 403:
+            log.warning('Unauthorized: %s', url)
+            raise InvalidImageUrlException
+        raise ImageConversionException(f'Status {res.status_code}')
+
+    try:
+        return Image.open(BytesIO(res.content))
+    except UnidentifiedImageError as e:
+        log.warning('Failed to hash image %s: %s', url, e)
+        raise ImageConversionException(e)
+
+
 def generate_img_by_file(path: str) -> Image:
 
     try:
@@ -65,46 +99,8 @@ def generate_img_by_file(path: str) -> Image:
     return img if img else None
 
 
-def set_image_hashes(post: Post, hash_size: int = 16) -> Post:
-    log.debug('Hashing image post')
-    try:
-        img = generate_img_by_url(post.url)
-    except ImageConversionException as e:
-        raise
 
-    try:
-        dhash_h = imagehash.dhash(img, hash_size=hash_size)
-        dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
-        post.hashes.append(PostHash(hash=str(dhash_h), hash_type_id=1, post_created_at=post.created_at))
-        post.hashes.append(PostHash(hash=str(dhash_v), hash_type_id=2, post_created_at=post.created_at))
-    except OSError as e:
-        log.warning('Problem hashing image: %s', e)
-    except Exception as e:
-        # TODO: Specific exception
-        log.exception('Error creating hash', exc_info=True)
-        raise
-
-    return post
-
-def get_image_hashes_from_pil(img, hash_size: int = 16) -> Dict:
-    result = {
-        'dhash_h': None,
-        'dhash_v': None,
-    }
-
-    try:
-        dhash_h = imagehash.dhash(img, hash_size=hash_size)
-        dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
-        result['dhash_h'] = str(dhash_h)
-        result['dhash_v'] = str(dhash_v)
-    except Exception as e:
-        # TODO: Specific exception
-        log.exception('Error creating hash', exc_info=True)
-        raise
-
-    return result
-
-def get_image_hashes(url: Text, hash_size: int = 16) -> Dict:
+def get_image_hashes(url: Text, hash_size: int = 16) -> dict:
     result = {
         'dhash_h': None,
         'dhash_v': None,
@@ -125,26 +121,3 @@ def get_image_hashes(url: Text, hash_size: int = 16) -> Dict:
         raise
 
     return result
-
-def set_image_hashes_api(post: Post, api_url: str) -> Post:
-    """
-    Call an external API to create image hashes.
-    This allows us to offload bandwidth to another server.  In the current case, a Digital Ocean Load Balancer
-    :param post: Post to hash
-    :param api_url: API URL to call
-    :return: Dict of hashes
-    """
-    r = requests.get(api_url, params={'url': post.url})
-    if r.status_code != 200:
-        log.error('Back statuscode from DO API %s', r.status_code)
-        raise ImageConversionException('Bad response from DO API')
-
-    hashes = json.loads(r.text)
-    log.debug(hashes)
-
-    post.dhash_h = hashes['dhash_h']
-    post.dhash_v = hashes['dhash_v']
-    post.ahash = hashes['ahash']
-
-    return post
-
