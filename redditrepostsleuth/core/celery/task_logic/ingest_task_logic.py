@@ -54,7 +54,7 @@ def process_image_post(post: Post, hash_size: int = 16) -> Post:
 def process_gallery(post: Post, submission_data: dict) -> Optional[Post]:
 
     if 'media_metadata' not in submission_data or submission_data['media_metadata'] is None:
-        log.error('Gallery without metadata.  https://redd.it/%s', submission_data['id'])
+        log.warning('Gallery without metadata.  https://redd.it/%s', submission_data['id'])
         return
 
     for url in image_links_from_gallery_meta_data(submission_data['media_metadata']):
