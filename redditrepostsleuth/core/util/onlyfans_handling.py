@@ -182,7 +182,3 @@ def get_links_from_comments_praw(username: str, reddit: Reddit) -> list[str]:
     log.debug('User %s has %s comment links', username, len(all_urls))
 
     return list(set(all_urls))
-
-if __name__ == '__main__':
-    user = UserReview(username='AbandonedJoint')
-    check_user(user)
