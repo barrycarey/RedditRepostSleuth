@@ -36,7 +36,7 @@ def save_new_post(self, submission: dict):
             log.info('Sending ingested post to monitored sub queue')
             celery.send_task('redditrepostsleuth.core.celery.response_tasks.sub_monitor_check_post',
                              args=[post.post_id, monitored_sub],
-                             queue='submonitor')
+                             queue='submonitor', countdown=20)
 
         try:
             uow.posts.add(post)
