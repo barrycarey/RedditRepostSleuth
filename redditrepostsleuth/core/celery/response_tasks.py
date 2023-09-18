@@ -68,7 +68,7 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     with self.uowm.start() as uow:
         post = uow.posts.get_by_post_id(post_id)
         if not post:
-            log.info('Post %s does exist', post_id)
+            log.warning('Post %s does exist', post_id)
             return
         if not post.post_type:
             log.warning('Unknown post type for %s - https://redd.it/%s', post.post_id, post.post_id)
