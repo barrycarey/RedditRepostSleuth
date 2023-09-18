@@ -121,7 +121,7 @@ class DuplicateImageService:
         :return: Search Results
         :rtype: ImageSearchResults
         """
-        log.info('Checking URL for matches: %s', url)
+        log.debug('Checking URL for matches: %s', url)
 
         if not search_settings:
             log.info('No search settings provided, using default')
@@ -304,7 +304,7 @@ class DuplicateImageService:
         :return:
         """
         results = []
-        log.info('Building search results from index matches')
+        log.debug('Building search results from index matches')
         with self.uowm.start() as uow:
             result_map = {}
             for r in api_search_results.results:

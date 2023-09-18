@@ -88,7 +88,7 @@ class SubMonitor:
             log.debug('No adult promoter settings active, skipping check')
             return
 
-        log.info('Checking if user %s is flagged', post.author)
+        log.debug('Checking if user %s is flagged', post.author)
         user = uow.user_review.get_by_username(post.author)
         if not user:
             log.info('No user review record for %s', post.author)
@@ -115,7 +115,7 @@ class SubMonitor:
         :return: None
         """
         if not monitored_sub.high_volume_reposter_remove_post and not monitored_sub.high_volume_reposter_ban_user and not monitored_sub.high_volume_reposter_notify_mod_mail:
-            log.info('No High Volume Repost settings enabled for %s, skipping', monitored_sub.name)
+            log.debug('No High Volume Repost settings enabled for %s, skipping', monitored_sub.name)
             return
 
         whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)

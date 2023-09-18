@@ -743,4 +743,4 @@ class UserReview(Base):
     content_links_found = Column(Boolean, default=False)
     added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     notes = Column(String(150))
-    last_checked = Column(DateTime)
+    last_checked = Column(DateTime, default=func.utc_timestamp())
