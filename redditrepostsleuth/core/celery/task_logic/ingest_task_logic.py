@@ -94,6 +94,10 @@ def image_links_from_gallery_meta_data(meta_data: dict[str, dict]) -> list[str]:
             log.info('Gallery image still processing')
             raise GalleryNotProcessed(f'Gallery image {k} is still processing')
 
+        if v['status'] == 'failed':
+            log.info('Gallery failed, skipping')
+            continue
+
         if v['status'] != 'valid':
             raise ValueError(f'Unexpected status in Gallery meta data {v["status"]}')
 
