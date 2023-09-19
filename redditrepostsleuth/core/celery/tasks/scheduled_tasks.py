@@ -1,5 +1,5 @@
 from praw.exceptions import PRAWException
-from prawcore import TooManyRequests, Redirect, ServerError
+from prawcore import TooManyRequests, Redirect, ServerError, NotFound
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
 from redditrepostsleuth.adminsvc.inbox_monitor import InboxMonitor
@@ -129,6 +129,9 @@ def check_for_subreddit_config_update_task(self, subreddit_name: str) -> None:
             self.config_updater.check_for_config_update(monitored_sub, notify_missing_keys=False)
         except TooManyRequests:
             raise
+        except NotFound:
+            log.warning('NotFound error when updating config for %s', monitored_sub.name)
+            return
         except Redirect as e:
             if str(e) == 'Redirect to /subreddits/search':
                 log.warning('Subreddit %s no longer exists.  Setting to inactive in database', monitored_sub.name)
