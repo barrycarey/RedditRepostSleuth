@@ -100,3 +100,6 @@ NO_BAN_PERMISSIONS = 'I attempted to ban user {username} but I do not have the p
 HIGH_VOLUME_REPOSTER_FOUND = 'User [u/{username}](https://reddit.com/u/{username}) has been flagged as a high volume reposter.\n\n' \
                              'They just created [this submission](https://redd.it/{post_id}) on [r/{subreddit}](https://reddit.com/r/{subreddit}) \n\n' \
                              'In the last 7 days I have detected {repost_count} reposts created by them'
+
+ADULT_PROMOTER_SUBMISSION_FOUND = 'User [u/{username}](https://reddit.com/u/{username}) has been flagged as an adult content promoter.\n\n' \
+                                  'They just submitted [this post](https://redd.it/{post_id}) in r/{subreddit}'

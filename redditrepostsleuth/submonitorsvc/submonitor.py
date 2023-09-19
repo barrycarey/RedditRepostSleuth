@@ -7,21 +7,22 @@ from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, UserReview
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub, \
     get_text_search_settings_for_monitored_sub
-from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, NO_BAN_PERMISSIONS, HIGH_VOLUME_REPOSTER_FOUND
-from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, log_search
+from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, NO_BAN_PERMISSIONS, HIGH_VOLUME_REPOSTER_FOUND, \
+    ADULT_PROMOTER_SUBMISSION_FOUND
+from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
 from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
 
 log = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ class SubMonitor:
         self.response_builder = response_builder
         self.resposne_handler = response_handler
         self.event_logger = event_logger
+        self.notification_svc = None
         if config:
             self.config = config
         else:
@@ -100,10 +102,33 @@ class SubMonitor:
 
         log.info('User %s is flagged as an adult promoter, taking action', user.username)
         if monitored_sub.adult_promoter_remove_post:
-            self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
+            if self.notification_svc:
+                self.notification_svc.send_notification(
+                    f'Post by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
+                    subject='Onlyfans Removal'
+                )
+            self._remove_post(monitored_sub, self.reddit.submission(post.post_id), mod_note=f'Adult Content Promoter Remova.  Notes: {user.notes}')
 
         if monitored_sub.adult_promoter_ban_user:
+            if self.notification_svc:
+                self.notification_svc.send_notification(
+                    f'User [{post.author}](https://reddit.com/u/{post.author}) banned from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
+                    subject='Onlyfans Ban Issued'
+                )
             self._ban_user(post.author, monitored_sub.name, user.notes)
+
+        if monitored_sub.adult_promoter_notify_mod_mail:
+            message_body = ADULT_PROMOTER_SUBMISSION_FOUND.format(
+                username=post.author,
+                subreddit=monitored_sub.name,
+                post_id=post.post_id,
+            )
+            self.resposne_handler.send_mod_mail(
+                monitored_sub.name,
+                message_body,
+                f'New Submission From Adult Content Promoter',
+                source='sub_monitor'
+            )
 
 
     def handle_high_volume_reposter_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> None:
@@ -126,6 +151,10 @@ class SubMonitor:
 
         repost_count = uow.stat_top_reposter.get_total_reposts_by_author_and_day_range(post.author, 7)
 
+        if not repost_count:
+            log.debug('User %s has no reposts, skipping high volume check', post.author)
+            return
+
         if monitored_sub.high_volume_reposter_threshold < 10:
             log.info('High volume threshold failsafe.  Skipping check')
             return
@@ -136,9 +165,19 @@ class SubMonitor:
             return
 
         if monitored_sub.high_volume_reposter_remove_post:
+            if self.notification_svc:
+                self.notification_svc.send_notification(
+                    f'Post by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
+                    subject='High Volume Removal'
+                )
             self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
 
         if monitored_sub.high_volume_reposter_ban_user:
+            if self.notification_svc:
+                self.notification_svc.send_notification(
+                    f'User [{post.author}](https://reddit.com/u/{post.author}) banned from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
+                    subject='High Volume Reposter Ban Issued'
+                )
             self._ban_user(post.author, monitored_sub.name, 'High volume of reposts detected by Repost Sleuth')
 
         if monitored_sub.high_volume_reposter_notify_mod_mail:
@@ -337,7 +376,7 @@ class SubMonitor:
             except Exception as e:
                 log.exception('Failed to lock comment', exc_info=True)
 
-    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission) -> None:
+    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission, mod_note: str = None) -> None:
         """
         Check if given sub wants posts removed.  Remove is enabled
         @param monitored_sub: Monitored sub
@@ -347,7 +386,7 @@ class SubMonitor:
             try:
                 removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
                 log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
-                submission.mod.remove(reason_id=removal_reason_id)
+                submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
             except Forbidden:
                 log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
             except Exception as e:

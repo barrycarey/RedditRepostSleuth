@@ -1,18 +1,17 @@
-import json
 import logging
-from typing import Dict, Text, Optional
-
-import requests
 from io import BytesIO
+from typing import Text, Optional
 from urllib import request
 from urllib.error import HTTPError
 
 import imagehash
+import requests
 from PIL import Image, UnidentifiedImageError
 from PIL.Image import DecompressionBombError
+from requests.exceptions import ConnectionError
 
-from redditrepostsleuth.core.exception import ImageConversionException, ImageRemovedException, InvalidImageUrlException
 from redditrepostsleuth.core.db.databasemodels import Post
+from redditrepostsleuth.core.exception import ImageConversionException, ImageRemovedException, InvalidImageUrlException
 
 log = logging.getLogger(__name__)
 
@@ -78,12 +77,12 @@ def generate_img_by_url_requests(url: str) -> Optional[Image]:
             raise ImageRemovedException('Image removed')
         elif res.status_code == 403:
             log.warning('Unauthorized: %s', url)
-            raise InvalidImageUrlException
+            raise InvalidImageUrlException(f'Unauthorized on {url}')
         raise ImageConversionException(f'Status {res.status_code}')
 
     try:
         return Image.open(BytesIO(res.content))
-    except UnidentifiedImageError as e:
+    except (UnidentifiedImageError, DecompressionBombError) as e:
         log.warning('Failed to hash image %s: %s', url, e)
         raise ImageConversionException(e)
 
