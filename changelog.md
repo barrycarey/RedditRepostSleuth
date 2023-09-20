@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-## [1.0.3.1] - 9/192/2019
+## [1.0.3.1] - 9/19/2023
 * [feature] Send mod mail for adult promoter detection
 * [feature] High volume reposter detection.  Use global list of reposters to ban worst offenders
 * [feature] Adult Promoter detection now checks last 100 comments for each user
