@@ -1,5 +1,5 @@
 import logging
-from typing import List, Text, NoReturn, Optional
+from typing import Optional
 
 from praw import Reddit
 from praw.exceptions import APIException
@@ -12,7 +12,6 @@ from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
-from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -107,7 +106,7 @@ class SubMonitor:
                     f'Post by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
                     subject='Onlyfans Removal'
                 )
-            self._remove_post(monitored_sub, self.reddit.submission(post.post_id), mod_note=f'Adult Content Promoter Remova.  Notes: {user.notes}')
+            self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
 
         if monitored_sub.adult_promoter_ban_user:
             if self.notification_svc:
@@ -194,7 +193,7 @@ class SubMonitor:
                 source='sub_monitor'
             )
 
-    def has_post_been_checked(self, post_id: Text) -> bool:
+    def has_post_been_checked(self, post_id: str) -> bool:
         """
         Check if a given post ID has been checked already
         :param post_id: ID of post to check
@@ -205,7 +204,7 @@ class SubMonitor:
                 return True
         return False
 
-    def should_check_post(self, post: Post, monitored_sub: MonitoredSub, title_keyword_filter: List[Text] = None) -> bool:
+    def should_check_post(self, post: Post, monitored_sub: MonitoredSub, title_keyword_filter: list[str] = None) -> bool:
         """
         Check if a given post should be checked
         :rtype: bool
@@ -419,16 +418,16 @@ class SubMonitor:
                 log.exception('Failed to set post OC https://redd.it/%s', submission.id, exc_info=True)
 
 
-    def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission, report_msg: Text) -> NoReturn:
+    def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission, report_msg: str) -> None:
         if not monitored_sub.report_reposts:
             return
         log.info('Reporting post %s on %s', f'https://redd.it/{submission.id}', monitored_sub.name)
         try:
-            submission.report(report_msg)
+            submission.report(report_msg[:99]) # TODO: Until database column length is fixed
         except Exception as e:
             log.exception('Failed to report submission', exc_info=True)
 
-    def _send_mod_mail(self, monitored_sub: MonitoredSub, search_results: SearchResults) -> NoReturn:
+    def _send_mod_mail(self, monitored_sub: MonitoredSub, search_results: SearchResults) -> None:
         """
         Send a mod mail alerting to a repost
         :param monitored_sub: Monitored sub

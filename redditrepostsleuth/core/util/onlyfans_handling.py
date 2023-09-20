@@ -155,12 +155,20 @@ def get_links_from_comments(username: str) -> list[str]:
     if response.status_code == 404:
         raise UserNotFound(f'User {username} does not exist or is banned')
 
+    if response.status_code == 403:
+        log.warning('Got unauthorized when checking user comments for %s', username)
+        return []
+
     if response.status_code != 200:
         log.warning('Unexpected status %s from util API', response.status_code)
         raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
     response_json = json.loads(response.text)
     all_urls = []
+
+    if not response_json['data']['children']:
+        log.warning('No comment data returned for %s', username)
+        return []
 
     for comment in response_json['data']['children']:
         all_urls += re.findall(r'href=[\'"]?([^\'" >]+)', comment['data']['body_html'])

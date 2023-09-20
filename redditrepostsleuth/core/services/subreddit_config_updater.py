@@ -8,6 +8,7 @@ from praw.exceptions import RedditAPIException
 from praw.models import WikiPage, Subreddit
 from prawcore import NotFound, Forbidden, ResponseException, TooManyRequests
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MonitoredSubConfigRevision
@@ -313,6 +314,9 @@ class SubredditConfigUpdater:
             uow.monitored_sub_config_revision.add(config_revision)
             try:
                 uow.commit()
+                return config_revision
+            except IntegrityError:
+                log.warning('Config revision already exists')
                 return config_revision
             except Exception as e:
                 log.exception('Failed to save config revision', exc_info=True)
