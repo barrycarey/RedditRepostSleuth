@@ -147,6 +147,9 @@ class ResponseHandler:
                 self.reddit.auth.limits['remaining']
             )
             log.info('Sent PM to %s. ', user.name)
+        except RedditAPIException as e:
+            if e.error_type == 'NOT_WHITELISTED_BY_USER_MESSAGE':
+                log.warning('Cannot send PM to %s.  Not whitelisted', user.name)
         except Exception as e:
             log.exception('Failed to send PM to %s', user.name, exc_info=True)
             raise
@@ -159,6 +162,7 @@ class ResponseHandler:
             recipient=user.name
         )
         self._save_private_message(bot_message)
+
         return bot_message
 
     def reply_to_private_message(self, message: Message, body: str) -> NoReturn:

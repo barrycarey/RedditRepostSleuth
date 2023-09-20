@@ -67,6 +67,9 @@ class PostType(Base):
     id = Column(TINYINT(), primary_key=True)
     name = Column(String(12, collation='latin1_bin'), nullable=False)
 
+    def __repr__(self):
+        return self.name
+
 class PostHash(Base):
     __tablename__ = 'post_hash'
     __table_args__ = (
@@ -740,4 +743,4 @@ class UserReview(Base):
     content_links_found = Column(Boolean, default=False)
     added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     notes = Column(String(150))
-    last_checked = Column(DateTime)
+    last_checked = Column(DateTime, default=func.utc_timestamp())

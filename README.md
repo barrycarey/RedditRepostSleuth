@@ -8,8 +8,7 @@
 </div>
 
 ![Master](https://github.com/barrycarey/RedditRepostSleuth/workflows/Tests/badge.svg)
-![Travis (.com)](https://img.shields.io/travis/com/barrycarey/RedditRepostSleuth)
-![semver](https://img.shields.io/badge/semver-1.0.3-blue)
+![semver](https://img.shields.io/badge/semver-1.0.3.1-blue)
 ![CodeFactor Grade](https://img.shields.io/codefactor/grade/github/barrycarey/RedditRepostSleuth/master)
 
 ![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/repostsleuthbot?style=social)

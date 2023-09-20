@@ -63,3 +63,11 @@ class UtilApiException(RepostSleuthException):
 class IndexApiException(RepostSleuthException):
     def __init__(self, message):
         super(IndexApiException, self).__init__(message)
+
+class GalleryNotProcessed(RepostSleuthException):
+    def __init__(self, message):
+        super(GalleryNotProcessed, self).__init__(message)
+
+class UserNotFound(RepostSleuthException):
+    def __init__(self, message):
+        super(UserNotFound, self).__init__(message)
