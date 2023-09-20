@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.0.3.1] - 9/192/2019
+* [feature] Send mod mail for adult promoter detection
+* [feature] High volume reposter detection.  Use global list of reposters to ban worst offenders
+* [feature] Adult Promoter detection now checks last 100 comments for each user
+* [feature] User whitelist.  All whitelisted users to be ignored for reposts and adult promotion
+
 ## [1.0.3] - 9/10/2023
 * [feature] Adult promoter detection.  Auto ban or remove posts from users that have share OnlyFans and Fansly links
 * [feature] Take action on high volume repost accounts.
