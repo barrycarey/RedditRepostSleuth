@@ -63,7 +63,7 @@ def process_gallery(post: Post, submission_data: dict) -> Optional[Post]:
         try:
             pil_image = generate_img_by_url_requests(url)
             dhash_h = imagehash.dhash(pil_image, hash_size=16)
-        except (ImageConversionException, ImageRemovedException, InvalidImageUrlException) as e:
+        except (ImageConversionException, ImageRemovedException, InvalidImageUrlException, OSError) as e:
             log.warning('Problem hashing image: %s', e)
             continue
         except Exception as e:

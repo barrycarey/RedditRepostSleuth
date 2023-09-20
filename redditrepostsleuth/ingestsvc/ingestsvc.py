@@ -178,7 +178,7 @@ async def main() -> None:
             try:
                 results = await fetch_page(url, session)
             except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError):
-                log.error('Error during fetch')
+                log.warning('Error during fetch')
                 await asyncio.sleep(2)
                 continue
 

@@ -240,7 +240,7 @@ class DuplicateImageService:
                 try:
                     uowm.commit()
                 except IntegrityError as e:
-                    log.error('Failed to save Meme hash, already exists. Post %s', post_id, exc_info=False)
+                    log.warning('Failed to save Meme hash, already exists. Post %s', post_id)
                 except Exception as e:
                     log.exception('')
 
