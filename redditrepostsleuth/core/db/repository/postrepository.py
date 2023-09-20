@@ -53,8 +53,8 @@ class PostRepository:
     def find_all_by_url(self, url_hash: str, limit: int = None):
         return self.db_session.query(Post).filter(Post.url_hash == url_hash).limit(limit).all()
 
-    def find_all_by_type(self, post_type: str, limit: int = None, offset: int = None) -> List[Post]:
-        return self.db_session.query(Post).filter(Post.post_type == post_type).order_by(Post.id.desc()).offset(offset).limit(limit).all()
+    def find_all_by_type_id(self, post_type_id: int, limit: int = None, offset: int = None) -> List[Post]:
+        return self.db_session.query(Post).filter(Post.post_type_id == post_type_id).order_by(Post.id.desc()).offset(offset).limit(limit).all()
 
     def find_all_for_delete_check(self, days: int, limit: int = None, offset: int = None) -> List[Post]:
         since = datetime.now() - timedelta(days=days)

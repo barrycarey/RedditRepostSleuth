@@ -104,7 +104,7 @@ class DuplicateImageService:
 
     def check_image(
             self,
-            url: Text,
+            url: str,
             post: Post = None,
             source='unknown',
             sort_by='created',
@@ -121,7 +121,7 @@ class DuplicateImageService:
         :return: Search Results
         :rtype: ImageSearchResults
         """
-        log.info('Checking URL for matches: %s', url)
+        log.debug('Checking URL for matches: %s', url)
 
         if not search_settings:
             log.info('No search settings provided, using default')
@@ -192,6 +192,17 @@ class DuplicateImageService:
         log.info('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
+    def check_gallery(
+            self,
+            url: str,
+            post: Post = None,
+            source='unknown',
+            sort_by='created',
+            search_settings: ImageSearchSettings = None,
+
+    ) -> ImageSearchResults:
+        pass
+
     def _get_meme_hash(self, url: str, post_id=None) -> Optional[Text]:
         """
         Take a given URL and return the hash that will be used for the meme filter
@@ -229,7 +240,7 @@ class DuplicateImageService:
                 try:
                     uowm.commit()
                 except IntegrityError as e:
-                    log.error('Failed to save Meme hash, already exists. Post %s', post_id, exc_info=False)
+                    log.warning('Failed to save Meme hash, already exists. Post %s', post_id)
                 except Exception as e:
                     log.exception('')
 
@@ -293,7 +304,7 @@ class DuplicateImageService:
         :return:
         """
         results = []
-        log.info('Building search results from index matches')
+        log.debug('Building search results from index matches')
         with self.uowm.start() as uow:
             result_map = {}
             for r in api_search_results.results:

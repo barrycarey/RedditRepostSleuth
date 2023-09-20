@@ -78,8 +78,8 @@ GENERIC_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Check Title:** {check_t
 REPORT_RESPONSE = 'Thank you for your report. \n\nIt has been documented and will be reviewed further'
 
 MONITORED_SUB_MOD_REMOVED_SUBJECT = 'RepostSleuthBot Scheduled For Removal'
-MONITORED_SUB_MOD_REMOVED_CONTENT = 'We noticed Repost Sleuth is no longer a moderator on r/{subreddit}.  No hard feelings, we know the bot is\'nt for everyone\n\n' \
-                                    'We have deactivated your Subreddit on ourside and scheduled the removal to happen in {hours} hours. No action is required on your part\n\n' \
+MONITORED_SUB_MOD_REMOVED_CONTENT = 'We noticed Repost Sleuth is no longer a moderator on r/{subreddit}.  No hard feelings, we know the bot isn\'t for everyone\n\n' \
+                                    'We have deactivated your Subreddit on our side and scheduled the removal to happen in {hours} hours. No action is required on your part\n\n' \
                                     'If you have any feedback or feature suggestions we would love to hear them on r/RepostSleuthBot.\n\n' \
                                     'If you decide to use the bot again in the future, simply re-mod it and it will set itself back up.\n\n' \
                                     'If you believe this message is an error, please message u/barrycarey'
@@ -100,3 +100,6 @@ NO_BAN_PERMISSIONS = 'I attempted to ban user {username} but I do not have the p
 HIGH_VOLUME_REPOSTER_FOUND = 'User [u/{username}](https://reddit.com/u/{username}) has been flagged as a high volume reposter.\n\n' \
                              'They just created [this submission](https://redd.it/{post_id}) on [r/{subreddit}](https://reddit.com/r/{subreddit}) \n\n' \
                              'In the last 7 days I have detected {repost_count} reposts created by them'
+
+ADULT_PROMOTER_SUBMISSION_FOUND = 'User [u/{username}](https://reddit.com/u/{username}) has been flagged as an adult content promoter.\n\n' \
+                                  'They just submitted [this post](https://redd.it/{post_id}) in r/{subreddit}'
