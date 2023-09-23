@@ -7,7 +7,7 @@ from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks
+from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, UserWhitelist
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
@@ -27,7 +27,7 @@ from redditrepostsleuth.core.util.repost.repost_search import image_search_by_po
 log = logging.getLogger(__name__)
 
 
-class SubMonitor:
+class MonitoredSubService:
 
     def __init__(
             self,
@@ -69,19 +69,24 @@ class SubMonitor:
                 source='sub_monitor'
             )
 
-    def handle_only_fans_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub):
+    def handle_only_fans_check(
+            self,
+            post: Post,
+            uow: UnitOfWork,
+            monitored_sub: MonitoredSub,
+            whitelisted_user: UserWhitelist = None
+    ):
         """
         Check if a given username has been flagged as an adult content promoter.  If it has take action per
         the monitored subreddit settings
+        :param whitelisted_user: A whitelisted user to see if they should be omitted from check
         :param post: Post in question
         :param uow: database connection
         :param monitored_sub: Subreddit the post is from
         :return:
         """
 
-        whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
-
-        if whitelisted and whitelisted.ignore_high_volume_repost_detection:
+        if whitelisted_user and whitelisted_user.ignore_high_volume_repost_detection:
             log.info('User %s is whitelisted, skipping adult promoter check')
             return
 
@@ -130,9 +135,16 @@ class SubMonitor:
             )
 
 
-    def handle_high_volume_reposter_check(self, post: Post, uow: UnitOfWork, monitored_sub: MonitoredSub) -> None:
+    def handle_high_volume_reposter_check(
+            self,
+            post: Post,
+            uow: UnitOfWork,
+            monitored_sub: MonitoredSub,
+            whitelisted_user: UserWhitelist = None
+    ) -> None:
         """
         Check if a submission was created by someone flagged as a high volume reposter
+        :param whitelisted_user: Whitelisted user to see if we should omit check
         :param post: Submission in question
         :param uow: Database connection
         :param monitored_sub: Monitored sub the submission is from
@@ -142,9 +154,7 @@ class SubMonitor:
             log.debug('No High Volume Repost settings enabled for %s, skipping', monitored_sub.name)
             return
 
-        whitelisted = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
-
-        if whitelisted and whitelisted.ignore_high_volume_repost_detection:
+        if whitelisted_user and whitelisted_user.ignore_high_volume_repost_detection:
             log.info('User %s is whitelisted, skipping high volume check', post.author)
             return
 
@@ -204,7 +214,13 @@ class SubMonitor:
                 return True
         return False
 
-    def should_check_post(self, post: Post, monitored_sub: MonitoredSub, title_keyword_filter: list[str] = None) -> bool:
+    def should_check_post(
+            self,
+            post: Post,
+            monitored_sub: MonitoredSub,
+            whitelisted_user: UserWhitelist = None,
+            title_keyword_filter: list[str] = None
+    ) -> bool:
         """
         Check if a given post should be checked
         :rtype: bool
@@ -212,6 +228,11 @@ class SubMonitor:
         :param title_keyword_filter: Optional list of keywords to skip if in title
         :return: bool
         """
+
+        if whitelisted_user and whitelisted_user.ignore_repost_detection:
+            log.debug('User %s is whitelisted on %s', post.author, post.subreddit)
+            return False
+
         if post.post_type.name not in self.config.supported_post_types:
             return False
 

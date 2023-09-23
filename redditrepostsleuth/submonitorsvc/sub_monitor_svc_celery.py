@@ -6,7 +6,7 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 sys.path.append('./')
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.celery.response_tasks import  process_monitored_sub
+from redditrepostsleuth.core.celery.tasks.monitored_sub_tasks import process_monitored_sub
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
@@ -16,7 +16,7 @@ from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_redis_client
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.submonitorsvc.submonitor import SubMonitor
+from redditrepostsleuth.submonitorsvc.monitored_sub_service import MonitoredSubService
 
 if __name__ == '__main__':
     config = Config()
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     reddit = get_reddit_instance(config)
     reddit_manager = RedditManager(reddit)
     dup = DuplicateImageService(uowm, event_logger, reddit, config=config)
-    monitor = SubMonitor(
+    monitor = MonitoredSubService(
         dup,
         uowm,
         reddit,
