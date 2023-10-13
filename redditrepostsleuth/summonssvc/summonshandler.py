@@ -23,7 +23,7 @@ from redditrepostsleuth.core.util.helpers import get_default_image_search_settin
     get_default_link_search_settings, get_default_text_search_settings
 from redditrepostsleuth.core.util.replytemplates import UNSUPPORTED_POST_TYPE, WATCH_ENABLED, \
     WATCH_ALREADY_ENABLED, WATCH_DISABLED_NOT_FOUND, WATCH_DISABLED, \
-    SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN
+    SUMMONS_ALREADY_RESPONDED, BANNED_SUB_MSG, OVER_LIMIT_BAN, UNKNOWN_SUBMISSION_TYPE
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results, \
     save_image_repost_result
 from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
@@ -81,7 +81,13 @@ class SummonsHandler:
         if self.summons_disabled:
             self._send_summons_disable_msg(summons)
 
-        if summons.post.post_type.name is None or summons.post.post_type.name not in self.config.supported_post_types:
+        if summons.post.post_type is None:
+            log.warning('Post %s has no post type.  Cannot process summons', summons.post.post_id)
+            response = SummonsResponse(summons=summons, message=UNKNOWN_SUBMISSION_TYPE)
+            self._send_response(response)
+            return
+
+        if summons.post.post_type.name not in self.config.supported_post_types:
             log.warning('Post %s: Type %s not supported', f'https://redd.it/{summons.post.post_id}', summons.post.post_type.name)
             self._send_unsupported_msg(summons)
             return
