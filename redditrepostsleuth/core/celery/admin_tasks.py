@@ -126,7 +126,7 @@ def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, use
 
 @celery.task(bind=True, base=AdminTask, autoretry_for=(UtilApiException,ConnectionError,TooManyRequests), retry_kwards={'max_retries': 3})
 def check_user_for_only_fans(self, username: str) -> None:
-    skip_names = ['[deleted]']
+    skip_names = ['[deleted]', 'AutoModerator']
 
     if username in skip_names:
         log.info('Skipping name %s', username)

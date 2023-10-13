@@ -143,8 +143,9 @@ def token_checker() -> None:
     if token_res.status_code != 200:
         log.error('Failed to get new token')
         return
-    decoded_token = jwt.decode(json.loads(token_res.text), '', algorithms=["HS256"], options={"verify_signature": False})
-    redis_client.set('prof_token', decoded_token['sub'])
+    #decoded_token = jwt.decode(json.loads(token_res.text), '', algorithms=["HS256"], options={"verify_signature": False})
+    new_token = json.loads(token_res.text)
+    redis_client.set('prof_token', new_token)
     log.info('New token set in Redis')
 
 def update_monitored_sub_data(
