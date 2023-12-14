@@ -116,7 +116,7 @@ def get_profile_links(username: str) -> list[str]:
     response = fetch_from_util_api(url)
 
     if response.status_code != 200:
-        log.warning('Non 200 return code %s from Util API')
+        log.warning('Non 200 return code %s from Util API', response.status_code)
         raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
     profile_links = json.loads(response.text)
@@ -165,6 +165,11 @@ def get_links_from_comments(username: str) -> list[str]:
 
     response_json = json.loads(response.text)
     all_urls = []
+
+    if not response_json:
+        log.warning('Bad data from Util api')
+        raise UtilApiException(f'Unexpected status {response.status_code} from util API')
+
 
     if not response_json['data']['children']:
         log.warning('No comment data returned for %s', username)
