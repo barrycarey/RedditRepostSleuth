@@ -86,7 +86,7 @@ class MonitoredSubService:
         :return:
         """
 
-        if whitelisted_user and whitelisted_user.ignore_high_volume_repost_detection:
+        if whitelisted_user and whitelisted_user.ignore_adult_promoter_detection:
             log.info('User %s is whitelisted, skipping adult promoter check')
             return
 
