@@ -8,7 +8,7 @@ import imagehash
 import requests
 from PIL import Image, UnidentifiedImageError
 from PIL.Image import DecompressionBombError
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, Timeout
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.exception import ImageConversionException, ImageRemovedException, InvalidImageUrlException
@@ -67,8 +67,8 @@ def generate_img_by_url_requests(url: str) -> Optional[Image]:
     }
 
     try:
-        res = requests.get(url, headers=headers)
-    except (ConnectionError) as e:
+        res = requests.get(url, headers=headers, timeout=7)
+    except (ConnectionError, Timeout) as e:
         raise ImageConversionException(str(e))
 
     if res.status_code != 200:
