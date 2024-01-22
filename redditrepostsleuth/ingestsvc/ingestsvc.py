@@ -3,7 +3,7 @@ import itertools
 import json
 import os
 import time
-from asyncio import ensure_future, gather, run, TimeoutError
+from asyncio import ensure_future, gather, run, TimeoutError, CancelledError
 from datetime import datetime
 from typing import List, Optional
 
@@ -15,6 +15,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.exception import RateLimitException, UtilApiException
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, JobStatus
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
@@ -36,6 +37,7 @@ if os.getenv('SENTRY_DNS', None):
 
 config = Config()
 REMOVAL_REASONS_TO_SKIP = ['deleted', 'author', 'reddit', 'copyright_takedown']
+HEADERS = {'User-Agent': 'u/RepostSleuthBot - Submission Ingest (by u/BarryCarey)'}
 
 
 async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
@@ -45,12 +47,20 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
     :param session: AIOHttp session to use
     :return: raw response from request
     """
-    async with session.get(url, timeout=ClientTimeout(total=10)) as resp:
+    log.debug('Page fetch')
+
+    async with session.get(url, timeout=ClientTimeout(total=10), headers=HEADERS) as resp:
         try:
             if resp.status == 200:
                 log.debug('Successful fetch')
-                return await resp.text()
+                try:
+                    return await resp.text()
+                except CancelledError:
+                    log.error('Canceled on getting text')
+                    raise UtilApiException('Canceled')
             else:
+                if resp.status == 429:
+                    raise RateLimitException('Data API rate limit')
                 log.info('Unexpected request status %s - %s', resp.status, url)
                 return
         except (ClientOSError, TimeoutError):
@@ -68,11 +78,15 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
     :rtype: BatchedPostRequestJob
     """
     try:
-        async with session.get(job.url, timeout=ClientTimeout(total=10)) as resp:
+        async with session.get(job.url, timeout=ClientTimeout(total=10), headers=HEADERS) as resp:
             if resp.status == 200:
                 log.debug('Successful fetch')
                 job.status = JobStatus.SUCCESS
+                log.debug('Fetching response text')
                 job.resp_data = await resp.text()
+            elif resp.status == 429:
+                log.warning('Data API Rate Limit')
+                job.status = JobStatus.RATELIMIT
             else:
                 log.warning('Unexpected request status %s - %s', resp.status, job.url)
                 job.status = JobStatus.ERROR
@@ -106,7 +120,7 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
 
     tasks = []
     conn = TCPConnector(limit=0)
-    async with ClientSession(connector=conn) as session:
+    async with ClientSession(connector=conn, headers=HEADERS) as session:
         while True:
             try:
                 chunk = list(itertools.islice(missing_ids, 100))
@@ -114,6 +128,7 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                 break
 
             url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(chunk)}'
+            #url = f'https://api.reddit.com/api/info?id={build_reddit_query_string(chunk)}'
             job = BatchedPostRequestJob(url, chunk, JobStatus.STARTED)
             tasks.append(ensure_future(fetch_page_as_job(job, session)))
             if len(tasks) >= 50 or len(chunk) == 0:
@@ -139,10 +154,15 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
                         else:
                             tasks.append(ensure_future(fetch_page_as_job(j, session)))
 
+                    any_rate_limit = next((x for x in results if x.status == JobStatus.RATELIMIT), None)
+                    if any_rate_limit:
+                        log.info('Some jobs hit data rate limit, waiting')
+                        await asyncio.sleep(10)
+
                 log.info('Sending %s posts to save queue', len(posts_to_save))
 
                 # save_new_posts.apply_async(([reddit_submission_to_post(submission) for submission in posts_to_save],))
-                save_new_posts.apply_async((posts_to_save,))
+                save_new_posts.apply_async((posts_to_save, True))
             if len(chunk) == 0:
                 break
 
@@ -170,52 +190,60 @@ async def main() -> None:
         oldest_id = oldest_post.post_id
 
     await ingest_range(newest_id, oldest_id)
-    async with ClientSession() as session:
-        delay = 0
-        while True:
-            ids_to_get = get_next_ids(newest_id, 100)
-            url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
+
+    delay = 0
+    while True:
+        ids_to_get = get_next_ids(newest_id, 100)
+        url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
+        #url = f'https://api.reddit.com/api/info?id={build_reddit_query_string(ids_to_get)}'
+        async with ClientSession(headers=HEADERS) as session:
             try:
+                log.debug('Sending fetch request')
                 results = await fetch_page(url, session)
-            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError):
+            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError, CancelledError, UtilApiException):
                 log.warning('Error during fetch')
                 await asyncio.sleep(2)
                 continue
-
-            if not results:
+            except RateLimitException:
+                log.warning('Hit Data API Rate Limit')
+                await asyncio.sleep(10)
                 continue
 
-            res_data = json.loads(results)
-            if not res_data or not len(res_data['data']['children']):
-                log.info('No results')
+        if not results:
+            log.debug('No results')
+            continue
+
+        res_data = json.loads(results)
+        if not res_data or not len(res_data['data']['children']):
+            log.info('No results')
+            continue
+
+        log.info('%s results returned from API', len(res_data['data']['children']))
+        if len(res_data['data']['children']) < 91:
+            delay += 1
+            log.debug('Delay increased by 1.  Current delay: %s', delay)
+        else:
+            if delay > 0:
+                delay -= 1
+                log.debug('Delay decreased by 1.  Current delay: %s', delay)
+
+        posts_to_save = []
+        for post in res_data['data']['children']:
+            if post['data']['removed_by_category'] in REMOVAL_REASONS_TO_SKIP:
                 continue
+            posts_to_save.append(post['data'])
 
-            log.info('%s results returned from API', len(res_data['data']['children']))
-            if len(res_data['data']['children']) < 90:
-                delay += 1
-                log.debug('Delay increased by 1.  Current delay: %s', delay)
-            else:
-                if delay > 0:
-                    delay -= 1
-                    log.debug('Delay decreased by 1.  Current delay: %s', delay)
+        log.info('Sending %s posts to save queue', len(posts_to_save))
+        # queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
+        queue_posts_for_ingest(posts_to_save)
 
-            posts_to_save = []
-            for post in res_data['data']['children']:
-                if post['data']['removed_by_category'] in REMOVAL_REASONS_TO_SKIP:
-                    continue
-                posts_to_save.append(post['data'])
+        ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(
+            res_data['data']['children'][0]['data']['created_utc'])
+        log.info('Current Delay: %s', ingest_delay)
 
-            log.info('Sending %s posts to save queue', len(posts_to_save))
-            # queue_posts_for_ingest([reddit_submission_to_post(submission) for submission in posts_to_save])
-            queue_posts_for_ingest(posts_to_save)
+        newest_id = res_data['data']['children'][-1]['data']['id']
 
-            ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(
-                res_data['data']['children'][0]['data']['created_utc'])
-            log.info('Current Delay: %s', ingest_delay)
-
-            newest_id = res_data['data']['children'][-1]['data']['id']
-
-            time.sleep(delay)
+        time.sleep(delay)
 
 
 if __name__ == '__main__':

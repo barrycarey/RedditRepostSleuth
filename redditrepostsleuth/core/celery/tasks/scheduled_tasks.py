@@ -9,7 +9,7 @@ from redditrepostsleuth.adminsvc.new_activation_monitor import NewActivationMoni
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask, AdminTask
 from redditrepostsleuth.core.celery.task_logic.scheduled_task_logic import update_proxies, update_top_reposts, \
-    token_checker, run_update_top_reposters, update_top_reposters, update_monitored_sub_data
+    token_checker, run_update_top_reposters, update_top_reposters, update_monitored_sub_data, run_update_top_reposts
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_praw, get_bot_permissions
@@ -178,6 +178,13 @@ def update_daily_stats(self):
         log.exception('Problem updating stats')
 
 
+@celery.task(bind=True, base=SqlAlchemyTask)
+def update_all_top_reposts_task(self):
+    try:
+        with self.uowm.start() as uow:
+            run_update_top_reposts(uow)
+    except Exception as e:
+        log.exception('Unknown task error')
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 def update_all_top_reposters_task(self):

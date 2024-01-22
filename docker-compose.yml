@@ -134,9 +134,9 @@ services:
         environment:
             - RUN_ENV=production
             - db_user=ingest
-            - LOG_LEVEL=ERROR
+            - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.ingest_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=3,16
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=16,1
 
     link_repost_worker:
         container_name: link-repost-worker
