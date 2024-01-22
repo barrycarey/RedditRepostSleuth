@@ -130,7 +130,7 @@ class ResponseBuilder:
 
         try:
             return self.build_default_comment(search_results, message, **kwargs)
-        except KeyError:
+        except KeyError as e:
             log.warning('Custom repost template for %s has a bad slug: %s', monitored_sub.name, monitored_sub.repost_response_template)
             return self.build_default_comment(search_results, **kwargs)
 

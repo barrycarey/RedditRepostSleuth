@@ -47,6 +47,7 @@ class Post(Base):
     reports = relationship('UserReport', back_populates='post')
     hashes = relationship('PostHash', back_populates='post')
     post_type = relationship('PostType') # lazy has to be set to JSON encoders don't fail for unbound session
+    #post_type = relationship('PostType', lazy='joined')
 
     def to_dict(self):
         return {
