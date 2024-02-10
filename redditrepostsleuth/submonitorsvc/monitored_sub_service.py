@@ -111,7 +111,11 @@ class MonitoredSubService:
                     f'Post by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
                     subject='Onlyfans Removal'
                 )
-            self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
+
+            self._remove_post(
+                monitored_sub.adult_promoter_removal_reason,
+                self.reddit.submission(post.post_id)
+            )
 
         if monitored_sub.adult_promoter_ban_user:
             if self.notification_svc:
@@ -179,7 +183,10 @@ class MonitoredSubService:
                     f'Post by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
                     subject='High Volume Removal'
                 )
-            self._remove_post(monitored_sub, self.reddit.submission(post.post_id))
+            self._remove_post(
+                monitored_sub.high_volume_reposter_removal_reason,
+                self.reddit.submission(post.post_id)
+            )
 
         if monitored_sub.high_volume_reposter_ban_user:
             if self.notification_svc:
@@ -302,7 +309,8 @@ class MonitoredSubService:
             report_msg = self.response_builder.build_report_msg(monitored_sub.name, msg_values)
             self._report_submission(monitored_sub, submission, report_msg)
             self._lock_post(monitored_sub, submission)
-            self._remove_post(monitored_sub, submission)
+            if monitored_sub.remove_repost:
+                self._remove_post(monitored_sub, submission)
             self._send_mod_mail(monitored_sub, search_results)
         else:
             self._mark_post_as_oc(monitored_sub, submission)
@@ -396,21 +404,20 @@ class MonitoredSubService:
             except Exception as e:
                 log.exception('Failed to lock comment', exc_info=True)
 
-    def _remove_post(self, monitored_sub: MonitoredSub, submission: Submission, mod_note: str = None) -> None:
+    def _remove_post(self, removal_reason: str, submission: Submission, mod_note: str = None) -> None:
         """
         Check if given sub wants posts removed.  Remove is enabled
         @param monitored_sub: Monitored sub
         @param submission: Submission to remove
         """
-        if monitored_sub.remove_repost:
-            try:
-                removal_reason_id = self._get_removal_reason_id(monitored_sub.removal_reason, submission.subreddit)
-                log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
-                submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
-            except Forbidden:
-                log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
-            except Exception as e:
-                log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
+        try:
+            removal_reason_id = self._get_removal_reason_id(removal_reason, submission.subreddit)
+            log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
+            submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
+        except Forbidden:
+            log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
+        except Exception as e:
+            log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
     def _get_removal_reason_id(self, removal_reason: str, subreddit: Subreddit) -> Optional[str]:
         if not removal_reason:
