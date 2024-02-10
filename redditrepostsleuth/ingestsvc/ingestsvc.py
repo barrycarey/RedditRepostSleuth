@@ -60,6 +60,7 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
                     raise UtilApiException('Canceled')
             else:
                 if resp.status == 429:
+                    text = await resp.text()
                     raise RateLimitException('Data API rate limit')
                 log.info('Unexpected request status %s - %s', resp.status, url)
                 return
@@ -189,13 +190,13 @@ async def main() -> None:
         oldest_post = uow.posts.get_newest_post()
         oldest_id = oldest_post.post_id
 
-    await ingest_range(newest_id, oldest_id)
+    #await ingest_range(newest_id, oldest_id)
 
     delay = 0
     while True:
         ids_to_get = get_next_ids(newest_id, 100)
-        url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
-        #url = f'https://api.reddit.com/api/info?id={build_reddit_query_string(ids_to_get)}'
+        #url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(ids_to_get)}'
+        url = f'https://api.reddit.com/api/info?id={build_reddit_query_string(ids_to_get)}'
         async with ClientSession(headers=HEADERS) as session:
             try:
                 log.debug('Sending fetch request')

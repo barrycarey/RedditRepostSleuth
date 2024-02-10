@@ -214,7 +214,7 @@ class Config:
             'default_text_crosspost_filter',
             'default_text_max_days_old_filter',
             'default_text_target_distance',
-            'discord_logging_hook'
+            'discord_logging_hook',
 
         ]
 
