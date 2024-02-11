@@ -199,7 +199,7 @@ class RepostSearch(Base):
         Index('idx_post_type_searched_at', 'post_type_id', 'searched_at'),
         Index('idx_by_subreddit_and_type', 'subreddit', 'source', 'post_type_id', 'matches_found'),
         Index('idx_source', 'source'),
-        Index('idx_matches_found', 'matches_found')
+        Index('idx_matches_found', 'searched_at', 'source', 'matches_found')
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
@@ -427,7 +427,12 @@ class MonitoredSub(Base):
             'high_volume_reposter_ban_user': self.high_volume_reposter_ban_user,
             'high_volume_reposter_remove_post': self.high_volume_reposter_remove_post,
             'high_volume_reposter_threshold': self.high_volume_reposter_threshold,
-            'high_volume_reposter_notify_mod_mail': self.high_volume_reposter_notify_mod_mail
+            'high_volume_reposter_notify_mod_mail': self.high_volume_reposter_notify_mod_mail,
+            'high_volume_reposter_removal_reason': self.high_volume_reposter_removal_reason,
+            'high_volume_reposter_ban_reason': self.high_volume_reposter_ban_reason,
+            'adult_promoter_removal_reason': self.adult_promoter_removal_reason,
+            'adult_promoter_ban_reason': self.adult_promoter_ban_reason
+
 
         }
 
