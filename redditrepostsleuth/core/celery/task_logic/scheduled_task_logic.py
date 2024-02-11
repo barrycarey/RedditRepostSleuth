@@ -57,35 +57,42 @@ def update_proxies(uowm: UnitOfWorkManager) -> None:
             )
         uow.commit()
 
-def update_top_reposts(uowm: UnitOfWorkManager):
+def update_top_reposts(uow: UnitOfWork, post_type_id: int, day_range: int = None):
     # reddit.info(reddit_ids_to_lookup):
-    post_types = [2, 3]
-    day_ranges = [1, 7, 14, 30, 365, None]
+    log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
     range_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY AND post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC"
     all_time_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC"
-    with uowm.start() as uow:
-        for post_type in post_types:
-            for days in day_ranges:
-                log.info('Getting top reposts for post type %s with range %s', post_type, days)
-                if days:
-                    query = range_query
-                else:
-                    query = all_time_query
-                uow.session.execute(
-                    text('DELETE FROM stat_top_repost WHERE post_type_id=:posttype AND day_range=:days'),
-                    {'posttype': post_type, 'days': days})
-                uow.commit()
-                result = uow.session.execute(text(query), {'posttype': post_type, 'days': days})
-                for row in result:
-                    stat = StatsTopRepost()
-                    stat.post_id = row[0]
-                    stat.post_type_id = post_type
-                    stat.day_range = days
-                    stat.repost_count = row[1]
-                    stat.updated_at = func.utc_timestamp()
-                    stat.nsfw = False
-                    uow.stat_top_repost.add(stat)
-                    uow.commit()
+    if day_range:
+        query = range_query
+        uow.session.execute(text('DELETE FROM stat_top_repost WHERE post_type_id=:posttype AND day_range=:days'),
+                            {'posttype': post_type_id, 'days': day_range})
+    else:
+        query = all_time_query
+        uow.session.execute(text('DELETE FROM stat_top_repost WHERE post_type_id=:posttype AND day_range IS NULL'),
+                            {'posttype': post_type_id})
+
+    uow.commit()
+
+
+
+    result = uow.session.execute(text(query), {'posttype': post_type_id, 'days': day_range})
+    for row in result:
+        stat = StatsTopRepost()
+        stat.post_id = row[0]
+        stat.post_type_id = post_type_id
+        stat.day_range = day_range
+        stat.repost_count = row[1]
+        stat.updated_at = func.utc_timestamp()
+        stat.nsfw = False
+        uow.stat_top_repost.add(stat)
+        uow.commit()
+
+def run_update_top_reposts(uow: UnitOfWork) -> None:
+    post_types = [1, 2, 3]
+    day_ranges = [1, 7, 14, 30, None]
+    for post_type_id in post_types:
+        for days in day_ranges:
+            update_top_reposts(uow, post_type_id, days)
 
 def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = None) -> None:
     log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)

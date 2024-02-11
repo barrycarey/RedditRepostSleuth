@@ -12,7 +12,7 @@ log = get_configured_logger('redditrepostsleuth')
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed), retry_kwargs={'max_retries': 10, 'countdown': 300})
-def save_new_post(self, submission: dict):
+def save_new_post(self, submission: dict, repost_check: bool = True):
 
     # TODO: temp fix until I can fix imgur gifs
     if 'imgur' in submission['url'] and 'gifv' in submission['url']:
@@ -48,21 +48,22 @@ def save_new_post(self, submission: dict):
             log.exception('Database save failed: %s', str(e), exc_info=False)
             return
 
-    if post.post_type_id == 1:
-        celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_for_text_repost_task', args=[post])
-    elif post.post_type_id == 2:
-        celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_image_repost_save', args=[post])
-    elif post.post_type_id == 3:
-        celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check', args=[post])
+    if repost_check:
+        if post.post_type_id == 1:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_for_text_repost_task', args=[post])
+        elif post.post_type_id == 2:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_image_repost_save', args=[post])
+        elif post.post_type_id == 3:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check', args=[post])
 
     celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
 
 
 
 @celery.task
-def save_new_posts(posts: list[dict]) -> None:
+def save_new_posts(posts: list[dict], repost_check: bool = True) -> None:
     for post in posts:
-        save_new_post.apply_async((post,))
+        save_new_post.apply_async((post, repost_check))
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results(self, data):

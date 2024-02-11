@@ -121,7 +121,12 @@ class TestMonitoredSubService(TestCase):
     def test__handle_only_fans_flagged_user_remove_post(self, mock_ban_user, mock_remove_post):
         user_review = UserReview(content_links_found=1, username='test_user', notes='Profile links match onlyfans.com')
         post = Post(subreddit='test_subreddit', author='test_user')
-        monitored_sub = MonitoredSub(name='test_subreddit', adult_promoter_remove_post=True, adult_promoter_ban_user=False)
+        monitored_sub = MonitoredSub(
+            name='test_subreddit',
+            adult_promoter_remove_post=True,
+            adult_promoter_ban_user=False,
+            adult_promoter_removal_reason='Removed'
+        )
         mock_uow = MagicMock(
             user_review=MagicMock(get_by_username=MagicMock(return_value=user_review)),
             user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
@@ -133,7 +138,7 @@ class TestMonitoredSubService(TestCase):
         sub_monitor.handle_only_fans_check(post, mock_uow, monitored_sub)
 
         mock_ban_user.assert_not_called()
-        mock_remove_post.assert_called_once_with(monitored_sub, ANY)
+        mock_remove_post.assert_called_once_with('Removed', ANY)
 
     @patch.object(MonitoredSubService, '_remove_post')
     @patch.object(MonitoredSubService, '_ban_user')
@@ -172,12 +177,13 @@ class TestMonitoredSubService(TestCase):
             high_volume_reposter_ban_user=False,
             high_volume_reposter_threshold=100,
             high_volume_reposter_notify_mod_mail=False,
-            high_volume_reposter_remove_post=True
+            high_volume_reposter_remove_post=True,
+            high_volume_reposter_removal_reason='Removed'
         )
         post = Post(subreddit='test_subreddit', author='test_user')
         sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
         mock_ban_user.assert_not_called()
-        mock_remove_post.assert_called_once_with(monitored_sub, ANY)
+        mock_remove_post.assert_called_once_with('Removed', ANY)
         mock_response_handler.send_mod_mail.assert_not_called()
 
     @patch.object(MonitoredSubService, '_remove_post')
@@ -195,12 +201,13 @@ class TestMonitoredSubService(TestCase):
             high_volume_reposter_ban_user=True,
             high_volume_reposter_threshold=100,
             high_volume_reposter_notify_mod_mail=False,
-            high_volume_reposter_remove_post=True
+            high_volume_reposter_remove_post=True,
+            high_volume_reposter_removal_reason='Removed'
         )
         post = Post(subreddit='test_subreddit', author='test_user')
         sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
         mock_ban_user.assert_called_once_with('test_user', 'test_subreddit', 'High volume of reposts detected by Repost Sleuth')
-        mock_remove_post.assert_called_once_with(monitored_sub, ANY)
+        mock_remove_post.assert_called_once_with('Removed', ANY)
         mock_response_handler.send_mod_mail.assert_not_called()
 
     @patch.object(MonitoredSubService, '_remove_post')
