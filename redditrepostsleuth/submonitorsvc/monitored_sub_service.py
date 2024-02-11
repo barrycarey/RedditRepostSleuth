@@ -185,7 +185,8 @@ class MonitoredSubService:
                 )
             self._remove_post(
                 monitored_sub.high_volume_reposter_removal_reason,
-                self.reddit.submission(post.post_id)
+                self.reddit.submission(post.post_id),
+                mod_note='High volume of reposts detected by Repost Sleuth'
             )
 
         if monitored_sub.high_volume_reposter_ban_user:
