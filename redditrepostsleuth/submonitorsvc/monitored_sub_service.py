@@ -123,7 +123,7 @@ class MonitoredSubService:
                     f'User [{post.author}](https://reddit.com/u/{post.author}) banned from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
                     subject='Onlyfans Ban Issued'
                 )
-            self._ban_user(post.author, monitored_sub.name, user.notes)
+            self._ban_user(post.author, monitored_sub.name, monitored_sub.adult_promoter_ban_reason or user.notes)
 
         if monitored_sub.adult_promoter_notify_mod_mail:
             message_body = ADULT_PROMOTER_SUBMISSION_FOUND.format(
@@ -194,7 +194,11 @@ class MonitoredSubService:
                     f'User [{post.author}](https://reddit.com/u/{post.author}) banned from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
                     subject='High Volume Reposter Ban Issued'
                 )
-            self._ban_user(post.author, monitored_sub.name, 'High volume of reposts detected by Repost Sleuth')
+            self._ban_user(
+                post.author,
+                monitored_sub.name,
+                monitored_sub.high_volume_reposter_ban_reason or 'High volume of reposts detected by Repost Sleuth'
+            )
 
         if monitored_sub.high_volume_reposter_notify_mod_mail:
             message_body = HIGH_VOLUME_REPOSTER_FOUND.format(
@@ -310,7 +314,7 @@ class MonitoredSubService:
             self._report_submission(monitored_sub, submission, report_msg)
             self._lock_post(monitored_sub, submission)
             if monitored_sub.remove_repost:
-                self._remove_post(monitored_sub, submission)
+                self._remove_post(monitored_sub.removal_reason, submission)
             self._send_mod_mail(monitored_sub, search_results)
         else:
             self._mark_post_as_oc(monitored_sub, submission)
