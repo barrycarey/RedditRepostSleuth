@@ -66,7 +66,7 @@ def pre_process_post(
                 redgif_url = get_redgif_image_url(submission['url'], token)
             except HTTPException as e:
                 if 'code' in e.error and e.error['code'] == 'TokenDecodeError':
-                    redgif_manager.remove_redgifs_token('localhost')
+                    redgif_manager.remove_redgifs_token(proxy or 'localhost')
                     raise e
 
         process_image_post(post, url=redgif_url, proxy=proxy)
