@@ -10,6 +10,10 @@ from redditrepostsleuth.core.util.constants import GENERIC_USER_AGENT
 
 log = logging.getLogger(__name__)
 
+"""
+Class for managing and caching RedGifs API tokens.  Currently overkill but if we need to backfill the database or 
+API rate limits get tight this will support caching a token for each proxy to Redis
+"""
 class RedGifsTokenManager:
     def __init__(self):
         config = Config()
@@ -22,16 +26,30 @@ class RedGifsTokenManager:
         )
 
 
-    def _cache_token(self, key: str, token: str):
+    def _cache_token(self, key: str, token: str) -> None:
+        """
+        Take a given token and cache it to Redis
+        :param key: key of the token
+        :param token: API token
+        """
         log.info('Caching token for %s', key)
         self.redis.set(f'redgifs-token:{key}', token, ex=82800)
 
-    def remove_redgifs_token(self, key: str):
+    def remove_redgifs_token(self, key: str) -> None:
+        """
+        Removed a cached token from Redis with a given key
+        :param key: key to remove
+        """
         log.info('Removing token for %s', key)
         self.redis.delete(f'redgifs-token:{key}')
 
 
     def get_redgifs_token(self, address: str = 'localhost') -> str:
+        """
+        Either return an existing cached token or create a new one
+        :param address: address of the proxy being used
+        :return: Token
+        """
         cached_token = self.redis.get(f'redgifs-token:{address}')
         if not cached_token:
             return self._request_and_cache_token(address)
@@ -40,7 +58,12 @@ class RedGifsTokenManager:
         return cached_token
 
 
-    def _request_and_cache_token(self, proxy_address):
+    def _request_and_cache_token(self, proxy_address: str = 'localhost') -> str:
+        """
+        Hit the Redgif API and request a new auth token.  Cache it to Redis
+        :param proxy_address: Proxy to use, if any
+        :return: Token
+        """
         proxies = None
         if proxy_address != 'localhost':
             proxies = {'http': f'https://{proxy_address}', 'https': f'http://{proxy_address}'}

@@ -51,7 +51,14 @@ def pre_process_post(
 
     post = reddit_submission_to_post(submission)
 
+    proxy = None
+    parsed_url = urlparse(post.url)
+    if parsed_url.netloc in domains_to_proxy:
+        proxy = proxy_manager.get_proxy().address
+
     if post.post_type_id == 2: # image
+
+        # Hacky RedGif support.  Will need to be refactored if we have to do similar for other sites
         redgif_url = None
         if 'redgif' in post.url:
             token = redgif_manager.get_redgifs_token()
@@ -62,7 +69,7 @@ def pre_process_post(
                     redgif_manager.remove_redgifs_token('localhost')
                     raise e
 
-        process_image_post(post, url=redgif_url)
+        process_image_post(post, url=redgif_url, proxy=proxy)
     elif post.post_type_id == 6: # gallery
         process_gallery(post, submission)
 
@@ -82,7 +89,9 @@ def process_image_post(post: Post, url: str = None, proxy: str = None, hash_size
     :param hash_size: Size of hash
     :return: Post object with hashes
     """
-    log.info('Hashing image with URL: %s', post.url)
+    log.debug('Hashing image with URL: %s', post.url)
+    if url:
+        log.info('Hashing %s', post.url)
 
     try:
         img = generate_img_by_url_requests(url or post.url, proxy=proxy)
