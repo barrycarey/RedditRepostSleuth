@@ -190,7 +190,7 @@ async def main() -> None:
         oldest_post = uow.posts.get_newest_post()
         oldest_id = oldest_post.post_id
 
-    #await ingest_range(newest_id, oldest_id)
+    await ingest_range(newest_id, oldest_id)
 
     delay = 0
     while True:

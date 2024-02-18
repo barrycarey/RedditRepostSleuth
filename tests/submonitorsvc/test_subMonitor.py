@@ -1,6 +1,8 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch, ANY
 
+from praw.models import Submission
+
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, PostType, UserReview, UserWhitelist
 from redditrepostsleuth.submonitorsvc.monitored_sub_service import MonitoredSubService
@@ -170,7 +172,10 @@ class TestMonitoredSubService(TestCase):
             user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
         )
         mock_response_handler = Mock(send_mod_mail=Mock())
-        sub_monitor = MonitoredSubService(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+        submission = Submission( MagicMock(), id='11')
+        sub_monitor = MonitoredSubService(MagicMock(), MagicMock(),
+                                          MagicMock(submission=MagicMock(return_value=submission)), MagicMock(),
+                                          mock_response_handler,
                                           config=MagicMock())
         monitored_sub = MonitoredSub(
             name='test_subreddit',
@@ -183,7 +188,7 @@ class TestMonitoredSubService(TestCase):
         post = Post(subreddit='test_subreddit', author='test_user')
         sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
         mock_ban_user.assert_not_called()
-        mock_remove_post.assert_called_once_with('Removed', ANY)
+        mock_remove_post.assert_called_once_with('Removed', submission, mod_note=ANY)
         mock_response_handler.send_mod_mail.assert_not_called()
 
     @patch.object(MonitoredSubService, '_remove_post')
@@ -194,7 +199,10 @@ class TestMonitoredSubService(TestCase):
             user_whitelist=MagicMock(get_by_username_and_subreddit=MagicMock(return_value=None))
         )
         mock_response_handler = Mock(send_mod_mail=Mock())
-        sub_monitor = MonitoredSubService(MagicMock(), MagicMock(), MagicMock(), MagicMock(), mock_response_handler,
+        submission = Submission(MagicMock(), id='11')
+        sub_monitor = MonitoredSubService(MagicMock(), MagicMock(),
+                                          MagicMock(submission=MagicMock(return_value=submission)), MagicMock(),
+                                          mock_response_handler,
                                           config=MagicMock())
         monitored_sub = MonitoredSub(
             name='test_subreddit',
@@ -207,7 +215,7 @@ class TestMonitoredSubService(TestCase):
         post = Post(subreddit='test_subreddit', author='test_user')
         sub_monitor.handle_high_volume_reposter_check(post, mock_uow, monitored_sub)
         mock_ban_user.assert_called_once_with('test_user', 'test_subreddit', 'High volume of reposts detected by Repost Sleuth')
-        mock_remove_post.assert_called_once_with('Removed', ANY)
+        mock_remove_post.assert_called_once_with('Removed', submission, mod_note=ANY)
         mock_response_handler.send_mod_mail.assert_not_called()
 
     @patch.object(MonitoredSubService, '_remove_post')
