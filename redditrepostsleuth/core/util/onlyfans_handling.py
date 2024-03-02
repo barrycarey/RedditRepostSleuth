@@ -115,6 +115,10 @@ def get_profile_links(username: str) -> list[str]:
     url = f'{config.util_api}/profile?username={username}'
     response = fetch_from_util_api(url)
 
+    if response.status_code == 404:
+        log.info('Redditor %s no longer exists', username)
+        raise UserNotFound(f'Redditor {username} no longer exists')
+
     if response.status_code != 200:
         log.warning('Non 200 return code %s from Util API', response.status_code)
         raise UtilApiException(f'Unexpected status {response.status_code} from util API')
@@ -152,35 +156,39 @@ def get_links_from_comments(username: str) -> list[str]:
     url = f'{config.util_api}/reddit/user-comment?username={username}'
     response = fetch_from_util_api(url)
 
-    if response.status_code == 404:
-        raise UserNotFound(f'User {username} does not exist or is banned')
+    match response.status_code:
+        case 404:
+            raise UserNotFound(f'User {username} does not exist or is banned')
+        case 403:
+            log.warning('Got unauthorized when checking user comments for %s', username)
+            raise UserNotFound(f'User {username} does not exist or is banned')
+        case 429:
+            log.warning('Rate limited')
+            raise UtilApiException(f'Rate limited')
+        case 200:
+            response_json = json.loads(response.text)
+            all_urls = []
 
-    if response.status_code == 403:
-        log.warning('Got unauthorized when checking user comments for %s', username)
-        return []
+            if not response_json:
+                log.warning('Bad data from Util api')
+                raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
-    if response.status_code != 200:
-        log.warning('Unexpected status %s from util API', response.status_code)
-        raise UtilApiException(f'Unexpected status {response.status_code} from util API')
+            if not response_json['data']['children']:
+                log.debug('No comment data returned for %s', username)
+                return []
 
-    response_json = json.loads(response.text)
-    all_urls = []
+            for comment in response_json['data']['children']:
+                all_urls += re.findall(r'href=[\'"]?([^\'" >]+)', comment['data']['body_html'])
 
-    if not response_json:
-        log.warning('Bad data from Util api')
-        raise UtilApiException(f'Unexpected status {response.status_code} from util API')
+            log.debug('User %s has %s comment links', username, len(all_urls))
+
+            return list(set(all_urls))
+
+        case _ :
+            log.warning('Unexpected status %s from util API', response.status_code)
+            raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
 
-    if not response_json['data']['children']:
-        log.warning('No comment data returned for %s', username)
-        return []
-
-    for comment in response_json['data']['children']:
-        all_urls += re.findall(r'href=[\'"]?([^\'" >]+)', comment['data']['body_html'])
-
-    log.debug('User %s has %s comment links', username, len(all_urls))
-
-    return list(set(all_urls))
 
 def get_links_from_comments_praw(username: str, reddit: Reddit) -> list[str]:
     all_urls = []
