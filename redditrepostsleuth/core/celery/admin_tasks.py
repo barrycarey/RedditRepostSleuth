@@ -131,6 +131,7 @@ def check_user_for_only_fans(self, username: str) -> None:
     if username in skip_names:
         log.info('Skipping name %s', username)
         return
+
     try:
         with self.uowm.start() as uow:
             user = uow.user_review.get_by_username(username)
@@ -138,7 +139,7 @@ def check_user_for_only_fans(self, username: str) -> None:
             if user:
                 delta = datetime.utcnow() - user.last_checked
                 if delta.days < 30:
-                    log.debug('Skipping existing user %s, last check was %s days ago', username, delta.days)
+                    log.info('Skipping existing user %s, last check was %s days ago', username, delta.days)
                     return
                 user.content_links_found = False
                 user.notes = None

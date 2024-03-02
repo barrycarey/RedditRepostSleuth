@@ -2,6 +2,7 @@ import os
 import time
 
 import redis
+from redis import ResponseError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.logging import get_configured_logger
@@ -23,8 +24,12 @@ def log_queue_size(event_logger):
                 queue_name = queue.decode('utf-8').replace('_kombu.binding.', '')
                 if len(queue_name) > 30 or queue_name in skip_keys or 'celery' in queue_name:
                     continue
+                try:
+                    queue_length = client.llen(queue_name)
+                except ResponseError as e:
+                    continue
                 event_logger.save_event(
-                    CeleryQueueSize(queue_name, client.llen(queue_name), event_type='queue_update', env=os.getenv('RUN_ENV', 'dev')))
+                    CeleryQueueSize(queue_name, queue_length, event_type='queue_update', env=os.getenv('RUN_ENV', 'dev')))
             time.sleep(2)
         except ConnectionError as e:
             log.error('Failed to connect to Redis')
