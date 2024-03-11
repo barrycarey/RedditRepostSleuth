@@ -94,8 +94,8 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
     except TimeoutError as e:
         log.error('Request Timeout')
         job.status = JobStatus.ERROR
-    except ClientConnectorError:
-        log.error('Client Connection Error')
+    except ClientConnectorError as e:
+        log.error('Client Connection Error: %s', e)
         await asyncio.sleep(5)
         job.status = JobStatus.ERROR
     except ServerDisconnectedError as e:
@@ -128,8 +128,8 @@ async def ingest_range(newest_post_id: str, oldest_post_id: str) -> None:
             except StopIteration:
                 break
 
-            url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(chunk)}'
-            #url = f'https://api.reddit.com/api/info?id={build_reddit_query_string(chunk)}'
+            #url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(chunk)}'
+            url = f'https://api.reddit.com/api/info?id={build_reddit_query_string(chunk)}'
             job = BatchedPostRequestJob(url, chunk, JobStatus.STARTED)
             tasks.append(ensure_future(fetch_page_as_job(job, session)))
             if len(tasks) >= 50 or len(chunk) == 0:

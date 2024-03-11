@@ -31,7 +31,7 @@ services:
         - '6379:6379'
       volumes:
         - /config/redis:/data
-      command: redis-server --save 60 1
+      command: redis-server --save 550 1 --maxmemory 40gb
 
     influxdb:
       image: influxdb:latest

@@ -86,7 +86,8 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
 
     if repost_check:
         if post.post_type_id == 1:
-            celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_for_text_repost_task', args=[post])
+            pass
+            #celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_for_text_repost_task', args=[post])
         elif post.post_type_id == 2:
             celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.check_image_repost_save', args=[post])
         elif post.post_type_id == 3:
