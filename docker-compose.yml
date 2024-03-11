@@ -181,9 +181,9 @@ services:
             - .env
         environment:
             - RUN_ENV=production
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARNING
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=8,5
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=10,5
 
     subreddit_config_update_worker:
         container_name: subreddit-config-update-worker

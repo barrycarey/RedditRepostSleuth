@@ -87,6 +87,7 @@ class PostHash(Base):
 
     post = relationship("Post", back_populates='hashes')
     hash_type = relationship("HashType")
+    #hash_type = relationship("HashType", lazy='joined')
 
     def to_dict(self):
         return {

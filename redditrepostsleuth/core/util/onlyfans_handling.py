@@ -24,7 +24,9 @@ known_domains = [
         'deviantart.com',
         'facebook.com',
         'reddit.com',
-        'youtube.com'
+        'youtube.com',
+        'twitch.tv',
+        'discord.gg'
     ]
 
 landing_domains = [
@@ -86,11 +88,6 @@ def check_page_source_for_flagged_words(page_source: str) -> str:
 def process_landing_link(url: str) -> Optional[str]:
 
     url_to_fetch = f'{config.util_api}/page-source?url={url}'
-    parsed_url = urlparse(url)
-    all_urls = flagged_words + known_domains + landing_domains
-    if parsed_url.netloc not in all_urls:
-        # So we can flag landing domains we're not checking
-        log.error('---------------------------------------> %s', url)
     response = requests.get(url_to_fetch)
     if response.status_code != 200:
         log.warning('No page text return for %s', url)
@@ -100,10 +97,11 @@ def process_landing_link(url: str) -> Optional[str]:
 
 
 def fetch_from_util_api(url: str) -> Response:
+    log.debug('Fetching %s', url)
     try:
         response = requests.get(url)
-    except ConnectionError:
-        log.error('Util API not responding')
+    except ConnectionError as e:
+        log.error('Util API not responding: %s', e)
         raise UtilApiException(f'Util API failed to connect')
     except Exception:
         log.exception('Unexpected exception from Util API')
@@ -126,6 +124,8 @@ def get_profile_links(username: str) -> list[str]:
     profile_links = json.loads(response.text)
     return profile_links
 
+links = []
+
 def check_user_for_promoter_links(username: str) -> Optional[LinkCheckResult]:
 
     profile_links = get_profile_links(username)
@@ -140,6 +140,19 @@ def check_user_for_promoter_links(username: str) -> Optional[LinkCheckResult]:
         if landing_link_with_flagged_content:
             return LinkCheckResult(source='Profile landing', url=landing_link_with_flagged_content)
 
+    comment_links = get_links_from_comments(username)
+
+    content_links_found = check_links_for_flagged_domains(comment_links)
+    if content_links_found:
+        return LinkCheckResult(source='Comment', url=content_links_found)
+
+    landing_link_found = check_links_for_landing_pages(comment_links)
+    if landing_link_found:
+        landing_link_with_flagged_content = process_landing_link(landing_link_found)
+        if landing_link_with_flagged_content:
+            return LinkCheckResult(source='Comment landing', url=landing_link_with_flagged_content)
+
+def check_user_comments_for_promoter_links(username: str) -> Optional[LinkCheckResult]:
     comment_links = get_links_from_comments(username)
 
     content_links_found = check_links_for_flagged_domains(comment_links)
