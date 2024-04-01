@@ -2,16 +2,21 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
 
 import requests
 from praw import Reddit
+from prawcore import TooManyRequests
 from requests import Response
 from requests.exceptions import ConnectionError
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import UserReview
+from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.exception import UtilApiException, UserNotFound
 
 log = logging.getLogger(__name__)
@@ -216,3 +221,47 @@ def get_links_from_comments_praw(username: str, reddit: Reddit) -> list[str]:
     log.debug('User %s has %s comment links', username, len(all_urls))
 
     return list(set(all_urls))
+
+def check_user_for_only_fans(uow: UnitOfWork, username: str) -> Optional[UserReview]:
+    skip_names = ['[deleted]', 'AutoModerator']
+
+    if username in skip_names:
+        log.info('Skipping name %s', username)
+        return
+
+    try:
+        user = uow.user_review.get_by_username(username)
+
+        if user:
+            delta = datetime.utcnow() - user.last_checked
+            if delta.days < 30:
+                log.info('Skipping existing user %s, last check was %s days ago', username, delta.days)
+                return
+            user.content_links_found = False
+            user.notes = None
+            user.last_checked = func.utc_timestamp()
+
+        log.info('Checking user %s', username)
+        if not user:
+            user = UserReview(username=username)
+        try:
+            result = check_user_for_promoter_links(username)
+        except UserNotFound as e:
+            log.warning(e)
+            return
+
+        if result:
+            log.info('Promoter found: %s - %s', username, str(result))
+            user.content_links_found = True
+            user.notes = str(result)
+        uow.user_review.add(user)
+        uow.commit()
+        return user
+    except (UtilApiException, ConnectionError, TooManyRequests) as e:
+        log.exception('')
+        raise e
+    except IntegrityError:
+        pass
+    except Exception as e:
+        log.exception('')
+

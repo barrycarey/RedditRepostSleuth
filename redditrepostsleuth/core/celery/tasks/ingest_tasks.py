@@ -93,7 +93,7 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
         elif post.post_type_id == 3:
             celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check', args=[post])
 
-    celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
+    #celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
 
 
 
