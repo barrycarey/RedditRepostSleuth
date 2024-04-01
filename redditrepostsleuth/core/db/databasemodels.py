@@ -507,7 +507,7 @@ class MonitoredSubConfigRevision(Base):
     id = Column(Integer, primary_key=True)
     revision_id = Column(String(36), nullable=False, unique=True)
     revised_by = Column(String(25), nullable=False)
-    config = Column(String(2500), nullable=False)
+    config = Column(String(3000), nullable=False)
     config_loaded_at = Column(DateTime)
     is_valid = Column(Boolean, default=False)
     notified = Column(Boolean, default=False)

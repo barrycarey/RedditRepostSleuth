@@ -12,7 +12,7 @@ from redditrepostsleuth.core.util.imagehashing import generate_img_by_file
 from redditrepostsleuth.core.util.videohelpers import generate_thumbnails_from_url, download_file, \
     generate_thumbnails_from_file
 
-
+# TODO - Remove this file
 @celery.task(bind=True, base=EventLoggerTask, ignore_results=True, serializer='pickle')
 def log_event(self, event):
     self.event_logger.save_event(event)

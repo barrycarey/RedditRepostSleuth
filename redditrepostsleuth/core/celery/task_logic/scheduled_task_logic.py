@@ -52,6 +52,7 @@ def update_proxies(uowm: UnitOfWorkManager) -> None:
         uow.http_proxy.delete_all()
         uow.commit()
         for proxy in res_data['results']:
+            print(proxy['proxy_address'])
             uow.http_proxy.add(
                 HttpProxy(address=f'{proxy["proxy_address"]}:{proxy["port"]}', provider='WebShare')
             )
@@ -241,8 +242,8 @@ def update_monitored_sub_data(
 
 if __name__ == '__main__':
     uowm = UnitOfWorkManager(get_db_engine(Config()))
-    #update_proxies(uowm)
-    #sys.exit()
+    update_proxies(uowm)
+    sys.exit()
     while True:
         token_checker()
         time.sleep(240)

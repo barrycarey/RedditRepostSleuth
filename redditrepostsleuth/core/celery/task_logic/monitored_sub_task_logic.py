@@ -5,7 +5,8 @@ from praw.exceptions import APIException, RedditAPIException
 from prawcore import TooManyRequests
 
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
-from redditrepostsleuth.core.exception import RateLimitException, NoIndexException
+from redditrepostsleuth.core.exception import RateLimitException, NoIndexException, UtilApiException
+from redditrepostsleuth.core.util.onlyfans_handling import check_user_for_only_fans
 from redditrepostsleuth.submonitorsvc.monitored_sub_service import MonitoredSubService
 
 log = logging.getLogger(__name__)
@@ -24,7 +25,18 @@ def process_monitored_subreddit_submission(post_id: str, monitored_sub_svc: Moni
         log.warning('Unknown post type for %s - https://redd.it/%s', post.post_id, post.post_id)
         return
 
+
+
+
+
     monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
+
+    if monitored_sub.adult_promoter_remove_post or monitored_sub.adult_promoter_ban_user or monitored_sub.adult_promoter_notify_mod_mail:
+        try:
+            check_user_for_only_fans(uow, post.author)
+        except (UtilApiException, ConnectionError, TooManyRequests) as e:
+            log.warning('Failed to do onlyfans check for user %s', post.author)
+
     whitelisted_user = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
 
     monitored_sub_svc.handle_only_fans_check(post, uow, monitored_sub, whitelisted_user=whitelisted_user)
