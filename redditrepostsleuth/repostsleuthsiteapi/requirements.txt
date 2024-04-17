@@ -1,5 +1,5 @@
 falcon==3.1.1
-gunicorn==21.2.0
+gunicorn==22.0.0
 requests==2.31.0
 falcon_cors
 sqlalchemy==2.0.20
