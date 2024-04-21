@@ -87,6 +87,9 @@ def handle_summons(summons: Summons) -> None:
 def monitor_for_mentions(reddit: Reddit, uowm: UnitOfWorkManager):
 
     for comment in reddit.inbox.mentions():
+        if not comment.author:
+            log.info('Skipping comment without author')
+            continue
 
         if comment.created_utc < datetime.utcnow().timestamp() - 86400:
             log.debug('Skipping old mention. Created at %s', datetime.fromtimestamp(comment.created_utc))

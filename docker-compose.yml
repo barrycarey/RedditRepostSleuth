@@ -198,6 +198,6 @@ services:
             - RUN_ENV=production
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.scheduled_tasks,redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q subreddit_config_updates,update_wiki_from_database -n subreddit_config_update_worker --autoscale=8,1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q batch_delete_searches,subreddit_config_updates,update_wiki_from_database -n subreddit_config_update_worker --autoscale=8,1
 
 

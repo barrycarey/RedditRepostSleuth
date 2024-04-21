@@ -25,10 +25,6 @@ def process_monitored_subreddit_submission(post_id: str, monitored_sub_svc: Moni
         log.warning('Unknown post type for %s - https://redd.it/%s', post.post_id, post.post_id)
         return
 
-
-
-
-
     monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
 
     if monitored_sub.adult_promoter_remove_post or monitored_sub.adult_promoter_ban_user or monitored_sub.adult_promoter_notify_mod_mail:

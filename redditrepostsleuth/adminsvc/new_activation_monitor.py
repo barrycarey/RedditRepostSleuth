@@ -36,7 +36,7 @@ class NewActivationMonitor:
     def check_for_new_invites(self):
         for msg in self.reddit.inbox.messages(limit=1000):
             if 'invitation to moderate' in msg.subject:
-                log.info('Found invitation for %s', msg.subreddit.display_name)
+                log.debug('Found invitation for %s', msg.subreddit.display_name)
                 self.activate_sub(msg)
 
 
@@ -100,7 +100,7 @@ class NewActivationMonitor:
         with self.uowm.start() as uow:
             existing = uow.monitored_sub.get_by_sub(msg.subreddit.display_name)
             if existing:
-                log.info('Monitored sub %s already exists, skipping activation', msg.subreddit.display_name)
+                log.debug('Monitored sub %s already exists, skipping activation', msg.subreddit.display_name)
                 raise ValueError(f'Monitored Sub already in database: {msg.subreddit.display_name}')
             monitored_sub = MonitoredSub(**{**DEFAULT_CONFIG_VALUES, **{'name': msg.subreddit.display_name}})
             uow.monitored_sub.add(monitored_sub)

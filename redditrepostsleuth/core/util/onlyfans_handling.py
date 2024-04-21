@@ -38,7 +38,8 @@ landing_domains = [
     'beacons.ai',
     'linktr.ee',
     'linkbio.co',
-    'snipfeed.co'
+    'snipfeed.co',
+    'allmylink.me'
 ]
 
 flagged_words = [
@@ -117,19 +118,20 @@ def fetch_from_util_api(url: str) -> Response:
 def get_profile_links(username: str) -> list[str]:
     url = f'{config.util_api}/profile?username={username}'
     response = fetch_from_util_api(url)
+    if response.status_code == 200:
+        profile_links = json.loads(response.text)
+        return profile_links
 
     if response.status_code == 404:
         log.info('Redditor %s no longer exists', username)
         raise UserNotFound(f'Redditor {username} no longer exists')
-
-    if response.status_code != 200:
+    elif response.status_code == 503:
+        log.info('No token to cehck user with')
+        return []
+    else:
         log.warning('Non 200 return code %s from Util API', response.status_code)
         raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
-    profile_links = json.loads(response.text)
-    return profile_links
-
-links = []
 
 def check_user_for_promoter_links(username: str) -> Optional[LinkCheckResult]:
 

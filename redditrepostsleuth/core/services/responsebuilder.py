@@ -163,10 +163,10 @@ class ResponseBuilder:
             if closest_template:
                 message += f'\n\n{closest_template}'
 
-        if signature:
-            message += f'\n\n{self._get_signature(search_results)} - {REPORT_POST_LINK}'
-        else:
-            message += f'\n\n{REPORT_POST_LINK}'
+        # if signature:
+        #     message += f'\n\n{self._get_signature(search_results)} - {REPORT_POST_LINK}'
+        # else:
+        #     message += f'\n\n{REPORT_POST_LINK}'
 
         # Checking post type is temp until the site supports everything
         if search_link and search_results.checked_post.post_type.name in ['image']:

@@ -75,7 +75,8 @@ TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someon
 
 TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
 
-IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filter_used} | **Target:** {effective_target_match_percent}% | **Check Title:** {check_title} | **Max Age:** {max_age}'
+IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Target Percent:** {effective_target_match_percent}% | **Max Age:** {max_age}'
+#IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filter_used} | **Target:** {effective_target_match_percent}% | **Check Title:** {check_title} | **Max Age:** {max_age}'
 GENERIC_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'
 REPORT_RESPONSE = 'Thank you for your report. \n\nIt has been documented and will be reviewed further'
 

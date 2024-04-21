@@ -19,6 +19,25 @@ class RepostSearchRepo:
     def update(self, revision: RepostSearch):
         self.db_session.update(revision)
 
+    def get_all_older_than_days(self, days: int, limit: int = 100) -> list[RepostSearch]:
+        delta = datetime.utcnow() - timedelta(days=days)
+        return self.db_session.query(RepostSearch).filter(RepostSearch.searched_at < delta).limit(limit).all()
+
+    def get_all_ids_older_than_days(self, days: int, limit: int = 100) -> list[RepostSearch]:
+        delta = datetime.utcnow() - timedelta(days=days)
+        return self.db_session.query(RepostSearch.id).filter(RepostSearch.searched_at < delta).order_by(RepostSearch.id).limit(limit).all()
+
+
+    def delete_all_older_than_days(self, days: int, limit: int = 100) -> None:
+        delta = datetime.utcnow() - timedelta(days=days)
+        self.db_session.query(RepostSearch).filter(RepostSearch.searched_at < delta).limit(limit).delete()
+
+    def delete_all_with_lower_id(self, lower_id: int) -> None:
+        self.db_session.query(RepostSearch).filter(RepostSearch.id < lower_id).delete()
+
+    def get_oldest_search(self) -> RepostSearch:
+        return self.db_session.query(RepostSearch).order_by(RepostSearch.id).first()
+
     def get_all(self, limit: int = None):
         return self.db_session.query(RepostSearch).limit(limit).all()
 

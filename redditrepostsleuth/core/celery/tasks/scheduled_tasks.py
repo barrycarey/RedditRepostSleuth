@@ -12,6 +12,7 @@ from redditrepostsleuth.core.celery.task_logic.scheduled_task_logic import updat
     token_checker, run_update_top_reposters, update_top_reposters, update_monitored_sub_data, run_update_top_reposts
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, StatsDailyCount
 from redditrepostsleuth.core.logging import configure_logger
+from redditrepostsleuth.core.util.helpers import chunk_list
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_praw, get_bot_permissions
 from redditrepostsleuth.core.util.replytemplates import MONITORED_SUB_MOD_REMOVED_CONTENT, \
     MONITORED_SUB_MOD_REMOVED_SUBJECT
@@ -204,14 +205,6 @@ def update_daily_top_reposters_task(self):
     except Exception as e:
         log.exception('Unknown task error')
 
-@celery.task(bind=True, base=SqlAlchemyTask)
-def update_top_reposts_task(self):
-    try:
-        update_top_reposts(self.uowm)
-    except Exception as e:
-        log.exception('Unknown task exception')
-
-
 
 @celery.task(bind=True, base=RedditTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
 def update_monitored_sub_stats_task(self, sub_name: str) -> None:
@@ -244,3 +237,30 @@ def update_proxies_task(self) -> None:
 def update_profile_token_task():
     print('Staring token checker')
     token_checker()
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def delete_search_batch(self, ids: list[int]):
+    try:
+        with self.uowm.start() as uow:
+            log.info('Starting range %s:%s', ids[0], ids[-1])
+            for id in ids:
+                search = uow.repost_search.get_by_id(id)
+                if search:
+                    log.debug('Deleting search %s', search.id)
+                    uow.repost_search.remove(search)
+            uow.commit()
+            log.info('Finished range %s:%s', ids[0], ids[-1])
+    except Exception as e:
+        log.exception('')
+
+@celery.task(bind=True, base=SqlAlchemyTask)
+def queue_search_history_cleanup(self):
+    with self.uowm.start() as uow:
+        searches = uow.repost_search.get_all_ids_older_than_days(120, limit=100000000)
+        if not searches:
+            log.info('No search history to cleanup')
+            return
+        log.info('Queuing Search History Cleanup.  Range: ID Range: %s:%s', searches[0].id, searches[-1].id)
+        ids = [x[0] for x in searches]
+        for chunk in chunk_list(ids, 5000):
+            delete_search_batch.apply_async((chunk,), queue='batch_delete_searches')
