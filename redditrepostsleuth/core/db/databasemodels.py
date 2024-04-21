@@ -226,6 +226,8 @@ class RepostSearch(Base):
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 
     post = relationship("Post", back_populates='searches')
+    monitored_sub_checked = relationship("MonitoredSubChecks", back_populates="search")
+    repost = relationship("Repost", back_populates="search")
     post_type = relationship('PostType')
 
     def __repr__(self):

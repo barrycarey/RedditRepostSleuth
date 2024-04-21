@@ -17,6 +17,7 @@ from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Post, UserRe
 from redditrepostsleuth.core.exception import UtilApiException, UserNotFound
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
+from redditrepostsleuth.core.util.helpers import chunk_list
 from redditrepostsleuth.core.util.onlyfans_handling import check_user_for_promoter_links, \
     check_user_comments_for_promoter_links
 
@@ -208,3 +209,5 @@ def check_user_comments_for_only_fans(self, username: str) -> None:
         pass
     except Exception as e:
         log.exception('')
+
+

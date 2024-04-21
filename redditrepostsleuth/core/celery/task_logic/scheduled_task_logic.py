@@ -89,7 +89,7 @@ def update_top_reposts(uow: UnitOfWork, post_type_id: int, day_range: int = None
         uow.commit()
 
 def run_update_top_reposts(uow: UnitOfWork) -> None:
-    post_types = [1, 2, 3]
+    post_types = [2, 3]
     day_ranges = [1, 7, 14, 30, None]
     for post_type_id in post_types:
         for days in day_ranges:
