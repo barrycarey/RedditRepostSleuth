@@ -7,6 +7,7 @@ from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
 from praw import Reddit
+from praw.models import Subreddit
 from redis import Redis
 from redlock import RedLockFactory
 from requests.exceptions import ConnectionError
@@ -25,6 +26,14 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, RepostSearch
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
+
+def get_removal_reason_id(removal_reason: str, subreddit: Subreddit) -> Optional[str]:
+    if not removal_reason:
+        return None
+    for r in subreddit.mod.removal_reasons:
+        if r.title.lower() == removal_reason.lower():
+            return r.id
+    return None
 
 def post_type_from_url(url: str) -> str:
     """

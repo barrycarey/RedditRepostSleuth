@@ -6,12 +6,15 @@ from praw.exceptions import APIException
 from praw.models import Submission, Comment, Subreddit
 from prawcore import Forbidden
 
+from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import leave_comment_task, report_submission_task, \
+    mark_as_oc_task, lock_submission_task, remove_submission_task, send_modmail_task, ban_user_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, MonitoredSubChecks, UserWhitelist
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.model.search.search_results import SearchResults
+from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -45,7 +48,7 @@ class MonitoredSubService:
         self.response_builder = response_builder
         self.resposne_handler = response_handler
         self.event_logger = event_logger
-        self.notification_svc = None
+        self.notification_svc = NotificationService(config)
         if config:
             self.config = config
         else:
@@ -53,21 +56,7 @@ class MonitoredSubService:
 
     def _ban_user(self, username: str, subreddit_name: str, ban_reason: str, note: str = None) -> None:
         log.info('Banning user %s from %s', username, subreddit_name)
-        subreddit = self.reddit.subreddit(subreddit_name)
-        try:
-            subreddit.banned.add(username, ban_reason=ban_reason, note=note)
-        except Forbidden:
-            log.warning('Unable to ban user %s on %s.  No permissions', username, subreddit_name)
-            message_body = NO_BAN_PERMISSIONS.format(
-                username=username,
-                subreddit=subreddit_name
-            )
-            self.resposne_handler.send_mod_mail(
-                subreddit_name,
-                message_body,
-                f'Unable To Ban User, No Permissions',
-                source='sub_monitor'
-            )
+        ban_user_task.apply_async((username, subreddit_name, ban_reason, note))
 
     def handle_only_fans_check(
             self,
@@ -108,11 +97,11 @@ class MonitoredSubService:
         if monitored_sub.adult_promoter_remove_post:
             if self.notification_svc:
                 self.notification_svc.send_notification(
-                    f'Post by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
+                    f'[Post](https://redd.it/{post.post_id}) by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
                     subject='Onlyfans Removal'
                 )
 
-            self._remove_post(
+            self._remove_submission(
                 monitored_sub.adult_promoter_removal_reason,
                 self.reddit.submission(post.post_id)
             )
@@ -120,7 +109,7 @@ class MonitoredSubService:
         if monitored_sub.adult_promoter_ban_user:
             if self.notification_svc:
                 self.notification_svc.send_notification(
-                    f'User [{post.author}](https://reddit.com/u/{post.author}) banned from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
+                    f'User [{post.author}](https://reddit.com/u/{post.author}) banned from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit}) for [this post](https://redd.it/{post.post_id})',
                     subject='Onlyfans Ban Issued'
                 )
             self._ban_user(post.author, monitored_sub.name, monitored_sub.adult_promoter_ban_reason or user.notes)
@@ -131,11 +120,9 @@ class MonitoredSubService:
                 subreddit=monitored_sub.name,
                 post_id=post.post_id,
             )
-            self.resposne_handler.send_mod_mail(
-                monitored_sub.name,
-                message_body,
-                f'New Submission From Adult Content Promoter',
-                source='sub_monitor'
+
+            send_modmail_task.apply_async(
+                (monitored_sub.name, message_body, f'New Submission From Adult Content Promoter')
             )
 
 
@@ -183,7 +170,7 @@ class MonitoredSubService:
                     f'Post by [{post.author}](https://reddit.com/u/{post.author}) removed from [r/{post.subreddit}](https://reddit.com/r/{post.subreddit})',
                     subject='High Volume Removal'
                 )
-            self._remove_post(
+            self._remove_submission(
                 monitored_sub.high_volume_reposter_removal_reason,
                 self.reddit.submission(post.post_id),
                 mod_note='High volume of reposts detected by Repost Sleuth'
@@ -208,11 +195,9 @@ class MonitoredSubService:
                 post_id=post.post_id,
                 repost_count=repost_count
             )
-            self.resposne_handler.send_mod_mail(
-                monitored_sub.name,
-                message_body,
-                f'New Submission From High Volume Reposter',
-                source='sub_monitor'
+
+            send_modmail_task.apply_async(
+                (monitored_sub.name, message_body, f'New Submission From High Volume Reposter')
             )
 
     def has_post_been_checked(self, post_id: str) -> bool:
@@ -289,23 +274,13 @@ class MonitoredSubService:
                      f'https://redd.it/{search_results.checked_post.post_id}')
             return search_results
 
-        reply_comment = None
 
         if monitored_sub.comment_on_repost:
-            try:
-                reply_comment = self._leave_comment(search_results, monitored_sub)
-            except APIException as e:
-                if e.error_type == 'THREAD_LOCKED':
-                    log.warning('Thread locked, unable to leave comment')
-                else:
-                    raise
+            self._leave_comment(search_results, monitored_sub)
 
         submission = self.reddit.submission(post.post_id)
-        if not submission:
-            log.warning('Failed to get submission %s for sub %s.  Cannot perform admin functions', post.post_id, post.subreddit)
-            return
 
-        if search_results.matches and self.config.live_responses:
+        if search_results.matches:
             msg_values = build_msg_values_from_search(search_results, self.uowm,
                                                       target_days_old=monitored_sub.target_days_old)
             if search_results.checked_post.post_type.name == 'image':
@@ -313,16 +288,13 @@ class MonitoredSubService:
 
             report_msg = self.response_builder.build_report_msg(monitored_sub.name, msg_values)
             self._report_submission(monitored_sub, submission, report_msg)
-            self._lock_post(monitored_sub, submission)
+            self._lock_submission(monitored_sub, submission)
             if monitored_sub.remove_repost:
-                self._remove_post(monitored_sub.removal_reason, submission)
+                self._remove_submission(monitored_sub.removal_reason, submission)
             self._send_mod_mail(monitored_sub, search_results)
         else:
             self._mark_post_as_oc(monitored_sub, submission)
 
-        if reply_comment and self.config.live_responses:
-            self._sticky_reply(monitored_sub, reply_comment)
-            self._lock_comment(monitored_sub, reply_comment)
         self.create_checked_post(search_results, monitored_sub)
 
 
@@ -388,77 +360,30 @@ class MonitoredSubService:
         log.debug(search_results)
         return search_results
 
-    def _sticky_reply(self, monitored_sub: MonitoredSub, comment: Comment) -> None:
-        if monitored_sub.sticky_comment:
-            try:
-                comment.mod.distinguish(sticky=True)
-                log.info('Made comment %s sticky', comment.id)
-            except Forbidden:
-                log.warning('Failed to sticky comment, no permissions')
-            except Exception as e:
-                log.exception('Failed to sticky comment', exc_info=True)
 
-    def _lock_comment(self, monitored_sub: MonitoredSub, comment: Comment) -> None:
-        if monitored_sub.lock_response_comment:
-            log.info('Attempting to lock comment %s on subreddit %s', comment.id, monitored_sub.name)
-            try:
-                comment.mod.lock()
-                log.info('Locked comment')
-            except Forbidden:
-                log.error('Failed to lock comment, no permission')
-            except Exception as e:
-                log.exception('Failed to lock comment', exc_info=True)
-
-    def _remove_post(self, removal_reason: str, submission: Submission, mod_note: str = None) -> None:
+    def _remove_submission(self, removal_reason: str, submission: Submission, mod_note: str = None) -> None:
         """
         Check if given sub wants posts removed.  Remove is enabled
         @param monitored_sub: Monitored sub
         @param submission: Submission to remove
         """
-        try:
-            removal_reason_id = self._get_removal_reason_id(removal_reason, submission.subreddit)
-            log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
-            submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
-        except Forbidden:
-            log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
-        except Exception as e:
-            log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
+        remove_submission_task.apply_async((submission, removal_reason), {'mod_note': mod_note})
 
-    def _get_removal_reason_id(self, removal_reason: str, subreddit: Subreddit) -> Optional[str]:
-        if not removal_reason:
-            return None
-        for r in subreddit.mod.removal_reasons:
-            if r.title.lower() == removal_reason.lower():
-                return r.id
-        return None
 
-    def _lock_post(self, monitored_sub: MonitoredSub, submission: Submission) -> None:
+    def _lock_submission(self, monitored_sub: MonitoredSub, submission: Submission) -> None:
         if monitored_sub.lock_post:
-            try:
-                submission.mod.lock()
-            except Forbidden:
-                log.error('Failed to lock post https://redd.it/%s, no permission', submission.id)
-            except Exception as e:
-                log.exception('Failed to lock submission https://redd.it/%s', submission.id, exc_info=True)
+            lock_submission_task.apply_async((submission,))
 
     def _mark_post_as_oc(self, monitored_sub: MonitoredSub, submission: Submission) -> None:
         if monitored_sub.mark_as_oc:
-            try:
-                submission.mod.set_original_content()
-            except Forbidden:
-                log.error('Failed to set post OC https://redd.it/%s, no permission', submission.id)
-            except Exception as e:
-                log.exception('Failed to set post OC https://redd.it/%s', submission.id, exc_info=True)
+            mark_as_oc_task.apply_async((submission,))
 
 
     def _report_submission(self, monitored_sub: MonitoredSub, submission: Submission, report_msg: str) -> None:
         if not monitored_sub.report_reposts:
             return
         log.info('Reporting post %s on %s', f'https://redd.it/{submission.id}', monitored_sub.name)
-        try:
-            submission.report(report_msg[:99]) # TODO: Until database column length is fixed
-        except Exception as e:
-            log.exception('Failed to report submission', exc_info=True)
+        report_submission_task.apply_async((submission, report_msg))
 
     def _send_mod_mail(self, monitored_sub: MonitoredSub, search_results: SearchResults) -> None:
         """
@@ -468,6 +393,7 @@ class MonitoredSubService:
         """
         if not monitored_sub.send_repost_modmail:
             return
+
         message_body = REPOST_MODMAIL.format(
             subreddit=monitored_sub.name,
             match_count=len(search_results.matches),
@@ -476,14 +402,14 @@ class MonitoredSubService:
             oldest_match=search_results.matches[0].post.perma_link if search_results.matches else None,
             title=search_results.checked_post.title
         )
-        self.resposne_handler.send_mod_mail(
-            monitored_sub.name,
-            message_body,
-            f'Repost found in r/{monitored_sub.name}',
-            source='sub_monitor'
+
+        send_modmail_task.apply_async((monitored_sub.name, message_body, f'Repost found in r/{monitored_sub.name}'), {'source': 'sub_monitor'})
+
+    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub) -> None:
+        message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
+        leave_comment_task.apply_async(
+            (search_results.checked_post.post_id, message),
+            {'sticky_comment': monitored_sub.sticky_comment, 'lock_comment': monitored_sub.lock_response_comment}
         )
 
-    def _leave_comment(self, search_results: ImageSearchResults, monitored_sub: MonitoredSub, post_db_id: int = None) -> Comment:
-        message = self.response_builder.build_sub_comment(monitored_sub, search_results, signature=False)
-        return self.resposne_handler.reply_to_submission(search_results.checked_post.post_id, message, 'submonitor')
 

@@ -13,6 +13,7 @@ from praw.exceptions import PRAWException
 from prawcore import NotFound, Forbidden, Redirect
 from sqlalchemy import text, func
 
+from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import send_modmail_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import HttpProxy, StatsTopRepost, StatsTopReposter
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -195,15 +196,15 @@ def update_monitored_sub_data(
     if monitored_sub.failed_admin_check_count == 2:
         subreddit = reddit.subreddit(monitored_sub.name)
         message = MONITORED_SUB_MOD_REMOVED_CONTENT.format(hours='72', subreddit=monitored_sub.name)
-        try:
-            response_handler.send_mod_mail(
+
+        send_modmail_task.apply_async(
+            (
                 subreddit.display_name,
                 message,
                 MONITORED_SUB_MOD_REMOVED_SUBJECT,
-                source='mod_check'
-            )
-        except PRAWException:
-            pass
+            ),
+            {'source': 'mod_check'}
+        )
         return
     elif monitored_sub.failed_admin_check_count >= 4 and monitored_sub.name.lower() != 'dankmemes':
         notification_svc.send_notification(

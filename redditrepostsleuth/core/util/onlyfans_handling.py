@@ -182,6 +182,8 @@ def get_links_from_comments(username: str) -> list[str]:
         case 403:
             log.warning('Got unauthorized when checking user comments for %s', username)
             raise UserNotFound(f'User {username} does not exist or is banned')
+        case 407:
+            return []
         case 429:
             log.warning('Rate limited')
             raise UtilApiException(f'Rate limited')

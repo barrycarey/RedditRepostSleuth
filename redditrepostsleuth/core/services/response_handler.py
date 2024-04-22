@@ -197,19 +197,18 @@ class ResponseHandler:
         if self.test_mode:
             message_body = REPLY_TEST_MODE + message_body
 
-        try:
-            if self.live_response:
-                subreddit.message(subject, message_body)
-            self._save_private_message(
-                BotPrivateMessage(
-                    subject=subject,
-                    body=message_body,
-                    triggered_from=source,
-                    recipient=f'r/{subreddit_name}'
-                )
+
+        if self.live_response:
+            subreddit.message(subject, message_body)
+        self._save_private_message(
+            BotPrivateMessage(
+                subject=subject,
+                body=message_body,
+                triggered_from=source,
+                recipient=f'r/{subreddit_name}'
             )
-        except RedditAPIException:
-            log.exception('Problem sending modmail message', exc_info=True)
+        )
+
 
     def _save_private_message(self, bot_message: BotPrivateMessage) -> NoReturn:
         """
