@@ -16,6 +16,6 @@ pytesseract
 falcon_multipart
 redlock==1.2.0
 celery[redis]==5.3.1
-pydantic==1.10.9
+pydantic==1.10.13
 sentry-sdk==1.29.2
 cryptography==41.0.6
