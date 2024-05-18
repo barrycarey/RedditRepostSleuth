@@ -2,6 +2,7 @@ import json
 from typing import Text, Optional, List
 
 import requests
+from asyncpraw import Reddit as AsyncReddit
 from praw import Reddit
 from praw.exceptions import APIException
 from praw.models import Subreddit

@@ -492,8 +492,8 @@ def get_next_ids(start_id, count):
     return ids
 
 def generate_next_ids(start_id, count):
-    start_num = base36decode(start_id)
-    for id_num in range(start_num, start_num + count):
+    #start_num = base36decode(start_id)
+    for id_num in range(start_id, start_id + count):
         yield base36encode(id_num)
 
 
