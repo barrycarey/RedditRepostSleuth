@@ -7,6 +7,7 @@ from praw.exceptions import APIException, RedditAPIException
 from praw.models import Subreddit, Message
 from prawcore import TooManyRequests
 
+from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import send_modmail_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -78,11 +79,13 @@ class NewActivationMonitor:
             log.info('Sending success PM to %s', subreddit.display_name)
             wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/wiki/repost_sleuth_config'
             try:
-                self.response_handler.send_mod_mail(
-                    subreddit.display_name,
-                    MONITORED_SUB_ADDED.format(wiki_config=wiki_url),
-                    'Repost Sleuth Activated',
-                    source='activation'
+                send_modmail_task.apply_async(
+                    (
+                        subreddit.display_name,
+                        MONITORED_SUB_ADDED.format(wiki_config=wiki_url),
+                        'Repost Sleuth Activated',
+                    ),
+                    {'source': 'activation'}
                 )
                 monitored_sub.activation_notification_sent = True
             except RedditAPIException as e:

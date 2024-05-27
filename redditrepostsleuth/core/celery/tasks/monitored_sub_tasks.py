@@ -44,7 +44,8 @@ class SubMonitorTask(Task):
         response_handler = ResponseHandler(self.reddit, self.uowm, event_logger, source='submonitor', live_response=self.config.live_responses)
         dup_image_svc = DuplicateImageService(self.uowm, event_logger, self.reddit, config=self.config)
         response_builder = ResponseBuilder(self.uowm)
-        self.monitored_sub_svc = MonitoredSubService(dup_image_svc, self.uowm, self.reddit, response_builder, response_handler, event_logger=event_logger, config=self.config)
+        self.monitored_sub_svc = MonitoredSubService(dup_image_svc, self.uowm, self.reddit, response_builder, event_logger=event_logger, config=self.config)
+
 
 
 @celery.task(
@@ -55,11 +56,15 @@ class SubMonitorTask(Task):
     retry_kwards={'max_retries': 3}
 )
 def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
-    update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': post_id,
-                                  'subreddit': monitored_sub.name, 'service': 'Subreddit_Monitor'})
+    try:
+        update_log_context_data(log, {'trace_id': str(randint(100000, 999999)), 'post_id': post_id,
+                                      'subreddit': monitored_sub.name, 'service': 'Subreddit_Monitor'})
 
-    with self.uowm.start() as uow:
-        process_monitored_subreddit_submission(post_id, self.monitored_sub_svc, uow)
+        with self.uowm.start() as uow:
+            process_monitored_subreddit_submission(post_id, self.monitored_sub_svc, uow)
+    except Exception as e:
+        log.exception('General failure')
+        pass
 
 
 @celery.task(

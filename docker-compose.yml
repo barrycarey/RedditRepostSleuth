@@ -122,6 +122,22 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.monitored_sub_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=6,2
 
+    reddit_actions_worker:
+        container_name: reddit-actions-worker
+        restart: unless-stopped
+        user: '1001'
+        build:
+            context: .
+            dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
+        environment:
+            - RUN_ENV=production
+            - db_user=sub_monitor
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.reddit_action_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q reddit_actions -n reddit_actions --autoscale=3,2
+
     ingest_worker:
         restart: unless-stopped
         container_name: ingest-worker

@@ -1,17 +1,22 @@
+import logging
+
 from celery import Task
 from prawcore import TooManyRequests
 from redis import Redis
+from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import UtilApiException
+from redditrepostsleuth.core.exception import UtilApiException, UserNotFound
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
+from redditrepostsleuth.core.util.onlyfans_handling import check_user_comments_for_promoter_links
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
+# TODO - THis should be safe to remove
 
 class AdultPromoterTask(Task):
     def __init__(self):
@@ -29,6 +34,8 @@ class AdultPromoterTask(Task):
             password=self.config.redis_password
         )
 
+
+log = logging.getLogger(__name__)
 
 @celery.task(bind=True, base=AdultPromoterTask, autoretry_for=(UtilApiException,ConnectionError,TooManyRequests), retry_kwards={'max_retries': 3})
 def check_user_comments_for_only_fans(self, username: str) -> None:
