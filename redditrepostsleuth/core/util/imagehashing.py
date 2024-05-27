@@ -12,6 +12,7 @@ from requests.exceptions import ConnectionError, Timeout
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.exception import ImageConversionException, ImageRemovedException, InvalidImageUrlException
+from redditrepostsleuth.core.util.constants import GENERIC_USER_AGENT
 
 log = logging.getLogger(__name__)
 
@@ -51,23 +52,28 @@ def generate_img_by_url(url: str) -> Image:
 
     return img if img else None
 
-def generate_img_by_url_requests(url: str) -> Optional[Image]:
+def generate_img_by_url_requests(url: str, proxy: str = None) -> Optional[Image]:
     """
     Take a URL and generate a PIL image
+    :param proxy: Optional proxy to use with request
     :param url: URL to get
     :return: PIL image
     """
     if 'redd.it' in url:
         useragent = 'repostsleuthbot:v1.0.3 Image Hasher (by /u/barrycarey)'
     else:
-        useragent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+        useragent = GENERIC_USER_AGENT
 
     headers = {
         'User-Agent': useragent
     }
 
+    proxies = None
+    if proxy:
+        proxies = {'http': proxy, 'https': proxy}
+
     try:
-        res = requests.get(url, headers=headers, timeout=7)
+        res = requests.get(url, headers=headers, timeout=7, proxies=proxies)
     except (ConnectionError, Timeout) as e:
         raise ImageConversionException(str(e))
 

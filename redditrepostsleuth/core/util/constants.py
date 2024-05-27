@@ -15,6 +15,8 @@ GENERIC_REQ_HEADERS = {
 	'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36"
 }
 
+GENERIC_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+
 REDDIT_REMOVAL_REASONS = ['deleted', 'author', 'reddit', 'copyright_takedown', 'content_takedown']
 
 EXCLUDE_FROM_TOP_REPOSTERS = [

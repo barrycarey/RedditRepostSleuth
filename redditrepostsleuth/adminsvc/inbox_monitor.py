@@ -39,7 +39,8 @@ class InboxMonitor:
         print('[Scheduled Job] Checking Inbox Start')
         for msg in self.reddit.inbox.messages(limit=500):
             if msg.author != 'RepostSleuthBot' and msg.subject.lower() in ['false negative', 'false positive']:
-                self._process_user_report(msg)
+                #self._process_user_report(msg)
+                pass
             elif TOP_POST_WATCH_SUBJECT.lower() in msg.subject.lower():
                 self._process_watch_request(msg)
 

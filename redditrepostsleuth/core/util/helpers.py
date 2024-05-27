@@ -7,6 +7,7 @@ from typing import Dict, List, Text, TYPE_CHECKING, Optional
 
 import requests
 from praw import Reddit
+from praw.models import Subreddit
 from redis import Redis
 from redlock import RedLockFactory
 from requests.exceptions import ConnectionError
@@ -25,6 +26,14 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub, RepostSearch
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 
+
+def get_removal_reason_id(removal_reason: str, subreddit: Subreddit) -> Optional[str]:
+    if not removal_reason:
+        return None
+    for r in subreddit.mod.removal_reasons:
+        if r.title.lower() == removal_reason.lower():
+            return r.id
+    return None
 
 def post_type_from_url(url: str) -> str:
     """
@@ -250,32 +259,51 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
     )
 
 def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSettings:
-    return ImageSearchSettings(
+    search_settings = ImageSearchSettings(
         req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
         config.default_image_target_annoy_distance,
         target_title_match=req.get_param_as_int('target_title_match', required=False,
                              default=None) or config.default_image_target_title_match,
-        filter_dead_matches=req.get_param_as_bool('filter_dead_matches', required=False,
-                              default=None) or config.default_image_dead_matches_filter,
-        filter_removed_matches=req.get_param_as_bool('filter_removed_matches', required=False,
-                              default=None) or config.default_image_removed_match_filter,
-        only_older_matches=req.get_param_as_bool('only_older_matches', required=False,
-                              default=None) or config.default_image_only_older_matches,
-        filter_same_author=req.get_param_as_bool('filter_same_author', required=False,
-                              default=None) or config.default_image_same_author_filter,
-        filter_crossposts=req.get_param_as_bool('filter_crossposts', required=False,
-                              default=None) or config.default_image_crosspost_filter,
+        filter_dead_matches=req.get_param_as_bool('filter_dead_matches', required=False, default=None),
+        filter_removed_matches=req.get_param_as_bool('filter_removed_matches', required=False, default=None),
+        only_older_matches=req.get_param_as_bool('only_older_matches', required=False, default=None),
+        filter_same_author=req.get_param_as_bool('filter_same_author', required=False, default=None),
+        filter_crossposts=req.get_param_as_bool('include_crossposts', required=False, default=None),
         target_meme_match_percent=req.get_param_as_int('target_meme_match_percent', required=False,
                              default=None) or config.default_image_target_meme_match,
-        meme_filter=req.get_param_as_bool('meme_filter', required=False,
-                              default=None) or config.default_image_meme_filter,
-        same_sub=req.get_param_as_bool('same_sub', required=False,
-                              default=None) or config.default_image_same_sub_filter,
+        meme_filter=req.get_param_as_bool('meme_filter', required=False, default=None),
+        same_sub=req.get_param_as_bool('same_sub', required=False, default=None),
         max_days_old=req.get_param_as_int('max_days_old', required=False,
                              default=None) or config.default_link_max_days_old_filter,
         max_depth=10000
 
     )
+
+    if search_settings.filter_dead_matches is None:
+        search_settings.filter_dead_matches = config.default_image_dead_matches_filter
+
+    if search_settings.filter_removed_matches is None:
+        search_settings.filter_removed_matches = config.default_image_removed_match_filter
+
+    if search_settings.only_older_matches is None:
+        search_settings.only_older_matches = config.default_image_only_older_matches
+
+    if search_settings.filter_same_author is None:
+        search_settings.filter_same_author = config.default_image_same_author_filter
+
+    if search_settings.meme_filter is None:
+        search_settings.meme_filter = config.default_image_meme_filter
+
+    if search_settings.filter_crossposts is None:
+        search_settings.filter_crossposts = config.default_image_crosspost_filter
+    else:
+        search_settings.filter_crossposts = not search_settings.filter_crossposts
+
+    if search_settings.same_sub is None:
+        search_settings.same_sub = config.default_image_same_sub_filter
+
+
+    return search_settings
 
 
 def get_default_link_search_settings(config: Config) -> SearchSettings:
@@ -464,8 +492,8 @@ def get_next_ids(start_id, count):
     return ids
 
 def generate_next_ids(start_id, count):
-    start_num = base36decode(start_id)
-    for id_num in range(start_num, start_num + count):
+    #start_num = base36decode(start_id)
+    for id_num in range(start_id, start_id + count):
         yield base36encode(id_num)
 
 

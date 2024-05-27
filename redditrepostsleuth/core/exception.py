@@ -71,3 +71,11 @@ class GalleryNotProcessed(RepostSleuthException):
 class UserNotFound(RepostSleuthException):
     def __init__(self, message):
         super(UserNotFound, self).__init__(message)
+
+class RedGifsTokenException(RepostSleuthException):
+    def __init__(self, message):
+        super(RedGifsTokenException, self).__init__(message)
+
+class RedditTokenExpiredException(RepostSleuthException):
+    def __init__(self, message):
+        super(RedditTokenExpiredException, self).__init__(message)

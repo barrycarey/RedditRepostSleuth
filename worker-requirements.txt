@@ -12,3 +12,4 @@ pydantic==1.10.9
 sentry-sdk==1.29.2
 pyjwt==2.8.0
 cryptography==41.0.6
+redgifs==1.9.0

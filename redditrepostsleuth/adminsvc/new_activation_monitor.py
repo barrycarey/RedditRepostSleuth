@@ -7,6 +7,7 @@ from praw.exceptions import APIException, RedditAPIException
 from praw.models import Subreddit, Message
 from prawcore import TooManyRequests
 
+from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import send_modmail_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -36,7 +37,7 @@ class NewActivationMonitor:
     def check_for_new_invites(self):
         for msg in self.reddit.inbox.messages(limit=1000):
             if 'invitation to moderate' in msg.subject:
-                log.info('Found invitation for %s', msg.subreddit.display_name)
+                log.debug('Found invitation for %s', msg.subreddit.display_name)
                 self.activate_sub(msg)
 
 
@@ -78,11 +79,13 @@ class NewActivationMonitor:
             log.info('Sending success PM to %s', subreddit.display_name)
             wiki_url = f'https://www.reddit.com/r/{subreddit.display_name}/wiki/repost_sleuth_config'
             try:
-                self.response_handler.send_mod_mail(
-                    subreddit.display_name,
-                    MONITORED_SUB_ADDED.format(wiki_config=wiki_url),
-                    'Repost Sleuth Activated',
-                    source='activation'
+                send_modmail_task.apply_async(
+                    (
+                        subreddit.display_name,
+                        MONITORED_SUB_ADDED.format(wiki_config=wiki_url),
+                        'Repost Sleuth Activated',
+                    ),
+                    {'source': 'activation'}
                 )
                 monitored_sub.activation_notification_sent = True
             except RedditAPIException as e:
@@ -100,7 +103,7 @@ class NewActivationMonitor:
         with self.uowm.start() as uow:
             existing = uow.monitored_sub.get_by_sub(msg.subreddit.display_name)
             if existing:
-                log.info('Monitored sub %s already exists, skipping activation', msg.subreddit.display_name)
+                log.debug('Monitored sub %s already exists, skipping activation', msg.subreddit.display_name)
                 raise ValueError(f'Monitored Sub already in database: {msg.subreddit.display_name}')
             monitored_sub = MonitoredSub(**{**DEFAULT_CONFIG_VALUES, **{'name': msg.subreddit.display_name}})
             uow.monitored_sub.add(monitored_sub)

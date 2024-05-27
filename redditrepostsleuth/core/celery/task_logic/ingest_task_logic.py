@@ -1,23 +1,75 @@
 import logging
+import os
 from hashlib import md5
 from typing import Optional
+from urllib.parse import urlparse
 
 import imagehash
+import redgifs
+from redgifs import HTTPException
 
 from redditrepostsleuth.core.db.databasemodels import Post, PostHash
 from redditrepostsleuth.core.exception import ImageRemovedException, ImageConversionException, InvalidImageUrlException, \
     GalleryNotProcessed
-from redditrepostsleuth.core.util.imagehashing import log, generate_img_by_url_requests
+from redditrepostsleuth.core.proxy_manager import ProxyManager
+from redditrepostsleuth.core.services.redgifs_token_manager import RedGifsTokenManager
+from redditrepostsleuth.core.util.constants import GENERIC_USER_AGENT
+from redditrepostsleuth.core.util.imagehashing import generate_img_by_url_requests
 from redditrepostsleuth.core.util.objectmapping import reddit_submission_to_post
 
 log = logging.getLogger(__name__)
 
-def pre_process_post(submission: dict) -> Optional[Post]:
+
+def get_redgif_id_from_url(url: str) -> Optional[str]:
+    parsed_url = urlparse(url)
+    id, _ = os.path.splitext(parsed_url.path.replace('/i/', ''))
+    return id
+
+def get_redgif_image_url(reddit_url: str, token: str, proxy: str = None) -> Optional[str]:
+
+    id = get_redgif_id_from_url(reddit_url)
+    if not id:
+        log.error('Failed to parse RedGifs ID from %s', reddit_url)
+        return
+
+    api = redgifs.API()
+    api.http._proxy = {'http': proxy, 'https': proxy}
+    api.http.headers.update({'User-Agent': GENERIC_USER_AGENT, 'authorization': f'Bearer {token}'})
+    try:
+        gif = api.get_gif(id)
+    except Exception as e:
+        log.error('')
+    return gif.urls.hd
+
+
+def pre_process_post(
+        submission: dict,
+        proxy_manager: ProxyManager,
+        redgif_manager: RedGifsTokenManager,
+        domains_to_proxy: list[str]
+) -> Optional[Post]:
 
     post = reddit_submission_to_post(submission)
 
+    proxy = None
+    parsed_url = urlparse(post.url)
+    if parsed_url.netloc in domains_to_proxy:
+        proxy = proxy_manager.get_proxy().address
+
     if post.post_type_id == 2: # image
-        process_image_post(post)
+
+        # Hacky RedGif support.  Will need to be refactored if we have to do similar for other sites
+        redgif_url = None
+        if 'redgif' in post.url:
+            token = redgif_manager.get_redgifs_token()
+            try:
+                redgif_url = get_redgif_image_url(submission['url'], token)
+            except HTTPException as e:
+                if 'code' in e.error and e.error['code'] == 'TokenDecodeError':
+                    redgif_manager.remove_redgifs_token(proxy or 'localhost')
+                    raise e
+
+        process_image_post(post, url=redgif_url, proxy=proxy)
     elif post.post_type_id == 6: # gallery
         process_gallery(post, submission)
 
@@ -28,12 +80,21 @@ def pre_process_post(submission: dict) -> Optional[Post]:
     return post
 
 
-def process_image_post(post: Post, hash_size: int = 16) -> Post:
-
-    log.info('Hashing image with URL: %s', post.url)
+def process_image_post(post: Post, url: str = None, proxy: str = None, hash_size: int = 16) -> Post:
+    """
+    Process an image post to generate the required hashes
+    :param proxy: Proxy to request image with
+    :param post: post object
+    :param url: Alternate URL to use
+    :param hash_size: Size of hash
+    :return: Post object with hashes
+    """
+    log.debug('Hashing image with URL: %s', post.url)
+    if url:
+        log.info('Hashing %s', post.url)
 
     try:
-        img = generate_img_by_url_requests(post.url)
+        img = generate_img_by_url_requests(url or post.url, proxy=proxy)
     except ImageConversionException as e:
         log.warning('Image conversion error: %s', e)
         raise
