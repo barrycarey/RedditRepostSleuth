@@ -10,6 +10,7 @@ from prawcore import NotFound, Forbidden, ResponseException, TooManyRequests
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
+from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import send_modmail_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import MonitoredSub, MonitoredSubConfigRevision
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -97,8 +98,8 @@ class SubredditConfigUpdater:
             return
 
         if notify_missing_keys:
-            if self._notify_new_options(subreddit, missing_keys):
-                self._set_config_notified(wiki_page.revision_id)
+            self._notify_new_options(subreddit, missing_keys)
+            self._set_config_notified(wiki_page.revision_id)
 
 
     def create_initial_wiki_config(self, subreddit: Subreddit, wiki_page: WikiPage, monitored_sub: MonitoredSub) -> NoReturn:
@@ -335,8 +336,8 @@ class SubredditConfigUpdater:
             wiki_config = self.get_wiki_config(wiki_page)
         except JSONDecodeError as e:
             self._set_config_validity(wiki_page.revision_id, valid=False)
-            if self._notify_failed_load(subreddit, str(e), wiki_page.revision_id):
-                self._set_config_notified(wiki_page.revision_id)
+            self._notify_failed_load(subreddit, str(e), wiki_page.revision_id)
+            self._set_config_notified(wiki_page.revision_id)
             raise
 
         self._update_monitored_sub_from_wiki(monitored_sub, wiki_config)
@@ -344,8 +345,8 @@ class SubredditConfigUpdater:
             uow.monitored_sub.update(monitored_sub)
             uow.commit()
         self._set_config_validity(wiki_page.revision_id, True)
-        if self._notify_successful_load(wiki_page.subreddit):
-            self._set_config_notified(wiki_page.revision_id)
+        self._notify_successful_load(wiki_page.subreddit)
+        self._set_config_notified(wiki_page.revision_id)
 
         return wiki_config
 
@@ -370,16 +371,16 @@ class SubredditConfigUpdater:
         :return: bool for successful or failed message
         """
         log.info('Sending config created notification to %s', subreddit.display_name)
-        try:
-            self.response_handler.send_mod_mail(
+
+        send_modmail_task.apply_async(
+            (
                 subreddit.display_name,
-                'Repost Sleuth Has Loaded Your New Config!',
-                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.'
-            )
-            return True
-        except Exception as e:
-            log.exception('Failed to send config created notification')
-            return False
+                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.',
+                'Repost Sleuth Has Loaded Your New Config!'
+            ),
+            {'source': 'config_updater'}
+        )
+
 
     def _notify_failed_load(self, subreddit: Subreddit, error: Text, revision_id: Text) -> bool:
         if self.notification_svc:
@@ -391,46 +392,51 @@ class SubredditConfigUpdater:
                 f'Error: {error} \n\n' \
                 'Please validate your changes and try again'
 
-        try:
-            self.response_handler.send_mod_mail(subreddit.display_name, body, 'Repost Sleuth Failed To Load Config', source='submonitor')
-            return True
-        except Exception as e:
-            log.exception('Failed to send PM to %s', subreddit.display_name)
-            return False
+        send_modmail_task.apply_async(
+            (
+                subreddit.display_name,
+                body,
+                'Repost Sleuth Failed To Load Config'
+            ),
+            {'source': 'config_updater'}
+        )
 
-    def _notify_successful_load(self, subreddit: Subreddit) -> bool:
+
+    def _notify_successful_load(self, subreddit: Subreddit) -> None:
         log.info('Sending notification for successful config update to %s', subreddit.display_name)
         if self.notification_svc:
             self.notification_svc.send_notification(
                 f'New config loaded for r/{subreddit.display_name}',
                 subject=f'Subreddit Config Load Success'
             )
-        try:
-            self.response_handler.send_mod_mail(
-                subreddit.display_name,
-                'Repost Sleuth Has Loaded Your New Config!',
-                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.',
-                source='submonitor'
-            )
-            return True
-        except Exception as e:
-            log.exception('Failed to send PM to %s', subreddit.display_name)
-            return False
 
-    def _notify_new_options(self, subreddit: Subreddit, config_keys: List[Text]) -> bool:
+        send_modmail_task.apply_async(
+            (
+                subreddit.display_name,
+                'I saw your config changes and have loaded them! \n\n I\'ll start using them now.',
+                'Repost Sleuth Has Loaded Your New Config!',
+            ),
+            {'source': 'config_updater'}
+        )
+
+
+    def _notify_new_options(self, subreddit: Subreddit, config_keys: List[Text]) -> None:
         log.info('Sending notification for new config keys being added to %s.  %s', config_keys, subreddit.display_name)
         if self.notification_svc:
             self.notification_svc.send_notification(
                 f'Added now config keys to r/{subreddit.display_name}\n{config_keys}\nhttps://reddit.com/r/{subreddit.display_name}',
                 subject='New Config Options Notification Sent'
             )
-        try:
-            message = f'Your Repost Sleuth config was missing some newly available options.\n\n I\'ve added the following options to your config: {config_keys}\n\nYou can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth#wiki_config_value_explanation'
-            self.response_handler.send_mod_mail(subreddit.display_name, message, 'New Repost Sleuth Options Available!', source='submonitor')
-            return True
-        except Exception as e:
-            log.exception('Failed to send PM to %s', subreddit.display_name)
-            return False
+        message = f'Your Repost Sleuth config was missing some newly available options.\n\n I\'ve added the following options to your config: {config_keys}\n\nYou can read more about them here: https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub/configure-repost-sleuth#wiki_config_value_explanation'
+        send_modmail_task.apply_async(
+            (
+                subreddit.display_name,
+                message,
+                'New Repost Sleuth Options Available!'
+            ),
+            {'source': 'config_updater'}
+        )
+
 
     def _set_config_validity(self, revision_id: Text, valid: bool) -> NoReturn:
         with self.uowm.start() as uowm:

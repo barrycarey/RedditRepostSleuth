@@ -29,7 +29,7 @@ def process_monitored_subreddit_submission(post_id: str, monitored_sub_svc: Moni
 
     if monitored_sub.adult_promoter_remove_post or monitored_sub.adult_promoter_ban_user or monitored_sub.adult_promoter_notify_mod_mail:
         try:
-            check_user_for_only_fans(uow, post.author)
+            check_user_for_only_fans(uow, post.author, monitored_sub_svc.reddit)
         except (UtilApiException, ConnectionError, TooManyRequests) as e:
             log.warning('Failed to do onlyfans check for user %s', post.author)
 
