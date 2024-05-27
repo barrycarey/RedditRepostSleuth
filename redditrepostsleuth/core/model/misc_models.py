@@ -11,6 +11,7 @@ class JobStatus(Enum):
 	TIMEOUT = auto()
 	PROXYERROR = auto()
 	ERROR = auto()
+	RATELIMIT = auto()
 
 @dataclass
 class BatchedPostRequestJob:

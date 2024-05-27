@@ -33,9 +33,13 @@ DEFAULT_CONFIG_VALUES = {
             "adult_promoter_remove_post": False,
             "adult_promoter_ban_user": False,
             "adult_promoter_notify_mod_mail": False,
+            "adult_promoter_ban_reason": None,
+            "adult_promoter_removal_reason": None,
             "high_volume_reposter_ban_user": False,
             "high_volume_reposter_remove_post": False,
             "high_volume_reposter_threshold": 150,
             "high_volume_reposter_notify_mod_mail": False,
+            "high_volume_reposter_removal_reason": None,
+            "high_volume_reposter_ban_reason": None
 
 }

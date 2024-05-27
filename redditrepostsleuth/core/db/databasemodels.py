@@ -47,6 +47,7 @@ class Post(Base):
     reports = relationship('UserReport', back_populates='post')
     hashes = relationship('PostHash', back_populates='post')
     post_type = relationship('PostType') # lazy has to be set to JSON encoders don't fail for unbound session
+    #post_type = relationship('PostType', lazy='joined')
 
     def to_dict(self):
         return {
@@ -86,6 +87,7 @@ class PostHash(Base):
 
     post = relationship("Post", back_populates='hashes')
     hash_type = relationship("HashType")
+    #hash_type = relationship("HashType", lazy='joined')
 
     def to_dict(self):
         return {
@@ -198,7 +200,7 @@ class RepostSearch(Base):
         Index('idx_post_type_searched_at', 'post_type_id', 'searched_at'),
         Index('idx_by_subreddit_and_type', 'subreddit', 'source', 'post_type_id', 'matches_found'),
         Index('idx_source', 'source'),
-        Index('idx_matches_found', 'matches_found')
+        Index('idx_matches_found', 'searched_at', 'source', 'matches_found')
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
@@ -224,6 +226,8 @@ class RepostSearch(Base):
     searched_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 
     post = relationship("Post", back_populates='searches')
+    monitored_sub_checked = relationship("MonitoredSubChecks", back_populates="search")
+    repost = relationship("Repost", back_populates="search")
     post_type = relationship('PostType')
 
     def __repr__(self):
@@ -351,10 +355,14 @@ class MonitoredSub(Base):
     adult_promoter_remove_post = Column(Boolean, default=False)
     adult_promoter_ban_user = Column(Boolean, default=False)
     adult_promoter_notify_mod_mail = Column(Boolean, default=False)
+    adult_promoter_removal_reason = Column(String(300))
+    adult_promoter_ban_reason = Column(String(300))
     high_volume_reposter_ban_user = Column(Boolean, default=False)
     high_volume_reposter_remove_post = Column(Boolean, default=False)
     high_volume_reposter_threshold = Column(Integer, default=100)
     high_volume_reposter_notify_mod_mail = Column(Boolean, default=False)
+    high_volume_reposter_removal_reason = Column(String(300))
+    high_volume_reposter_ban_reason = Column(String(300))
 
     post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub', cascade='all, delete', )
     config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub', cascade='all, delete')
@@ -422,7 +430,12 @@ class MonitoredSub(Base):
             'high_volume_reposter_ban_user': self.high_volume_reposter_ban_user,
             'high_volume_reposter_remove_post': self.high_volume_reposter_remove_post,
             'high_volume_reposter_threshold': self.high_volume_reposter_threshold,
-            'high_volume_reposter_notify_mod_mail': self.high_volume_reposter_notify_mod_mail
+            'high_volume_reposter_notify_mod_mail': self.high_volume_reposter_notify_mod_mail,
+            'high_volume_reposter_removal_reason': self.high_volume_reposter_removal_reason,
+            'high_volume_reposter_ban_reason': self.high_volume_reposter_ban_reason,
+            'adult_promoter_removal_reason': self.adult_promoter_removal_reason,
+            'adult_promoter_ban_reason': self.adult_promoter_ban_reason
+
 
         }
 
@@ -496,7 +509,7 @@ class MonitoredSubConfigRevision(Base):
     id = Column(Integer, primary_key=True)
     revision_id = Column(String(36), nullable=False, unique=True)
     revised_by = Column(String(25), nullable=False)
-    config = Column(String(2500), nullable=False)
+    config = Column(String(3000), nullable=False)
     config_loaded_at = Column(DateTime)
     is_valid = Column(Boolean, default=False)
     notified = Column(Boolean, default=False)

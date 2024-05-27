@@ -41,8 +41,10 @@ SUMMONS_CROSSPOST = 'This is a crosspost. I\'ve seen the same {post_type} {match
                     '{first_seen} {oldest_percent_match} match. {last_seen} {newest_percent_match} match \n\n'
 
 MONITORED_SUB_ADDED = 'Congratulations! Your Subreddit is now monitored by Repost Sleuth Bot. It will start scanning all of your new posts shortly\n\n' \
-                      'If you gave me wiki permissions you can find my configuration file here {wiki_config}\n\n' \
+                        'You manage the bots settings by visiting https://repostsleuth.com, logging in with your Reddit account and selecting your Subreddit' \
+                      'If you gave me wiki permissions you can find the configuration file here {wiki_config}\n\n' \
                       'You can find details about the configuration options [here](https://www.reddit.com/r/RepostSleuthBot/wiki/add-you-sub#wiki_configuration)\n\n' \
+                        'Please note, managing settings via the Wiki page can be cumbersome and error prone. Using the website allows the use of a simple interface to change settings\n\n' \
                       'If you notice any issues please report them at r/RepostSleuthBot\n\n' \
                       'You can also manage the bots settings by visiting https://repostsleuth.com'
 
@@ -75,7 +77,8 @@ TOP_POST_WATCH_BODY = 'Hey! Your OC hit the front page.  It would suck if someon
 
 TOP_POST_REPORT_MSG = 'Looks like a repost. I\'ve seen this {post_type} {match_count} {times_word}. First seen {oldest_shortlink}' \
 
-IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filter_used} | **Target:** {effective_target_match_percent}% | **Check Title:** {check_title} | **Max Age:** {max_age}'
+IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Target Percent:** {effective_target_match_percent}% | **Max Age:** {max_age}'
+#IMAGE_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Meme Filter:** {meme_filter_used} | **Target:** {effective_target_match_percent}% | **Check Title:** {check_title} | **Max Age:** {max_age}'
 GENERIC_SEARCH_SETTINGS = '**Scope:** {search_scope} | **Check Title:** {check_title} | **Max Age:** {max_days_old}'
 REPORT_RESPONSE = 'Thank you for your report. \n\nIt has been documented and will be reviewed further'
 

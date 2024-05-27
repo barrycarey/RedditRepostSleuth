@@ -28,17 +28,19 @@ task_routes = {
     'redditrepostsleuth.core.celery.tasks.scheduled_tasks.*': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.admin_tasks.update_proxies_job': {'queue': 'scheduled_tasks'},
     'redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans': {'queue': 'onlyfans_check'},
-    'redditrepostsleuth.core.celery.admin_tasks.update_subreddit_config_from_database': {'queue': 'update_wiki_from_database'}
+    'redditrepostsleuth.core.celery.admin_tasks.update_subreddit_config_from_database': {'queue': 'update_wiki_from_database'},
+    'redditrepostsleuth.core.celery.admin_tasks.delete_search_batch': {'queue': 'batch_delete_searches'},
+    'redditrepostsleuth.core.celery.tasks.reddit_action_tasks.*': {'queue': 'reddit_actions'},
 
 
 }
 
 
 beat_schedule = {
-    'update-proxy-list': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_proxies_task',
-        'schedule': 3600
-    },
+    # 'update-proxy-list': {
+    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_proxies_task',
+    #     'schedule': 3600
+    # },
     'check-inbox': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_inbox_task',
         'schedule': 300
@@ -60,7 +62,7 @@ beat_schedule = {
         'schedule': 300
     },
     'update-top-reposts': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_top_reposts_task',
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_all_top_reposts_task',
         'schedule': 86400
     },
     'update-top-reposters': {
@@ -71,25 +73,29 @@ beat_schedule = {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_daily_top_reposters_task',
         'schedule': 900
     },
-    'send-reports-to-meme-voting': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.send_reports_to_meme_voting_task',
-        'schedule': 3600
-    },
-    'check-meme-template-potential-votes': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_meme_template_potential_votes_task',
-        'schedule': 1800
-    },
+    # 'send-reports-to-meme-voting': {
+    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.send_reports_to_meme_voting_task',
+    #     'schedule': 3600
+    # },
+    # 'check-meme-template-potential-votes': {
+    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_meme_template_potential_votes_task',
+    #     'schedule': 1800
+    # },
     'monitored-sub-config-update': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
         'schedule': 3600
     },
-    'update-profile-token': {
-        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',
-        'schedule': 120
-    },
+    # 'update-profile-token': {
+    #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',
+    #     'schedule': 120
+    # },
     'update-daily-stats': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_daily_stats',
         'schedule': 86400
+    },
+    'search-history-cleanup': {
+        'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_search_history_cleanup',
+        'schedule': 3600
     },
 
 }

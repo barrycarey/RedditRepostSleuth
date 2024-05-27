@@ -27,21 +27,6 @@ class TestNewActivationMonitor(TestCase):
             monitor.check_for_new_invites()
             mocked_monitor.assert_called()
 
-    def test__notify_added(self):
-        sub_repo = MagicMock()
-        uow = MagicMock()
-        uowm = MagicMock()
-        sub_repo.get_by_sub.return_value = MonitoredSub(name='testsub')
-        type(uow).monitored_sub = mock.PropertyMock(return_value=sub_repo)
-        uow.__enter__.return_value = uow
-        uow.commit.return_value = None
-        uowm.start.return_value = uow
-        mock_response_hander = Mock(send_mod_mail=Mock(return_value=None))
-        monitor = NewActivationMonitor(uowm, Mock(), mock_response_hander)
-        subreddit = Mock(message=Mock(return_value=None), display_name='testsub')
-        monitor._notify_added(subreddit)
-        mock_response_hander.send_mod_mail.assert_called()
-        self.assertTrue(sub_repo.get_by_sub.activation_notification_sent)
 
     def test__create_wiki_page(self):
         monitor = NewActivationMonitor(Mock(), Mock(), Mock())

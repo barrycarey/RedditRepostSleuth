@@ -9,7 +9,6 @@ from praw import Reddit
 from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
 
-from redditrepostsleuth.core.celery.admin_tasks import delete_post_task
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -395,7 +394,7 @@ class DuplicateImageService:
                     match_hash = meme_hashes['dhash_h']
                 except ImageConversionException:
                     log.warning('Failed to get meme hash for %s.  Sending to delete queue', match.post.post_id)
-                    delete_post_task.apply_async((match.post.post_id,))
+                    #delete_post_task.apply_async((match.post.post_id,))
                     continue
                 except Exception:
                     log.exception('Failed to get meme hash for %s', match.post.url, exc_info=True)

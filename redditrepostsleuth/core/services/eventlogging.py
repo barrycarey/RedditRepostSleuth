@@ -66,7 +66,7 @@ class EventLogging:
     def _write_to_influx(self, event: InfluxEvent) -> bool:
         try:
             self._influx_client.write(bucket=self._config.influx_bucket, record=event.get_influx_event())
-            #log.debug('Wrote to Influx: %s', event.get_influx_event())
+            log.debug('Wrote to Influx: %s', event.get_influx_event())
             self._successive_failures = 0
             return True
         except Exception as e:

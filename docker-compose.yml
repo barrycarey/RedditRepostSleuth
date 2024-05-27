@@ -122,6 +122,22 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.monitored_sub_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=6,2
 
+    reddit_actions_worker:
+        container_name: reddit-actions-worker
+        restart: unless-stopped
+        user: '1001'
+        build:
+            context: .
+            dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
+        environment:
+            - RUN_ENV=production
+            - db_user=sub_monitor
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.reddit_action_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q reddit_actions -n reddit_actions --autoscale=3,2
+
     ingest_worker:
         restart: unless-stopped
         container_name: ingest-worker
@@ -134,9 +150,9 @@ services:
         environment:
             - RUN_ENV=production
             - db_user=ingest
-            - LOG_LEVEL=ERROR
+            - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.ingest_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=3,16
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=16,1
 
     link_repost_worker:
         container_name: link-repost-worker
@@ -181,9 +197,9 @@ services:
             - .env
         environment:
             - RUN_ENV=production
-            - LOG_LEVEL=INFO
+            - LOG_LEVEL=WARNING
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=8,5
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=10,5
 
     subreddit_config_update_worker:
         container_name: subreddit-config-update-worker
@@ -198,6 +214,6 @@ services:
             - RUN_ENV=production
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.scheduled_tasks,redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q subreddit_config_updates,update_wiki_from_database -n subreddit_config_update_worker --autoscale=8,1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q batch_delete_searches,subreddit_config_updates,update_wiki_from_database -n subreddit_config_update_worker --autoscale=8,1
 
 
