@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 import requests
 from praw import Reddit
-from prawcore import TooManyRequests
+from prawcore import TooManyRequests, NotFound
 from requests import Response
 from requests.exceptions import ConnectionError
 from sqlalchemy import func
@@ -115,6 +115,20 @@ def fetch_from_util_api(url: str) -> Response:
 
     return response
 
+def check_bio_for_promoter_links(username: str, reddit: Reddit) -> Optional[str]:
+    try:
+        redditor = reddit.redditor(username)
+        bio = redditor.subreddit.public_description
+    except (NotFound, AttributeError):
+        log.warning('Failed to get Redditor bio for username %s', username)
+        return
+
+    log.debug('Checking for of %s: %s', username, redditor.subreddit.public_description)
+
+    for domain in flagged_words:
+        if domain in bio:
+            return domain
+
 def get_profile_links(username: str) -> list[str]:
     url = f'{config.util_api}/profile?username={username}'
     response = fetch_from_util_api(url)
@@ -133,7 +147,12 @@ def get_profile_links(username: str) -> list[str]:
         raise UtilApiException(f'Unexpected status {response.status_code} from util API')
 
 
-def check_user_for_promoter_links(username: str) -> Optional[LinkCheckResult]:
+def check_user_for_promoter_links(username: str, reddit: Reddit) -> Optional[LinkCheckResult]:
+
+    flagged_bio_domain = check_bio_for_promoter_links(username, reddit)
+
+    if flagged_bio_domain:
+        return LinkCheckResult(source='Bio', url=flagged_bio_domain)
 
     profile_links = get_profile_links(username)
 
@@ -226,7 +245,7 @@ def get_links_from_comments_praw(username: str, reddit: Reddit) -> list[str]:
 
     return list(set(all_urls))
 
-def check_user_for_only_fans(uow: UnitOfWork, username: str) -> Optional[UserReview]:
+def check_user_for_only_fans(uow: UnitOfWork, username: str, reddit: Reddit) -> Optional[UserReview]:
     skip_names = ['[deleted]', 'AutoModerator']
 
     if username in skip_names:
@@ -238,7 +257,7 @@ def check_user_for_only_fans(uow: UnitOfWork, username: str) -> Optional[UserRev
 
         if user:
             delta = datetime.utcnow() - user.last_checked
-            if delta.days < 30:
+            if delta.days < 7:
                 log.info('Skipping existing user %s, last check was %s days ago', username, delta.days)
                 return
             user.content_links_found = False
@@ -249,7 +268,7 @@ def check_user_for_only_fans(uow: UnitOfWork, username: str) -> Optional[UserRev
         if not user:
             user = UserReview(username=username)
         try:
-            result = check_user_for_promoter_links(username)
+            result = check_user_for_promoter_links(username, reddit)
         except UserNotFound as e:
             log.warning(e)
             return

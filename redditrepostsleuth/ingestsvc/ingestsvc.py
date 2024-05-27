@@ -16,7 +16,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import RateLimitException, UtilApiException
+from redditrepostsleuth.core.exception import RateLimitException, UtilApiException, RedditTokenExpiredException
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, JobStatus
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
@@ -38,7 +38,6 @@ if os.getenv('SENTRY_DNS', None):
 config = Config()
 REMOVAL_REASONS_TO_SKIP = ['deleted', 'author', 'reddit', 'copyright_takedown']
 HEADERS = {'User-Agent': 'u/RepostSleuthBot - Submission Ingest (by u/BarryCarey)'}
-
 
 async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
     """
@@ -62,8 +61,11 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
                 if resp.status == 429:
                     text = await resp.text()
                     raise RateLimitException('Data API rate limit')
+                elif resp.status == 401:
+                    raise RedditTokenExpiredException('Token expired')
                 log.info('Unexpected request status %s - %s', resp.status, url)
                 return
+
         except (ClientOSError, TimeoutError):
             log.exception('')
 
@@ -229,8 +231,8 @@ def get_auth_headers(reddit: Reddit) -> dict:
 async def main() -> None:
     log.info('Starting post ingestor')
     reddit = get_reddit_instance(config)
-    allowed_submission_delay_seconds = 30
-    missed_id_retry_count = 2000
+    allowed_submission_delay_seconds = 90
+    missed_id_retry_count = 3000
 
     newest_id = get_newest_praw_post_id(reddit)
     uowm = UnitOfWorkManager(get_db_engine(config))
@@ -266,6 +268,9 @@ async def main() -> None:
             except RateLimitException:
                 log.warning('Hit Data API Rate Limit')
                 await asyncio.sleep(10)
+                continue
+            except RedditTokenExpiredException:
+                auth_headers = get_auth_headers(reddit)
                 continue
 
         if not results:
@@ -305,17 +310,5 @@ async def main() -> None:
             await ingest_sequence(missed_ids, alt_headers=auth_headers)
             missed_ids = []
 
-
-async def temp_backfill():
-    reddit = get_reddit_instance(config)
-    uowm = UnitOfWorkManager(get_db_engine(config))
-    get_newest_praw_post_id(reddit)
-    new_headers = {**HEADERS, **{'Authorization': f'Bearer {reddit.auth._reddit._core._authorizer.access_token}'}}
-
-    with uowm.start() as uow:
-        oldest_post = uow.posts.get_newest_post()
-        oldest_id = oldest_post.post_id
-
-    await ingest_range(oldest_id, '1ctkrlw', alt_headers=new_headers)
 if __name__ == '__main__':
     run(main())

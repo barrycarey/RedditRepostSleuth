@@ -8,6 +8,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.logging import get_configured_logger
+from redditrepostsleuth.core.model.events.RedditAdminActionEvent import RedditAdminActionEvent
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -38,6 +39,12 @@ def remove_submission_task(self, submission: Submission, removal_reason: str, mo
         removal_reason_id = get_removal_reason_id(removal_reason, submission.subreddit)
         log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
         submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
+        self.event_logger.save_event(
+            RedditAdminActionEvent(
+                submission.subreddit.display_name,
+                'remove_submission'
+            )
+        )
     except Forbidden:
         log.error('Failed to remove post https://redd.it/%s, no permission', submission.id)
         send_modmail_task.apply_async(
@@ -66,6 +73,12 @@ def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, not
     try:
         subreddit = self.reddit.subreddit(subreddit_name)
         subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+        self.event_logger.save_event(
+            RedditAdminActionEvent(
+                subreddit_name,
+                'ban_user'
+            )
+        )
     except TooManyRequests as e:
         log.warning('Too many requests when banning user')
         raise e
@@ -109,6 +122,12 @@ def lock_submission_task(self, submission: Submission) -> None:
     log.info('Locking submission https://redd.it/%s', submission.id)
     try:
         submission.mod.lock()
+        self.event_logger.save_event(
+            RedditAdminActionEvent(
+                submission.subreddit.display_name,
+                'submission_lock'
+            )
+        )
     except TooManyRequests as e:
         log.warning('Too many requests when locking submission')
         raise e
@@ -129,6 +148,12 @@ def lock_comment_task(self, comment: Comment) -> None:
     log.info('Locking comment https://reddit.com%s', comment.permalink)
     try:
         comment.mod.lock()
+        self.event_logger.save_event(
+            RedditAdminActionEvent(
+                comment.subreddit.display_name,
+                'comment_lock'
+            )
+        )
     except TooManyRequests as e:
         log.warning('Too many requests when locking comment')
         raise e
@@ -149,6 +174,12 @@ def sticky_comment_task(self, comment: Comment) -> None:
     log.info('Make comment sticky: https://reddit.com%s ', comment.permalink)
     try:
         comment.mod.distinguish(sticky=True)
+        self.event_logger.save_event(
+            RedditAdminActionEvent(
+                comment.subreddit.display_name,
+                'comment_sticky'
+            )
+        )
     except TooManyRequests as e:
         log.warning('Too many requests when sticky comment')
         raise e
@@ -169,6 +200,12 @@ def mark_as_oc_task(self, submission: Submission) -> None:
     log.info('Marking submission %s as OC', submission.id)
     try:
         submission.mod.set_original_content()
+        self.event_logger.save_event(
+            RedditAdminActionEvent(
+                submission.subreddit.display_name,
+                'submission_mark_oc'
+            )
+        )
     except TooManyRequests as e:
         log.warning('Too many requests when marking submission OC')
         raise e
@@ -196,6 +233,12 @@ def report_submission_task(self, submission: Submission, report_msg: str) -> Non
     log.info('Reporting submission https://redd.it/%s', submission.id)
     try:
         submission.report(report_msg[:99])  # TODO: Until database column length is fixed
+        self.event_logger.save_event(
+            RedditAdminActionEvent(
+                submission.subreddit.display_name,
+                'submission_report'
+            )
+        )
     except TooManyRequests as e:
         log.warning('Too many requests when reporting submission')
         raise e

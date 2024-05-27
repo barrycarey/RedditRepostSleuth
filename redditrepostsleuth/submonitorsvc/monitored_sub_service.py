@@ -2,9 +2,7 @@ import logging
 from typing import Optional
 
 from praw import Reddit
-from praw.exceptions import APIException
-from praw.models import Submission, Comment, Subreddit
-from prawcore import Forbidden
+from praw.models import Submission
 
 from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import leave_comment_task, report_submission_task, \
     mark_as_oc_task, lock_submission_task, remove_submission_task, send_modmail_task, ban_user_task
@@ -17,12 +15,11 @@ from redditrepostsleuth.core.model.search.search_results import SearchResults
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.responsebuilder import ResponseBuilder
 from redditrepostsleuth.core.util.helpers import build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_link_search_settings_for_monitored_sub, \
     get_text_search_settings_for_monitored_sub
-from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, NO_BAN_PERMISSIONS, HIGH_VOLUME_REPOSTER_FOUND, \
+from redditrepostsleuth.core.util.replytemplates import REPOST_MODMAIL, HIGH_VOLUME_REPOSTER_FOUND, \
     ADULT_PROMOTER_SUBMISSION_FOUND
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
 from redditrepostsleuth.core.util.repost.repost_search import image_search_by_post, link_search, text_search_by_post
@@ -38,7 +35,6 @@ class MonitoredSubService:
             uowm: UnitOfWorkManager,
             reddit: Reddit,
             response_builder: ResponseBuilder,
-            response_handler: ResponseHandler,
             event_logger: EventLogging = None,
             config: Config = None
     ):
@@ -46,7 +42,6 @@ class MonitoredSubService:
         self.uowm = uowm
         self.reddit = reddit
         self.response_builder = response_builder
-        self.resposne_handler = response_handler
         self.event_logger = event_logger
         self.notification_svc = NotificationService(config)
         if config:
