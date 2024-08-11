@@ -63,8 +63,9 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
                     raise RateLimitException('Data API rate limit')
                 elif resp.status == 401:
                     raise RedditTokenExpiredException('Token expired')
-                log.info('Unexpected request status %s - %s', resp.status, url)
-                return
+                else:
+                    log.info('Unexpected request status %s - %s', resp.status, url)
+                    return
 
         except (ClientOSError, TimeoutError):
             log.exception('')
@@ -261,7 +262,7 @@ async def main() -> None:
             try:
                 log.debug('Sending fetch request')
                 results = await fetch_page(url, session)
-            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError, CancelledError, UtilApiException):
+            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError, CancelledError, UtilApiException) as e:
                 log.warning('Error during fetch')
                 await asyncio.sleep(2)
                 continue

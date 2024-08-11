@@ -62,22 +62,25 @@ def update_proxies(uowm: UnitOfWorkManager) -> None:
 def update_top_reposts(uow: UnitOfWork, post_type_id: int, day_range: int = None):
     # reddit.info(reddit_ids_to_lookup):
     log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
-    range_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY AND post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC"
-    all_time_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC"
+    range_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY AND post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC LIMIT 100000"
+    all_time_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC LIMIT 100000"
     if day_range:
         query = range_query
+        log.debug('Deleting top reposts for day range %s', day_range)
         uow.session.execute(text('DELETE FROM stat_top_repost WHERE post_type_id=:posttype AND day_range=:days'),
                             {'posttype': post_type_id, 'days': day_range})
     else:
         query = all_time_query
+        log.debug('Deleting all top reposts for all time')
         uow.session.execute(text('DELETE FROM stat_top_repost WHERE post_type_id=:posttype AND day_range IS NULL'),
                             {'posttype': post_type_id})
 
     uow.commit()
 
 
-
+    log.debug('Executing query for day range %s', day_range)
     result = uow.session.execute(text(query), {'posttype': post_type_id, 'days': day_range})
+    log.debug('Finished executing query for day range %s', day_range)
     for row in result:
         stat = StatsTopRepost()
         stat.post_id = row[0]
@@ -99,7 +102,7 @@ def run_update_top_reposts(uow: UnitOfWork) -> None:
 def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = None) -> None:
     log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
     range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC"
-    all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC"
+    all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC LIMIT 100000"
     if day_range:
         query = range_query
     else:
@@ -123,7 +126,9 @@ def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = No
         stat.repost_count = row[1]
         stat.updated_at = func.utc_timestamp()
         uow.stat_top_reposter.add(stat)
-        uow.commit()
+    uow.commit()
+
+    log.info('finished')
 
 def run_update_top_reposters(uow: UnitOfWork):
     post_types = [1, 2, 3]
