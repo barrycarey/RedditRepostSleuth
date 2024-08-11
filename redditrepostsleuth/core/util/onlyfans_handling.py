@@ -143,8 +143,8 @@ def get_profile_links(username: str) -> list[str]:
         log.info('No token to cehck user with')
         return []
     else:
-        log.warning('Non 200 return code %s from Util API', response.status_code)
-        raise UtilApiException(f'Unexpected status {response.status_code} from util API')
+        log.warning('Non 200 return code %s from Util API: %s', response.status_code, response.text)
+        return []
 
 
 def check_user_for_promoter_links(username: str, reddit: Reddit) -> Optional[LinkCheckResult]:
@@ -206,6 +206,9 @@ def get_links_from_comments(username: str) -> list[str]:
         case 429:
             log.warning('Rate limited')
             raise UtilApiException(f'Rate limited')
+        case 500:
+            log.warning('Got a 500 from util API: %s', response.text)
+            raise UtilApiException(f'No Sessions')
         case 200:
             response_json = json.loads(response.text)
             all_urls = []
@@ -281,7 +284,6 @@ def check_user_for_only_fans(uow: UnitOfWork, username: str, reddit: Reddit) -> 
         uow.commit()
         return user
     except (UtilApiException, ConnectionError, TooManyRequests) as e:
-        log.exception('')
         raise e
     except IntegrityError:
         pass

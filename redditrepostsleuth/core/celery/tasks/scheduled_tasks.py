@@ -37,7 +37,7 @@ def check_inbox_task(self) -> None:
 
 @celery.task(bind=True, base=RedditTask)
 def check_new_activations_task(self) -> None:
-    log.info('Scheduled Task: Checking For Activations')
+    log.debug('Scheduled Task: Checking For Activations')
     activation_monitor = NewActivationMonitor(
         self.uowm,
         self.reddit,
@@ -75,7 +75,7 @@ def update_ban_list_task(self) -> None:
 
 @celery.task(bind=True, base=RedditTask)
 def update_monitored_sub_data_task(self) -> None:
-    log.info('Starting Job: Update Subreddit Data')
+    log.debug('Starting Job: Update Subreddit Data')
     try:
         with self.uowm.start() as uow:
             subs = uow.monitored_sub.get_all()
