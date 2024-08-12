@@ -101,7 +101,7 @@ def run_update_top_reposts(uow: UnitOfWork) -> None:
 
 def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = None) -> None:
     log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
-    range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC"
+    range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC LIMIT 100000"
     all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC LIMIT 100000"
     if day_range:
         query = range_query
