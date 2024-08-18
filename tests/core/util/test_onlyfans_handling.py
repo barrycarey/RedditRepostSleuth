@@ -44,10 +44,9 @@ class TestOnlyfansHandling(TestCase):
             get_profile_links('testuser')
 
     @patch('redditrepostsleuth.core.util.onlyfans_handling.requests.get')
-    def test_get_profile_links_api_bad_status(self, mock_requests):
+    def test_get_profile_links_api_bad_status_return_empty(self, mock_requests):
         mock_requests.return_value = Mock(status_code=500)
-        with self.assertRaises(UtilApiException):
-            get_profile_links('testuser')
+        self.assertEqual([], get_profile_links('testuser'))
     @patch('redditrepostsleuth.core.util.onlyfans_handling.requests.get')
     def test_get_profile_links_get_links(self, mock_requests):
         expected = ['facebook.com', 'google.com']

@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 
 import jwt
 import redis
@@ -133,9 +134,13 @@ def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = No
 def run_update_top_reposters(uow: UnitOfWork):
     post_types = [1, 2, 3]
     day_ranges = [1, 7, 14, 30, None]
+    log.warning('Starting update to reposters task')
+    start_time = datetime.utcnow()
     for post_type_id in post_types:
         for days in day_ranges:
             update_top_reposters(uow, post_type_id, days)
+            delta = (datetime.utcnow() - start_time)
+            log.warning('Top reposters: Type=%s days=%s time=%s', post_type_id, days, delta)
 
 
 def token_checker() -> None:

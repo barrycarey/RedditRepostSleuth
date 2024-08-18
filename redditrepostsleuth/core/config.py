@@ -176,6 +176,7 @@ class Config:
             'wiki_config_name',
             'index_api',
             'util_api',
+            'embedding_api',
             'live_responses',
             'top_post_offer_watch',
             'ocr_east_model',
