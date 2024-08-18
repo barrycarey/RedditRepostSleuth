@@ -120,7 +120,7 @@ services:
             - db_user=sub_monitor
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.monitored_sub_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=6,2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=10,2
 
     reddit_actions_worker:
         container_name: reddit-actions-worker
