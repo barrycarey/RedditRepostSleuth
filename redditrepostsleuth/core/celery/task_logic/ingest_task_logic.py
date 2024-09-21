@@ -1,6 +1,8 @@
+import base64
 import logging
 import os
 from hashlib import md5
+from io import BytesIO
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -8,6 +10,7 @@ import imagehash
 import redgifs
 from redgifs import HTTPException
 
+from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.db.databasemodels import Post, PostHash
 from redditrepostsleuth.core.exception import ImageRemovedException, ImageConversionException, InvalidImageUrlException, \
     GalleryNotProcessed
@@ -109,6 +112,17 @@ def process_image_post(post: Post, url: str = None, proxy: str = None, hash_size
     except Exception as e:
         log.exception('Error creating hash')
         raise
+
+    try:
+
+        buffered = BytesIO()
+        img.save(buffered, format=img.format)
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        celery.send_task('redditrepostsleuth.core.celery.tasks.embedding_tasks.fetch_and_save_embedding',
+                         args=[img_str, post.post_id],
+                         queue='image_embed')
+    except:
+        log.exception('Problem encoding image')
 
     return post
 
