@@ -1,4 +1,5 @@
 from celery import Task
+from pymilvus import MilvusClient
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.db_utils import get_db_engine
@@ -65,3 +66,13 @@ class AdminTask(Task):
             self.config,
             notification_svc=self.notification_svc
         )
+
+class MilvusTask(Task):
+    def __init__(self):
+        self.config = Config()
+        self.milvus_conn = False
+
+    def _check_milvus_connection(self):
+        if not self.milvus_conn:
+            self.milvus_conn = MilvusClient(uri=f'http://{self.config.milvus}', db_name='reddit', keep_alive=True)
+            self.retry()

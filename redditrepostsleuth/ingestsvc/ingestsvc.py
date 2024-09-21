@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import json
 import os
+import random
 import time
 from asyncio import ensure_future, gather, run, TimeoutError, CancelledError
 from datetime import datetime
@@ -93,7 +94,8 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
                 job.status = JobStatus.RATELIMIT
             elif resp.status == 500:
                 log.warning('Reddit Server Error')
-                job.status = JobStatus.ERROR
+                #job.status = JobStatus.ERROR
+                job.status = JobStatus.RATELIMIT
             else:
                 log.warning('Unexpected request status %s - %s', resp.status, job.url)
                 job.status = JobStatus.ERROR
@@ -183,7 +185,7 @@ async def ingest_sequence(ids: Union[list[int], Generator[int, None, None]], alt
                     any_rate_limit = next((x for x in results if x.status == JobStatus.RATELIMIT), None)
                     if any_rate_limit:
                         log.info('Some jobs hit data rate limit, waiting')
-                        await asyncio.sleep(10)
+                        await asyncio.sleep(random.randint(5,30))
 
                 log.info('Sending %s posts to save queue', len(posts_to_save))
 
@@ -243,7 +245,7 @@ async def main() -> None:
         oldest_post = uow.posts.get_newest_post()
         oldest_id = oldest_post.post_id
 
-    await ingest_range(newest_id, oldest_id, alt_headers=auth_headers)
+    #await ingest_range(newest_id, oldest_id, alt_headers=auth_headers)
 
     request_delay = 0
     missed_ids = [] # IDs that we didn't get results back for or had a removal reason
