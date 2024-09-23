@@ -239,12 +239,12 @@ def update_monitored_sub_data(
 
     monitored_sub.is_private = True if subreddit.subreddit_type == 'private' else False
     monitored_sub.nsfw = True if subreddit.over18 else False
-    log.info('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
+    log.debug('[Subscriber Update] %s: %s subscribers', monitored_sub.name, monitored_sub.subscribers)
 
     perms = get_bot_permissions(subreddit) if monitored_sub.is_mod else []
     monitored_sub.post_permission = True if 'all' in perms or 'posts' in perms else None
     monitored_sub.wiki_permission = True if 'all' in perms or 'wiki' in perms else None
-    log.info('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission,
+    log.debug('[Mod Check] %s | Post Perm: %s | Wiki Perm: %s', monitored_sub.name, monitored_sub.post_permission,
              monitored_sub.wiki_permission)
 
 
