@@ -22,7 +22,7 @@ class EventLogging:
         client = InfluxDBClient(
             url=f'http://{self._config.influx_host}:{self._config.influx_port}',
             token=self._config.influx_token,
-            org=self._config.influx_org,
+            org=self._config.influx_org
         )
 
         self._influx_client = client.write_api(write_options=SYNCHRONOUS)
@@ -90,4 +90,4 @@ class EventLogging:
         except Exception as e:
             log.exception('Failed to write to Influx')
 
-        log.info('Wrote Influx: %s', points)
+        #log.info('Wrote Influx: %s', points)

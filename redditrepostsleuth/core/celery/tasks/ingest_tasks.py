@@ -2,6 +2,7 @@ import json
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from time import perf_counter
 from typing import Optional
 
 import requests
@@ -44,6 +45,18 @@ class IngestTask(Task):
 @celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed, HTTPException), retry_kwargs={'max_retries': 10, 'countdown': 300})
 def save_new_post(self, submission: dict, repost_check: bool = True):
 
+    start_time = perf_counter()
+    save_event = {
+            'measurement': 'Post_Ingest',
+            #'time': datetime.utcnow().timestamp(),
+            'fields': {
+                'run_time': None
+            },
+            'tags': {
+                'post_type': None,
+            }
+        }
+
     # TODO: temp fix until I can fix imgur gifs
     if 'imgur' in submission['url'] and 'gifv' in submission['url']:
         return
@@ -83,6 +96,10 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
         except Exception as e:
             log.exception('Database save failed: %s', str(e), exc_info=False)
             return
+
+    save_event['fields']['run_time'] = perf_counter() - start_time
+    save_event['tags']['post_type'] = post.post_type_id
+    self.event_logger.write_raw_points([save_event])
 
     if repost_check:
         if post.post_type_id == 1:
