@@ -262,6 +262,7 @@ class Repost(Base):
         Index('idx_repost_by_type', 'post_type_id', 'detected_at', unique=False),
         Index('idx_repost_of_date',  'author', 'detected_at',unique=False),
         Index('idx_repost_by_subreddit', 'subreddit', 'post_type_id', 'detected_at', unique=False),
+        Index('idx_repost_by_author', 'author', unique=False),
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))

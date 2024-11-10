@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from time import perf_counter
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 from celery import Task
@@ -50,12 +51,19 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
             'measurement': 'Post_Ingest',
             #'time': datetime.utcnow().timestamp(),
             'fields': {
-                'run_time': None
+                'run_time': None,
+                'post_id': submission.get('id', None)
             },
             'tags': {
                 'post_type': None,
+                'domain': None
             }
         }
+
+    # Adding for timing in Grafana
+    url = submission.get('url', None)
+    if url:
+        save_event['tags']['domain'] = urlparse(url).netloc
 
     # TODO: temp fix until I can fix imgur gifs
     if 'imgur' in submission['url'] and 'gifv' in submission['url']:
