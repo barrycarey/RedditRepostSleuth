@@ -1,5 +1,6 @@
 from sqlalchemy.orm import scoped_session
 
+from redditrepostsleuth.core.db.databasemodels import Subreddit
 from redditrepostsleuth.core.db.repository.banned_subreddit_repo import BannedSubredditRepo
 from redditrepostsleuth.core.db.repository.banned_user_repo import BannedUserRepo
 from redditrepostsleuth.core.db.repository.bot_private_message_repo import BotPrivateMessageRepo
@@ -27,6 +28,7 @@ from redditrepostsleuth.core.db.repository.site_admin_repo import SiteAdminRepo
 from redditrepostsleuth.core.db.repository.stat_daily_count_repo import StatDailyCountRepo
 from redditrepostsleuth.core.db.repository.stat_top_repost_repo import StatTopRepostRepo
 from redditrepostsleuth.core.db.repository.stats_top_reposter_repo import StatTopReposterRepo
+from redditrepostsleuth.core.db.repository.subreddit_repo import SubredditRepo
 from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepository
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
 from redditrepostsleuth.core.db.repository.user_review_repo import UserReviewRepo
@@ -176,3 +178,7 @@ class UnitOfWork:
     @property
     def user_whitelist(self) -> UserWhitelistRepo:
         return UserWhitelistRepo(self.session)
+
+    @property
+    def subreddit(self) -> SubredditRepo:
+        return SubredditRepo(self.session)

@@ -262,6 +262,7 @@ class Repost(Base):
         Index('idx_repost_by_type', 'post_type_id', 'detected_at', unique=False),
         Index('idx_repost_of_date',  'author', 'detected_at',unique=False),
         Index('idx_repost_by_subreddit', 'subreddit', 'post_type_id', 'detected_at', unique=False),
+        Index('idx_repost_by_author', 'author', unique=False),
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
@@ -759,3 +760,18 @@ class UserReview(Base):
     added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     notes = Column(String(150))
     last_checked = Column(DateTime, default=func.utc_timestamp())
+
+class Subreddit(Base):
+    __tablename__ = 'subreddit'
+    __table_args__ = (
+        Index('idx_subreddit_name', 'name'),
+    )
+    id = Column(Integer, primary_key=True)
+    name = Column(String(25), nullable=False, unique=True)
+    subscribers = Column(Integer, nullable=False, default=0)
+    nsfw = Column(Boolean, nullable=False, default=False)
+    added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    bot_banned = Column(Boolean, nullable=False, default=False)
+    bot_banned_at = Column(DateTime)
+    last_ban_check = Column(DateTime)
+    last_checked = Column(DateTime)

@@ -19,6 +19,9 @@ class RepostRepo:
     def get_all_by_type(self, post_type_id: int, limit: None, offset: None) -> list[Repost]:
         return self.db_session.query(Repost).filter(Repost.post_type_id == post_type_id).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
+    def get_by_author(self, author: str) -> List[Repost]:
+        return self.db_session.query(Repost).filter(Repost.author == author).all()
+
     def get_all_without_author(self, limit: int = None, offset: int = None):
         return self.db_session.query(Repost).filter(Repost.author == None).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
