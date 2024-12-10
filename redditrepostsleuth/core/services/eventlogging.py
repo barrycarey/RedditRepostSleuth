@@ -22,7 +22,7 @@ class EventLogging:
         client = InfluxDBClient(
             url=f'http://{self._config.influx_host}:{self._config.influx_port}',
             token=self._config.influx_token,
-            org=self._config.influx_org,
+            org=self._config.influx_org
         )
 
         self._influx_client = client.write_api(write_options=SYNCHRONOUS)
@@ -83,3 +83,11 @@ class EventLogging:
             log.error('Failed To Write To InfluxDB', exc_info=True)
             log.error(event.get_influx_event())
             return False
+
+    def write_raw_points(self, points: list[dict]):
+        try:
+            self._influx_client.write(bucket=self._config.influx_bucket, record=points)
+        except Exception as e:
+            log.exception('Failed to write to Influx')
+
+        #log.info('Wrote Influx: %s', points)

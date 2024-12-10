@@ -31,6 +31,22 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.tasks.scheduled_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q scheduled_tasks -n scheduled_task_worker --autoscale=15,2
 
+    subreddit_update_worker:
+        container_name: subreddit_update_worker
+        restart: unless-stopped
+        user: "1001"
+        build:
+            context: .
+            dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
+        environment:
+            - RUN_ENV=production
+            - db_user=maintenance_task
+            - LOG_LEVEL=DEBUG
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.maintenance_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q update_subreddit_data -n subreddit_update_worker --autoscale=1,4
+
     scheduler:
         container_name: beat_scheduler
         restart: unless-stopped
@@ -120,7 +136,7 @@ services:
             - db_user=sub_monitor
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.monitored_sub_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=6,2
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=10,2
 
     reddit_actions_worker:
         container_name: reddit-actions-worker

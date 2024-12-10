@@ -5,21 +5,13 @@ from typing import NoReturn
 
 import pymysql
 from celery import Task
-from prawcore import TooManyRequests
-from requests.exceptions import ConnectionError
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 
 from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import AdminTask
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Post, UserReview
-from redditrepostsleuth.core.exception import UtilApiException, UserNotFound
+from redditrepostsleuth.core.db.databasemodels import MonitoredSub, Post
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
-from redditrepostsleuth.core.util.helpers import chunk_list
-from redditrepostsleuth.core.util.onlyfans_handling import check_user_for_promoter_links, \
-    check_user_comments_for_promoter_links
 
 log = configure_logger(
     name='redditrepostsleuth',
@@ -126,88 +118,5 @@ def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, use
     )
 
 
-@celery.task(bind=True, base=AdminTask, autoretry_for=(UtilApiException,ConnectionError,TooManyRequests), retry_kwards={'max_retries': 3, 'retry_backoff': True})
-def check_user_for_only_fans(self, username: str) -> None:
-    skip_names = ['[deleted]', 'AutoModerator']
-
-    if username in skip_names:
-        log.info('Skipping name %s', username)
-        return
-
-    try:
-        with self.uowm.start() as uow:
-            user = uow.user_review.get_by_username(username)
-
-            if user:
-                delta = datetime.utcnow() - user.last_checked
-                if delta.days < 30:
-                    log.info('Skipping existing user %s, last check was %s days ago', username, delta.days)
-                    return
-                user.content_links_found = False
-                user.notes = None
-                user.last_checked = func.utc_timestamp()
-
-            log.info('Checking user %s', username)
-            if not user:
-                user = UserReview(username=username)
-            try:
-                result = check_user_for_promoter_links(username)
-            except UserNotFound as e:
-                log.warning(e)
-                return
-
-            if result:
-                log.info('Promoter found: %s - %s', username, str(result))
-                user.content_links_found = True
-                user.notes = str(result)
-            uow.user_review.add(user)
-            uow.commit()
-    except (UtilApiException, ConnectionError, TooManyRequests) as e:
-        raise e
-    except IntegrityError:
-        pass
-    except Exception as e:
-        log.exception('')
-
-
-@celery.task(bind=True, base=AdminTask, autoretry_for=(UtilApiException,ConnectionError,TooManyRequests), retry_kwards={'max_retries': 3})
-def check_user_comments_for_only_fans(self, username: str) -> None:
-    """
-    This should be run after the profile check so we don't do any timeframe checking
-    :param self:
-    :param username:
-    :return:
-    """
-    skip_names = ['[deleted]', 'AutoModerator']
-
-    if username in skip_names:
-        log.info('Skipping name %s', username)
-        return
-
-    try:
-        with self.uowm.start() as uow:
-            user = uow.user_review.get_by_username(username)
-
-            if not user:
-                log.error('User not found: %s', username)
-
-            try:
-                result = check_user_comments_for_promoter_links(username)
-            except UserNotFound as e:
-                log.warning(e)
-                return
-
-            if result:
-                log.info('Promoter found: %s - %s', username, str(result))
-                user.content_links_found = True
-                user.notes = str(result)
-            uow.user_review.add(user)
-            uow.commit()
-    except (UtilApiException, ConnectionError, TooManyRequests) as e:
-        raise e
-    except IntegrityError:
-        pass
-    except Exception as e:
-        log.exception('')
 
 

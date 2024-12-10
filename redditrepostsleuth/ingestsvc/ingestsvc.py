@@ -63,8 +63,9 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
                     raise RateLimitException('Data API rate limit')
                 elif resp.status == 401:
                     raise RedditTokenExpiredException('Token expired')
-                log.info('Unexpected request status %s - %s', resp.status, url)
-                return
+                else:
+                    log.info('Unexpected request status %s - %s', resp.status, url)
+                    return
 
         except (ClientOSError, TimeoutError):
             log.exception('')
@@ -225,7 +226,7 @@ def get_auth_headers(reddit: Reddit) -> dict:
     :param reddit:
     :return:
     """
-    reddit.user.me()
+    list(reddit.subreddit('all').new(limit=1)) # Force praw to make a req so we can steal the token
     return {**HEADERS, **{'Authorization': f'Bearer {reddit.auth._reddit._core._authorizer.access_token}'}}
 
 async def main() -> None:
@@ -261,7 +262,7 @@ async def main() -> None:
             try:
                 log.debug('Sending fetch request')
                 results = await fetch_page(url, session)
-            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError, CancelledError, UtilApiException):
+            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError, CancelledError, UtilApiException) as e:
                 log.warning('Error during fetch')
                 await asyncio.sleep(2)
                 continue
@@ -299,16 +300,17 @@ async def main() -> None:
 
         newest_id = res_data['data']['children'][-1]['data']['id']
 
-
-        saved_ids = [x['id'] for x in posts_to_save]
-        missing_ids_in_this_req = list(set(ids_to_get).difference(saved_ids))
-        missed_ids += [base36decode(x) for x in missing_ids_in_this_req]
         time.sleep(request_delay)
 
-        log.info('Missed IDs: %s', len(missed_ids))
-        if len(missed_ids) > missed_id_retry_count:
-            await ingest_sequence(missed_ids, alt_headers=auth_headers)
-            missed_ids = []
+        # saved_ids = [x['id'] for x in posts_to_save]
+        # missing_ids_in_this_req = list(set(ids_to_get).difference(saved_ids))
+        # missed_ids += [base36decode(x) for x in missing_ids_in_this_req]
+
+
+        # log.info('Missed IDs: %s', len(missed_ids))
+        # if len(missed_ids) > missed_id_retry_count:
+        #     await ingest_sequence(missed_ids, alt_headers=auth_headers)
+        #     missed_ids = []
 
 if __name__ == '__main__':
     run(main())
