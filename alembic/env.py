@@ -41,8 +41,6 @@ target_metadata = Base.metadata
 
 def get_conn_string():
     return f'mysql+pymysql://{bot_config.db_user}:{quote_plus(bot_config.db_password)}@{bot_config.db_host}/{bot_config.db_name}'
-    return conn_str
-
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
