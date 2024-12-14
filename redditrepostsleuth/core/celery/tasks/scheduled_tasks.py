@@ -2,6 +2,7 @@ import datetime
 from functools import wraps
 from time import perf_counter
 
+import requests
 from prawcore import TooManyRequests, Redirect, ServerError, NotFound
 
 from redditrepostsleuth.adminsvc.bot_comment_monitor import BotCommentMonitor
@@ -14,6 +15,7 @@ from redditrepostsleuth.core.celery.basetasks import RedditTask, SqlAlchemyTask,
 from redditrepostsleuth.core.celery.task_logic.scheduled_task_logic import update_proxies, token_checker, \
     run_update_top_reposters, update_top_reposters, update_monitored_sub_data, run_update_top_reposts
 from redditrepostsleuth.core.db.databasemodels import StatsDailyCount
+from redditrepostsleuth.core.exception import UtilApiException
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.util.helpers import chunk_list
 
@@ -322,3 +324,12 @@ def queue_search_history_cleanup(self):
         ids = [x[0] for x in searches]
         for chunk in chunk_list(ids, 5000):
             delete_search_batch.apply_async((chunk,))
+
+@celery.task(bind=True, base=RedditTask, autoretry_for=(UtilApiException,), retry_kwards={'max_retries': 5})
+@record_task_status
+def queue_subreddit_data_updates(self) -> None:
+    with self.uowm.start() as uow:
+        subreddits_to_update = uow.subreddit.get_subreddits_to_update()
+        for subreddit in subreddits_to_update:
+            celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit',
+                             args=[subreddit.name])

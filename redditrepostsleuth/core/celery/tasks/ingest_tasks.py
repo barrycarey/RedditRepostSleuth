@@ -15,6 +15,7 @@ from redditrepostsleuth.core.celery import celery
 from redditrepostsleuth.core.celery.basetasks import SqlAlchemyTask
 from redditrepostsleuth.core.celery.task_logic.ingest_task_logic import pre_process_post, get_redgif_image_url
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.db.databasemodels import Subreddit
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import InvalidImageUrlException, GalleryNotProcessed, ImageConversionException, \
@@ -42,6 +43,22 @@ class IngestTask(Task):
         self._redgifs_token_manager = RedGifsTokenManager()
         self._proxy_manager = ProxyManager(self.uowm, 1000)
         self.domains_to_proxy = []
+
+@celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle')
+def save_subreddit(self, subreddit_name: str):
+    try:
+        with self.uowm.start() as uow:
+            existing = uow.subreddit.get_by_name(subreddit_name)
+            if existing:
+                log.debug('Subreddit %s already exists', subreddit_name)
+                return
+            subreddit = Subreddit(name=subreddit_name)
+            uow.subreddit.add(subreddit)
+            uow.commit()
+            log.debug('Saved Subreddit %s', subreddit_name)
+            celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data', args=[subreddit_name])
+    except Exception as e:
+        log.exception()
 
 @celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed, HTTPException), retry_kwargs={'max_retries': 10, 'countdown': 300})
 def save_new_post(self, submission: dict, repost_check: bool = True):
@@ -118,7 +135,7 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
         elif post.post_type_id == 3:
             celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check', args=[post])
 
-    #celery.send_task('redditrepostsleuth.core.celery.admin_tasks.check_user_for_only_fans', args=[post.author])
+    celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit', args=[post.subreddit])
 
 
 
@@ -126,6 +143,7 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
 def save_new_posts(posts: list[dict], repost_check: bool = True) -> None:
     for post in posts:
         save_new_post.apply_async((post, repost_check))
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True)
 def save_pushshift_results(self, data):
