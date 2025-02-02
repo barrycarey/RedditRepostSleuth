@@ -6,7 +6,7 @@ from celery.signals import after_setup_logger
 from kombu.serialization import registry
 from prawcore import TooManyRequests
 
-from redditrepostsleuth.core.exception import IngestHighMatchMeme, ImageConversionException
+from redditrepostsleuth.core.exception import IngestHighMatchMeme, ImageConversionException, UtilApiException
 
 registry.enable('pickle')
 celery = Celery('tasks')
@@ -29,7 +29,7 @@ if os.getenv('SENTRY_DNS', None):
                     monitor_beat_tasks=True,
                 ),
             ],
-            ignore_errors=[IngestHighMatchMeme, ImageConversionException, WorkerLostError, TooManyRequests]
+            ignore_errors=[IngestHighMatchMeme, ImageConversionException, WorkerLostError, TooManyRequests, UtilApiException]
         )
 
 @after_setup_logger.connect

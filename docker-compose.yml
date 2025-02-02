@@ -45,7 +45,7 @@ services:
             - db_user=maintenance_task
             - LOG_LEVEL=DEBUG
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.maintenance_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q update_subreddit_data -n subreddit_update_worker --autoscale=1,4
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q update_subreddit_data -n subreddit_update_worker --autoscale=1,10
 
     scheduler:
         container_name: beat_scheduler

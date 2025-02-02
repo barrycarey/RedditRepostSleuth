@@ -44,21 +44,21 @@ class IngestTask(Task):
         self._proxy_manager = ProxyManager(self.uowm, 1000)
         self.domains_to_proxy = []
 
-@celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle')
-def save_subreddit(self, subreddit_name: str):
-    try:
-        with self.uowm.start() as uow:
-            existing = uow.subreddit.get_by_name(subreddit_name)
-            if existing:
-                log.debug('Subreddit %s already exists', subreddit_name)
-                return
-            subreddit = Subreddit(name=subreddit_name)
-            uow.subreddit.add(subreddit)
-            uow.commit()
-            log.debug('Saved Subreddit %s', subreddit_name)
-            celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data', args=[subreddit_name])
-    except Exception as e:
-        log.exception()
+# @celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle')
+# def save_subreddit(self, subreddit_name: str):
+#     try:
+#         with self.uowm.start() as uow:
+#             existing = uow.subreddit.get_by_name(subreddit_name)
+#             if existing:
+#                 log.debug('Subreddit %s already exists', subreddit_name)
+#                 return
+#             subreddit = Subreddit(name=subreddit_name)
+#             uow.subreddit.add(subreddit)
+#             uow.commit()
+#             log.debug('Saved Subreddit %s', subreddit_name)
+#             celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data', args=[subreddit_name])
+#     except Exception as e:
+#         log.exception()
 
 @celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed, HTTPException), retry_kwargs={'max_retries': 10, 'countdown': 300})
 def save_new_post(self, submission: dict, repost_check: bool = True):

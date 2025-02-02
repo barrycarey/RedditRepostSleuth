@@ -137,9 +137,16 @@ def update_monitored_sub_data_task(self) -> None:
         with self.uowm.start() as uow:
             subs = uow.monitored_sub.get_all()
             for sub in subs:
-                update_monitored_sub_stats_task.apply_async((sub.name,))
+                #update_monitored_sub_stats_task.apply_async((sub.name,))
+                update_monitored_sub_data(
+                    uow,
+                    sub.name,
+                    self.reddit,
+                    self.notification_svc,
+                    self.response_handler
+                )
     except Exception as e:
-        log.exception('Problem with scheduled task')
+        log.exception('Problem with scheduled task update_monitored_sub_data_task')
 
 
 @celery.task(bind=True, base=RedditTask)
