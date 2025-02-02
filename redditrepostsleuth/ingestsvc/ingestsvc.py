@@ -92,6 +92,7 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
                 log.warning('Data API Rate Limit')
                 job.status = JobStatus.RATELIMIT
             elif resp.status == 500:
+                text = await resp.text()
                 log.warning('Reddit Server Error')
                 job.status = JobStatus.ERROR
             else:
@@ -99,7 +100,7 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
                 job.status = JobStatus.ERROR
     except TimeoutError as e:
         log.error('Request Timeout')
-        job.status = JobStatus.ERROR
+        job.status = JobStatus.TIMEOUT
     except ClientConnectorError as e:
         log.error('Client Connection Error: %s', e)
         await asyncio.sleep(5)
@@ -176,7 +177,9 @@ async def ingest_sequence(ids: Union[list[int], Generator[int, None, None]], alt
                                     continue
                                 posts_to_save.append(post['data'])
                                 saved_posts += 1
-
+                        elif j.status == JobStatus.ERROR:
+                            log.warning('Backfill job errored out for url %s', j.url)
+                            continue
                         else:
                             tasks.append(ensure_future(fetch_page_as_job(j, session)))
 

@@ -33,7 +33,8 @@ task_routes = {
     #'redditrepostsleuth.core.celery.admin_tasks.delete_search_batch': {'queue': 'batch_delete_searches'},
     'redditrepostsleuth.core.celery.tasks.reddit_action_tasks.*': {'queue': 'reddit_actions'},
     'redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data': {'queue': 'update_subreddit_data'},
-    'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit': {'queue': 'update_subreddit_data'}
+    'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit': {'queue': 'update_subreddit_data'},
+'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit_batch': {'queue': 'update_subreddit_data'},
 
 
 }
@@ -50,7 +51,7 @@ beat_schedule = {
     },
     'check-new-activations': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_new_activations_task',
-        'schedule': 60
+        'schedule': 240
     },
     'update-subreddit-ban-list': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_ban_list_task',
@@ -86,7 +87,7 @@ beat_schedule = {
     # },
     'monitored-sub-config-update': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
-        'schedule': 3600
+        'schedule': 7200
     },
     # 'update-profile-token': {
     #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',

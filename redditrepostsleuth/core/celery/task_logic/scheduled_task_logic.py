@@ -221,6 +221,7 @@ def update_monitored_sub_data(
             f'[r/{monitored_sub.name}](https://reddit.com/r/{monitored_sub.name}) failed admin check {monitored_sub.failed_admin_check_count} times',
             subject='Removing Monitored Subreddit'
         )
+        log.info('Monitored sub has %s failed mod checks, deleting', monitored_sub.name)
         uow.monitored_sub.remove(monitored_sub)
         uow.commit()
         return

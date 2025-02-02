@@ -13,5 +13,5 @@ def get_db_engine(config: Config):
         host=config.db_host,
         database=config.db_name,
     )
-    return create_engine(connection_uri, echo=False, pool_size=50, pool_pre_ping=True)
+    return create_engine(connection_uri, echo=True, pool_size=50, pool_pre_ping=True)
 
