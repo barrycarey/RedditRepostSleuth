@@ -21,9 +21,10 @@ from redditrepostsleuth.core.model.search.image_search_results import ImageSearc
 from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.util.helpers import get_default_image_search_settings
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
-from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter
-from redditrepostsleuth.core.util.repost.repost_helpers import sort_reposts, get_closest_image_match, set_all_title_similarity, \
+from redditrepostsleuth.core.util.repost.repost_helpers import sort_reposts, get_closest_image_match, \
+    set_all_title_similarity, \
     filter_search_results, log_search
+from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter
 
 log = logging.getLogger(__name__)
 
@@ -188,7 +189,7 @@ class DuplicateImageService:
         with self.uowm.start() as uow:
             log_search(uow, search_results, source, 'image')
 
-        log.info('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
+        log.debug('Searched %s items and found %s matches', search_results.total_searched, len(search_results.matches))
         return search_results
 
     def check_gallery(

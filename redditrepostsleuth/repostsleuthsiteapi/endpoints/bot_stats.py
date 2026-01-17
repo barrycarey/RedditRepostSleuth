@@ -57,9 +57,15 @@ class BotStats:
         days = req.get_param_as_int('days', default=30, required=False)
         results = []
         with self.uowm.start() as uow:
-            result = uow.stat_top_repost.get_all(days=days, nsfw=nsfw)
-            for repost in result:
-                post = uow.posts.get_by_post_id(repost.post_id)
+            repost_stats = uow.stat_top_repost.get_all(day_range=days, nsfw=nsfw, limit=limit)
+
+            # Batch fetch all posts in one query (fixes N+1 and uses correct ID)
+            post_ids = [r.post_id for r in repost_stats]
+            posts = uow.posts.get_all_by_ids(post_ids)
+            posts_by_id = {p.id: p for p in posts}
+
+            for repost in repost_stats:
+                post = posts_by_id.get(repost.post_id)
                 if not post:
                     continue
                 results.append({
