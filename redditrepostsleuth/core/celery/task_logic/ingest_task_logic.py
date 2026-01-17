@@ -101,9 +101,9 @@ def process_image_post(post: Post, url: str = None, proxy: str = None, hash_size
 
     try:
         dhash_h = imagehash.dhash(img, hash_size=hash_size)
-        dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
+        #dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
         post.hashes.append(PostHash(hash=str(dhash_h), hash_type_id=1, post_created_at=post.created_at))
-        post.hashes.append(PostHash(hash=str(dhash_v), hash_type_id=2, post_created_at=post.created_at))
+        #post.hashes.append(PostHash(hash=str(dhash_v), hash_type_id=2, post_created_at=post.created_at))
     except OSError as e:
         log.warning('Problem hashing image: %s', e)
     except Exception as e:

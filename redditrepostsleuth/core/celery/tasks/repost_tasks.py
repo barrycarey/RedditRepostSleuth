@@ -33,17 +33,17 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         r = requests.head(post.url)
         if r.status_code != 200:
             log.info('Skipping image that is deleted %s', post.url)
-            celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
+            #celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
             return
 
         search_settings = get_default_image_search_settings(self.config)
         search_settings.max_matches = 75
-        search_results = self.dup_service.check_image(
-            post.url,
-            post=post,
-            search_settings=search_settings,
-            source='ingest'
-        )
+        # search_results = self.dup_service.check_image(
+        #     post.url,
+        #     post=post,
+        #     search_settings=search_settings,
+        #     source='ingest'
+        # )
         with self.uowm.start() as uow:
             search_results = image_search_by_post(
                 post,
@@ -59,7 +59,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
                 if watches and self.config.enable_repost_watch:
                     notify_watch.apply_async((watches, post), queue='watch_notify')
 
-    except (RedLockError, NoIndexException, IngestHighMatchMeme):
+    except (RedLockError, NoIndexException, IngestHighMatchMeme) as e:
         raise
     except (ConnectTimeout):
         log.warning('Failed to validate image url at %s', post.url)

@@ -56,8 +56,9 @@ def update_subreddit_data(self, subreddit_name) -> None:
                 self.rate_limited_at = datetime.datetime.now(datetime.UTC)
                 raise UtilApiException(f'Bad status {res.status_code} checking {subreddit_name}')
             elif res.status_code != 200:
-                log.error('Bad status %s from util API when checking subreddit %s', res.status_code, subreddit.name)
-                raise UtilApiException(f'Bad status {res.status_code} checking {subreddit_name}')
+                log.warning('Bad status %s from util API when checking subreddit %s', res.status_code, subreddit.name)
+                return
+                #raise UtilApiException(f'Bad status {res.status_code} checking {subreddit_name}')
 
             subreddit_data = res.json()['data']
             subreddit.subscribers = subreddit_data['subscribers'] if 'subscribers' in subreddit_data else None
@@ -139,8 +140,6 @@ def save_subreddit_batch(self, subreddit_names: list[str]):
             for subreddit_name in subreddit_names:
                 if subreddit_name[:2] == 'u_':
                     continue
-
-
                 existing = uow.subreddit.get_by_name(subreddit_name)
                 if existing:
                     #log.debug('Subreddit %s already exists', subreddit_name)

@@ -9,5 +9,5 @@ class StatTopRepostRepo:
     def add(self, item):
         self.db_session.add(item)
 
-    def get_all(self, day_range: int, nsfw: bool = False) -> list[StatsTopRepost]:
-        return self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type_id == 2, StatsTopRepost.day_range == day_range, StatsTopRepost.nsfw == nsfw).all()
+    def get_all(self, day_range: int = 30, nsfw: bool = False, limit: int = 100) -> list[StatsTopRepost]:
+        return self.db_session.query(StatsTopRepost).filter(StatsTopRepost.post_type_id == 2, StatsTopRepost.day_range == day_range, StatsTopRepost.nsfw == nsfw).limit(limit).all()
