@@ -68,3 +68,43 @@ class RepostRepo:
     def remove(self, item: Repost):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
+
+
+    def get_top_reposters_by_subreddit(self, subreddit: str, limit: int = 10, days: int = None) -> List:
+        """Get top reposters in a subreddit by repost count."""
+        query = self.db_session.query(
+            Repost.author,
+            func.count(Repost.id).label('repost_count'),
+            func.max(Repost.detected_at).label('last_detected')
+        ).filter(
+            Repost.subreddit == subreddit,
+            Repost.author != None,
+            Repost.author != '[deleted]'
+        )
+        if days:
+            query = query.filter(Repost.detected_at > (datetime.now() - timedelta(days=days)))
+        return query.group_by(Repost.author).order_by(func.count(Repost.id).desc()).limit(limit).all()
+
+    def get_top_reposts_by_subreddit(self, subreddit: str, limit: int = 10, days: int = None) -> List:
+        """Get most frequently reposted content in a subreddit."""
+        query = self.db_session.query(
+            Repost.repost_of_id,
+            func.count(Repost.id).label('repost_count')
+        ).filter(
+            Repost.subreddit == subreddit,
+            Repost.repost_of_id != None
+        )
+        if days:
+            query = query.filter(Repost.detected_at > (datetime.now() - timedelta(days=days)))
+        return query.group_by(Repost.repost_of_id).order_by(func.count(Repost.id).desc()).limit(limit).all()
+
+    def get_daily_counts_by_subreddit(self, subreddit: str, days: int = 30) -> List:
+        """Get daily repost counts for trend charts."""
+        oldest = datetime.now() - timedelta(days=days)
+        return self.db_session.query(
+            func.date(Repost.detected_at).label('date'),
+            func.count(Repost.id).label('count')
+        ).filter(
+            Repost.subreddit == subreddit,
+            Repost.detected_at > oldest
+        ).group_by(func.date(Repost.detected_at)).order_by(func.date(Repost.detected_at)).all()

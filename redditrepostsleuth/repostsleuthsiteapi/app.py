@@ -23,6 +23,7 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search import ImageS
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.image_search_history import ImageSearchHistory
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.meme_template import MemeTemplateEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub import MonitoredSub
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub_stats import MonitoredSubStats
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.posts import PostsEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.repost_history import RepostHistoryEndpoint
@@ -78,6 +79,15 @@ api.add_route('/api/monitored-sub/{subreddit}', MonitoredSub(uowm, config, reddi
 api.add_route('/api/monitored-sub/{subreddit}/refresh', MonitoredSub(uowm, config, reddit, config_updater), suffix='refresh')
 api.add_route('/api/monitored-sub/popular', MonitoredSub(uowm, config, reddit, config_updater), suffix='popular')
 api.add_route('/api/monitored-sub/all', MonitoredSub(uowm, config, reddit, config_updater), suffix='all')
+
+# Monitored Sub Stats endpoints (mod-only dashboard)
+api.add_route('/api/monitored-sub/{subreddit}/stats/overview', MonitoredSubStats(uowm, config), suffix='overview')
+api.add_route('/api/monitored-sub/{subreddit}/stats/trends', MonitoredSubStats(uowm, config), suffix='trends')
+api.add_route('/api/monitored-sub/{subreddit}/stats/top-reposters', MonitoredSubStats(uowm, config), suffix='top_reposters')
+api.add_route('/api/monitored-sub/{subreddit}/stats/top-reposts', MonitoredSubStats(uowm, config), suffix='top_reposts')
+api.add_route('/api/monitored-sub/{subreddit}/stats/config-history', MonitoredSubStats(uowm, config), suffix='config_history')
+api.add_route('/api/monitored-sub/{subreddit}/stats/reddit-traffic', MonitoredSubStats(uowm, config), suffix='reddit_traffic')
+
 api.add_route('/api/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))
 api.add_route('/api/meme-template/', MemeTemplateEndpoint(uowm))
 api.add_route('/api/meme-template/potential', MemeTemplateEndpoint(uowm), suffix='potential')
