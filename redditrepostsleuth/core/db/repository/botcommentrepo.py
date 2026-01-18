@@ -39,3 +39,12 @@ class BotCommentRepo:
             query = query.filter(BotComment.comment_left_at > (datetime.now() - timedelta(hours=hours)))
         r = query.first()
         return r[0] if r else None
+
+
+    def get_count_by_subreddit(self, subreddit: str, hours: int = None) -> Optional[int]:
+        """Get comment count for a specific subreddit."""
+        query = self.db_session.query(func.count(BotComment.id)).filter(BotComment.subreddit == subreddit)
+        if hours:
+            query = query.filter(BotComment.comment_left_at > (datetime.now() - timedelta(hours=hours)))
+        r = query.first()
+        return r[0] if r else None
