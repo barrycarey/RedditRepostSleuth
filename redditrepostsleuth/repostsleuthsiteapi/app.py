@@ -94,6 +94,7 @@ api.add_route('/api/meme-template/potential', MemeTemplateEndpoint(uowm), suffix
 api.add_route('/api/meme-template/potential/{id:int}', MemeTemplateEndpoint(uowm), suffix='potential')
 api.add_route('/api/stats', BotStats(uowm, reddit))
 api.add_route('/api/stats/home', BotStats(uowm, reddit), suffix='home')
+api.add_route('/api/stats/general', BotStats(uowm, reddit), suffix='general')
 api.add_route('/api/stats/subreddit/{subreddit}', BotStats(uowm, reddit), suffix='subreddit')
 api.add_route('/api/stats/top-reposters', BotStats(uowm, reddit), suffix='reposters')
 api.add_route('/api/stats/banned-subreddits', BotStats(uowm, reddit), suffix='banned_subs')

@@ -2,6 +2,7 @@ import json
 from typing import Text
 
 from falcon import Response, Request, HTTPNotFound, HTTPUnauthorized, HTTPInternalServerError
+from falcon.errors import HTTPForbidden
 from praw import Reddit
 from praw.exceptions import APIException
 
@@ -35,7 +36,7 @@ class MonitoredSub:
         token = req.get_param('token', required=True)
 
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
-            raise HTTPUnauthorized(f'You are not a moderator on {subreddit}',
+            raise HTTPForbidden(f'You are not a moderator on {subreddit}',
                                    f'You\'re not a moderator on {subreddit}')
         with self.uowm.start() as uow:
             sub = uow.monitored_sub.get_by_sub(subreddit)

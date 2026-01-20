@@ -63,8 +63,8 @@ def update_proxies(uowm: UnitOfWorkManager) -> None:
 def update_top_reposts(uow: UnitOfWork, post_type_id: int, day_range: int = None):
     # reddit.info(reddit_ids_to_lookup):
     log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
-    range_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY AND post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC LIMIT 100000"
-    all_time_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC LIMIT 100000"
+    range_query = "SELECT r.repost_of_id, COUNT(*) c, p.nsfw FROM repost r INNER JOIN post p ON p.id = r.repost_of_id WHERE r.detected_at > NOW() - INTERVAL :days DAY AND r.post_type_id=:posttype GROUP BY r.repost_of_id, p.nsfw HAVING c > 5 ORDER BY c DESC LIMIT 100000"
+    all_time_query = "SELECT r.repost_of_id, COUNT(*) c, p.nsfw FROM repost r INNER JOIN post p ON p.id = r.repost_of_id WHERE r.post_type_id=:posttype GROUP BY r.repost_of_id, p.nsfw HAVING c > 5 ORDER BY c DESC LIMIT 100000"
     if day_range:
         query = range_query
         log.debug('Deleting top reposts for day range %s', day_range)
@@ -89,7 +89,7 @@ def update_top_reposts(uow: UnitOfWork, post_type_id: int, day_range: int = None
         stat.day_range = day_range
         stat.repost_count = row[1]
         stat.updated_at = func.utc_timestamp()
-        stat.nsfw = False
+        stat.nsfw = row[2] if row[2] is not None else False
         uow.stat_top_repost.add(stat)
         uow.commit()
 
