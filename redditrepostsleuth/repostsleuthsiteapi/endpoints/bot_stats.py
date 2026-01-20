@@ -7,6 +7,7 @@ from praw import Reddit
 from sqlalchemy import text
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.repostsleuthsiteapi.cache import cache
 
 
 log = logging.getLogger(__name__)
@@ -31,11 +32,12 @@ class BotStats:
         with self.uowm.start() as uow:
             for daily in uow.stat_daily_count.get_all(limit=14):
                 # TODO - Temp solution to stay compatible with frontend
-                results['summons_per_day'].append({'date': daily.date, 'count': daily.summons})
-                results['comments_per_day'].append({'date': daily.date, 'count': daily.comments})
-                results['karma_per_day'].append({'date': daily.date, 'count': 0})
-                results['image_reposts_per_day'].append({'date': daily.date, 'count': daily.image_reposts})
-                results['link_reposts_per_day'].append({'date': daily.date, 'count': daily.link_reposts})
+                date_str = daily.ran_at.strftime('%Y-%m-%d') if daily.ran_at else ''
+                results['summons_per_day'].append({'date': date_str, 'count': daily.summons_24h or 0})
+                results['comments_per_day'].append({'date': date_str, 'count': daily.comments_24h or 0})
+                results['karma_per_day'].append({'date': date_str, 'count': 0})
+                results['image_reposts_per_day'].append({'date': date_str, 'count': daily.image_reposts_24h or 0})
+                results['link_reposts_per_day'].append({'date': date_str, 'count': daily.link_reposts_24h or 0})
 
         resp.body = json.dumps(results)
 
@@ -143,3 +145,93 @@ class BotStats:
                 resp.body = json.dumps({'count': total, 'stat_name': stat_name})
             elif stat_name.lower() == 'subreddit_count':
                 resp.body = json.dumps({'count': uow.monitored_sub.get_count(), 'stat_name': stat_name})
+
+    @cache.cached(timeout=3600)
+    def on_get_general(self, req: Request, resp: Response):
+        with self.uowm.start() as uow:
+            stats = uow.stat_daily_count.get_latest()
+            if not stats:
+                log.error('No stats available')
+                raise HTTPNotFound(title='No stats found', description='No bot stats are available')
+
+            # Calculate totals
+            total_reposts = (
+                (stats.image_reposts_total or 0) +
+                (stats.link_reposts_total or 0) +
+                (stats.video_reposts_total or 0) +
+                (stats.text_reposts_total or 0)
+            )
+            total_reposts_24h = (
+                (stats.image_reposts_24h or 0) +
+                (stats.link_reposts_24h or 0) +
+                (stats.video_reposts_24h or 0) +
+                (stats.text_reposts_24h or 0)
+            )
+
+            totals = {
+                'reposts_detected': total_reposts,
+                'posts_indexed': uow.posts.get_approximate_count() or 0,
+                'summons_handled': stats.summons_total or 0,
+                'comments_posted': stats.comments_total or 0,
+                'subreddits_monitored': stats.monitored_subreddit_count or 0
+            }
+
+            last_24h = {
+                'reposts_detected': total_reposts_24h,
+                'summons_handled': stats.summons_24h or 0,
+                'comments_posted': stats.comments_24h or 0
+            }
+
+            by_type = {
+                'image': {
+                    'total': stats.image_reposts_total or 0,
+                    'last_24h': stats.image_reposts_24h or 0
+                },
+                'link': {
+                    'total': stats.link_reposts_total or 0,
+                    'last_24h': stats.link_reposts_24h or 0
+                },
+                'video': {
+                    'total': stats.video_reposts_total or 0,
+                    'last_24h': stats.video_reposts_24h or 0
+                },
+                'text': {
+                    'total': stats.text_reposts_total or 0,
+                    'last_24h': stats.text_reposts_24h or 0
+                }
+            }
+
+            # Build trends from last 14 days
+            trends = {
+                'labels': [],
+                'reposts': [],
+                'summons': [],
+                'comments': []
+            }
+            for daily in uow.stat_daily_count.get_all(limit=14):
+                trends['labels'].append(daily.ran_at.strftime('%Y-%m-%d') if daily.ran_at else '')
+                daily_reposts = (
+                    (daily.image_reposts_24h or 0) +
+                    (daily.link_reposts_24h or 0) +
+                    (daily.video_reposts_24h or 0) +
+                    (daily.text_reposts_24h or 0)
+                )
+                trends['reposts'].append(daily_reposts)
+                trends['summons'].append(daily.summons_24h or 0)
+                trends['comments'].append(daily.comments_24h or 0)
+
+            # Reverse to get chronological order (oldest first)
+            trends['labels'].reverse()
+            trends['reposts'].reverse()
+            trends['summons'].reverse()
+            trends['comments'].reverse()
+
+            result = {
+                'totals': totals,
+                'last_24h': last_24h,
+                'by_type': by_type,
+                'trends': trends,
+                'updated_at': stats.ran_at.isoformat() if stats.ran_at else None
+            }
+
+        resp.body = json.dumps(result)

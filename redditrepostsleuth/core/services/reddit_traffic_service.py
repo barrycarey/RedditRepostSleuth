@@ -39,7 +39,8 @@ def get_subreddit_traffic(
             log.warning('Traffic stats not available for %s (may be private or user is not a mod)', subreddit)
             return None
         if response.status_code != 200:
-            log.error('Failed to get traffic for %s: status %s', subreddit, response.status_code)
+            log.error('Failed to get traffic for %s: status %s, response: %s',
+                      subreddit, response.status_code, response.text)
             return None
 
         data = response.json()
