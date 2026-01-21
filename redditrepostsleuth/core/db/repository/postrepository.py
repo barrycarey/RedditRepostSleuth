@@ -35,8 +35,11 @@ class PostRepository:
     def get_newest(self, limit: int = 500):
         return self.db_session.query(Post).order_by(Post.id.desc()).limit(limit).all()
 
-    def get_newest_by_type(self, post_type_id: int, limit: int = 500, offset: int = None):
-        return self.db_session.query(Post).filter(Post.post_type_id == post_type_id).order_by(Post.id.desc()).limit(limit).offset(offset).all()
+    def get_newest_by_type(self, post_type_id: int, limit: int = 500, offset: int = None, nsfw: bool = None):
+        query = self.db_session.query(Post).filter(Post.post_type_id == post_type_id)
+        if nsfw is not None:
+            query = query.filter(Post.nsfw == nsfw)
+        return query.order_by(Post.id.desc()).limit(limit).offset(offset).all()
 
     def get_oldest_post(self, limit: int = None):
         return self.db_session.query(Post).order_by(Post.created_at).first()

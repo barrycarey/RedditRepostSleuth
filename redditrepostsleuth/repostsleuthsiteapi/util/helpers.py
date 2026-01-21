@@ -1,6 +1,7 @@
+import re
 from typing import Text
 
-from falcon import HTTPBadRequest, Request, HTTPServiceUnavailable
+from falcon import HTTPBadRequest, Request, HTTPServiceUnavailable, HTTPUnauthorized
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
@@ -18,6 +19,27 @@ def is_site_admin(user_data: dict, uowm: UnitOfWorkManager) -> bool:
     if user_data['name'].lower() in ['barrycarey', 'repostsleuthbot']:
         return True
     return False
+
+
+def get_token_from_header(req: Request) -> str:
+    """Extract Bearer token from Authorization header."""
+    auth_header = req.get_header('Authorization')
+
+    if not auth_header:
+        raise HTTPUnauthorized(
+            title='Missing Authorization Header',
+            description='Authorization header with Bearer token is required'
+        )
+
+    match = re.match(r'^Bearer\s+(.+)$', auth_header, re.IGNORECASE)
+    if not match:
+        raise HTTPUnauthorized(
+            title='Invalid Authorization Header',
+            description='Use format: Authorization: Bearer <token>'
+        )
+
+    return match.group(1)
+
 
 def check_image(
         search_settings: ImageSearchSettings,

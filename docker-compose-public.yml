@@ -9,9 +9,23 @@ services:
         environment:
             LOG_LEVEL: INFO
             db_user: api
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
         restart: unless-stopped
         entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10 --log-level DEBUG
         volumes:
             - /opt/letsencrypt/etc/letsencrypt/live/www.repostsleuth.com:/config/keys
             - /opt/imageuploads:/opt/imageuploads
+        depends_on:
+            - redis
+
+    redis:
+        container_name: api-redis
+        image: redis:7-alpine
+        restart: unless-stopped
+        volumes:
+            - redis_data:/data
+
+volumes:
+    redis_data:
 

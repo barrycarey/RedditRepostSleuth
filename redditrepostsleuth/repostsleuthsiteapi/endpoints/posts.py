@@ -22,14 +22,14 @@ class PostsEndpoint:
             resp.body = json.dumps(post.to_dict())
 
     def on_get_all(self, req: Request, resp: Response):
-        result = []
         with self.uowm.start() as uow:
+            nsfw = req.get_param_as_bool('nsfw', required=False)
             image_posts = uow.posts.get_newest_by_type(
                 2,
                 req.get_param_as_int('limit', default=20, required=False),
-                req.get_param_as_int('offset', default=None, required=False)
+                req.get_param_as_int('offset', default=None, required=False),
+                nsfw=nsfw
             )
-
             resp.body = json.dumps([p.to_dict() for p in image_posts])
 
     def on_get_reddit(self, req: Request, resp: Response):

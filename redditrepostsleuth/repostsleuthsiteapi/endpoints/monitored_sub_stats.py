@@ -8,8 +8,10 @@ from falcon import Request, Response, HTTPNotFound, HTTPForbidden
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.services.reddit_traffic_service import get_subreddit_traffic
+from redditrepostsleuth.core.services.reddit_traffic_service import get_subreddit_traffic_praw
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_token
+from redditrepostsleuth.repostsleuthsiteapi.cache import cache
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
 
 log = logging.getLogger(__name__)
 
@@ -20,13 +22,14 @@ class MonitoredSubStats:
     All endpoints require moderator authentication.
     """
 
-    def __init__(self, uowm: UnitOfWorkManager, config: Config):
+    def __init__(self, uowm: UnitOfWorkManager, config: Config, reddit=None):
         self.uowm = uowm
         self.config = config
+        self.reddit = reddit
 
     def _verify_mod_and_get_sub(self, req: Request, subreddit: str):
         """Verify the user is a moderator and return the monitored sub."""
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
 
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPForbidden(
@@ -47,8 +50,24 @@ class MonitoredSubStats:
         """
         Get overview stats for a subreddit.
         Returns counts for day/week/month/all time ranges.
+        Cached for 30 minutes per subreddit.
+        
+        Query params:
+            refresh: Set to 'true' to bypass cache and fetch fresh data
         """
+        # Auth check must happen before cache lookup
         sub, _ = self._verify_mod_and_get_sub(req, subreddit)
+
+        cache_key = f'monitored_sub_stats_overview_{subreddit.lower()}'
+        
+        # Check if frontend requested a cache refresh
+        force_refresh = req.get_param_as_bool('refresh', default=False)
+        
+        if not force_refresh:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                resp.body = cached_result
+                return
 
         with self.uowm.start() as uow:
             # Posts checked
@@ -119,15 +138,31 @@ class MonitoredSubStats:
                 'comments': comments
             }
 
-        resp.body = json.dumps(result)
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=1800)
+        resp.body = result_json
 
     def on_get_trends(self, req: Request, resp: Response, subreddit: str):
         """
         Get daily trend data for charts.
         Returns posts checked and reposts found per day.
+        Cached for 15 minutes per subreddit and days combination.
+        
+        Query params:
+            days: Number of days to include (default 30)
+            refresh: Set to 'true' to bypass cache and fetch fresh data
         """
         sub, _ = self._verify_mod_and_get_sub(req, subreddit)
         days = req.get_param_as_int('days', default=30, required=False)
+
+        cache_key = f'monitored_sub_stats_trends_{subreddit.lower()}_{days}'
+        force_refresh = req.get_param_as_bool('refresh', default=False)
+
+        if not force_refresh:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                resp.body = cached_result
+                return
 
         with self.uowm.start() as uow:
             # Get daily repost counts
@@ -148,16 +183,33 @@ class MonitoredSubStats:
                 'reposts_found': repost_counts
             }
 
-        resp.body = json.dumps(result)
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=900)
+        resp.body = result_json
 
     def on_get_top_reposters(self, req: Request, resp: Response, subreddit: str):
         """
         Get top reposters in the subreddit.
         Returns usernames, counts, and last detected dates.
+        Cached for 15 minutes per subreddit, limit, and days combination.
+        
+        Query params:
+            limit: Maximum number of results (default 10, max 100)
+            days: Only include reposts from last N days (optional)
+            refresh: Set to 'true' to bypass cache and fetch fresh data
         """
         sub, _ = self._verify_mod_and_get_sub(req, subreddit)
         limit = req.get_param_as_int('limit', default=10, required=False, max_value=100)
         days = req.get_param_as_int('days', default=None, required=False)
+
+        cache_key = f'monitored_sub_stats_top_reposters_{subreddit.lower()}_{limit}_{days}'
+        force_refresh = req.get_param_as_bool('refresh', default=False)
+
+        if not force_refresh:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                resp.body = cached_result
+                return
 
         with self.uowm.start() as uow:
             top_reposters = uow.repost.get_top_reposters_by_subreddit(subreddit, limit=limit, days=days)
@@ -171,15 +223,32 @@ class MonitoredSubStats:
                     'profile_url': f'https://reddit.com/u/{row.author}'
                 })
 
-        resp.body = json.dumps(result)
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=900)
+        resp.body = result_json
 
     def on_get_top_reposts(self, req: Request, resp: Response, subreddit: str):
         """
         Get most frequently reposted content in the subreddit.
+        Cached for 15 minutes per subreddit, limit, and days combination.
+        
+        Query params:
+            limit: Maximum number of results (default 10, max 100)
+            days: Only include reposts from last N days (optional)
+            refresh: Set to 'true' to bypass cache and fetch fresh data
         """
         sub, _ = self._verify_mod_and_get_sub(req, subreddit)
         limit = req.get_param_as_int('limit', default=10, required=False, max_value=100)
         days = req.get_param_as_int('days', default=None, required=False)
+
+        cache_key = f'monitored_sub_stats_top_reposts_{subreddit.lower()}_{limit}_{days}'
+        force_refresh = req.get_param_as_bool('refresh', default=False)
+
+        if not force_refresh:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                resp.body = cached_result
+                return
 
         with self.uowm.start() as uow:
             top_reposts = uow.repost.get_top_reposts_by_subreddit(subreddit, limit=limit, days=days)
@@ -203,14 +272,30 @@ class MonitoredSubStats:
                         'shortlink': f'https://redd.it/{post.post_id}'
                     })
 
-        resp.body = json.dumps(result)
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=900)
+        resp.body = result_json
 
     def on_get_config_history(self, req: Request, resp: Response, subreddit: str):
         """
         Get recent configuration change history for audit trail.
+        Cached for 5 minutes per subreddit and limit combination.
+        
+        Query params:
+            limit: Maximum number of results (default 20, max 100)
+            refresh: Set to 'true' to bypass cache and fetch fresh data
         """
         sub, _ = self._verify_mod_and_get_sub(req, subreddit)
         limit = req.get_param_as_int('limit', default=20, required=False, max_value=100)
+
+        cache_key = f'monitored_sub_stats_config_history_{subreddit.lower()}_{limit}'
+        force_refresh = req.get_param_as_bool('refresh', default=False)
+
+        if not force_refresh:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                resp.body = cached_result
+                return
 
         with self.uowm.start() as uow:
             changes = uow.monitored_sub_config_change.get_by_monitored_sub(sub.id, limit=limit)
@@ -226,21 +311,44 @@ class MonitoredSubStats:
                     'new_value': change.new_value
                 })
 
-        resp.body = json.dumps(result)
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=300)
+        resp.body = result_json
 
     def on_get_reddit_traffic(self, req: Request, resp: Response, subreddit: str):
         """
-        Get Reddit traffic statistics using the moderator's OAuth token.
+        Get Reddit traffic statistics using the bot's PRAW instance.
+        Verifies the user is a moderator first, then uses the bot's credentials
+        to fetch traffic data (since the bot is also a mod).
         Returns pageviews, unique visitors, and subscriber data.
+        Cached for 30 minutes per subreddit.
+        
+        Query params:
+            refresh: Set to 'true' to bypass cache and fetch fresh data
         """
-        sub, token = self._verify_mod_and_get_sub(req, subreddit)
+        sub, _ = self._verify_mod_and_get_sub(req, subreddit)
 
-        traffic_data = get_subreddit_traffic(token, subreddit, self.config.reddit_useragent)
+        cache_key = f'monitored_sub_stats_reddit_traffic_{subreddit.lower()}'
+        force_refresh = req.get_param_as_bool('refresh', default=False)
+
+        if not force_refresh:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                resp.body = cached_result
+                return
+
+        if not self.reddit:
+            raise HTTPNotFound(
+                title='Traffic data unavailable',
+                description='Reddit instance not configured for traffic fetching.'
+            )
+
+        traffic_data = get_subreddit_traffic_praw(self.reddit, subreddit)
 
         if traffic_data is None:
             raise HTTPNotFound(
                 title='Traffic data unavailable',
-                description='Unable to fetch traffic statistics. This may be due to the subreddit settings or permissions.'
+                description='Unable to fetch traffic statistics. The bot may not be a moderator of this subreddit.'
             )
 
         result = {
@@ -248,4 +356,6 @@ class MonitoredSubStats:
             **traffic_data
         }
 
-        resp.body = json.dumps(result)
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=1800)
+        resp.body = result_json

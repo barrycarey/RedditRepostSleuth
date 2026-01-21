@@ -16,7 +16,7 @@ from redditrepostsleuth.core.services.subreddit_config_updater import SubredditC
 from redditrepostsleuth.core.util.default_bot_config import DEFAULT_CONFIG_VALUES
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_token, get_user_data, get_subscribers, \
     is_sub_mod_praw, get_bot_permissions
-from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin, get_token_from_header
 
 
 class MonitoredSub:
@@ -33,7 +33,7 @@ class MonitoredSub:
         self.uowm = uowm
 
     def on_get(self, req: Request, resp: Response, subreddit: str):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
 
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPForbidden(f'You are not a moderator on {subreddit}',
@@ -80,7 +80,7 @@ class MonitoredSub:
 
     def on_post(self, req: Request, resp: Response, subreddit: str):
         log.info('Attempting to create monitored sub %s', subreddit)
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'You are not a moderator on {subreddit}',
                                    f'You\'re not a moderator on {subreddit}')
@@ -108,7 +108,7 @@ class MonitoredSub:
 
 
     def on_patch(self, req: Request, resp: Response, subreddit: Text):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         log.info('Saving settings for subreddit %s', subreddit)
         user_data = get_user_data(token)
         log.info('%s Save: Got user data', subreddit)
@@ -150,7 +150,7 @@ class MonitoredSub:
                          queue='update_wiki_from_database')
 
     def on_delete(self, req: Request, resp: Response, subreddit: Text):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if not is_site_admin(user_data, self.uowm):
             raise HTTPUnauthorized(f'Not authorized to make this request',
