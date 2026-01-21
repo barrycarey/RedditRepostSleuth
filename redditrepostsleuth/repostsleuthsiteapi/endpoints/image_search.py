@@ -13,7 +13,7 @@ from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
-from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request, reddit_post_id_from_url, \
+from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request, get_image_search_settings_from_form_data, reddit_post_id_from_url, \
     is_image_url
 from redditrepostsleuth.repostsleuthsiteapi.util.helpers import check_image
 from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
@@ -63,7 +63,20 @@ class ImageSearch:
     def on_post(self, req: Request, resp: Response):
         allowed_img_ext = ['jpg', 'jpeg', 'png', 'gif']
         form = req.get_media()
-        file = next((x for x in form if x.name == 'image'), None)
+        
+        # Collect all form fields and the file from multipart data
+        file = None
+        form_data = {}
+        for part in form:
+            if part.name == 'image':
+                file = part
+            else:
+                # Store form field values
+                form_data[part.name] = part.text
+        
+        if file is None:
+            raise HTTPBadRequest(title='Missing file', description='No image file was provided')
+        
         file_ext = file.secure_filename.split('.')[-1]
         if file_ext not in allowed_img_ext:
             raise HTTPBadRequest(title='Invalid file type', description=f'File type {file_ext} is not allowed')
@@ -72,7 +85,7 @@ class ImageSearch:
         with open(os.path.join('/opt/imageuploads', saved_file_name), 'wb') as f:
             file.stream.pipe(f)
 
-        search_settings = get_image_search_settings_from_request(req, self.config)
+        search_settings = get_image_search_settings_from_form_data(form_data, self.config)
         # TODO - This is hacky as fuck.  Dup image service needs to be rewritten to take hash and search
         search_results = check_image(search_settings, self.uowm, self.image_svc, url=f'http://localhost:8443/imageserve/{saved_file_name}')
         os.remove(os.path.join('/opt/imageuploads', saved_file_name))

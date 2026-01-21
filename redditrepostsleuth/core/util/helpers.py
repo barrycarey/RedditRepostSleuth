@@ -306,6 +306,71 @@ def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSe
     return search_settings
 
 
+def _parse_bool(value: str) -> bool | None:
+    """Parse a string boolean value from form data."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    return value.lower() in ('true', '1', 'yes')
+
+def _parse_int(value: str) -> int | None:
+    """Parse a string integer value from form data."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+def get_image_search_settings_from_form_data(form_data: dict, config: Config) -> ImageSearchSettings:
+    """Create ImageSearchSettings from multipart form data dictionary."""
+    target_match = _parse_int(form_data.get('target_match_percent'))
+    if target_match is None:
+        target_match = config.default_image_target_match
+    
+    search_settings = ImageSearchSettings(
+        target_match,
+        config.default_image_target_annoy_distance,
+        target_title_match=_parse_int(form_data.get('target_title_match')) or config.default_image_target_title_match,
+        filter_dead_matches=_parse_bool(form_data.get('filter_dead_matches')),
+        filter_removed_matches=_parse_bool(form_data.get('filter_removed_matches')),
+        only_older_matches=_parse_bool(form_data.get('only_older')),
+        filter_same_author=_parse_bool(form_data.get('filter_author')),
+        filter_crossposts=_parse_bool(form_data.get('include_crossposts')),
+        target_meme_match_percent=_parse_int(form_data.get('target_meme_match_percent')) or config.default_image_target_meme_match,
+        meme_filter=_parse_bool(form_data.get('meme_filter')),
+        same_sub=_parse_bool(form_data.get('same_sub')),
+        max_days_old=_parse_int(form_data.get('target_days_old')) or config.default_link_max_days_old_filter,
+        max_depth=10000
+    )
+
+    if search_settings.filter_dead_matches is None:
+        search_settings.filter_dead_matches = config.default_image_dead_matches_filter
+
+    if search_settings.filter_removed_matches is None:
+        search_settings.filter_removed_matches = config.default_image_removed_match_filter
+
+    if search_settings.only_older_matches is None:
+        search_settings.only_older_matches = config.default_image_only_older_matches
+
+    if search_settings.filter_same_author is None:
+        search_settings.filter_same_author = config.default_image_same_author_filter
+
+    if search_settings.meme_filter is None:
+        search_settings.meme_filter = config.default_image_meme_filter
+
+    if search_settings.filter_crossposts is None:
+        search_settings.filter_crossposts = config.default_image_crosspost_filter
+    else:
+        search_settings.filter_crossposts = not search_settings.filter_crossposts
+
+    if search_settings.same_sub is None:
+        search_settings.same_sub = config.default_image_same_sub_filter
+
+    return search_settings
+
+
 def get_default_link_search_settings(config: Config) -> SearchSettings:
     return SearchSettings(
         target_title_match=config.default_link_target_title_match,

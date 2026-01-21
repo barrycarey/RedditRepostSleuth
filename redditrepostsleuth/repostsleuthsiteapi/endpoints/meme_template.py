@@ -5,7 +5,7 @@ from falcon import Request, Response, HTTPNotFound, HTTPBadRequest, HTTPUnauthor
 from redditrepostsleuth.core.db.databasemodels import MemeTemplate, MemeTemplatePotentialVote, MemeTemplatePotential
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.util.reddithelpers import get_user_data
-from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin, get_token_from_header
 
 
 class MemeTemplateEndpoint:
@@ -13,7 +13,7 @@ class MemeTemplateEndpoint:
         self.uowm = uowm
 
     def on_get_potential(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         with self.uowm.start() as uow:
             results = []
@@ -34,7 +34,7 @@ class MemeTemplateEndpoint:
         # here to the CORS middlewhere allows patch.  Apprently it doesn't work with route suffix
         pass
     def on_delete_potential(self, req: Request, resp: Response, id: int):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if not is_site_admin(user_data, self.uowm):
             raise HTTPUnauthorized(f'Not authorized to make this request',
@@ -48,7 +48,7 @@ class MemeTemplateEndpoint:
             uow.commit()
 
     def on_post_potential(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         post_id = req.get_param('post_id', required=True)
         user_data = get_user_data(token)
         if not user_data:
@@ -72,7 +72,7 @@ class MemeTemplateEndpoint:
 
 
     def on_patch_potential(self, req: Request, resp: Response, id: int):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         vote = req.get_param_as_int('vote', required=True, min_value=-1, max_value=1)
         user_data = get_user_data(token)
         if not user_data:
@@ -104,7 +104,7 @@ class MemeTemplateEndpoint:
 
 
     def on_post(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         data = json.load(req.bounded_stream)
         with self.uowm.start() as uow:

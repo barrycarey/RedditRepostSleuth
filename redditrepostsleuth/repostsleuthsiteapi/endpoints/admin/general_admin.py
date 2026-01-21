@@ -4,6 +4,7 @@ from falcon import Response, Request, HTTPNotFound
 
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.util.reddithelpers import get_user_data
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
 
 
 class GeneralAdmin:
@@ -11,7 +12,7 @@ class GeneralAdmin:
         self.uowm = uowm
 
     def on_get(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if not user_data:
             raise HTTPNotFound(title=f'No admin found for provided token',

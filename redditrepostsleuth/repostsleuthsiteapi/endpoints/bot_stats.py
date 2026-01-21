@@ -17,6 +17,7 @@ class BotStats:
         self.reddit = reddit
         self.uowm = uowm
 
+    @cache.cached(timeout=900)
     def on_get(self, req: Request, resp: Response):
         results = {
             'summons_per_day': [],
@@ -46,17 +47,34 @@ class BotStats:
         limit = req.get_param_as_int('limit', default=100, required=False, max_value=2000)
         nsfw = req.get_param_as_bool('nsfw', default=False, required=False)
         post_type = req.get_param_as_int('post_type', default=3)
+        
+        cache_key = f'bot_stats_reposters_{days}_{limit}_{nsfw}_{post_type}'
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            resp.body = cached_result
+            return
+
         results = []
         with self.uowm.start() as uow:
             result = uow.stat_top_reposter.get_by_post_type_and_range(post_type, days)
             # TODO: This is temp to stay compatible with frontend
             result_list = [{'user': r.author, 'repost_count': r.repost_count} for r in result]
-        resp.body = json.dumps(result_list)
+        
+        result_json = json.dumps(result_list)
+        cache.set(cache_key, result_json, timeout=1800)
+        resp.body = result_json
 
     def on_get_top_image_reposts(self, req: Request, resp: Response):
         limit = req.get_param_as_int('limit', default=100, required=False, max_value=2000)
         nsfw = req.get_param_as_bool('nsfw', default=False, required=False)
         days = req.get_param_as_int('days', default=30, required=False)
+        
+        cache_key = f'bot_stats_top_image_reposts_{limit}_{nsfw}_{days}'
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            resp.body = cached_result
+            return
+
         results = []
         with self.uowm.start() as uow:
             repost_stats = uow.stat_top_repost.get_all(day_range=days, nsfw=nsfw, limit=limit)
@@ -81,8 +99,12 @@ class BotStats:
                     'repost_count': repost.repost_count,
                     'subreddit': post.subreddit
                 })
-            resp.body = json.dumps(results)
+        
+        result_json = json.dumps(results)
+        cache.set(cache_key, result_json, timeout=1800)
+        resp.body = result_json
 
+    @cache.cached(timeout=3600)
     def on_get_banned_subs(self, req: Request, resp: Response):
         results = []
         with self.uowm.start() as uow:
@@ -101,32 +123,48 @@ class BotStats:
                 raise HTTPNotFound(title='Subreddit not found', description=f'{subreddit} is not registered')
 
         stat_name = req.get_param('stat_name', required=True)
+        
+        cache_key = f'bot_stats_subreddit_{subreddit.lower()}_{stat_name.lower()}'
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            resp.body = cached_result
+            return
+
         if stat_name.lower() == 'link_reposts_all':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 3)[0], 'stat_name': stat_name})
+            result = {'count': uow.repost.get_count_by_subreddit(subreddit, 3)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'image_reposts_all':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 2)[0], 'stat_name': stat_name})
+            result = {'count': uow.repost.get_count_by_subreddit(subreddit, 2)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'link_reposts_month':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 3, hours=720)[0], 'stat_name': stat_name})
+            result = {'count': uow.repost.get_count_by_subreddit(subreddit, 3, hours=720)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'image_reposts_month':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 2, hours=720)[0], 'stat_name': stat_name})
+            result = {'count': uow.repost.get_count_by_subreddit(subreddit, 2, hours=720)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'link_reposts_day':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 3, hours=24)[0], 'stat_name': stat_name})
+            result = {'count': uow.repost.get_count_by_subreddit(subreddit, 3, hours=24)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'image_reposts_day':
-            resp.body = json.dumps({'count': uow.repost.get_count_by_subreddit(subreddit, 2, hours=24)[0], 'stat_name': stat_name})
+            result = {'count': uow.repost.get_count_by_subreddit(subreddit, 2, hours=24)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'checked_post_all':
-            resp.body = json.dumps({'count': uow.monitored_sub_checked.get_count_by_subreddit(sub.id)[0], 'stat_name': stat_name})
+            result = {'count': uow.monitored_sub_checked.get_count_by_subreddit(sub.id)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'checked_post_month':
-            resp.body = json.dumps({'count': uow.monitored_sub_checked.get_count_by_subreddit(sub.id, hours=720)[0], 'stat_name': stat_name})
+            result = {'count': uow.monitored_sub_checked.get_count_by_subreddit(sub.id, hours=720)[0], 'stat_name': stat_name}
         elif stat_name.lower() == 'checked_post_day':
-            resp.body = json.dumps({'count': uow.monitored_sub_checked.get_count_by_subreddit(sub.id, hours=24)[0], 'stat_name': stat_name})
-
-
-        if not resp.body:
+            result = {'count': uow.monitored_sub_checked.get_count_by_subreddit(sub.id, hours=24)[0], 'stat_name': stat_name}
+        else:
             raise HTTPBadRequest(title='Stat not found', description=f'Unable to find stat {stat_name}')
+
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=600)
+        resp.body = result_json
 
 
     def on_get_home(self, req: Request, resp: Response):
         stat_name = req.get_param('stat_name', required=True)
+        
+        cache_key = f'bot_stats_home_{stat_name.lower()}'
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            resp.body = cached_result
+            return
+        
         # TODO - Refactor.  Hacked in to stay consistant with frontend after db change
         with self.uowm.start() as uow:
             stats = uow.stat_daily_count.get_latest()
@@ -134,17 +172,23 @@ class BotStats:
                 log.error('No stats available')
                 raise HTTPNotFound(title='No stats found', description=f'No bot stats are available')
             if stat_name.lower() == 'summons_all':
-                resp.body = json.dumps({'count': stats.summons_total, 'stat_name': stat_name})
+                result = {'count': stats.summons_total, 'stat_name': stat_name}
             elif stat_name.lower() == 'summons_today':
-                resp.body = json.dumps({'count': stats.summons_24h, 'stat_name': stat_name})
+                result = {'count': stats.summons_24h, 'stat_name': stat_name}
             elif stat_name.lower() == 'reposts_all':
                 total = stats.image_reposts_total
-                resp.body = json.dumps({'count': total, 'stat_name': stat_name})
+                result = {'count': total, 'stat_name': stat_name}
             elif stat_name.lower() == 'reposts_today':
                 total = stats.image_reposts_24h
-                resp.body = json.dumps({'count': total, 'stat_name': stat_name})
+                result = {'count': total, 'stat_name': stat_name}
             elif stat_name.lower() == 'subreddit_count':
-                resp.body = json.dumps({'count': uow.monitored_sub.get_count(), 'stat_name': stat_name})
+                result = {'count': uow.monitored_sub.get_count(), 'stat_name': stat_name}
+            else:
+                raise HTTPBadRequest(title='Stat not found', description=f'Unable to find stat {stat_name}')
+
+        result_json = json.dumps(result)
+        cache.set(cache_key, result_json, timeout=300)
+        resp.body = result_json
 
     @cache.cached(timeout=3600)
     def on_get_general(self, req: Request, resp: Response):

@@ -3,7 +3,7 @@ from typing import List, Text
 from sqlalchemy import func
 from datetime import timedelta, datetime
 
-from redditrepostsleuth.core.db.databasemodels import Repost
+from redditrepostsleuth.core.db.databasemodels import Repost, Subreddit
 from redditrepostsleuth.core.logging import log
 
 
@@ -16,7 +16,7 @@ class RepostRepo:
     def get_all(self, limit: int = None, offset: int = None) -> List[Repost]:
         return self.db_session.query(Repost).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
-    def get_all_by_type(self, post_type_id: int, limit: None, offset: None) -> list[Repost]:
+    def get_all_by_type(self, post_type_id: int, limit: int = None, offset: int = None) -> list[Repost]:
         return self.db_session.query(Repost).filter(Repost.post_type_id == post_type_id).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
     def get_by_author(self, author: str) -> List[Repost]:
@@ -51,6 +51,18 @@ class RepostRepo:
         if hours:
             query = query.filter(Repost.detected_at > (datetime.now() - timedelta(hours=hours)))
         return query.first()
+
+    def get_counts_by_subreddits(self, subreddits: List[str]) -> dict[str, int]:
+        """Get total repost counts for multiple subreddits in a single query."""
+        if not subreddits:
+            return {}
+        results = self.db_session.query(
+            Repost.subreddit,
+            func.count(Repost.id).label('count')
+        ).filter(
+            Repost.subreddit.in_(subreddits)
+        ).group_by(Repost.subreddit).all()
+        return {r.subreddit: r.count for r in results}
 
     def add(self, item):
         self.db_session.add(item)

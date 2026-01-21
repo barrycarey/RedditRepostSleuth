@@ -15,6 +15,13 @@ class SubredditRepo:
     def get_by_name(self, name: str):
         return self.db_session.query(Subreddit).filter(Subreddit.name == name).first()
 
+    def get_by_names(self, names: list[str]) -> dict[str, Subreddit]:
+        """Get multiple subreddits by name in a single query."""
+        if not names:
+            return {}
+        results = self.db_session.query(Subreddit).filter(Subreddit.name.in_(names)).all()
+        return {r.name.lower(): r for r in results}
+
     def get_subreddits_to_update(self, limit: int = None, offset: int = None) -> list[Subreddit]:
         delta = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=3)
         return self.db_session.query(Subreddit).filter(or_(Subreddit.added_at < delta, Subreddit.last_checked == None)).limit(limit).offset(offset).all()

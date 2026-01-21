@@ -227,7 +227,7 @@ def update_daily_stats(self):
     daily_stats = StatsDailyCount()
     try:
         with self.uowm.start() as uow:
-            daily_stats.summons_24 = uow.summons.get_count(hours=24)
+            daily_stats.summons_24h = uow.summons.get_count(hours=24)
             daily_stats.summons_total = uow.summons.get_count()
             daily_stats.comments_24h = uow.bot_comment.get_count(hours=24)
             daily_stats.comments_total = uow.bot_comment.get_count()

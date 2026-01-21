@@ -6,6 +6,7 @@ from falcon import Request, Response, HTTPNotFound, HTTPUnauthorized
 from redditrepostsleuth.core.db.databasemodels import RepostWatch
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.util.reddithelpers import get_user_data, is_sleuth_admin
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
 
 
 class PostWatch:
@@ -13,6 +14,14 @@ class PostWatch:
         self.uowm = uowm
 
     def on_get(self, req: Request, res: Response):
+        token = get_token_from_header(req)
+        user_data = get_user_data(token)
+        if not user_data:
+            raise HTTPUnauthorized(
+                title='Invalid token',
+                description='Failed to authenticate with Reddit'
+            )
+
         response = {
             'data': [],
             'next_id': None
@@ -20,7 +29,7 @@ class PostWatch:
         limit = req.get_param_as_int('limit', required=False, default=100)
         offset = req.get_param_as_int('offset', required=False)
         with self.uowm.start() as uow:
-            watches = uow.repostwatch.get_all(limit=limit, offset=offset)
+            watches = uow.repostwatch.get_all_by_user(user_data['name'], limit=limit, offset=offset)
             for watch in watches:
                 post = uow.posts.get_by_post_id(watch.post_id)
                 if not post:
@@ -31,7 +40,7 @@ class PostWatch:
 
     def on_get_user(self, req: Request, resp: Response, user: Text):
         results = []
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if user.lower() != user_data['name'].lower():
             if not is_sleuth_admin(token, user_data):
@@ -50,7 +59,7 @@ class PostWatch:
         resp.body = json.dumps(results)
 
     def on_patch(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         data = json.load(req.bounded_stream)
         with self.uowm.start() as uow:
@@ -66,7 +75,7 @@ class PostWatch:
             uow.commit()
 
     def on_delete(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         watch_id = req.get_param_as_int('watch_id', required=True)
         user_data = get_user_data(token)
         with self.uowm.start() as uow:
@@ -82,7 +91,7 @@ class PostWatch:
 
 
     def on_post(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         data = json.load(req.bounded_stream)
         with self.uowm.start() as uow:
