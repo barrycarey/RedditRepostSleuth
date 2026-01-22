@@ -2,14 +2,14 @@ import json
 import mimetypes
 import os
 import re
-import uuid
 from typing import Text
 
 from falcon import Response, Request, HTTPBadRequest, HTTPServiceUnavailable
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
+from redditrepostsleuth.core.util.imagehashing import get_image_hashes_from_bytes
 from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
@@ -65,30 +65,56 @@ class ImageSearch:
         form = req.get_media()
         
         # Collect all form fields and the file from multipart data
-        file = None
+        # IMPORTANT: Must read stream data during iteration, not after
+        image_bytes = None
+        file_ext = None
         form_data = {}
         for part in form:
             if part.name == 'image':
-                file = part
+                file_ext = part.secure_filename.split('.')[-1]
+                # Read bytes immediately while iterating
+                image_bytes = part.stream.read()
             else:
                 # Store form field values
                 form_data[part.name] = part.text
         
-        if file is None:
+        if image_bytes is None:
             raise HTTPBadRequest(title='Missing file', description='No image file was provided')
         
-        file_ext = file.secure_filename.split('.')[-1]
         if file_ext not in allowed_img_ext:
             raise HTTPBadRequest(title='Invalid file type', description=f'File type {file_ext} is not allowed')
 
-        saved_file_name = f'{uuid.uuid4()}.{file_ext}'
-        with open(os.path.join('/opt/imageuploads', saved_file_name), 'wb') as f:
-            file.stream.pipe(f)
+        # Compute target hash from bytes
+        try:
+            hashes = get_image_hashes_from_bytes(image_bytes)
+            target_hash = hashes['dhash_h']
+        except ImageConversionException as e:
+            raise HTTPBadRequest(title='Invalid image', description=f'Could not process image: {str(e)}')
 
+        # Get search settings to check if meme filter is enabled
         search_settings = get_image_search_settings_from_form_data(form_data, self.config)
-        # TODO - This is hacky as fuck.  Dup image service needs to be rewritten to take hash and search
-        search_results = check_image(search_settings, self.uowm, self.image_svc, url=f'http://localhost:8443/imageserve/{saved_file_name}')
-        os.remove(os.path.join('/opt/imageuploads', saved_file_name))
+
+        # Compute meme hash if meme filter is enabled
+        meme_hash = None
+        if search_settings.meme_filter:
+            try:
+                meme_hashes = get_image_hashes_from_bytes(
+                    image_bytes,
+                    hash_size=self.config.default_meme_filter_hash_size
+                )
+                meme_hash = meme_hashes['dhash_h']
+            except ImageConversionException:
+                log.warning('Failed to compute meme hash from uploaded image')
+
+        # Use placeholder URL since image is processed in memory
+        search_results = check_image(
+            search_settings,
+            self.uowm,
+            self.image_svc,
+            url='memory://uploaded',
+            target_hash=target_hash,
+            meme_hash=meme_hash
+        )
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
 
     def on_get_search_by_url(self, req: Request, resp: Response):

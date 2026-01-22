@@ -109,6 +109,8 @@ class DuplicateImageService:
             source='unknown',
             sort_by='created',
             search_settings: ImageSearchSettings = None,
+            target_hash: str = None,
+            meme_hash: str = None,
 
     ) -> ImageSearchResults:
         """
@@ -118,6 +120,8 @@ class DuplicateImageService:
         :param source: Source that triggered this search.  Used for logging
         :param sort_by: Sort results by
         :param search_settings: Search settings to use when searching
+        :param target_hash: Pre-computed target hash (optional, avoids URL fetch)
+        :param meme_hash: Pre-computed meme hash (optional, avoids URL fetch for meme detection)
         :return: Search Results
         :rtype: ImageSearchResults
         """
@@ -130,7 +134,8 @@ class DuplicateImageService:
         search_results = ImageSearchResults(
             url,
             checked_post=post,
-            search_settings=search_settings
+            search_settings=search_settings,
+            target_hash=target_hash
         )
 
         search_results.search_times.start_timer('total_search_time')
@@ -142,7 +147,10 @@ class DuplicateImageService:
             if search_results.meme_template:
                 search_settings.target_match_percent = 100  # Keep only 100% matches on default hash size
                 search_results.search_times.start_timer('set_meme_hash_time')
-                search_results.meme_hash = self._get_meme_hash(url, post_id=post.post_id if post else None)
+                if meme_hash:
+                    search_results.meme_hash = meme_hash
+                else:
+                    search_results.meme_hash = self._get_meme_hash(url, post_id=post.post_id if post else None)
                 search_results.search_times.stop_timer('set_meme_hash_time')
                 if not search_results.meme_hash:
                     log.warning('No meme hash, disabled meme filter')

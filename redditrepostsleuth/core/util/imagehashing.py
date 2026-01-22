@@ -126,3 +126,45 @@ def get_image_hashes(url: Text, hash_size: int = 16) -> dict:
         raise
 
     return result
+
+
+def generate_img_by_bytes(data: bytes) -> Image:
+    """
+    Convert raw image bytes to a PIL Image object.
+    :param data: Raw image bytes
+    :return: PIL Image
+    """
+    try:
+        img = Image.open(BytesIO(data))
+    except (OSError, DecompressionBombError) as e:
+        log.warning('Failed to convert image from bytes. Error: %s', str(e), exc_info=False)
+        raise ImageConversionException(str(e))
+    return img if img else None
+
+
+def get_image_hashes_from_bytes(data: bytes, hash_size: int = 16) -> dict:
+    """
+    Generate image hashes directly from bytes without requiring a URL.
+    :param data: Raw image bytes
+    :param hash_size: Size of the hash (default 16)
+    :return: Dictionary containing dhash_h, dhash_v, and ahash
+    """
+    result = {
+        'dhash_h': None,
+        'dhash_v': None,
+        'ahash': None,
+    }
+    log.debug('Hashing image from bytes')
+    img = generate_img_by_bytes(data)
+    try:
+        dhash_h = imagehash.dhash(img, hash_size=hash_size)
+        dhash_v = imagehash.dhash_vertical(img, hash_size=hash_size)
+        ahash = imagehash.average_hash(img, hash_size=hash_size)
+        result['dhash_h'] = str(dhash_h)
+        result['dhash_v'] = str(dhash_v)
+        result['ahash'] = str(ahash)
+    except Exception as e:
+        log.exception('Error creating hash from bytes', exc_info=True)
+        raise
+
+    return result
