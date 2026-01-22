@@ -223,7 +223,9 @@ class BotStats:
             last_24h = {
                 'reposts_detected': total_reposts_24h,
                 'summons_handled': stats.summons_24h or 0,
-                'comments_posted': stats.comments_24h or 0
+                'comments_posted': stats.comments_24h or 0,
+                'image_searches': uow.repost_search.get_count(hours=24, post_type=2) or 0,
+                'link_searches': uow.repost_search.get_count(hours=24, post_type=3) or 0
             }
 
             by_type = {
@@ -250,7 +252,9 @@ class BotStats:
                 'labels': [],
                 'reposts': [],
                 'summons': [],
-                'comments': []
+                'comments': [],
+                'image_searches': [],
+                'link_searches': []
             }
             for daily in uow.stat_daily_count.get_all(limit=14):
                 trends['labels'].append(daily.ran_at.strftime('%Y-%m-%d') if daily.ran_at else '')
@@ -263,12 +267,16 @@ class BotStats:
                 trends['reposts'].append(daily_reposts)
                 trends['summons'].append(daily.summons_24h or 0)
                 trends['comments'].append(daily.comments_24h or 0)
+                trends['image_searches'].append(daily.image_searches_24h or 0)
+                trends['link_searches'].append(daily.link_searches_24h or 0)
 
             # Reverse to get chronological order (oldest first)
             trends['labels'].reverse()
             trends['reposts'].reverse()
             trends['summons'].reverse()
             trends['comments'].reverse()
+            trends['image_searches'].reverse()
+            trends['link_searches'].reverse()
 
             result = {
                 'totals': totals,

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer
-from sqlalchemy.dialects.mysql import TINYINT
+from sqlalchemy.dialects.mysql import TINYINT, MEDIUMTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -29,7 +29,7 @@ class Post(Base):
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
     author = Column(String(25), nullable=False)
-    selftext = Column(Text(75000, collation='utf8mb4_general_ci'))
+    selftext = Column(MEDIUMTEXT(charset='utf8mb4', collation='utf8mb4_general_ci'))
     created_at = Column(DateTime)
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(25), nullable=False)
@@ -713,6 +713,8 @@ class StatsDailyCount(Base):
     text_reposts_total = Column(Integer)
     text_reposts_24h = Column(Integer)
     monitored_subreddit_count = Column(Integer)
+    image_searches_24h = Column(Integer)
+    link_searches_24h = Column(Integer)
 
 class StatsTopReposter(Base):
     __tablename__ = 'stat_top_reposters'
@@ -765,6 +767,7 @@ class Subreddit(Base):
     __tablename__ = 'subreddit'
     __table_args__ = (
         Index('idx_subreddit_name', 'name'),
+        Index('idx_subs_nsfw', 'subscribers', 'nsfw'),
     )
     id = Column(Integer, primary_key=True)
     name = Column(String(25), nullable=False, unique=True)
@@ -779,3 +782,6 @@ class Subreddit(Base):
     deleted = Column(Boolean, default=False)
     active_user_count = Column(Integer)
     is_private = Column(Boolean, default=False)
+
+    banner_image = Column(String(2048), nullable=True)
+    avatar_image = Column(String(2048), nullable=True)
