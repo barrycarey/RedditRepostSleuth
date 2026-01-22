@@ -47,11 +47,13 @@ def check_image(
         image_svc: DuplicateImageService,
         post_id: Text = None,
         url: Text = None,
+        target_hash: str = None,
+        meme_hash: str = None,
 ) -> ImageSearchResults:
 
-    if not post_id and not url:
-        log.error('No post ID or URL provided')
-        raise HTTPBadRequest("No Post ID or URL", "Please provide a post ID or url to search")
+    if not post_id and not url and not target_hash:
+        log.error('No post ID, URL, or target hash provided')
+        raise HTTPBadRequest("No Post ID, URL, or hash", "Please provide a post ID, url, or pre-computed hash to search")
 
     search_settings.max_matches = 500
 
@@ -65,7 +67,9 @@ def check_image(
             url,
             post=post,
             search_settings=search_settings,
-            source='api'
+            source='api',
+            target_hash=target_hash,
+            meme_hash=meme_hash,
         )
     except NoIndexException:
         log.error('No available index for image repost check.  Trying again later')
