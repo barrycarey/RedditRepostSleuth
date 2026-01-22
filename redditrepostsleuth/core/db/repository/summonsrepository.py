@@ -50,5 +50,12 @@ class SummonsRepository:
 
     def remove(self, item: Summons):
         self.db_session.delete(item)
+
     def remove_by_post_id(self, post_id: str) -> None:
         self.db_session.query(Summons).filter(Summons.post_id == post_id).delete()
+
+    def get_count_for_date_range(self, start: datetime, end: datetime):
+        query = self.db_session.query(func.count(Summons.id))
+        query = query.filter(Summons.summons_received_at >= start, Summons.summons_received_at < end)
+        r = query.first()
+        return r[0] if r else 0

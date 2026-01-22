@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+from sqlalchemy import func
+
 from redditrepostsleuth.core.db.databasemodels import RepostSearch
 
 
@@ -57,3 +59,20 @@ class RepostSearchRepo:
 
     def remove(self, item: RepostSearch):
         self.db_session.delete(item)
+
+    def get_count(self, hours: int = None, post_type: int = None):
+        query = self.db_session.query(func.count(RepostSearch.id))
+        if post_type:
+            query = query.filter(RepostSearch.post_type_id == post_type)
+        if hours:
+            query = query.filter(RepostSearch.searched_at > (datetime.now() - timedelta(hours=hours)))
+        r = query.first()
+        return r[0] if r else None
+
+    def get_count_for_date_range(self, start: datetime, end: datetime, post_type: int = None):
+        query = self.db_session.query(func.count(RepostSearch.id))
+        if post_type:
+            query = query.filter(RepostSearch.post_type_id == post_type)
+        query = query.filter(RepostSearch.searched_at >= start, RepostSearch.searched_at < end)
+        r = query.first()
+        return r[0] if r else 0

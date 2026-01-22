@@ -236,6 +236,8 @@ def update_daily_stats(self):
             daily_stats.image_reposts_24h = uow.repost.get_count(hours=24, post_type=2)
             daily_stats.image_reposts_total = uow.repost.get_count(post_type=2)
             daily_stats.monitored_subreddit_count = uow.monitored_sub.get_count()
+            daily_stats.image_searches_24h = uow.repost_search.get_count(hours=24, post_type=2)
+            daily_stats.link_searches_24h = uow.repost_search.get_count(hours=24, post_type=3)
             uow.stat_daily_count.add(daily_stats)
             uow.commit()
             log.info('[Daily Stat Update] Finished')
