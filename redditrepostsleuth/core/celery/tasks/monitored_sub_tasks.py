@@ -53,7 +53,7 @@ class SubMonitorTask(Task):
     base=SubMonitorTask,
     serializer='pickle',
     autoretry_for=(TooManyRequests, RedditAPIException, NoIndexException, RateLimitException),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     try:
@@ -73,7 +73,7 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     serializer='pickle',
     ignore_results=True,
     autoretry_for=(LoadSubredditException,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def process_monitored_sub(self, monitored_sub):
 

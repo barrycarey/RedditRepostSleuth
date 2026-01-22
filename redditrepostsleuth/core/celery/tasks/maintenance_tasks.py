@@ -31,7 +31,7 @@ class MaintenanceTask(SqlAlchemyTask):
         return True
 
 
-@celery.task(bind=True, base=MaintenanceTask, autoretry_for=(UtilApiException,RateLimitException), retry_kwards={'max_retries': 50, 'countdown': 1800})
+@celery.task(bind=True, base=MaintenanceTask, autoretry_for=(UtilApiException,RateLimitException), retry_kwargs={'max_retries': 50, 'countdown': 1800})
 def update_subreddit_data(self, subreddit_name) -> None:
     if self.is_ratelimited():
         raise RateLimitException('Ratelimited')
@@ -90,7 +90,7 @@ def update_subreddit_data(self, subreddit_name) -> None:
     except Exception as e:
         log.exception('')
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def save_subreddit(self, subreddit_name: str):
 
     if subreddit_name[:2] == 'u_':
@@ -133,7 +133,7 @@ def save_subreddit(self, subreddit_name: str):
     except Exception as e:
         log.exception('')
 
-@celery.task(bind=True, base=SqlAlchemyTask, ignore_reseults=True, serializer='pickle')
+@celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def save_subreddit_batch(self, subreddit_names: list[str]):
     try:
         with self.uowm.start() as uow:

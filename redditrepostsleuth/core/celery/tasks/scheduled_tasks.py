@@ -178,7 +178,7 @@ def check_meme_template_potential_votes_task(self):
         log.exception('Problem in scheduled task')
 
 
-@celery.task(bind=True, base=AdminTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
+@celery.task(bind=True, base=AdminTask, autoretry_for=(TooManyRequests,), retry_kwargs={'max_retries': 3})
 @record_task_status
 def check_for_subreddit_config_update_task(self, subreddit_name: str) -> None:
     with self.uowm.start() as uow:
@@ -273,7 +273,7 @@ def update_daily_top_reposters_task(self):
         log.exception('Unknown task error')
 
 
-@celery.task(bind=True, base=RedditTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
+@celery.task(bind=True, base=RedditTask, autoretry_for=(TooManyRequests,), retry_kwargs={'max_retries': 3})
 @record_task_status
 def update_monitored_sub_stats_task(self, sub_name: str) -> None:
     try:
@@ -332,7 +332,7 @@ def queue_search_history_cleanup(self):
         for chunk in chunk_list(ids, 5000):
             delete_search_batch.apply_async((chunk,))
 
-@celery.task(bind=True, base=RedditTask, autoretry_for=(UtilApiException,), retry_kwards={'max_retries': 5})
+@celery.task(bind=True, base=RedditTask, autoretry_for=(UtilApiException,), retry_kwargs={'max_retries': 5})
 @record_task_status
 def queue_subreddit_data_updates(self) -> None:
     with self.uowm.start() as uow:

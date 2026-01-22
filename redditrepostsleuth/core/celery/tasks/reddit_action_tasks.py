@@ -32,7 +32,7 @@ class RedditActionTask(Task):
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def remove_submission_task(self, submission: Submission, removal_reason: str, mod_note: str = None) -> None:
     try:
@@ -65,7 +65,7 @@ def remove_submission_task(self, submission: Submission, removal_reason: str, mo
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, note: str = None) -> None:
     log.info('Banning user %s from %s', username, subreddit_name)
@@ -116,7 +116,7 @@ def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, not
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def lock_submission_task(self, submission: Submission) -> None:
     log.info('Locking submission https://redd.it/%s', submission.id)
@@ -142,7 +142,7 @@ def lock_submission_task(self, submission: Submission) -> None:
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def lock_comment_task(self, comment: Comment) -> None:
     log.info('Locking comment https://reddit.com%s', comment.permalink)
@@ -168,7 +168,7 @@ def lock_comment_task(self, comment: Comment) -> None:
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def sticky_comment_task(self, comment: Comment) -> None:
     log.info('Make comment sticky: https://reddit.com%s ', comment.permalink)
@@ -194,7 +194,7 @@ def sticky_comment_task(self, comment: Comment) -> None:
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def mark_as_oc_task(self, submission: Submission) -> None:
     log.info('Marking submission %s as OC', submission.id)
@@ -227,7 +227,7 @@ def mark_as_oc_task(self, submission: Submission) -> None:
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def report_submission_task(self, submission: Submission, report_msg: str) -> None:
     log.info('Reporting submission https://redd.it/%s', submission.id)
@@ -251,7 +251,7 @@ def report_submission_task(self, submission: Submission, report_msg: str) -> Non
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def leave_comment_task(
         self,
@@ -290,7 +290,7 @@ def leave_comment_task(
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def send_modmail_task(self, subreddit_name: str, message: str, subject: str, source: str = 'sub_monitor') -> None:
     log.info('Sending modmail to r/%s', subreddit_name)

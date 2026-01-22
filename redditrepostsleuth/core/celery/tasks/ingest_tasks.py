@@ -44,7 +44,7 @@ class IngestTask(Task):
         self._proxy_manager = ProxyManager(self.uowm, 1000)
         self.domains_to_proxy = []
 
-# @celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle')
+# @celery.task(bind=True, base=IngestTask, ignore_results=True, serializer='pickle')
 # def save_subreddit(self, subreddit_name: str):
 #     try:
 #         with self.uowm.start() as uow:
@@ -60,7 +60,7 @@ class IngestTask(Task):
 #     except Exception as e:
 #         log.exception()
 
-@celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed, HTTPException), retry_kwargs={'max_retries': 10, 'countdown': 300})
+@celery.task(bind=True, base=IngestTask, ignore_results=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed, HTTPException), retry_kwargs={'max_retries': 10, 'countdown': 300})
 def save_new_post(self, submission: dict, repost_check: bool = True):
 
     start_time = perf_counter()
