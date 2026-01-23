@@ -19,6 +19,7 @@ DEFAULT_CONFIG_VALUES = {
               "check_title_similarity": False,
               "target_title_match": 50,
               "filter_crossposts": True,
+              "check_crossposts": False,
               "filter_same_author": True,
               "check_image_posts": True,
               "check_link_posts": True,

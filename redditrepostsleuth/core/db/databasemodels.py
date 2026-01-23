@@ -312,6 +312,7 @@ class MonitoredSub(Base):
     same_sub_only = Column(Boolean, default=False)
     notes = Column(String(250))
     filter_crossposts = Column(Boolean, default=True)
+    check_crossposts = Column(Boolean, default=False)
     filter_same_author = Column(Boolean, default=True)
     sticky_comment = Column(Boolean, default=False)
     remove_repost = Column(Boolean, default=False)
@@ -386,6 +387,7 @@ class MonitoredSub(Base):
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
             'filter_crossposts': self.filter_crossposts,
+            'check_crossposts': self.check_crossposts,
             'filter_same_author': self.filter_same_author,
             'remove_repost': self.remove_repost,
             'removal_reason': self.removal_reason,

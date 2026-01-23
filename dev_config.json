@@ -1,0 +1,101 @@
+{
+  "general": {
+
+    "supported_post_types": [
+      "image",
+      "link"
+    ],
+    "bot_status": "live",
+    "bot_comment_karma_flag_threshold": -7,
+    "bot_comment_karma_remove_threshold": -10
+  },
+  "image_repost": {
+    "repost_image_check_on_ingest": true,
+    "index_current_max_age": 7200,
+    "index_current_skip_load_age": 5000,
+    "index_current_file": "/opt/imageindex/images_current.ann",
+    "index_historical_skip_load_age": 259200,
+    "index_historical_file": "/opt/imageindex/images_historical.ann",
+    "index_historical_max_age": 2764800,
+    "index_meme_file": "/opt/imageindex/images_meme.ann",
+    "index_meme_skip_load_age": 86400,
+    "index_meme_max_age": 604800,
+    "default_hamming_distance": 9,
+    "default_annoy_distance": 0.265,
+    "enable_repost_watch": false
+  },
+  "sub_monitor": {
+    "sub_monitor_exposed_config_options": [
+      "active",
+      "report_reposts",
+      "report_msg",
+      "match_percent_dif",
+      "same_sub_only",
+      "sticky_comment",Add
+      "search_depth",
+      "target_days_old",
+      "meme_filter",
+      "oc_response_template",
+      "repost_response_template",
+      "lock_post",
+      "mark_as_oc",
+      "remove_repost",
+      "removal_reason_id",
+      "title_ignore_keywords",
+      "disable_summons_after_auto_response",
+      "only_allow_one_summons",
+      "remove_additional_summons",
+      "check_all_submissions",
+      "check_title_similarity",
+      "target_title_match",
+      "check_crossposts"
+    ],
+    "wiki_config_name": "repost_sleuth_config"
+  },
+  "link_repost": {
+    "repost_link_check_on_ingest": true
+  },
+  "hot_post": {
+    "hot_post_comment_on_oc": false
+  },
+  "summoning":{
+    "summons_subreddits": "pics+RepostSleuthBot+aww+gaming+pcmasterrace+AdviceAnimals+gaming+memes+WTF+insaneparents+trashy+IdiotsInCars+WhitePeopleTwitter+blackpeopletwitter+HistoryMemes",
+    "summons_match_strictness_loose": 20,
+    "summons_match_strictness_tight": 1,
+    "summons_meme_filter": true,
+    "summons_all_matches": false,
+    "summons_same_sub": false,
+    "summons_max_age": null,
+    "summons_send_pm_subs": [
+      "PewdiepieSubmissions"
+    ]
+  },
+  "reddit": {
+    "reddit_client_id": "ZP1QCL9jI_-HOA",
+    "reddit_client_secret": "_cFZA8eq7dcIBJTjIuWGqr1iQrg",
+    "reddit_useragent": "windows.repostsleuthbot:v0.0.1 (by /u/barrycarey)",
+    "reddit_username": "RepostSleuthBot",
+    "reddit_password": "Tovalu12!"
+  },
+  "database": {
+    "db_host": "db.ho.me",
+    "db_port": 3306,
+    "db_user": "dev",
+    "db_password": "@Password",
+    "db_name": "reddit"
+  },
+  "redis": {
+    "redis_host": "dev.ho.me",
+    "redis_password": "@Password",
+    "redis_port": 6379,
+    "redis_database": 0
+  },
+  "influx": {
+    "influx_host": "monitor.ho.me",
+    "influx_port": "8086",
+    "influx_user": "root",
+    "influx_password": "Tovalu88!",
+    "influx_database": "repost_sleuth",
+    "influx_verify_ssl": false
+  }
+}
