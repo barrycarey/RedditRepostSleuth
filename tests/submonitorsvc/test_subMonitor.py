@@ -19,12 +19,19 @@ class TestMonitoredSubService(TestCase):
         post = Post(post_type=post_type)
         self.assertTrue(sub_monitor.should_check_post(post, monitored_sub))
 
-    def test__should_check_post__reject_crosspost(self):
-        monitored_sub = MonitoredSub(check_image_posts=True, check_link_posts=True, check_text_posts=True)
+    def test__should_check_post__reject_crosspost_when_disabled(self):
+        monitored_sub = MonitoredSub(check_image_posts=True, check_link_posts=True, check_text_posts=True, check_crossposts=False)
         sub_monitor = MonitoredSubService(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=Config(redis_host='dummy', supported_post_types=['image']))
         post_type = PostType(name='image')
         post = Post(post_type=post_type, is_crosspost=True)
         self.assertFalse(sub_monitor.should_check_post(post, monitored_sub))
+
+    def test__should_check_post__accept_crosspost_when_enabled(self):
+        monitored_sub = MonitoredSub(check_image_posts=True, check_link_posts=True, check_text_posts=True, check_crossposts=True)
+        sub_monitor = MonitoredSubService(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), config=Config(redis_host='dummy', supported_post_types=['image']))
+        post_type = PostType(name='image')
+        post = Post(post_type=post_type, is_crosspost=True)
+        self.assertTrue(sub_monitor.should_check_post(post, monitored_sub))
 
     def test__should_check_post__title_filter_accept(self):
         monitored_sub = MonitoredSub(check_image_posts=True, check_link_posts=True, check_text_posts=True)

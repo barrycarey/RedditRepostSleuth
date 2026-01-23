@@ -239,7 +239,7 @@ class MonitoredSubService:
             log.info('Skipping link post')
             return False
 
-        if post.is_crosspost:
+        if post.is_crosspost and not monitored_sub.check_crossposts:
             log.debug('Skipping crosspost')
             return False
 
