@@ -101,6 +101,11 @@ class MonitoredSub:
         with self.uowm.start() as uow:
             existing = uow.monitored_sub.get_by_sub(subreddit)
             if existing:
+                # Re-activation: reset status fields since bot was re-invited
+                log.info('Re-activating existing monitored sub %s', subreddit)
+                existing.is_mod = True
+                existing.failed_admin_check_count = 0
+                uow.commit()
                 resp.body = json.dumps(existing.to_dict())
                 return
             monitored_sub = create_monitored_sub_in_db(subreddit, uow)

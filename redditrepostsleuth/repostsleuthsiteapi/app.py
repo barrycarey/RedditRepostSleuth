@@ -91,7 +91,7 @@ api.add_route('/api/monitored-sub/{subreddit}/stats/top-reposts', MonitoredSubSt
 api.add_route('/api/monitored-sub/{subreddit}/stats/config-history', MonitoredSubStats(uowm, config, reddit), suffix='config_history')
 api.add_route('/api/monitored-sub/{subreddit}/stats/reddit-traffic', MonitoredSubStats(uowm, config, reddit), suffix='reddit_traffic')
 
-# OAuth token exchange endpoint (for authorization code flow)
+# OAuth token exchange endpoint (for authorization code flow).
 api.add_route('/api/oauth/token', OAuthToken(config))
 
 api.add_route('/api/subreddit/{subreddit}/reposts', ImageRepostEndpoint(uowm))

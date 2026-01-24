@@ -24,6 +24,7 @@ def get_user_data(token: Text, user_agent: Text = 'windows.repostsleuthbot:v0.0.
     headers = {'Authorization': f'Bearer {token}', 'User-Agent': user_agent}
     r = requests.get('https://oauth.reddit.com/api/v1/me/', headers=headers)
     if r.status_code != 200:
+        print(f'Unepexted status when getting user data: {r.status_code}')
         return
     return json.loads(r.text)
 
