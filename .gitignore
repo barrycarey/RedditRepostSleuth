@@ -5,3 +5,14 @@ scratch_files
 __pycache__
 .ann
 .csv
+
+# Environment secrets (keep .env.example tracked)
+.env
+*.env.local
+
+# Legacy Dockerfiles (kept for rollback)
+*.legacy
+
+# Build artifacts
+*.whl
+/wheels/
