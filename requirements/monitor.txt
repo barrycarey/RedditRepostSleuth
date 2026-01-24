@@ -1,0 +1,6 @@
+# Monitor service dependencies (ingest, queue monitor, summons)
+-r base.txt
+celery[redis]==5.3.1
+imagehash==4.3.1
+aiohttp==3.9.0
+redgifs==1.9.1

@@ -1,0 +1,35 @@
+# Multi-stage Dockerfile for long-running monitor services
+# (ingest, queue monitor, summons handler)
+
+# Build stage
+FROM python:3.11-bookworm AS builder
+WORKDIR /build
+COPY requirements/base.txt requirements/monitor.txt ./requirements/
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements/monitor.txt
+
+# Runtime stage
+FROM python:3.11-slim-bookworm
+
+LABEL maintainer="Barry Carey <mcarey66@gmail.com>"
+
+# Create non-root user
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -m appuser
+
+WORKDIR /app
+
+# Install wheels from builder stage
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+# Copy application code
+COPY --chown=appuser:appgroup redditrepostsleuth /app/redditrepostsleuth/
+COPY --chown=appuser:appgroup sleuth_config.json /app/
+
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD pgrep -f python || exit 1
+
+# Default command - override in compose
+CMD ["python", "-u", "-m", "redditrepostsleuth"]
