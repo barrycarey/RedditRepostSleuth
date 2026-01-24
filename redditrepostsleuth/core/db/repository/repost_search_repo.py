@@ -40,6 +40,10 @@ class RepostSearchRepo:
     def get_oldest_search(self) -> RepostSearch:
         return self.db_session.query(RepostSearch).order_by(RepostSearch.id).first()
 
+    def get_newest(self) -> RepostSearch:
+        """Return the most recent repost search by id (correlates with searched_at)."""
+        return self.db_session.query(RepostSearch).order_by(RepostSearch.id.desc()).limit(1).first()
+
     def get_all(self, limit: int = None):
         return self.db_session.query(RepostSearch).limit(limit).all()
 
