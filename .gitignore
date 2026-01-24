@@ -5,3 +5,5 @@ scratch_files
 __pycache__
 .ann
 .csv
+sleuth_config.json
+sleuth_config_dev.json

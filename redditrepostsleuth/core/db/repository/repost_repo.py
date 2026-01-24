@@ -120,3 +120,7 @@ class RepostRepo:
             Repost.subreddit == subreddit,
             Repost.detected_at > oldest
         ).group_by(func.date(Repost.detected_at)).order_by(func.date(Repost.detected_at)).all()
+
+    def get_newest(self) -> Repost:
+        """Return the most recent repost by id (correlates with detected_at)."""
+        return self.db_session.query(Repost).order_by(Repost.id.desc()).limit(1).first()
