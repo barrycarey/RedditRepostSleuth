@@ -10,6 +10,10 @@ __pycache__
 .env
 *.env.local
 
+# Local configuration files
+sleuth_config.json
+sleuth_config_dev.json
+
 # Legacy Dockerfiles (kept for rollback)
 *.legacy
 
