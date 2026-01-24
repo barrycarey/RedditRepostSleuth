@@ -16,6 +16,7 @@ from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.general_admin import GeneralAdmin
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.bot_health import BotHealth
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.health import Health
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.message_template import MessageTemplate
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.bot_stats import BotStats
@@ -112,6 +113,7 @@ api.add_route('/api/admin/message-templates/all', MessageTemplate(uowm), suffix=
 api.add_route('/api/admin/users', GeneralAdmin(uowm))
 api.add_route('/api/user-whitelist/{subreddit}', UserWhitelistEndpoint(uowm, config, reddit))
 api.add_route('/api/health', Health())
+api.add_route('/api/health/bot', BotHealth(uowm))
 
 api = SentryWsgiMiddleware(api)
 
