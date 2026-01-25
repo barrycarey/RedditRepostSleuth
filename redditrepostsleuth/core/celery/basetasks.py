@@ -32,7 +32,7 @@ class RepostTask(SqlAlchemyTask):
         self.reddit = get_reddit_instance(self.config)
 
 
-class AnnoyTask(Task):
+class ImageSearchTask(Task):
     def __init__(self):
         self.config = Config()
         from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService

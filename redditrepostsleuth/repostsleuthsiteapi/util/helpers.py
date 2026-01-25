@@ -49,6 +49,7 @@ def check_image(
         url: Text = None,
         target_hash: str = None,
         meme_hash: str = None,
+        sort_by: str = 'highest_match',
 ) -> ImageSearchResults:
 
     if not post_id and not url and not target_hash:
@@ -70,6 +71,7 @@ def check_image(
             source='api',
             target_hash=target_hash,
             meme_hash=meme_hash,
+            sort_by=sort_by,
         )
     except NoIndexException:
         log.error('No available index for image repost check.  Trying again later')

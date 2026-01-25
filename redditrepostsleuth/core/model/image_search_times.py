@@ -7,7 +7,6 @@ class ImageSearchTimes(SearchTimes):
     """
     def __init__(self):
         super().__init__()
-        self.pre_annoy_filter_time: float = float(0)
         self.index_search_time: float = float(0)
         self.meme_filter_time: float = float(0)
         self.meme_detection_time: float = float(0)
@@ -21,10 +20,10 @@ class ImageSearchTimes(SearchTimes):
         self.set_closest_meme_hash_time: float = float(0)
         self.distance_filter_time: float = float(0)
         self.get_closest_match_time: float = float(0)
+        self.prefilter_time: float = float(0)
 
     def to_dict(self):
         return {**{
-            'pre_annoy_filter_time': self.pre_annoy_filter_time,
             'index_search_time': self.index_search_time,
             'meme_filter_time': self.meme_filter_time,
             'meme_detection_time': self.meme_detection_time,
@@ -34,11 +33,11 @@ class ImageSearchTimes(SearchTimes):
             'image_search_api_time': self.image_search_api_time,
             'filter_removed_posts_time': self.filter_removed_posts_time,
             'filter_deleted_posts_time': self.filter_deleted_posts_time,
-            'image_search_api_time': self.image_search_api_time,
             'set_meme_hash_time': self.set_meme_hash_time,
             'set_closest_meme_hash_time': self.set_closest_meme_hash_time,
             'distance_filter_time': self.distance_filter_time,
-            'get_closest_match_time': self.get_closest_match_time
+            'get_closest_match_time': self.get_closest_match_time,
+            'prefilter_time': self.prefilter_time
 
         }, **super().to_dict()}
 

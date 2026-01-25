@@ -7,3 +7,5 @@ __pycache__
 .csv
 sleuth_config.json
 sleuth_config_dev.json
+claude_db_access.json
+dev_config.json

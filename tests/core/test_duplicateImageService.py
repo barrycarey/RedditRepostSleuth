@@ -42,9 +42,9 @@ class TestDuplicateImageService(TestCase):
 
     def test__remove_duplicates_one_dup_remove(self):
         matches = [
-            ImageSearchMatch('test.com', 123, Post(id=1), 10, 10, 32),
-            ImageSearchMatch('test.com', 123, Post(id=1), 10, 10, 32),
-            ImageSearchMatch('test.com', 123, Post(id=2), 10, 10, 32)
+            ImageSearchMatch('test.com', 123, Post(id=1), 40, 256),
+            ImageSearchMatch('test.com', 123, Post(id=1), 40, 256),
+            ImageSearchMatch('test.com', 123, Post(id=2), 40, 256)
         ]
         dup_svc = DuplicateImageService(Mock(), Mock(), Mock(), config=MagicMock())
         r = dup_svc._remove_duplicates(matches)
