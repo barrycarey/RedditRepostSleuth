@@ -239,6 +239,20 @@ def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
 
+def hamming_distance_bits(hex_str1: str, hex_str2: str) -> int:
+    """
+    Calculate true bit-level hamming distance between two hex strings.
+    
+    :param hex_str1: First hex string
+    :param hex_str2: Second hex string
+    :return: Number of differing bits (0-256 for 64-char hex strings)
+    :raises ValueError: If hex strings have different lengths
+    """
+    if len(hex_str1) != len(hex_str2):
+        raise ValueError(f"Hex strings must have equal length")
+    return (int(hex_str1, 16) ^ int(hex_str2, 16)).bit_count()
+
+
 def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
         config.default_image_target_match,
@@ -252,8 +266,6 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
         meme_filter=config.default_image_meme_filter,
         same_sub=config.default_image_same_sub_filter,
         max_days_old=config.default_image_max_days_old_filter,
-        target_annoy_distance=config.default_image_target_annoy_distance,
-        max_depth=10000,
         max_matches=config.default_image_max_matches
 
     )
@@ -261,21 +273,19 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSettings:
     search_settings = ImageSearchSettings(
         req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
-        config.default_image_target_annoy_distance,
         target_title_match=req.get_param_as_int('target_title_match', required=False,
                              default=None) or config.default_image_target_title_match,
         filter_dead_matches=req.get_param_as_bool('filter_dead_matches', required=False, default=None),
         filter_removed_matches=req.get_param_as_bool('filter_removed_matches', required=False, default=None),
-        only_older_matches=req.get_param_as_bool('only_older_matches', required=False, default=None),
-        filter_same_author=req.get_param_as_bool('filter_same_author', required=False, default=None),
+        only_older_matches=req.get_param_as_bool('only_older', required=False, default=None),
+        filter_same_author=req.get_param_as_bool('filter_author', required=False, default=None),
         filter_crossposts=req.get_param_as_bool('include_crossposts', required=False, default=None),
         target_meme_match_percent=req.get_param_as_int('target_meme_match_percent', required=False,
                              default=None) or config.default_image_target_meme_match,
         meme_filter=req.get_param_as_bool('meme_filter', required=False, default=None),
         same_sub=req.get_param_as_bool('same_sub', required=False, default=None),
-        max_days_old=req.get_param_as_int('max_days_old', required=False,
+        max_days_old=req.get_param_as_int('target_days_old', required=False,
                              default=None) or config.default_link_max_days_old_filter,
-        max_depth=10000
 
     )
 
@@ -328,10 +338,9 @@ def get_image_search_settings_from_form_data(form_data: dict, config: Config) ->
     target_match = _parse_int(form_data.get('target_match_percent'))
     if target_match is None:
         target_match = config.default_image_target_match
-    
+
     search_settings = ImageSearchSettings(
         target_match,
-        config.default_image_target_annoy_distance,
         target_title_match=_parse_int(form_data.get('target_title_match')) or config.default_image_target_title_match,
         filter_dead_matches=_parse_bool(form_data.get('filter_dead_matches')),
         filter_removed_matches=_parse_bool(form_data.get('filter_removed_matches')),
@@ -342,7 +351,6 @@ def get_image_search_settings_from_form_data(form_data: dict, config: Config) ->
         meme_filter=_parse_bool(form_data.get('meme_filter')),
         same_sub=_parse_bool(form_data.get('same_sub')),
         max_days_old=_parse_int(form_data.get('target_days_old')) or config.default_link_max_days_old_filter,
-        max_depth=10000
     )
 
     if search_settings.filter_dead_matches is None:
@@ -423,10 +431,9 @@ def get_text_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> T
 
     )
 
-def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, target_annoy_distance: float = 170.0) -> ImageSearchSettings:
+def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
     return ImageSearchSettings(
         monitored_sub.target_image_match,
-        target_annoy_distance,
         target_meme_match_percent=monitored_sub.target_image_meme_match,
         meme_filter=monitored_sub.meme_filter,
         target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
@@ -435,7 +442,6 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         filter_same_author=monitored_sub.filter_same_author,
         filter_crossposts=monitored_sub.filter_crossposts,
         filter_removed_matches=monitored_sub.filter_removed_matches,
-        max_depth=10000,
         max_matches=200
 
     )

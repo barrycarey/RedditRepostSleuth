@@ -12,7 +12,6 @@ class ImageSearchMatch(SearchMatch):
             match_id: int,
             post: Post,
             hamming_distance: int,
-            annoy_distance: float,
             hash_size: int,
             title_similarity: int = 0,
             ):
@@ -20,14 +19,12 @@ class ImageSearchMatch(SearchMatch):
         :param searched_url: URL of the searched image
         :param post: Post obj of this match
         :param title_similarity: % similarity of title
-        :param hamming_distance: Hamming distance between match and searched image
-        :param annoy_distance:  Annoy distance between match and searched image
-        :param hash_size: Hash size used in search
+        :param hamming_distance: Bit-level hamming distance between match and searched image (0-256 for 256-bit hash)
+        :param hash_size: Hash size in bits (256 for standard 64-char hex hash)
         """
         super().__init__(searched_url, post, title_similarity)
         # TODO - Don't need to set attrbs used in super
         self.hash_size = hash_size
-        self.annoy_distance = annoy_distance
         self.hamming_distance = hamming_distance
         self.title_similarity = title_similarity
         self.post = post
@@ -41,7 +38,6 @@ class ImageSearchMatch(SearchMatch):
     def to_dict(self):
         return {**{
             'hamming_distance': self.hamming_distance,
-            'annoy_distance': self.annoy_distance,
             'hamming_match_percent': self.hamming_match_percent,
             'hash_size': self.hash_size,
         }, **super().to_dict()}

@@ -37,29 +37,14 @@ def same_sub_filter(subreddit: Text):
     return sub_filter
 
 
-def annoy_distance_filter(target_annoy_distance: float):
-    def annoy_filter(match: ImageSearchMatch):
-        if match.annoy_distance <= target_annoy_distance:
-            return True
-        log.debug('Annoy Filter Reject - Target: %s Actual: %s - %s', target_annoy_distance, match.annoy_distance,
-                  f'https://redd.it/{match.post.post_id}')
-        return False
-    return annoy_filter
-
 def text_distance_filter(target_distance: float):
-    def annoy_filter(match: TextSearchMatch):
+    def distance_filter(match: TextSearchMatch):
         if match.distance >= target_distance:
             return True
         log.debug('Text Distance Filter Reject - Target: %s Actual: %s - %s', target_distance, match.distance,
                   f'https://redd.it/{match.post.post_id}')
         return False
-    return annoy_filter
-
-
-def raw_annoy_filter(target_annoy_distance: float):
-    def annoy_filter(item):
-        return item[1] < target_annoy_distance
-    return annoy_filter
+    return distance_filter
 
 
 def hamming_distance_filter(target_hamming_distance: float):

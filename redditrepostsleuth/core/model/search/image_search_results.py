@@ -43,11 +43,19 @@ class ImageSearchResults(SearchResults):
 
     @property
     def target_hamming_distance(self):
-        return get_hamming_from_percent(self.search_settings.target_match_percent, len(self.target_hash))
+        """
+        Returns the target hamming distance in bits for filtering matches.
+        Uses bit-level calculation (0-256 for 256-bit/64-char hex hash).
+        """
+        return get_hamming_from_percent(self.search_settings.target_match_percent, len(self.target_hash) * 4)
 
     @property
     def target_meme_hamming_distance(self):
-        return get_hamming_from_percent(self.search_settings.target_meme_match_percent, len(self.meme_hash))
+        """
+        Returns the target meme hamming distance in bits for filtering meme matches.
+        Uses bit-level calculation (0-256 for 256-bit/64-char hex hash).
+        """
+        return get_hamming_from_percent(self.search_settings.target_meme_match_percent, len(self.meme_hash) * 4)
 
     @property
     def report_data(self) -> Optional[Text]:

@@ -189,7 +189,6 @@ class Config:
             'default_image_target_meme_match',
             'default_image_target_title_match',
             'default_image_meme_filter',
-            'default_image_target_annoy_distance',
             'default_image_max_matches',
             'default_image_same_sub_filter',
             'default_image_dead_matches_filter',

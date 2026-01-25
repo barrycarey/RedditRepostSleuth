@@ -43,6 +43,7 @@ class ImageSearch:
     def on_get(self, req: Request, resp: Response):
         url = req.get_param('url', required=False, default=None)
         post_id = req.get_param('postId', required=False, default=None)
+        sort_by = req.get_param('sort_by', required=False, default='highest_match')
         if not post_id:
             post_id = reddit_post_id_from_url(url)
 
@@ -53,7 +54,7 @@ class ImageSearch:
             if not is_image_url(url):
                 raise HTTPBadRequest(title='Invalid URL', description='The provided URL is not supported')
         search_settings = get_image_search_settings_from_request(req, self.config)
-        search_results = check_image(search_settings, self.uowm, self.image_svc, post_id=post_id, url=url)
+        search_results = check_image(search_settings, self.uowm, self.image_svc, post_id=post_id, url=url, sort_by=sort_by)
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
 
     def on_get_static_image(self, req: Request, resp: Response, name: Text):
@@ -142,7 +143,6 @@ class ImageSearch:
                 filter_dead_matches=filter_dead_matches,
                 filter_author=filter_author,
                 max_matches=500,
-                max_depth=-1,
                 source='api'
             )
         except NoIndexException:
