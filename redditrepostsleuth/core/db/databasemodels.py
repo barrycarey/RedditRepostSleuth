@@ -383,7 +383,6 @@ class MonitoredSub(Base):
             'report_msg': self.report_msg,
             'requestor': self.requestor,
             'added_at': self.added_at.timestamp() if self.added_at else None,
-            'target_annoy': self.target_annoy,
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
             'filter_crossposts': self.filter_crossposts,
