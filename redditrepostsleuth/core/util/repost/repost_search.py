@@ -30,10 +30,10 @@ from redditrepostsleuth.core.util.repost_filters import text_distance_filter
 config = Config()
 log = logging.getLogger(__name__)
 
-def get_text_matches(text: str) -> APISearchResults:
+def get_text_matches(text: str, source: str = 'unknown') -> APISearchResults:
 
     try:
-        res = requests.post(f'{config.index_api}/text', json={'text': text})
+        res = requests.post(f'{config.index_api}/text', json={'text': text}, headers={'x-source': source})
     except ConnectionError:
         log.error('Failed to connect to Index API')
         raise NoIndexException('Failed to connect to Index API')
@@ -58,7 +58,7 @@ def text_search_by_post(
 ) -> Optional[SearchResults]:
 
     search_results = SearchResults(post.url, checked_post=post, search_settings=search_settings)
-    api_results = get_text_matches(post.selftext)
+    api_results = get_text_matches(post.selftext, source=source)
     for index_results in api_results.results:
         for match in index_results.matches:
             post = uow.posts.get_by_id(match.id)

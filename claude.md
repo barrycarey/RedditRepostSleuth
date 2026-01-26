@@ -2,8 +2,10 @@
 
 ## Important Development Practices
 - Run all unit tests before and after making changes
+- All new code requires test coverage
 - When implementing new features or updates, make a commit when finished
 - When you finish implementing a plan, create a commit
+- When making any changes involving duplicateimageservice.py, extra thought must be given to unintended impacts.  This is core to the bot.
 
 ## Project Overview
 
