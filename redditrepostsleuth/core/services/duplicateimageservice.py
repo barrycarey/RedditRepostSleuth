@@ -138,7 +138,7 @@ class DuplicateImageService:
 
         if search_settings.meme_filter:
             search_results.search_times.start_timer('meme_detection_time')
-            search_results.meme_template = self._get_meme_template(search_results.target_hash)
+            search_results.meme_template = self._get_meme_template(search_results.target_hash, source=source)
             search_results.search_times.stop_timer('meme_detection_time')
             if search_results.meme_template:
                 search_settings.target_match_percent = 100  # Keep only 100% matches on default hash size
@@ -161,6 +161,7 @@ class DuplicateImageService:
             search_results.target_hash,
             search_results.target_hamming_distance,  # Bit-level distance (0-256)
             max_matches=search_settings.max_matches,
+            source=source,
         )
         search_results.search_times.stop_timer('image_search_api_time')
 
@@ -262,12 +263,14 @@ class DuplicateImageService:
             hash: Text,
             target_hamming_distance: float,
             max_matches: int = 50,
+            source: str = 'unknown',
     ) -> APISearchResults:
         """
         Take a given hash and search the image index API for matches
         :param hash: Hash of image to search
         :param target_hamming_distance: Target hamming distance (in bits, 0-256 for 256-bit hash)
         :param max_matches: Max results to fetch from index API
+        :param source: Source of the request for logging
         :rtype: APISearchResults
         """
         try:
@@ -278,13 +281,17 @@ class DuplicateImageService:
             }
             url = f'{self.config.index_api}/image'
             log.debug('Image Index API request: %s with params %s', url, params)
-            r = requests.get(url, params=params)
+            r = requests.get(url, params=params, headers={'x-source': source})
         except ConnectionError:
             log.error('Failed to connect to Index API')
             raise NoIndexException('Failed to connect to Index API')
         except Exception as e:
             log.exception('Problem with image index api', exc_info=True)
             raise
+
+        if r.status_code == 503:
+            log.warning('Index API returned 503 (indexes loading)')
+            raise NoIndexException('Index API unavailable (503)')
 
         if r.status_code != 200:
             log.error('Unexpected status from index API: %s | %s', r.status_code, r.text)
@@ -408,9 +415,9 @@ class DuplicateImageService:
         return results
 
 
-    def _get_meme_template(self, image_hash: Text) -> Optional[MemeTemplate]:
+    def _get_meme_template(self, image_hash: Text, source: str = 'unknown') -> Optional[MemeTemplate]:
         try:
-            r = requests.get(f'{self.config.index_api}/meme', params={'hash': image_hash})
+            r = requests.get(f'{self.config.index_api}/meme', params={'hash': image_hash}, headers={'x-source': source})
         except Exception as e:
             log.exception('Failed to get meme template from api', exc_info=True)
             return

@@ -20,10 +20,10 @@ from redditrepostsleuth.core.util.helpers import get_default_link_search_setting
 config = Config()
 log = logging.getLogger(__name__)
 
-def get_text_matches(text: str) -> APISearchResults:
+def get_text_matches(text: str, source: str = 'unknown') -> APISearchResults:
 
     try:
-        res = requests.post(f'{config.index_api}/text', json={'text': text})
+        res = requests.post(f'{config.index_api}/text', json={'text': text}, headers={'x-source': source})
     except ConnectionError:
         log.error('Failed to connect to Index API')
         raise NoIndexException('Failed to connect to Index API')

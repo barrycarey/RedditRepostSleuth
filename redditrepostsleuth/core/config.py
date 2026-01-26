@@ -215,6 +215,11 @@ class Config:
             'default_text_max_days_old_filter',
             'default_text_target_distance',
             'discord_logging_hook',
+            'patreon_access_token',
+            'patreon_campaign_id',
+            'patreon_client_id',
+            'patreon_client_secret',
+            'patreon_refresh_token',
 
         ]
 

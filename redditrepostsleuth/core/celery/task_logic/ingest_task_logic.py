@@ -144,8 +144,11 @@ def image_links_from_gallery_meta_data(meta_data: dict[str, dict]) -> list[str]:
     """
     extension_map = {
         'image/jpg': '.jpg',
+        'image/jpeg': '.jpg',
         'image/png': '.png',
-        'image/gif': '.gif'
+        'image/gif': '.gif',
+        'image/webp': '.webp',
+        'image/avif': '.avif',
     }
 
     image_urls = []
@@ -162,8 +165,13 @@ def image_links_from_gallery_meta_data(meta_data: dict[str, dict]) -> list[str]:
         if v['status'] != 'valid':
             raise ValueError(f'Unexpected status in Gallery meta data {v["status"]}')
 
+        mime_type = v.get("m")
+        if mime_type not in extension_map:
+            log.warning('Unknown gallery MIME type: %s for post item %s', mime_type, k)
+            continue
+
         image_urls.append(
-            f'https://i.redd.it/{k}{extension_map[v["m"]]}'
+            f'https://i.redd.it/{k}{extension_map[mime_type]}'
         )
 
     return image_urls
