@@ -79,3 +79,36 @@ def check_image(
     except ImageConversionException as e:
         log.warning('Problem hashing the provided url: %s', str(e))
         raise HTTPBadRequest('Invalid URL', 'The provided URL is not a valid image')
+
+
+def preload_hashes_for_search_results(search_results: ImageSearchResults, uowm) -> None:
+    """Load hashes for all posts in search results to avoid DetachedInstanceError during serialization."""
+    # Collect all posts that need hashes
+    posts = []
+    if search_results.checked_post:
+        posts.append(search_results.checked_post)
+    for match in search_results.matches:
+        if match.post:
+            posts.append(match.post)
+    if search_results.closest_match and search_results.closest_match.post:
+        posts.append(search_results.closest_match.post)
+
+    if not posts:
+        return
+
+    # Get unique post IDs (use internal id, not post_id string)
+    post_ids = list(set(p.id for p in posts))
+
+    with uowm.start() as uow:
+        # Fetch all hashes in one query
+        from redditrepostsleuth.core.db.databasemodels import PostHash
+        all_hashes = uow.session.query(PostHash).filter(PostHash.post_id.in_(post_ids)).all()
+
+        # Group by post_id
+        hashes_by_post_id = {}
+        for h in all_hashes:
+            hashes_by_post_id.setdefault(h.post_id, []).append(h)
+
+        # Attach to posts (set the attribute directly to bypass lazy loading)
+        for post in posts:
+            post.hashes = hashes_by_post_id.get(post.id, [])
