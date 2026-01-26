@@ -50,6 +50,11 @@ class Post(Base):
     #post_type = relationship('PostType', lazy='joined')
 
     def to_dict(self):
+        from sqlalchemy.orm.exc import DetachedInstanceError
+        try:
+            hashes = [h.to_dict() for h in self.hashes]
+        except DetachedInstanceError:
+            hashes = []
         return {
             'post_id': self.post_id,
             'url': self.url,
@@ -59,7 +64,7 @@ class Post(Base):
             'created_at': self.created_at.timestamp(),
             'author': self.author,
             'subreddit': self.subreddit,
-            'hashes': [h.to_dict() for h in self.hashes]
+            'hashes': hashes
         }
 
 class PostType(Base):
