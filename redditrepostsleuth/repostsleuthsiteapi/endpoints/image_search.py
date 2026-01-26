@@ -2,9 +2,10 @@ import json
 import mimetypes
 import os
 import re
+from datetime import datetime
 from typing import Text
 
-from falcon import Response, Request, HTTPBadRequest, HTTPServiceUnavailable
+from falcon import Response, Request, HTTPBadRequest, HTTPServiceUnavailable, HTTPNotFound
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
@@ -14,8 +15,8 @@ from redditrepostsleuth.core.jsonencoders import ImageRepostWrapperEncoder
 from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.util.helpers import get_image_search_settings_from_request, get_image_search_settings_from_form_data, reddit_post_id_from_url, \
-    is_image_url
-from redditrepostsleuth.repostsleuthsiteapi.util.helpers import check_image
+    is_image_url, hamming_distance_bits
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import check_image, preload_hashes_for_search_results
 from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
 
@@ -43,6 +44,11 @@ class ImageSearch:
     def on_get(self, req: Request, resp: Response):
         url = req.get_param('url', required=False, default=None)
         post_id = req.get_param('postId', required=False, default=None)
+        sort_by = req.get_param('sort_by', required=False, default='highest_match')
+
+        log.debug('ImageSearch request received - URL: %s, Post ID: %s, Sort By: %s, Remote Addr: %s, User Agent: %s',
+                  url, post_id, sort_by, req.remote_addr, req.user_agent)
+
         if not post_id:
             post_id = reddit_post_id_from_url(url)
 
@@ -53,7 +59,12 @@ class ImageSearch:
             if not is_image_url(url):
                 raise HTTPBadRequest(title='Invalid URL', description='The provided URL is not supported')
         search_settings = get_image_search_settings_from_request(req, self.config)
-        search_results = check_image(search_settings, self.uowm, self.image_svc, post_id=post_id, url=url)
+        log.debug('ImageSearch settings - Target Match: %s, Max Matches: %s, Filter Dead: %s, Meme Filter: %s',
+                  search_settings.target_match_percent, search_settings.max_matches,
+                  search_settings.filter_dead_matches, search_settings.meme_filter)
+        search_results = check_image(search_settings, self.uowm, self.image_svc, post_id=post_id, url=url, sort_by=sort_by)
+        log.debug('ImageSearch completed - Post ID: %s, URL: %s', post_id, url)
+        preload_hashes_for_search_results(search_results, self.uowm)
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
 
     def on_get_static_image(self, req: Request, resp: Response, name: Text):
@@ -115,6 +126,7 @@ class ImageSearch:
             target_hash=target_hash,
             meme_hash=meme_hash
         )
+        preload_hashes_for_search_results(search_results, self.uowm)
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
 
     def on_get_search_by_url(self, req: Request, resp: Response):
@@ -142,7 +154,6 @@ class ImageSearch:
                 filter_dead_matches=filter_dead_matches,
                 filter_author=filter_author,
                 max_matches=500,
-                max_depth=-1,
                 source='api'
             )
         except NoIndexException:
@@ -150,11 +161,69 @@ class ImageSearch:
             raise HTTPServiceUnavailable('Search API is not available.', 'The search API is not currently available')
 
         print(search_results.search_times.to_dict())
+        preload_hashes_for_search_results(search_results, self.uowm)
         resp.body = json.dumps(search_results, cls=ImageRepostWrapperEncoder)
     def on_get_compare(self, req: Request, resp: Response):
+        post_id_one = req.get_param('post_id_one', required=True)
+        post_id_two = req.get_param('post_id_two', required=True)
+
         with self.uowm.start() as uow:
-            post_one = uow.posts.get_by_post_id(req.get_param('post_one', required=True))
-            post_two = uow.posts.get_by_post_id(req.get_param('post_two', required=True))
+            post_one = uow.posts.get_by_post_id(post_id_one)
+            post_two = uow.posts.get_by_post_id(post_id_two)
+
+            if not post_one:
+                raise HTTPNotFound(title='Post not found', description=f'Post {post_id_one} not found in database')
+            if not post_two:
+                raise HTTPNotFound(title='Post not found', description=f'Post {post_id_two} not found in database')
+
+            # Get dhash_h (hash_type_id == 1) for both posts
+            hash_one = next((h.hash for h in post_one.hashes if h.hash_type_id == 1), None)
+            hash_two = next((h.hash for h in post_two.hashes if h.hash_type_id == 1), None)
+
+            # Calculate similarity metrics
+            similarity = {
+                'match_percent': 0,
+                'hamming_distance': 256,  # Max distance for 256-bit hash
+                'dhash_similarity': 0,
+                'visual_similarity': 0
+            }
+
+            if hash_one and hash_two:
+                hamming_dist = hamming_distance_bits(hash_one, hash_two)
+                hash_bits = len(hash_one) * 4  # 4 bits per hex char
+                match_percent = round(100 - (hamming_dist / hash_bits) * 100, 2)
+
+                similarity = {
+                    'match_percent': match_percent,
+                    'hamming_distance': hamming_dist,
+                    'dhash_similarity': match_percent,
+                    'visual_similarity': match_percent
+                }
+
+            def post_to_comparison_dict(post, dhash):
+                return {
+                    'post_id': post.post_id,
+                    'title': post.title,
+                    'author': post.author,
+                    'subreddit': post.subreddit,
+                    'url': post.url,
+                    'permalink': f'https://reddit.com{post.perma_link}' if post.perma_link else None,
+                    'image_url': post.url,
+                    'thumbnail_url': None,
+                    'created_at': post.created_at.isoformat() if post.created_at else None,
+                    'score': None,  # Not stored in DB
+                    'num_comments': None,  # Not stored in DB
+                    'is_nsfw': post.nsfw,
+                    'dhash_h': dhash
+                }
+
+            result = {
+                'post_one': post_to_comparison_dict(post_one, hash_one),
+                'post_two': post_to_comparison_dict(post_two, hash_two),
+                'similarity': similarity
+            }
+
+            resp.body = json.dumps(result)
 
     # def on_get_compare_image_text(self, req: Request, resp: Response):
     #     image_one_text, _ = get_image_text_tesseract(req.get_param('image_one', required=True), self.config.ocr_east_model)

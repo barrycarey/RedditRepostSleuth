@@ -31,10 +31,21 @@ config = Config()
 
 def sort_reposts(posts: List[RepostMatch], reverse=False, sort_by='created') -> List[RepostMatch]:
     """
-    Take a list of reposts and sort them by date
-    :param posts:
+    Take a list of reposts and sort them by date or match percent
+    :param posts: List of repost matches to sort
+    :param reverse: Whether to reverse the sort order (only used for 'created' and 'percent')
+    :param sort_by: Sort method - 'created', 'percent', 'newest', 'oldest', 'highest_match', 'lowest_match'
     """
-    if sort_by == 'created':
+    # Map frontend values to internal logic
+    if sort_by == 'newest':
+        return sorted(posts, key=lambda x: x.post.created_at, reverse=True)
+    elif sort_by == 'oldest':
+        return sorted(posts, key=lambda x: x.post.created_at, reverse=False)
+    elif sort_by == 'highest_match':
+        return sorted(posts, key=lambda x: x.hamming_match_percent, reverse=True)
+    elif sort_by == 'lowest_match':
+        return sorted(posts, key=lambda x: x.hamming_match_percent, reverse=False)
+    elif sort_by == 'created':
         return sorted(posts, key=lambda x: x.post.created_at, reverse=reverse)
     elif sort_by == 'percent':
         return sorted(posts, key=lambda x: x.hamming_match_percent, reverse=True)

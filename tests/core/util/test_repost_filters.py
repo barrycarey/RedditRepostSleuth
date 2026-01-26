@@ -5,7 +5,7 @@ from unittest.mock import patch, Mock
 
 from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
-from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_sub_filter, annoy_distance_filter, \
+from redditrepostsleuth.core.util.repost_filters import cross_post_filter, same_sub_filter, \
     hamming_distance_filter, filter_newer_matches, filter_days_old_matches, filter_same_author, filter_same_post, \
     filter_title_keywords, filter_title_distance, filter_dead_urls_remote
 from redditrepostsleuth.core.util.repost.repost_helpers import filter_search_results
@@ -38,16 +38,6 @@ class TestRepostFilters(TestCase):
         r = list(filter(hamming_distance_filter(11), search_results.matches))
         self.assertEqual(len(r), 1)
         self.assertEqual(1, r[0].post.id)
-
-    def test_annoy_distance_filter__remove_higher_distance(self):
-        search_results = get_image_search_results_multi_match()
-        search_results.matches[0].annoy_distance = .100
-        search_results.matches[1].annoy_distance = .200
-        search_results.matches[2].annoy_distance = .250
-        r = list(filter(annoy_distance_filter(0.150), search_results.matches))
-        self.assertEqual(len(r), 1)
-        self.assertEqual(1, r[0].post.id)
-
 
     def test_filter_days_old_matches__remove_older(self):
         search_results = get_image_search_results_multi_match()
@@ -127,9 +117,8 @@ class TestRepostFilters(TestCase):
                 'test.com',
                 1,
                 Post(id=1, author='barry', post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         # Dropped by crosspost
@@ -138,9 +127,8 @@ class TestRepostFilters(TestCase):
                 'test.com',
                 1,
                 Post(id=2, author='steve', post_id='123abc', is_crosspost=True, created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         # Dropped by only older
@@ -149,9 +137,8 @@ class TestRepostFilters(TestCase):
                 'test.com',
                 1,
                 Post(id=3, author='steve', post_id='3333', title='some normal title', created_at=datetime.utcfromtimestamp(1574081650)),
-                10,
-                0.250,
-                32
+                40,
+                256
             )
         )
         # Dropped by same sub
@@ -160,9 +147,8 @@ class TestRepostFilters(TestCase):
                 'test.com',
                 1,
                 Post(id=4, author='steve', post_id='4444', title='some normal title', subreddit='sub2', created_at=datetime.utcfromtimestamp(1573908850)),
-                10,
-                0.250,
-                32
+                40,
+                256
             )
         )
         matches.append(
@@ -170,9 +156,8 @@ class TestRepostFilters(TestCase):
                 'test.com',
                 1,
                 Post(id=5, author='steve', post_id='5555', title='some normal title', subreddit='sub1', created_at=datetime.utcfromtimestamp(1573988200)),
-                10,
-                0.250,
-                32
+                40,
+                256
             )
         )
         # Dropped by same post
@@ -181,9 +166,8 @@ class TestRepostFilters(TestCase):
                 'test.com',
                 1,
                 Post(id=6, post_id='1111', title='some normal title', subreddit='sub1', created_at=datetime.utcfromtimestamp(1573908850)),
-                10,
-                0.250,
-                32
+                40,
+                256
             )
         )
         matches.append(
@@ -192,9 +176,8 @@ class TestRepostFilters(TestCase):
                 1,
                 Post(id=7, post_id='6666', title='some normal title', subreddit='sub1',
                      created_at=datetime.utcfromtimestamp(1573908850)),
-                10,
-                0.250,
-                32
+                40,
+                256
             )
         )
         search_results.matches = matches

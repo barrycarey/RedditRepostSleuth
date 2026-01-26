@@ -294,7 +294,7 @@ class SummonsHandler:
         response = SummonsResponse(summons=summons)
         # TODO - THis doesn't honor monitored sub settings
         search_settings = get_default_image_search_settings(self.config)
-        target_image_match, target_meme_match, target_annoy_distance = self._get_target_distances(
+        target_image_match, target_meme_match = self._get_target_distances(
             monitored_sub
         )
         search_settings.target_match_percent = target_image_match
@@ -325,19 +325,18 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def _get_target_distances(self, monitored_sub: MonitoredSub) -> Tuple[int, int, float]:
+    def _get_target_distances(self, monitored_sub: MonitoredSub) -> Tuple[int, int]:
         """
         Check if the post we were summoned on is in a monitored sub.  If it is get the target distances for that sub
-        :rtype: Tuple[int,float]
+        :rtype: Tuple[int, int]
         :param monitored_sub: Subreddit name
-        :return: Tuple with target hamming and annoy
+        :return: Tuple with target match percent and meme match percent
         """
         if monitored_sub:
             target_match_percent = monitored_sub.target_image_match
             target_meme_match_percent = monitored_sub.target_image_meme_match
-            target_annoy_distance = monitored_sub.target_annoy
-            return target_match_percent, target_meme_match_percent, target_annoy_distance
-        return self.config.default_image_target_match, self.config.default_image_target_meme_match, self.config.default_image_target_annoy_distance
+            return target_match_percent, target_meme_match_percent
+        return self.config.default_image_target_match, self.config.default_image_target_meme_match
 
 
     def _send_response(self, response: SummonsResponse) -> None:

@@ -12,12 +12,9 @@ class TextSearchSettings(SearchSettings):
             **kwargs
     ):
         """
-        Settings to use when performing an image search.
+        Settings to use when performing a text search.
         When values are not provided sensible defaults are used
-        :param target_match_percent: Percent threshold a match must meet to be considered
-        :param target_meme_match_percent: Percent threshold an identified meme must match to be considered
-        :param target_annoy_distance: Minimum distance from the annoy indiex
-        :param meme_filter: enable the meme filter when searching
+        :param target_distance: Minimum distance threshold for text matching
         :param kwargs:
         """
         super().__init__(**kwargs)

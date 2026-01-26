@@ -33,7 +33,6 @@
     "default_image_max_matches": 250,
     "default_image_target_match": 86,
     "default_image_target_meme_match":96,
-    "default_image_target_annoy_distance": 170,
     "default_image_meme_filter": true,
     "default_image_same_sub_filter": false,
     "default_image_max_days_old_filter": 99999,

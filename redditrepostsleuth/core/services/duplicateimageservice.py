@@ -4,7 +4,6 @@ from time import perf_counter
 from typing import List, Text, Optional
 
 import requests
-from distance import hamming
 from praw import Reddit
 from requests.exceptions import ConnectionError
 from sqlalchemy.exc import IntegrityError
@@ -13,18 +12,18 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHash
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
-from redditrepostsleuth.core.model.events.annoysearchevent import AnnoySearchEvent
+from redditrepostsleuth.core.model.events.imagesearchevent import ImageSearchEvent
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
 from redditrepostsleuth.core.model.search.image_search_results import ImageSearchResults
 from redditrepostsleuth.core.services.eventlogging import EventLogging
-from redditrepostsleuth.core.util.helpers import get_default_image_search_settings
+from redditrepostsleuth.core.util.helpers import get_default_image_search_settings, hamming_distance_bits
 from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 from redditrepostsleuth.core.util.repost.repost_helpers import sort_reposts, get_closest_image_match, \
     set_all_title_similarity, \
     filter_search_results, log_search
-from redditrepostsleuth.core.util.repost_filters import annoy_distance_filter, hamming_distance_filter
+from redditrepostsleuth.core.util.repost_filters import hamming_distance_filter
 
 log = logging.getLogger(__name__)
 
@@ -53,11 +52,9 @@ class DuplicateImageService:
         """
         Take a list of matches and filter out posts that are not reposts.
         This is done via distance checking, creation date, crosspost
-        :param checked_post: The post we're finding matches for
-        :param search_results: A cleaned list of matches
-        :param target_hamming_distance: Hamming cutoff for matches
-        :param target_annoy_distance: Annoy cutoff for matches
-        :rtype: List[ImageSearchMatch]
+        :param search_results: Search results containing matches to filter
+        :param sort_by: How to sort the filtered results
+        :rtype: ImageSearchResults
         """
 
         log.debug('Starting result filters with %s matches', len(search_results.matches))
@@ -78,13 +75,12 @@ class DuplicateImageService:
             if search_results.closest_match and search_results.meme_template:
                 search_results.search_times.start_timer('set_closest_meme_hash_time')
                 match_hash = self._get_meme_hash(search_results.closest_match.post.url)
-                search_results.closest_match.hamming_distance = hamming(search_results.meme_hash, match_hash)
-                search_results.closest_match.hash_size = len(match_hash)
+                search_results.closest_match.hamming_distance = hamming_distance_bits(search_results.meme_hash, match_hash)
+                search_results.closest_match.hash_size = len(match_hash) * 4  # Bit count
                 search_results.search_times.stop_timer('set_closest_meme_hash_time')
 
         # Has to be after closest match so we don't drop closest
         search_results.search_times.start_timer('distance_filter_time')
-        search_results.matches = list(filter(annoy_distance_filter(search_results.search_settings.target_annoy_distance), search_results.matches))
         search_results.matches = list(filter(hamming_distance_filter(search_results.target_hamming_distance), search_results.matches))
         search_results.search_times.stop_timer('distance_filter_time')
 
@@ -97,8 +93,8 @@ class DuplicateImageService:
         search_results.matches = sort_reposts(search_results.matches, sort_by=sort_by)
 
         for match in search_results.matches:
-            log.debug('Match found: %s - A:%s H:%s P:%s', f'https://redd.it/{match.post.post_id}',
-                      round(match.annoy_distance, 5), match.hamming_distance, f'{match.hamming_match_percent}%')
+            log.debug('Match found: %s - H:%s P:%s', f'https://redd.it/{match.post.post_id}',
+                      match.hamming_distance, f'{match.hamming_match_percent}%')
 
         return search_results
 
@@ -142,7 +138,7 @@ class DuplicateImageService:
 
         if search_settings.meme_filter:
             search_results.search_times.start_timer('meme_detection_time')
-            search_results.meme_template = self._get_meme_template(search_results.target_hash)
+            search_results.meme_template = self._get_meme_template(search_results.target_hash, source=source)
             search_results.search_times.stop_timer('meme_detection_time')
             if search_results.meme_template:
                 search_settings.target_match_percent = 100  # Keep only 100% matches on default hash size
@@ -163,15 +159,23 @@ class DuplicateImageService:
         search_results.search_times.start_timer('image_search_api_time')
         api_search_results = self._get_matches(
             search_results.target_hash,
-            search_results.target_hamming_distance,
-            search_settings.target_annoy_distance,
+            search_results.target_hamming_distance,  # Bit-level distance (0-256)
             max_matches=search_settings.max_matches,
-            max_depth=search_settings.max_depth,
+            source=source,
         )
         search_results.search_times.stop_timer('image_search_api_time')
 
         search_results.search_times.index_search_time = float(api_search_results.total_search_time)
         search_results.total_searched = api_search_results.total_searched
+
+        # Pre-filter before expensive DB lookup
+        search_results.search_times.start_timer('prefilter_time')
+        api_search_results, _ = self._prefilter_api_results(
+            api_search_results,
+            search_results.target_hamming_distance,
+            keep_top_n=10
+        )
+        search_results.search_times.stop_timer('prefilter_time')
 
         search_results.search_times.start_timer('set_match_post_time')
         search_results.matches = self._build_search_results(api_search_results, url, search_results.target_hash)
@@ -258,35 +262,36 @@ class DuplicateImageService:
             self,
             hash: Text,
             target_hamming_distance: float,
-            target_annoy_distance: float,
             max_matches: int = 50,
-            max_depth: int = 4000,
+            source: str = 'unknown',
     ) -> APISearchResults:
         """
         Take a given hash and search the image index API for matches
         :param hash: Hash of image to search
-        :param target_hamming_distance: Target hamming distance
-        :param target_annoy_distance: Target annoy distance
+        :param target_hamming_distance: Target hamming distance (in bits, 0-256 for 256-bit hash)
         :param max_matches: Max results to fetch from index API
-        :param max_depth: Max depth to search index
-        :rtype: ImageIndexApiResult
+        :param source: Source of the request for logging
+        :rtype: APISearchResults
         """
         try:
-
             params = {
                 'hash': hash,
                 'max_results': max_matches,
-                'max_depth': max_depth,
-                'a_filter': target_annoy_distance,
-                'h_filter': target_hamming_distance
+                #'h_filter': target_hamming_distance
             }
-            r = requests.get(f'{self.config.index_api}/image', params=params)
+            url = f'{self.config.index_api}/image'
+            log.debug('Image Index API request: %s with params %s', url, params)
+            r = requests.get(url, params=params, headers={'x-source': source})
         except ConnectionError:
             log.error('Failed to connect to Index API')
             raise NoIndexException('Failed to connect to Index API')
         except Exception as e:
             log.exception('Problem with image index api', exc_info=True)
             raise
+
+        if r.status_code == 503:
+            log.warning('Index API returned 503 (indexes loading)')
+            raise NoIndexException('Index API unavailable (503)')
 
         if r.status_code != 200:
             log.error('Unexpected status from index API: %s | %s', r.status_code, r.text)
@@ -295,9 +300,58 @@ class DuplicateImageService:
         res_data = json.loads(r.text)
 
         try:
-            return APISearchResults(**res_data)
+            api_results = APISearchResults(**res_data)
+            # Debug: top 3 match distances across all indexes
+            all_matches = [m for idx_result in api_results.results for m in idx_result.matches]
+            top_3 = sorted(all_matches, key=lambda x: x.distance)[:3]
+            log.debug('Top 3 match distances: %s', [m.distance for m in top_3])
+            return api_results
         except TypeError as e:
             raise NoIndexException(f'Failed to convert API result: {str(e)}')
+
+    def _prefilter_api_results(
+            self,
+            api_results: APISearchResults,
+            target_hamming_distance: float,
+            keep_top_n: int = 10
+    ) -> tuple[APISearchResults, int]:
+        """
+        Pre-filter API results by hamming distance before DB lookup.
+        Keeps matches within threshold AND top N closest for closest_match accuracy.
+
+        :param api_results: Raw API search results
+        :param target_hamming_distance: Target distance threshold (bits)
+        :param keep_top_n: Number of closest matches to keep regardless of threshold
+        :return: Tuple of (filtered results, original match count)
+        """
+        original_count = sum(len(r.matches) for r in api_results.results)
+
+        for index_result in api_results.results:
+            if not index_result.matches:
+                continue
+
+            # Sort by distance (closest first)
+            sorted_matches = sorted(index_result.matches, key=lambda m: m.distance)
+
+            # Keep all within threshold
+            within_threshold = [m for m in sorted_matches if m.distance <= target_hamming_distance]
+
+            # Keep top N closest regardless of threshold
+            top_n = sorted_matches[:keep_top_n]
+
+            # Merge without duplicates (dict by id)
+            merged = {m.id: m for m in within_threshold}
+            for m in top_n:
+                if m.id not in merged:
+                    merged[m.id] = m
+
+            index_result.matches = list(merged.values())
+
+        filtered_count = sum(len(r.matches) for r in api_results.results)
+        log.debug('Pre-filter: %s -> %s matches (kept top %s + threshold %.1f)',
+                  original_count, filtered_count, keep_top_n, target_hamming_distance)
+
+        return api_results, original_count
 
     def _build_search_results(
             self,
@@ -307,28 +361,32 @@ class DuplicateImageService:
     ) -> List[ImageSearchMatch]:
         """
         Take a list of index matches and convert them to ImageSearchMatches
-        :param index_matches: Dict of raw matches from index search
+        :param api_search_results: Results from the FAISS index API search
         :param url: URL of the image we searched
-        :return:
+        :param searched_hash: The hash that was searched (unused, kept for API compatibility)
+        :return: List of ImageSearchMatch objects
         """
         results = []
         log.debug('Building search results from index matches')
         with self.uowm.start() as uow:
-            result_map = {}
             for r in api_search_results.results:
-                index_matches = uow.image_index_map.get_all_in_by_ids_and_index([m.id for m in r.matches], r.index_name)
+                log.debug(f'Found {len(r.matches)} in {r.index_name}')
+
+                # Create mapping from index ID to distance from API results
+                distance_map = {m.id: m.distance for m in r.matches}
+
+                index_matches = uow.image_index_map.get_all_in_by_ids_and_index(
+                    [m.id for m in r.matches], r.index_name
+                )
 
                 for im in index_matches:
-                    search_result = next((x for x in r.matches if x.id == im.annoy_index_id), None)
-                    image_match_hash = next((i for i in im.post.hashes if i.hash_type_id == 1), None) # get dhash_h
                     results.append(
                         ImageSearchMatch(
                             url,
                             im.post_id,
                             im.post,
-                            hamming(searched_hash, image_match_hash.hash),
-                            search_result.distance,
-                            len(image_match_hash.hash)
+                            int(distance_map[im.annoy_index_id]),  # Use annoy_index_id for lookup
+                            256  # Standard hash size in bits
                         )
                     )
 
@@ -337,7 +395,7 @@ class DuplicateImageService:
 
     def _log_search_time(self, search_results: ImageSearchResults, source: Text):
         self.event_logger.save_event(
-            AnnoySearchEvent(
+            ImageSearchEvent(
                 search_results.search_times,
                 event_type='duplicate_image_search',
                 source=source
@@ -357,9 +415,9 @@ class DuplicateImageService:
         return results
 
 
-    def _get_meme_template(self, image_hash: Text) -> Optional[MemeTemplate]:
+    def _get_meme_template(self, image_hash: Text, source: str = 'unknown') -> Optional[MemeTemplate]:
         try:
-            r = requests.get(f'{self.config.index_api}/meme', params={'hash': image_hash})
+            r = requests.get(f'{self.config.index_api}/meme', params={'hash': image_hash}, headers={'x-source': source})
         except Exception as e:
             log.exception('Failed to get meme template from api', exc_info=True)
             return
@@ -410,7 +468,7 @@ class DuplicateImageService:
                     continue
             if not match_hash:
                 continue
-            h_distance = hamming(searched_hash, match_hash)
+            h_distance = hamming_distance_bits(searched_hash, match_hash)
 
             if h_distance > target_hamming:
                 log.info('Meme Hamming Filter Reject - Target: %s Actual: %s - %s', target_hamming,
@@ -419,7 +477,7 @@ class DuplicateImageService:
             log.debug('Match found: %s - H:%s', f'https://redd.it/{match.post.post_id}',
                       h_distance)
             match.hamming_distance = h_distance
-            match.hash_size = len(searched_hash)
+            match.hash_size = len(searched_hash) * 4  # Bit count
             results.append(match)
 
         return results

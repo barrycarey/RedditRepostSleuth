@@ -57,8 +57,9 @@ class TestIngestTasks(TestCase):
                 'm': 'image/test'
             },
         }
-        with self.assertRaises(KeyError):
-            image_links_from_gallery_meta_data(meta_data)
+        # Unknown MIME types are now gracefully skipped with a warning instead of raising KeyError
+        result = image_links_from_gallery_meta_data(meta_data)
+        self.assertEqual(result, [])
 
     def test_image_links_from_gallery_meta_data_image_still_processing_raises(self):
         meta_data = {
@@ -79,3 +80,27 @@ class TestIngestTasks(TestCase):
         }
         with self.assertRaises(ValueError):
             image_links_from_gallery_meta_data(meta_data)
+
+
+    def test_image_links_from_gallery_meta_data_return_additional_mime_types(self):
+        meta_data = {
+            'item1': {
+                'status': 'valid',
+                'm': 'image/jpeg'
+            },
+            'item2': {
+                'status': 'valid',
+                'm': 'image/webp'
+            },
+            'item3': {
+                'status': 'valid',
+                'm': 'image/avif'
+            }
+        }
+        expected = [
+            'https://i.redd.it/item1.jpg',
+            'https://i.redd.it/item2.webp',
+            'https://i.redd.it/item3.avif'
+        ]
+        result = image_links_from_gallery_meta_data(meta_data)
+        self.assertCountEqual(expected, result)
