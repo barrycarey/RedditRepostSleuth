@@ -83,6 +83,8 @@ def check_image(
 
 def preload_hashes_for_search_results(search_results: ImageSearchResults, uowm) -> None:
     """Load hashes for all posts in search results to avoid DetachedInstanceError during serialization."""
+    from sqlalchemy.orm.attributes import set_committed_value
+
     # Collect all posts that need hashes
     posts = []
     if search_results.checked_post:
@@ -109,6 +111,6 @@ def preload_hashes_for_search_results(search_results: ImageSearchResults, uowm) 
         for h in all_hashes:
             hashes_by_post_id.setdefault(h.post_id, []).append(h)
 
-        # Attach to posts (set the attribute directly to bypass lazy loading)
+        # Attach to posts using set_committed_value to bypass lazy loading
         for post in posts:
-            post.hashes = hashes_by_post_id.get(post.id, [])
+            set_committed_value(post, 'hashes', hashes_by_post_id.get(post.id, []))
