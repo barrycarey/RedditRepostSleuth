@@ -6,10 +6,10 @@ from requests.exceptions import ConnectTimeout
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
+from redditrepostsleuth.core.celery.basetasks import ImageSearchTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.task_logic.repost_image import repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch
-from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, IndexApiException
+from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
@@ -26,7 +26,7 @@ log = configure_logger(
 )
 
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError, NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
+@celery.task(bind=True, base=ImageSearchTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError, NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
 
     try:
@@ -37,7 +37,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
             return
 
         search_settings = get_default_image_search_settings(self.config)
-        search_settings.max_matches = 75
+        search_settings.max_matches = 50
         # search_results = self.dup_service.check_image(
         #     post.url,
         #     post=post,
@@ -63,6 +63,8 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
         raise
     except (ConnectTimeout):
         log.warning('Failed to validate image url at %s', post.url)
+    except TypeError as e:
+        log.warning('Type Error During Search: %s', str(e))
     except Exception as e:
         log.exception('')
 
@@ -90,7 +92,14 @@ def link_repost_check(self, post):
         log.exception('')
 
 
-@celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
+@celery.task(
+    bind=True,
+    base=RepostTask,
+    ignore_results=True,
+    serializer='pickle',
+    autoretry_for=(NoIndexException,),
+    retry_kwargs={'max_retries': 10, 'countdown': 60}
+)
 def check_for_text_repost_task(self, post: Post) -> None:
     log.debug('Checking post for repost: %s', post.post_id)
     try:
@@ -103,11 +112,11 @@ def check_for_text_repost_task(self, post: Post) -> None:
                 source='ingest'
             )
             log.info('Found %s matching text posts', len(search_results.matches))
-    except IndexApiException as e:
-        log.warning(e, exc_info=False)
+    except NoIndexException as e:
+        log.warning('Index unavailable for text repost check: %s', e)
         raise
     except Exception as e:
-        log.exception('Unknown exception during test repost check')
+        log.exception('Unknown exception during text repost check')
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)

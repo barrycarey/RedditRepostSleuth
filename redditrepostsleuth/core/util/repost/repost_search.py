@@ -11,7 +11,7 @@ from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import IndexApiException
+from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.link_search_settings import TextSearchSettings
@@ -30,17 +30,21 @@ from redditrepostsleuth.core.util.repost_filters import text_distance_filter
 config = Config()
 log = logging.getLogger(__name__)
 
-def get_text_matches(text: str) -> APISearchResults:
+def get_text_matches(text: str, source: str = 'unknown') -> APISearchResults:
 
     try:
-        res = requests.post(f'{config.index_api}/text', json={'text': text})
+        res = requests.post(f'{config.index_api}/text', json={'text': text}, headers={'x-source': source})
     except ConnectionError:
         log.error('Failed to connect to Index API')
-        raise
+        raise NoIndexException('Failed to connect to Index API')
+
+    if res.status_code == 503:
+        log.warning('Index API returned 503 (indexes loading)')
+        raise NoIndexException('Index API unavailable (503)')
 
     if res.status_code != 200:
         log.error('Unexpected status code %s from Index API', res.status_code)
-        raise IndexApiException(f'Unexpected Status {res.status_code} from Index API')
+        raise NoIndexException(f'Unexpected status {res.status_code} from Index API')
 
     return APISearchResults(**json.loads(res.text))
 
@@ -54,7 +58,7 @@ def text_search_by_post(
 ) -> Optional[SearchResults]:
 
     search_results = SearchResults(post.url, checked_post=post, search_settings=search_settings)
-    api_results = get_text_matches(post.selftext)
+    api_results = get_text_matches(post.selftext, source=source)
     for index_results in api_results.results:
         for match in index_results.matches:
             post = uow.posts.get_by_id(match.id)

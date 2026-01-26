@@ -6,11 +6,13 @@ from falcon import CORSMiddleware
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 from redditrepostsleuth.core.config import Config
+from redditrepostsleuth.core.logging import log
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
+from redditrepostsleuth.core.services.patreon_token_manager import PatreonTokenManager
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
 from redditrepostsleuth.core.services.subreddit_config_updater import SubredditConfigUpdater
@@ -27,6 +29,7 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.meme_template import MemeT
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub import MonitoredSub
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.monitored_sub_stats import MonitoredSubStats
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.public_stats import PublicStats
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.patreon_stats import PatreonStats
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.oauth_token import OAuthToken
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatch
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.posts import PostsEndpoint
@@ -35,6 +38,13 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.user_whitelist_endpoint im
 from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
 config = Config()
+
+# Log configured upstream APIs at startup
+log.info('=== Repost Sleuth Site API Starting ===')
+log.info('Configured upstream APIs:')
+log.info('  Util API: %s', config.util_api)
+log.info('  Index API: %s', config.index_api)
+
 event_logger = EventLogging(config=config)
 uowm = UnitOfWorkManager(get_db_engine(config))
 reddit = get_reddit_instance(config)
@@ -49,6 +59,7 @@ config_updater = SubredditConfigUpdater(
     config,
     notification_svc=notification_svc
 )
+patreon_token_manager = PatreonTokenManager(config)
 
 if os.getenv('SENTRY_DNS', None):
     import sentry_sdk
@@ -66,6 +77,7 @@ api.req_options.auto_parse_form_urlencoded = True
 image_store = ImageStore('/opt/imageuploads')
 
 api.add_route('/api/image', ImageSearch(dup, uowm, config, image_store))
+api.add_route('/api/image/compare', ImageSearch(dup, uowm, config, image_store), suffix='compare')
 api.add_route('/api/imageserve/{name}', ImageServe())
 #api.add_route('/api/image/ocr', ImageSearch(dup, uowm, config), suffix='compare_image_text')
 api.add_route('/api/watch', PostWatch(uowm))
@@ -107,6 +119,7 @@ api.add_route('/api/stats/top-reposters', BotStats(uowm, reddit), suffix='repost
 api.add_route('/api/stats/banned-subreddits', BotStats(uowm, reddit), suffix='banned_subs')
 api.add_route('/api/stats/top-image-reposts', BotStats(uowm, reddit), suffix='top_image_reposts')
 api.add_route('/api/stats/monitored-subs', PublicStats(uowm), suffix='monitored_subs')
+api.add_route('/api/stats/patreon', PatreonStats(config, patreon_token_manager))
 api.add_route('/api/admin/message-templates', MessageTemplate(uowm))
 api.add_route('/api/admin/message-templates/{id:int}', MessageTemplate(uowm))
 api.add_route('/api/admin/message-templates/all', MessageTemplate(uowm), suffix='all')

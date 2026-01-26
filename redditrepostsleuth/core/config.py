@@ -189,7 +189,6 @@ class Config:
             'default_image_target_meme_match',
             'default_image_target_title_match',
             'default_image_meme_filter',
-            'default_image_target_annoy_distance',
             'default_image_max_matches',
             'default_image_same_sub_filter',
             'default_image_dead_matches_filter',
@@ -216,6 +215,11 @@ class Config:
             'default_text_max_days_old_filter',
             'default_text_target_distance',
             'discord_logging_hook',
+            'patreon_access_token',
+            'patreon_campaign_id',
+            'patreon_client_id',
+            'patreon_client_secret',
+            'patreon_refresh_token',
 
         ]
 

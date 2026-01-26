@@ -34,7 +34,7 @@ class TestResponseBuilder(TestCase):
         search_results.closest_match = ImageSearchMatch('test.com', 1, Post(post_id='abc123',
                                                                             created_at=datetime.strptime(
                                                                                 '2019-01-28 05:20:03',
-                                                                                '%Y-%m-%d %H:%M:%S')), 5, 3, 32)
+                                                                                '%Y-%m-%d %H:%M:%S')), 20, 256)
         result = response_builder.build_default_comment(search_results, signature=True, stats=True, search_link=True,
                                                         search_settings=True)
         self.assertEqual(IMAGE_OC_ALL_ENABLED_ALL_ENABLED_NO_MEME, result)
@@ -123,10 +123,8 @@ class TestResponseBuilder(TestCase):
     def _get_image_search_settings(self):
         return ImageSearchSettings(
             90,
-            .077,
             target_meme_match_percent=50,
             meme_filter=False,
-            max_depth=5000,
             target_title_match=None,
             max_matches=75,
             same_sub=False,
@@ -168,9 +166,8 @@ class TestResponseBuilder(TestCase):
                 'test.com',
                 1,
                 Post(post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         return search_results
@@ -185,9 +182,8 @@ class TestResponseBuilder(TestCase):
                 'test.com',
                 1,
                 Post(post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         search_results.matches.append(
@@ -195,9 +191,8 @@ class TestResponseBuilder(TestCase):
                 'test.com',
                 1,
                 Post(post_id='123abc', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         return search_results

@@ -9,7 +9,7 @@ from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import IndexApiException
+from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
 from redditrepostsleuth.core.model.search.search_results import SearchResults
@@ -20,17 +20,21 @@ from redditrepostsleuth.core.util.helpers import get_default_link_search_setting
 config = Config()
 log = logging.getLogger(__name__)
 
-def get_text_matches(text: str) -> APISearchResults:
+def get_text_matches(text: str, source: str = 'unknown') -> APISearchResults:
 
     try:
-        res = requests.post(f'{config.index_api}/text', json={'text': text})
+        res = requests.post(f'{config.index_api}/text', json={'text': text}, headers={'x-source': source})
     except ConnectionError:
         log.error('Failed to connect to Index API')
-        raise
+        raise NoIndexException('Failed to connect to Index API')
+
+    if res.status_code == 503:
+        log.warning('Index API returned 503 (indexes loading)')
+        raise NoIndexException('Index API unavailable (503)')
 
     if res.status_code != 200:
         log.error('Unexpected status code %s from Index API', res.status_code)
-        raise IndexApiException(f'Unexpected Status {res.status_code} from Index API')
+        raise NoIndexException(f'Unexpected status {res.status_code} from Index API')
 
     return APISearchResults(**json.loads(res.text))
 

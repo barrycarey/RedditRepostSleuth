@@ -159,7 +159,7 @@ services:
         container_name: ingest-worker
         user: '1001'
         build:
-            context: .t
+            context: .
             dockerfile: docker/WorkerDockerFile
         env_file:
             - .env
@@ -168,7 +168,7 @@ services:
             - db_user=ingest
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.ingest_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=26,1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=10,1
 
     link_repost_worker:
         container_name: link-repost-worker
@@ -184,7 +184,7 @@ services:
             - LOG_LEVEL=WARN
             - RUN_ENV=production
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.repost_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_link -n repost_link_worker --autoscale=6,1
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_link -n repost_link_worker --autoscale=4,1
 
     image_repost_worker:
         container_name: image-repost-worker
