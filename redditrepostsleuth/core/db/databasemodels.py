@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer
+from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer, BigInteger, JSON
 from sqlalchemy.dialects.mysql import TINYINT, MEDIUMTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -370,6 +370,14 @@ class MonitoredSub(Base):
     high_volume_reposter_notify_mod_mail = Column(Boolean, default=False)
     high_volume_reposter_removal_reason = Column(String(300))
     high_volume_reposter_ban_reason = Column(String(300))
+    # Spam detection settings
+    spam_detection_enabled = Column(Boolean, default=False)
+    spam_detection_remove_post = Column(Boolean, default=False)
+    spam_detection_ban_user = Column(Boolean, default=False)
+    spam_detection_notify_mod_mail = Column(Boolean, default=False)
+    spam_detection_score_threshold = Column(Float, default=0.8)
+    spam_detection_removal_reason = Column(String(300))
+    spam_detection_ban_reason = Column(String(300))
 
     post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub', cascade='all, delete', )
     config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub', cascade='all, delete')
@@ -441,9 +449,14 @@ class MonitoredSub(Base):
             'high_volume_reposter_removal_reason': self.high_volume_reposter_removal_reason,
             'high_volume_reposter_ban_reason': self.high_volume_reposter_ban_reason,
             'adult_promoter_removal_reason': self.adult_promoter_removal_reason,
-            'adult_promoter_ban_reason': self.adult_promoter_ban_reason
-
-
+            'adult_promoter_ban_reason': self.adult_promoter_ban_reason,
+            'spam_detection_enabled': self.spam_detection_enabled,
+            'spam_detection_remove_post': self.spam_detection_remove_post,
+            'spam_detection_ban_user': self.spam_detection_ban_user,
+            'spam_detection_notify_mod_mail': self.spam_detection_notify_mod_mail,
+            'spam_detection_score_threshold': self.spam_detection_score_threshold,
+            'spam_detection_removal_reason': self.spam_detection_removal_reason,
+            'spam_detection_ban_reason': self.spam_detection_ban_reason,
         }
 
 
@@ -762,12 +775,21 @@ class UserReview(Base):
     __tablename__ = 'user_review'
     __table_args__ = (
         Index('idx_last_checked', 'last_checked'),
+        Index('idx_spam_score', 'spam_score'),
+        Index('idx_risk_level', 'risk_level'),
     )
     username = Column(String(25), nullable=False, primary_key=True, unique=True)
     content_links_found = Column(Boolean, default=False)
     added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     notes = Column(String(150))
     last_checked = Column(DateTime, default=func.utc_timestamp())
+    # Spam detection columns
+    spam_score = Column(Float, nullable=True)
+    spam_score_confidence = Column(Float, nullable=True)
+    spam_score_updated_at = Column(DateTime, nullable=True)
+    risk_level = Column(String(20), nullable=True)  # low, medium, high, critical
+    is_verified_spam = Column(Boolean, default=False)
+    is_verified_legit = Column(Boolean, default=False)
 
 class Subreddit(Base):
     __tablename__ = 'subreddit'
@@ -791,3 +813,82 @@ class Subreddit(Base):
 
     banner_image = Column(String(2048), nullable=True)
     avatar_image = Column(String(2048), nullable=True)
+
+
+class AuthorActivityTracking(Base):
+    """Lightweight author activity for spam detection queries."""
+    __tablename__ = 'author_activity_tracking'
+    __table_args__ = (
+        Index('idx_author_created', 'author', 'created_at'),
+        Index('idx_author_subreddit', 'author', 'subreddit'),
+        Index('idx_created_at', 'created_at'),
+    )
+    id = Column(BigInteger, primary_key=True)
+    post_id = Column(String(15), nullable=False, unique=True)
+    author = Column(String(25), nullable=False)
+    subreddit = Column(String(25), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    post_type_id = Column(TINYINT(), nullable=False)
+    is_nsfw = Column(Boolean, default=False)
+    has_adult_link = Column(Boolean, default=False)
+    has_short_link = Column(Boolean, default=False)
+    tracked_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+
+
+class UserSpamFeatures(Base):
+    """Computed spam detection features for a user."""
+    __tablename__ = 'user_spam_features'
+    __table_args__ = (
+        Index('idx_spam_score', 'spam_score'),
+        Index('idx_computed_at', 'computed_at'),
+    )
+    username = Column(String(25), nullable=False, primary_key=True, unique=True)
+    spam_score = Column(Float, nullable=True)
+    spam_score_confidence = Column(Float, nullable=True)
+    computed_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    # Feature data stored as JSON
+    total_posts = Column(Integer, default=0)
+    nsfw_post_count = Column(Integer, default=0)
+    nsfw_post_ratio = Column(Float, nullable=True)
+    unique_subreddit_count = Column(Integer, default=0)
+    adult_link_count = Column(Integer, default=0)
+    short_link_count = Column(Integer, default=0)
+    spam_subreddit_count = Column(Integer, default=0)
+    avg_posts_per_day = Column(Float, nullable=True)
+    max_posts_per_day = Column(Integer, nullable=True)
+    feature_data = Column(JSON, nullable=True)
+
+
+class SpamSubredditList(Base):
+    """Reference table for known spam/karma farm subreddits."""
+    __tablename__ = 'spam_subreddit_list'
+    __table_args__ = (
+        Index('idx_category', 'category'),
+        Index('idx_is_active', 'is_active'),
+    )
+    id = Column(Integer, primary_key=True)
+    subreddit_name = Column(String(25), nullable=False, unique=True)
+    category = Column(String(50), nullable=False)  # karma_farm, spam_network, etc.
+    added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    added_by = Column(String(50), nullable=True)
+    notes = Column(String(500), nullable=True)
+    is_active = Column(Boolean, default=True)
+
+
+class SpamTrainingLabels(Base):
+    """Labeled data for ML training."""
+    __tablename__ = 'spam_training_labels'
+    __table_args__ = (
+        Index('idx_label', 'label'),
+        Index('idx_labeled_at', 'labeled_at'),
+        Index('idx_label_source', 'label_source'),
+    )
+    id = Column(Integer, primary_key=True)
+    username = Column(String(25), nullable=False)
+    label = Column(String(20), nullable=False)  # spam, not_spam, suspicious
+    confidence = Column(Float, nullable=True)
+    label_source = Column(String(50), nullable=False)  # manual, auto_ban, user_report, etc.
+    labeled_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    labeled_by = Column(String(50), nullable=True)
+    notes = Column(String(500), nullable=True)
+    feature_snapshot = Column(JSON, nullable=True)  # Features at time of labeling
