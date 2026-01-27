@@ -250,6 +250,9 @@ class SummonsHandler:
         elif summons.post.post_type.name == 'text':
             self.process_text_repost_request(summons, monitored_sub=monitored_sub)
 
+        # Queue spam analysis for the post author (not the requestor)
+        self._queue_spam_analysis(summons.post.author)
+
     def process_text_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None)  -> None:
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
@@ -487,3 +490,32 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             banned = uow.banned_user.get_by_user(requestor)
         return True if banned else False
+
+    def _queue_spam_analysis(self, author: str) -> None:
+        """
+        Queue spam analysis for a post author.
+
+        This is called after processing a repost request to analyze
+        the post's author (not the summons requestor) for spam patterns.
+
+        Args:
+            author: Reddit username of the post author
+        """
+        if not author or author == '[deleted]':
+            log.debug('Skipping spam analysis for invalid author: %s', author)
+            return
+
+        try:
+            # Check if user has been recently analyzed
+            with self.uowm.start() as uow:
+                if uow.spam_features.user_was_recently_analyzed(author, within_days=7):
+                    log.debug('User %s was recently analyzed for spam, skipping', author)
+                    return
+
+            # Queue async spam scoring task (low priority from summons)
+            from redditrepostsleuth.core.celery.tasks.spam_detection_tasks import score_and_flag_user
+            score_and_flag_user.delay(author, update_user_review=True)
+            log.debug('Queued spam analysis for post author %s (via summons)', author)
+        except Exception as e:
+            # Don't let spam analysis failures affect summons processing
+            log.warning('Failed to queue spam analysis for %s: %s', author, str(e))

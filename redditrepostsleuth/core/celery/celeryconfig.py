@@ -1,5 +1,7 @@
 import os
 
+from celery.schedules import crontab
+
 from redditrepostsleuth.core.config import Config
 
 config = Config()
@@ -113,6 +115,24 @@ beat_schedule = {
     'search-history-cleanup': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_search_history_cleanup',
         'schedule': 3600
+    },
+
+    # Spam detection scheduled tasks
+    'analyze-top-reposters-daily': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_analyze_top_reposters',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 3 AM UTC
+    },
+    'enrich-high-risk-users-daily': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_enrich_high_risk',
+        'schedule': crontab(hour=4, minute=0),  # Daily at 4 AM UTC
+    },
+    'cleanup-old-features-weekly': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_cleanup_features',
+        'schedule': crontab(day_of_week=0, hour=5, minute=0),  # Sunday at 5 AM UTC
+    },
+    'purge-old-activity-tracking-weekly': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_purge_activity_tracking',
+        'schedule': crontab(day_of_week=0, hour=6, minute=0),  # Sunday at 6 AM UTC
     },
 
 }

@@ -130,7 +130,7 @@ class SpamScorer:
         """Load spam subreddit list with caching."""
         if self._spam_subs_cache is None:
             with self.uowm.start() as uow:
-                self._spam_subs_cache = uow.spam_subreddit.get_as_dict()
+                self._spam_subs_cache = uow.spam_subreddits.get_as_dict()
         return self._spam_subs_cache
 
     def score_user(self, features: Tier1Features) -> ScoringResult:
@@ -143,6 +143,11 @@ class SpamScorer:
         Returns:
             ScoringResult with score, confidence, risk level, and reasons
         """
+        log.info('Starting spam scoring for user: %s', features.username)
+        log.debug('Input features: posts=%d, reposts=%d, nsfw_ratio=%.2f, adult_ratio=%.2f',
+                  features.total_posts_indexed, features.total_reposts_detected,
+                  features.nsfw_post_ratio, features.adult_platform_ratio)
+
         score = 0.0
         reasons = []
         component_scores = {}
@@ -155,6 +160,8 @@ class SpamScorer:
         component_scores['repost_behavior'] = repost_score['score']
         if repost_score['reason']:
             reasons.append(repost_score['reason'])
+        log.debug('Signal 1 (repost_behavior): score=%.3f, reason=%s',
+                  repost_score['score'], repost_score['reason'])
 
         # =====================================================================
         # SIGNAL 2: Adult Platform Promotion
@@ -164,6 +171,8 @@ class SpamScorer:
         component_scores['adult_platform'] = adult_score['score']
         if adult_score['reason']:
             reasons.append(adult_score['reason'])
+        log.debug('Signal 2 (adult_platform): score=%.3f, reason=%s',
+                  adult_score['score'], adult_score['reason'])
 
         # =====================================================================
         # SIGNAL 3: Posting Patterns (frequency, diversity)
@@ -172,6 +181,8 @@ class SpamScorer:
         score += posting_score['score']
         component_scores['posting_patterns'] = posting_score['score']
         reasons.extend(posting_score['reasons'])
+        log.debug('Signal 3 (posting_patterns): score=%.3f, reasons=%s',
+                  posting_score['score'], posting_score['reasons'])
 
         # =====================================================================
         # SIGNAL 4: Username Pattern
@@ -181,6 +192,8 @@ class SpamScorer:
         component_scores['username_pattern'] = username_score['score']
         if username_score['reason']:
             reasons.append(username_score['reason'])
+        log.debug('Signal 4 (username_pattern): score=%.3f, reason=%s',
+                  username_score['score'], username_score['reason'])
 
         # =====================================================================
         # SIGNAL 5: Karma Farming Subreddit Participation
@@ -190,6 +203,8 @@ class SpamScorer:
         component_scores['karma_farming'] = karma_score['score']
         if karma_score['reason']:
             reasons.append(karma_score['reason'])
+        log.debug('Signal 5 (karma_farming): score=%.3f, reason=%s',
+                  karma_score['score'], karma_score['reason'])
 
         # =====================================================================
         # SIGNAL 6: Supporting Signals (short links, NSFW combo)
@@ -198,9 +213,12 @@ class SpamScorer:
         score += support_score['score']
         component_scores['supporting_signals'] = support_score['score']
         reasons.extend(support_score['reasons'])
+        log.debug('Signal 6 (supporting_signals): score=%.3f, reasons=%s',
+                  support_score['score'], support_score['reasons'])
 
         # Cap at 1.0
         final_score = min(1.0, score)
+        log.debug('Raw score=%.3f, capped final_score=%.3f', score, final_score)
 
         # Calculate confidence based on data availability
         confidence = self._calculate_confidence(features)
@@ -208,7 +226,7 @@ class SpamScorer:
         # Determine risk level
         risk_level = self._classify_risk(final_score)
 
-        return ScoringResult(
+        result = ScoringResult(
             score=round(final_score, 3),
             confidence=round(confidence, 2),
             risk_level=risk_level,
@@ -216,10 +234,19 @@ class SpamScorer:
             component_scores={k: round(v, 3) for k, v in component_scores.items()},
         )
 
+        log.info('Completed scoring for %s: score=%.3f, confidence=%.2f, risk=%s, reasons=%d',
+                 features.username, result.score, result.confidence,
+                 result.risk_level, len(result.reasons))
+
+        return result
+
     def _score_repost_behavior(self, features: Tier1Features) -> dict:
         """Score based on repost ratio."""
         cfg = self.config
         ratio = features.repost_ratio
+
+        log.debug('Evaluating repost behavior: ratio=%.3f (thresholds: critical=%.2f, high=%.2f, medium=%.2f)',
+                  ratio, cfg.repost_ratio_critical, cfg.repost_ratio_high, cfg.repost_ratio_medium)
 
         if ratio >= cfg.repost_ratio_critical:
             return {
@@ -244,6 +271,9 @@ class SpamScorer:
         cfg = self.config
         ratio = features.adult_platform_ratio
         platforms = features.detected_platforms
+
+        log.debug('Evaluating adult platform: ratio=%.3f, platforms=%s, post_count=%d',
+                  ratio, platforms, features.adult_platform_post_count)
 
         if ratio >= cfg.adult_ratio_critical:
             platform_str = ', '.join(platforms) if platforms else 'unknown'
@@ -273,6 +303,9 @@ class SpamScorer:
 
         # Posting frequency
         ppd = features.posts_per_day_avg
+        log.debug('Evaluating posting patterns: posts_per_day=%.2f (thresholds: critical=%.1f, high=%.1f, elevated=%.1f)',
+                  ppd, cfg.posts_per_day_critical, cfg.posts_per_day_high, cfg.posts_per_day_elevated)
+
         if ppd >= cfg.posts_per_day_critical:
             score += cfg.posting_weight_critical
             reasons.append(f"Very high posting frequency: {ppd:.1f} posts/day")
@@ -285,6 +318,8 @@ class SpamScorer:
 
         # Subreddit diversity (only meaningful with enough posts)
         if features.total_posts_indexed >= cfg.min_posts_for_diversity:
+            log.debug('Evaluating subreddit diversity: unique_subs=%d, total_posts=%d, threshold=%d',
+                      features.unique_subreddits_posted, features.total_posts_indexed, cfg.low_diversity_threshold)
             if features.unique_subreddits_posted < cfg.low_diversity_threshold:
                 score += 0.12
                 reasons.append(
@@ -296,6 +331,9 @@ class SpamScorer:
 
     def _score_username_pattern(self, features: Tier1Features) -> dict:
         """Score based on suspicious username patterns."""
+        log.debug('Evaluating username pattern: suspicious=%s, matches=%s',
+                  features.username_suspicious_pattern, features.username_pattern_matches)
+
         if features.username_suspicious_pattern:
             # Get most significant matched pattern
             matches = features.username_pattern_matches
@@ -332,6 +370,9 @@ class SpamScorer:
         cfg = self.config
         karma_posts = features.karma_farming_sub_posts
 
+        log.debug('Evaluating karma farming: karma_farm_posts=%d (weight_per_post=%.3f, max=%.3f)',
+                  karma_posts, cfg.karma_farm_weight_per_post, cfg.karma_farm_weight_max)
+
         if karma_posts > 0:
             # Scale score by number of karma farm posts, capped
             score = min(
@@ -350,6 +391,11 @@ class SpamScorer:
         cfg = self.config
         score = 0.0
         reasons = []
+
+        log.debug('Evaluating supporting signals: short_link_ratio=%.3f, short_link_count=%d, '
+                  'nsfw_ratio=%.3f, adult_ratio=%.3f',
+                  features.short_link_ratio, features.short_link_post_count,
+                  features.nsfw_post_ratio, features.adult_platform_ratio)
 
         # Short/promo links
         if features.short_link_ratio > 0.3:
@@ -392,6 +438,9 @@ class SpamScorer:
         if features.total_reposts_detected > 0:
             base_confidence = min(0.98, base_confidence + 0.05)
 
+        log.debug('Calculated confidence: posts=%d, reposts=%d, confidence=%.2f',
+                  posts, features.total_reposts_detected, base_confidence)
+
         return base_confidence
 
     def _classify_risk(self, score: float) -> str:
@@ -399,13 +448,18 @@ class SpamScorer:
         cfg = self.config
 
         if score >= cfg.risk_critical_threshold:
-            return 'CRITICAL'
+            risk = 'CRITICAL'
         elif score >= cfg.risk_high_threshold:
-            return 'HIGH'
+            risk = 'HIGH'
         elif score >= cfg.risk_medium_threshold:
-            return 'MEDIUM'
+            risk = 'MEDIUM'
         else:
-            return 'LOW'
+            risk = 'LOW'
+
+        log.debug('Classified risk: score=%.3f, thresholds=(critical=%.2f, high=%.2f, medium=%.2f) -> %s',
+                  score, cfg.risk_critical_threshold, cfg.risk_high_threshold, cfg.risk_medium_threshold, risk)
+
+        return risk
 
     def score_from_username(self, username: str) -> Optional[ScoringResult]:
         """
@@ -421,12 +475,16 @@ class SpamScorer:
             SpamFeatureExtractor
         )
 
+        log.info('Score from username called for: %s', username)
+
         extractor = SpamFeatureExtractor(self.uowm)
         features = extractor.extract_tier1_features(username)
 
         if not features:
+            log.info('Cannot score %s: insufficient data for feature extraction', username)
             return None
 
+        log.debug('Features extracted for %s, proceeding to score', username)
         return self.score_user(features)
 
 
@@ -457,11 +515,17 @@ class SpamScorerWithTier2:
         Returns:
             Enhanced ScoringResult
         """
+        log.info('Scoring with Tier 2 features for user: %s', tier1_features.username)
+        log.debug('Tier 2 features: %s', tier2_features)
+
         # Start with base Tier 1 score
         result = self.base_scorer.score_user(tier1_features)
+        log.debug('Base Tier 1 score: %.3f, risk=%s', result.score, result.risk_level)
 
         # Enhance with Tier 2 signals
         tier2_adjustments = self._score_tier2_signals(tier2_features)
+        log.debug('Tier 2 adjustments: score=%.3f, reasons=%s',
+                  tier2_adjustments['score'], tier2_adjustments['reasons'])
 
         # Combine scores
         combined_score = min(1.0, result.score + tier2_adjustments['score'])
@@ -470,10 +534,18 @@ class SpamScorerWithTier2:
         result.component_scores['tier2_signals'] = tier2_adjustments['score']
 
         # Boost confidence with Tier 2 data
+        old_confidence = result.confidence
         result.confidence = min(0.98, result.confidence + 0.10)
+        log.debug('Confidence boosted: %.2f -> %.2f (Tier 2 data available)',
+                  old_confidence, result.confidence)
 
         # Reclassify risk
         result.risk_level = self.base_scorer._classify_risk(combined_score)
+
+        log.info('Tier 2 scoring complete for %s: score=%.3f (tier1=%.3f + tier2=%.3f), risk=%s',
+                 tier1_features.username, combined_score,
+                 combined_score - tier2_adjustments['score'], tier2_adjustments['score'],
+                 result.risk_level)
 
         return result
 
@@ -482,19 +554,26 @@ class SpamScorerWithTier2:
         score = 0.0
         reasons = []
 
+        log.debug('Evaluating Tier 2 signals: suspended=%s, age_days=%s, karma=%s',
+                  tier2.get('account_suspended'), tier2.get('account_age_days'),
+                  tier2.get('total_karma'))
+
         # Account suspended = confirmed spam
         if tier2.get('account_suspended'):
             score += 0.50
             reasons.append("Account suspended by Reddit (confirmed spam)")
+            log.debug('Signal: account suspended (+0.50)')
 
         # Very new account with high activity
         age_days = tier2.get('account_age_days', 365)
         if age_days < 30:
             score += 0.15
             reasons.append(f"Very new account: {age_days} days old")
+            log.debug('Signal: very new account %d days (+0.15)', age_days)
         elif age_days < 90:
             score += 0.08
             reasons.append(f"New account: {age_days} days old")
+            log.debug('Signal: new account %d days (+0.08)', age_days)
 
         # Low karma ratio (karma much lower than expected for activity)
         karma = tier2.get('total_karma', 0)
@@ -503,28 +582,35 @@ class SpamScorerWithTier2:
         if age_days > 30 and karma < 100:
             score += 0.10
             reasons.append(f"Very low karma for account age: {karma}")
+            log.debug('Signal: very low karma %d (+0.10)', karma)
         elif karma_per_day < 0.5 and age_days > 90:
             score += 0.05
             reasons.append(f"Low karma accumulation rate: {karma_per_day:.1f}/day")
+            log.debug('Signal: low karma rate %.1f/day (+0.05)', karma_per_day)
 
         # No verified email (suspicious for promotional accounts)
         if not tier2.get('has_verified_email', True):
             score += 0.05
             reasons.append("No verified email")
+            log.debug('Signal: no verified email (+0.05)')
 
         # Default avatar (low effort account)
         if not tier2.get('has_custom_avatar', True):
             score += 0.03
             reasons.append("Default avatar (no customization)")
+            log.debug('Signal: default avatar (+0.03)')
 
         # Adult links found in profile/comments (Tier 2 enrichment)
         if tier2.get('has_adult_profile_links'):
             score += 0.20
             reasons.append("Adult platform links in profile/comments")
+            log.debug('Signal: adult profile links (+0.20)')
 
         # Telegram links found (off-platform promo)
         if tier2.get('has_telegram_links'):
             score += 0.15
             reasons.append("Telegram links for off-platform communication")
+            log.debug('Signal: telegram links (+0.15)')
 
+        log.debug('Tier 2 signal scoring complete: total=%.3f, reasons=%d', score, len(reasons))
         return {'score': score, 'reasons': reasons}
