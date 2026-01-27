@@ -12,6 +12,7 @@ from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
 from redditrepostsleuth.core.services.eventlogging import EventLogging
+from redditrepostsleuth.core.services.influx_query_service import InfluxQueryService
 from redditrepostsleuth.core.services.patreon_token_manager import PatreonTokenManager
 from redditrepostsleuth.core.services.reddit_manager import RedditManager
 from redditrepostsleuth.core.services.response_handler import ResponseHandler
@@ -19,6 +20,7 @@ from redditrepostsleuth.core.services.subreddit_config_updater import SubredditC
 from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.general_admin import GeneralAdmin
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.bot_health import BotHealth
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.queue_health import QueueHealth
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.health import Health
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.admin.message_template import MessageTemplate
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.bot_stats import BotStats
@@ -35,6 +37,7 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.post_watch import PostWatc
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.posts import PostsEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.repost_history import RepostHistoryEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.user_whitelist_endpoint import UserWhitelistEndpoint
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.spam_voting import SpamVotingEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
 config = Config()
@@ -46,6 +49,7 @@ log.info('  Util API: %s', config.util_api)
 log.info('  Index API: %s', config.index_api)
 
 event_logger = EventLogging(config=config)
+influx_query_service = InfluxQueryService(config=config)
 uowm = UnitOfWorkManager(get_db_engine(config))
 reddit = get_reddit_instance(config)
 reddit_manager = RedditManager(reddit)
@@ -127,6 +131,13 @@ api.add_route('/api/admin/users', GeneralAdmin(uowm))
 api.add_route('/api/user-whitelist/{subreddit}', UserWhitelistEndpoint(uowm, config, reddit))
 api.add_route('/api/health', Health())
 api.add_route('/api/health/bot', BotHealth(uowm))
+api.add_route('/api/health/bot/queues', QueueHealth(influx_query_service))
+
+# Spam voting endpoints (Phase 5.5: Community-Assisted Training)
+api.add_route('/api/spam/voting/queue', SpamVotingEndpoint(uowm, config), suffix='queue')
+api.add_route('/api/spam/voting/vote', SpamVotingEndpoint(uowm, config), suffix='vote')
+api.add_route('/api/spam/voting/user/{username}', SpamVotingEndpoint(uowm, config), suffix='user_votes')
+api.add_route('/api/spam/voting/stats', SpamVotingEndpoint(uowm, config), suffix='stats')
 
 api = SentryWsgiMiddleware(api)
 

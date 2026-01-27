@@ -37,6 +37,7 @@ from redditrepostsleuth.core.db.repository.author_activity_repo import AuthorAct
 from redditrepostsleuth.core.db.repository.spam_features_repo import SpamFeaturesRepo
 from redditrepostsleuth.core.db.repository.spam_subreddit_repo import SpamSubredditRepo
 from redditrepostsleuth.core.db.repository.spam_training_labels_repo import SpamTrainingLabelsRepo
+from redditrepostsleuth.core.db.repository.moderator_spam_vote_repo import ModeratorSpamVoteRepo
 
 
 class UnitOfWork:
@@ -202,3 +203,7 @@ class UnitOfWork:
     @property
     def spam_training_labels(self) -> SpamTrainingLabelsRepo:
         return SpamTrainingLabelsRepo(self.session)
+
+    @property
+    def moderator_spam_vote(self) -> ModeratorSpamVoteRepo:
+        return ModeratorSpamVoteRepo(self.session)

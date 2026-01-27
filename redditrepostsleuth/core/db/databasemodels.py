@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer, BigInteger, JSON
+from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer, BigInteger, JSON, UniqueConstraint
 from sqlalchemy.dialects.mysql import TINYINT, MEDIUMTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -881,6 +881,13 @@ class UserSpamFeatures(Base):
     tier2_enrichment_failed = Column(Boolean, default=False)
     tier2_failure_reason = Column(String(200), nullable=True)
 
+    # Moderator voting aggregates (Phase 5.5)
+    mod_vote_total = Column(Integer, default=0)       # Sum of all votes (+1/-1)
+    mod_vote_count = Column(Integer, default=0)       # Total votes cast
+    mod_vote_weighted = Column(Float, default=0.0)    # Subscriber-weighted score
+    mod_vote_updated_at = Column(DateTime, nullable=True)
+    mod_vote_consensus = Column(String(20), nullable=True)  # 'spam', 'legit', 'disputed'
+
 
 class SpamSubredditList(Base):
     """Reference table for known spam/karma farm subreddits."""
@@ -915,3 +922,37 @@ class SpamTrainingLabels(Base):
     labeled_by = Column(String(50), nullable=True)
     notes = Column(String(500), nullable=True)
     feature_snapshot = Column(JSON, nullable=True)  # Features at time of labeling
+
+
+class ModeratorSpamVote(Base):
+    """Moderator votes on spam detection results (Phase 5.5)."""
+    __tablename__ = 'moderator_spam_vote'
+    __table_args__ = (
+        Index('idx_mod_vote_target', 'target_username'),
+        Index('idx_mod_vote_moderator', 'moderator_username'),
+        Index('idx_mod_vote_voted_at', 'voted_at'),
+        UniqueConstraint('target_username', 'moderator_username', name='uq_target_moderator'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    target_username = Column(String(25), nullable=False)      # User being voted on
+    moderator_username = Column(String(25), nullable=False)   # Mod casting vote
+    subreddit = Column(String(25), nullable=False)            # Qualifying sub
+    subreddit_subscribers = Column(Integer, nullable=False)   # Subscriber count at vote
+    vote = Column(Integer, nullable=False)                    # +1=spam, -1=not spam
+    notes = Column(String(500), nullable=True)                # Optional explanation
+    voted_at = Column(DateTime, default=func.utc_timestamp())
+    spam_score_at_vote = Column(Float, nullable=True)         # Score snapshot
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'target_username': self.target_username,
+            'moderator_username': self.moderator_username,
+            'subreddit': self.subreddit,
+            'subreddit_subscribers': self.subreddit_subscribers,
+            'vote': self.vote,
+            'notes': self.notes,
+            'voted_at': self.voted_at.timestamp() if self.voted_at else None,
+            'spam_score_at_vote': self.spam_score_at_vote,
+        }
