@@ -184,16 +184,21 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
         created_at_iso: ISO format datetime string
     """
     if not author or author == '[deleted]':
+        log.debug('Skipping author activity for post %s: author is %s', post_id, author)
         return
 
     # Skip posts without a valid post_type_id (required by author_activity_tracking table)
     if post_type_id is None:
-        log.debug('Skipping author activity tracking for post %s: post_type_id is None', post_id)
+        log.debug('Skipping author activity for post %s: post_type_id is None', post_id)
         return
+
+    log.debug('Tracking author activity: post=%s, author=%s, subreddit=%s, nsfw=%s, type=%d',
+              post_id, author, subreddit, is_nsfw, post_type_id)
 
     try:
         created_at = datetime.fromisoformat(created_at_iso)
     except (ValueError, TypeError):
+        log.debug('Invalid created_at_iso for post %s, using utcnow()', post_id)
         created_at = datetime.utcnow()
 
     has_adult_link = detect_adult_platform_link(url)
@@ -201,8 +206,11 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
     has_telegram_link = detect_telegram_link(url)
 
     if has_adult_link or has_short_link or has_telegram_link:
-        log.info('Detected suspicious link in %s (adult=%s, short=%s, telegram=%s)',
-                 url, has_adult_link, has_short_link, has_telegram_link)
+        log.info('Suspicious link detected in post %s by %s: adult=%s, short=%s, telegram=%s, url=%s',
+                 post_id, author, has_adult_link, has_short_link, has_telegram_link, url)
+    else:
+        log.debug('Link analysis for post %s: adult=%s, short=%s, telegram=%s',
+                  post_id, has_adult_link, has_short_link, has_telegram_link)
 
     activity = AuthorActivityTracking(
         post_id=post_id,
@@ -221,14 +229,16 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
             # Check if already tracked (idempotent)
             existing = uow.author_activity.get_by_post_id(post_id)
             if existing:
-                log.debug('Post %s already tracked for author activity', post_id)
+                log.debug('Post %s already tracked for author activity, skipping', post_id)
                 return
 
             uow.author_activity.add(activity)
             uow.commit()
-            log.debug('Tracked activity for author %s on post %s', author, post_id)
+            log.debug('Successfully tracked activity for author %s on post %s in r/%s',
+                      author, post_id, subreddit)
     except Exception as e:
-        log.warning('Failed to track author activity for post %s: %s', post_id, str(e))
+        log.warning('Failed to track author activity for post %s by %s: %s',
+                    post_id, author, str(e), exc_info=True)
         raise
 
 
@@ -250,22 +260,29 @@ def compute_user_spam_features_tier1(self, username: str) -> Optional[dict]:
     from redditrepostsleuth.core.services.spam.spam_feature_extractor import SpamFeatureExtractor
 
     if not username or username == '[deleted]':
+        log.debug('Skipping Tier 1 feature computation for invalid username: %s', username)
         return None
 
+    log.info('Starting Tier 1 feature computation for user: %s', username)
+
     try:
+        log.debug('Initializing SpamFeatureExtractor for %s', username)
         extractor = SpamFeatureExtractor(self.uowm)
         features = extractor.extract_and_store(username)
 
         if features:
-            log.info('Computed Tier 1 features for user %s: %d posts, %.2f repost ratio',
-                     username, features.total_posts_indexed, features.repost_ratio)
+            log.info('Tier 1 features computed for %s: posts=%d, reposts=%d (ratio=%.2f), '
+                     'nsfw_ratio=%.2f, adult_ratio=%.2f, karma_farm_posts=%d',
+                     username, features.total_posts_indexed, features.total_reposts_detected,
+                     features.repost_ratio, features.nsfw_post_ratio,
+                     features.adult_platform_ratio, features.karma_farming_sub_posts)
             return features.to_dict()
         else:
-            log.debug('Insufficient data to compute features for user %s', username)
+            log.info('Insufficient data to compute Tier 1 features for user %s', username)
             return None
 
     except Exception as e:
-        log.error('Failed to compute spam features for %s: %s', username, str(e))
+        log.error('Failed to compute Tier 1 features for %s: %s', username, str(e), exc_info=True)
         raise
 
 
@@ -435,28 +452,37 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
     from redditrepostsleuth.core.services.spam.user_data_fetcher import UserDataFetcher
 
     if not username or username == '[deleted]':
+        log.debug('Skipping Tier 2 enrichment for invalid username: %s', username)
         return None
 
-    log.info('Enriching Tier 2 features for: %s', username)
+    log.info('Starting Tier 2 enrichment for user: %s', username)
 
     try:
+        log.debug('Initializing UserDataFetcher for %s', username)
         fetcher = UserDataFetcher(
             self.reddit,
             self.uowm,
             circuit_breaker=self.circuit_breaker,
             rate_limiter=self.rate_limiter
         )
+
+        log.debug('Fetching Tier 2 data for %s (scan_profile=True)', username)
         tier2_features = fetcher.fetch_and_enrich(username, scan_profile=True)
 
         if not tier2_features:
-            log.warning('Failed to fetch Tier 2 data for %s', username)
+            log.warning('Failed to fetch Tier 2 data for %s (returned None)', username)
             # Mark as failed in database
             with self.uowm.start() as uow:
                 uow.spam_features.mark_tier2_enrichment_failed(username, 'Fetch returned None')
                 uow.commit()
             return None
 
+        log.debug('Tier 2 data fetched for %s: age_days=%s, karma=%s, suspended=%s',
+                  username, tier2_features.account_age_days, tier2_features.total_karma,
+                  tier2_features.account_suspended)
+
         # Update stored features
+        log.debug('Updating database with Tier 2 features for %s', username)
         with self.uowm.start() as uow:
             uow.spam_features.update_tier2_features(
                 username,
@@ -475,16 +501,19 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
             )
             uow.commit()
 
-            log.info('Updated Tier 2 features for %s', username)
+            log.info('Tier 2 enrichment complete for %s: age=%d days, karma=%d, suspended=%s, adult_links=%s',
+                     username, tier2_features.account_age_days or 0, tier2_features.total_karma or 0,
+                     tier2_features.account_suspended, tier2_features.has_adult_profile_links)
 
         return tier2_features.to_dict()
 
     except RateLimitExceeded as e:
-        log.warning('Rate limited enriching %s, retry after %ds', username, e.retry_after)
+        log.warning('Rate limited during Tier 2 enrichment for %s, will retry after %ds',
+                    username, e.retry_after)
         raise self.retry(countdown=e.retry_after)
 
     except Exception as e:
-        log.error('Error enriching %s: %s', username, str(e), exc_info=True)
+        log.error('Error during Tier 2 enrichment for %s: %s', username, str(e), exc_info=True)
         # Mark as failed in database
         try:
             with self.uowm.start() as uow:
@@ -689,24 +718,35 @@ def score_user_spam(self, username: str) -> Optional[dict]:
     from redditrepostsleuth.core.services.spam.spam_scorer import SpamScorer
 
     if not username or username == '[deleted]':
+        log.debug('Skipping scoring for invalid username: %s', username)
         return None
 
-    log.info('Scoring user for spam: %s', username)
+    log.info('Starting spam scoring task for user: %s', username)
 
     try:
         # Extract features
+        log.debug('Initializing SpamFeatureExtractor for %s', username)
         extractor = SpamFeatureExtractor(self.uowm)
         features = extractor.extract_tier1_features(username)
 
         if not features:
-            log.debug('Insufficient data to score user: %s', username)
+            log.info('Insufficient data to score user %s, skipping', username)
             return None
 
+        log.debug('Features extracted for %s: posts=%d, reposts=%d, repost_ratio=%.3f',
+                  username, features.total_posts_indexed, features.total_reposts_detected,
+                  features.repost_ratio)
+
         # Score the user
+        log.debug('Initializing SpamScorer for %s', username)
         scorer = SpamScorer(self.uowm)
         result = scorer.score_user(features)
 
+        log.debug('Scoring complete for %s: score=%.3f, confidence=%.2f, risk=%s',
+                  username, result.score, result.confidence, result.risk_level)
+
         # Update stored features with scoring results
+        log.debug('Updating database with scoring results for %s', username)
         with self.uowm.start() as uow:
             spam_features = uow.spam_features.get_by_username(username)
             if spam_features:
@@ -719,8 +759,10 @@ def score_user_spam(self, username: str) -> Optional[dict]:
                 feature_dict['risk_level'] = result.risk_level
                 feature_dict['top_contributing_factors'] = result.reasons
                 spam_features.feature_data = feature_dict
+                log.debug('Updated existing spam_features record for %s', username)
             else:
                 # Create new record via extractor
+                log.debug('Creating new spam_features record for %s', username)
                 extractor.store_features(features)
                 # Then update with scoring info
                 spam_features = uow.spam_features.get_by_username(username)
@@ -729,10 +771,13 @@ def score_user_spam(self, username: str) -> Optional[dict]:
                     spam_features.spam_score_confidence = result.confidence
             uow.commit()
 
-        log.info(
-            'Scored user %s: %.2f (%s)',
-            username, result.score, result.risk_level
-        )
+        log.info('Spam scoring complete for %s: score=%.3f, risk=%s, confidence=%.2f, reasons=%d',
+                 username, result.score, result.risk_level, result.confidence, len(result.reasons))
+
+        if result.risk_level in ('HIGH', 'CRITICAL'):
+            log.info('High-risk user detected: %s (score=%.3f, risk=%s) - reasons: %s',
+                     username, result.score, result.risk_level, ', '.join(result.reasons[:3]))
+
         return result.to_dict()
 
     except Exception as e:
@@ -763,27 +808,38 @@ def score_and_flag_user(
     from redditrepostsleuth.core.db.databasemodels import UserReview
 
     if not username or username == '[deleted]':
+        log.debug('Skipping score_and_flag for invalid username: %s', username)
         return None
+
+    log.info('Starting score_and_flag task for user: %s (update_review=%s)',
+             username, update_user_review)
 
     # Score the user (calls the task directly, not async)
     result_dict = score_user_spam(username)
 
     if not result_dict:
+        log.info('No scoring result for %s (insufficient data)', username)
         return None
+
+    log.debug('Scoring result for %s: score=%.3f, risk=%s',
+              username, result_dict['score'], result_dict['risk_level'])
 
     # Update user_review if requested
     if update_user_review:
+        log.debug('Updating user_review table for %s', username)
         with self.uowm.start() as uow:
             review = uow.user_review.get_by_username(username)
 
             if review:
                 # Update existing review
+                log.debug('Updating existing user_review record for %s', username)
                 review.spam_score = result_dict['score']
                 review.spam_score_confidence = result_dict['confidence']
                 review.spam_score_updated_at = datetime.utcnow()
                 review.risk_level = result_dict['risk_level']
             else:
                 # Create new review entry
+                log.debug('Creating new user_review record for %s', username)
                 review = UserReview(
                     username=username,
                     spam_score=result_dict['score'],
@@ -795,7 +851,10 @@ def score_and_flag_user(
 
             uow.commit()
 
-        log.info('Updated user_review for %s', username)
+        log.info('Updated user_review for %s: score=%.3f, risk=%s',
+                 username, result_dict['score'], result_dict['risk_level'])
+    else:
+        log.debug('Skipping user_review update for %s (disabled)', username)
 
     return result_dict
 
@@ -811,7 +870,7 @@ def batch_score_users(self, usernames: List[str]) -> dict:
     Returns:
         Dict with results summary
     """
-    log.info('Batch scoring %d users', len(usernames))
+    log.info('Starting batch scoring for %d users', len(usernames))
 
     results = {
         'total': len(usernames),
@@ -822,28 +881,43 @@ def batch_score_users(self, usernames: List[str]) -> dict:
         'critical_risk': 0,
     }
 
-    for username in usernames:
+    for i, username in enumerate(usernames):
         if not username or username == '[deleted]':
+            log.debug('Skipping invalid username at index %d: %s', i, username)
             results['skipped'] += 1
             continue
 
         try:
+            log.debug('Scoring user %d/%d: %s', i + 1, len(usernames), username)
             result = score_and_flag_user(username, update_user_review=True)
 
             if result:
                 results['scored'] += 1
                 if result['risk_level'] == 'CRITICAL':
                     results['critical_risk'] += 1
+                    log.info('CRITICAL risk user found: %s (score=%.2f)', username, result['score'])
                 elif result['risk_level'] == 'HIGH':
                     results['high_risk'] += 1
+                    log.info('HIGH risk user found: %s (score=%.2f)', username, result['score'])
+                else:
+                    log.debug('Scored user %s: score=%.2f, risk=%s',
+                              username, result['score'], result['risk_level'])
             else:
                 results['skipped'] += 1
+                log.debug('Skipped user %s (insufficient data)', username)
 
         except Exception as e:
-            log.error('Failed to score %s: %s', username, str(e))
+            log.error('Failed to score user %s: %s', username, str(e), exc_info=True)
             results['failed'] += 1
 
-    log.info('Batch scoring complete: %s', results)
+        # Log progress every 10 users
+        if (i + 1) % 10 == 0:
+            log.info('Batch scoring progress: %d/%d users processed (scored=%d, skipped=%d, failed=%d)',
+                     i + 1, len(usernames), results['scored'], results['skipped'], results['failed'])
+
+    log.info('Batch scoring complete: total=%d, scored=%d, skipped=%d, failed=%d, high_risk=%d, critical=%d',
+             results['total'], results['scored'], results['skipped'], results['failed'],
+             results['high_risk'], results['critical_risk'])
     return results
 
 
@@ -870,12 +944,16 @@ def score_top_reposters(
     from sqlalchemy import func
     from redditrepostsleuth.core.db.databasemodels import Repost
 
-    log.info('Scoring top %d reposters from past %d days', limit, days)
+    log.info('Starting score_top_reposters: limit=%d, days=%d, min_reposts=%d',
+             limit, days, min_reposts)
 
     usernames_to_score = []
 
+    log.debug('Querying top reposters from database')
     with self.uowm.start() as uow:
         cutoff = datetime.utcnow() - timedelta(days=days)
+        log.debug('Cutoff date for repost query: %s', cutoff)
+
         results = uow.session.query(
             Repost.author,
             func.count(Repost.id).label('repost_count')
@@ -892,28 +970,137 @@ def score_top_reposters(
         for row in results:
             if row.author:
                 usernames_to_score.append(row.author)
+                log.debug('Top reposter: %s (%d reposts)', row.author, row.repost_count)
+
+    log.info('Found %d top reposters with >= %d reposts in last %d days',
+             len(usernames_to_score), min_reposts, days)
 
     if not usernames_to_score:
         log.info('No top reposters found matching criteria')
         return {'analyzed': 0, 'total': 0}
 
     # Filter out recently analyzed users
+    log.debug('Filtering out recently scored users')
     users_needing_scoring = []
     with self.uowm.start() as uow:
         for username in usernames_to_score:
             features = uow.spam_features.get_by_username(username)
             if not features or not features.spam_score:
+                log.debug('User %s has no score, will be scored', username)
                 users_needing_scoring.append(username)
             elif features.computed_at:
                 # Re-score if older than 7 days
                 age = datetime.utcnow() - features.computed_at
                 if age.days > 7:
+                    log.debug('User %s has stale score (%d days old), will be re-scored',
+                              username, age.days)
                     users_needing_scoring.append(username)
+                else:
+                    log.debug('User %s already scored recently (%d days ago), skipping',
+                              username, age.days)
 
-    log.info('Found %d users needing scoring (out of %d top reposters)',
+    log.info('Filtered to %d users needing scoring (out of %d top reposters)',
              len(users_needing_scoring), len(usernames_to_score))
 
     if not users_needing_scoring:
+        log.info('All top reposters already have recent scores')
         return {'analyzed': 0, 'total': len(usernames_to_score), 'message': 'All already scored'}
 
+    log.info('Starting batch scoring for %d top reposters', len(users_needing_scoring))
     return batch_score_users(users_needing_scoring)
+
+
+# ============================================================================
+# Scheduled Task Wrappers (for Celery Beat)
+# ============================================================================
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=True, serializer='pickle')
+def scheduled_analyze_top_reposters(self) -> dict:
+    """
+    Scheduled task wrapper for analyzing top reposters.
+
+    Runs daily to score users with high repost activity.
+    Default: limit=100, days=7, min_reposts=3
+
+    Returns:
+        Dict with analysis results
+    """
+    log.info('Starting scheduled_analyze_top_reposters task')
+    try:
+        result = score_top_reposters(limit=100, days=7, min_reposts=3)
+        log.info('scheduled_analyze_top_reposters completed: %s', result)
+        return result
+    except Exception as e:
+        log.error('scheduled_analyze_top_reposters failed: %s', str(e), exc_info=True)
+        raise
+
+
+@celery.task(bind=True, base=SpamDetectionTaskWithReddit, ignore_results=True, serializer='pickle')
+def scheduled_enrich_high_risk(self) -> dict:
+    """
+    Scheduled task wrapper for enriching high-risk users with Tier 2 data.
+
+    Runs daily to fetch Reddit API data for high-risk users.
+    Default: min_score=0.5, limit=50
+
+    Returns:
+        Dict with enrichment results
+    """
+    log.info('Starting scheduled_enrich_high_risk task')
+    try:
+        result = enrich_high_risk_users(min_score=0.5, limit=50)
+        log.info('scheduled_enrich_high_risk completed: %s', result)
+        return result
+    except Exception as e:
+        log.error('scheduled_enrich_high_risk failed: %s', str(e), exc_info=True)
+        raise
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=True, serializer='pickle')
+def scheduled_cleanup_features(self) -> dict:
+    """
+    Scheduled task wrapper for cleaning up old feature records.
+
+    Runs weekly to remove stale feature records.
+    Default: keep_per_user=5
+
+    Returns:
+        Dict with cleanup results
+    """
+    log.info('Starting scheduled_cleanup_features task')
+    try:
+        result = cleanup_old_feature_records(keep_per_user=5)
+        log.info('scheduled_cleanup_features completed: %s', result)
+        return result
+    except Exception as e:
+        log.error('scheduled_cleanup_features failed: %s', str(e), exc_info=True)
+        raise
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=True, serializer='pickle')
+def scheduled_purge_activity_tracking(self) -> dict:
+    """
+    Scheduled task wrapper for purging old author activity tracking records.
+
+    Runs weekly to delete activity records older than 180 days.
+    This helps manage database size while retaining recent data.
+
+    Returns:
+        Dict with purge results
+    """
+    log.info('Starting scheduled_purge_activity_tracking task')
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=180)
+
+        with self.uowm.start() as uow:
+            deleted_count = uow.author_activity.delete_older_than(cutoff)
+            uow.commit()
+
+        result = {'deleted_count': deleted_count, 'cutoff_date': cutoff.isoformat()}
+        log.info('scheduled_purge_activity_tracking completed: deleted %d records older than %s',
+                 deleted_count, cutoff.isoformat())
+        return result
+    except Exception as e:
+        log.error('scheduled_purge_activity_tracking failed: %s', str(e), exc_info=True)
+        raise
