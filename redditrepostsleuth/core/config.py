@@ -126,6 +126,16 @@ class Config:
         return self._fetch(key)
 
 
+
+    def _get_bool(self, key: str, default: bool = False) -> bool:
+        """Parse a config value as boolean."""
+        value = getattr(self, key, None)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ('true', '1', 'yes', 'on')
+
     def _initialize_attributes(self):
         attrbs = [
             'redis_host',
@@ -220,6 +230,11 @@ class Config:
             'patreon_client_id',
             'patreon_client_secret',
             'patreon_refresh_token',
+            # Spam detection feature flags
+            'spam_detection_enabled',
+            'spam_author_tracking_enabled',
+            'spam_detection_shadow_mode',
+            'spam_detection_auto_actions_enabled',
 
         ]
 

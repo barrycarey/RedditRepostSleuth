@@ -137,6 +137,14 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
 
     celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit', args=[post.subreddit])
 
+    # Queue author activity tracking for spam detection (decoupled for failure isolation)
+    if self.config._get_bool('spam_author_tracking_enabled', False):
+        from redditrepostsleuth.core.celery.tasks.spam_detection_tasks import track_author_activity
+        track_author_activity.apply_async(
+            args=[post.post_id, post.author, post.subreddit, post.url, post.nsfw, post.post_type_id, post.created_at.isoformat()],
+            queue='spam_detection'
+        )
+
 
 
 @celery.task

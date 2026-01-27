@@ -35,7 +35,7 @@ task_routes = {
     'redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data': {'queue': 'update_subreddit_data'},
     'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit': {'queue': 'update_subreddit_data'},
 'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit_batch': {'queue': 'update_subreddit_data'},
-
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.*': {'queue': 'spam_detection'},
 
 }
 
