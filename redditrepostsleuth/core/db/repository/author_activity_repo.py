@@ -55,11 +55,11 @@ class AuthorActivityRepo:
 
         if result:
             return {
-                'total_posts': result.total_posts or 0,
-                'nsfw_count': result.nsfw_count or 0,
-                'adult_link_count': result.adult_link_count or 0,
-                'short_link_count': result.short_link_count or 0,
-                'unique_subreddits': result.unique_subreddits or 0
+                'total_posts': int(result.total_posts or 0),
+                'nsfw_count': int(result.nsfw_count or 0),
+                'adult_link_count': int(result.adult_link_count or 0),
+                'short_link_count': int(result.short_link_count or 0),
+                'unique_subreddits': int(result.unique_subreddits or 0)
             }
         return {
             'total_posts': 0,
