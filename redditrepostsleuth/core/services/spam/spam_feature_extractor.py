@@ -123,14 +123,19 @@ class SpamFeatureExtractor:
         # Check cache
         if self._spam_subreddits_cache:
             cache_time, cache_data = self._spam_subreddits_cache
-            if (now - cache_time).total_seconds() < SPAM_SUBREDDIT_CACHE_TTL:
+            cache_age = (now - cache_time).total_seconds()
+            if cache_age < SPAM_SUBREDDIT_CACHE_TTL:
+                log.debug('Using cached spam subreddits (age: %.0fs, count: %d)',
+                          cache_age, len(cache_data))
                 return cache_data
 
         # Refresh cache
+        log.debug('Refreshing spam subreddits cache from database')
         with self.uowm.start() as uow:
-            spam_subs = uow.spam_subreddit.get_as_dict()
+            spam_subs = uow.spam_subreddits.get_as_dict()
 
         self._spam_subreddits_cache = (now, spam_subs)
+        log.info('Loaded %d spam subreddits into cache', len(spam_subs))
         return spam_subs
 
     def is_user_worth_analyzing(self, username: str) -> bool:
@@ -144,11 +149,15 @@ class SpamFeatureExtractor:
             True if user has enough posts for analysis
         """
         if not username or username == '[deleted]':
+            log.debug('User %s is invalid or deleted, skipping analysis', username)
             return False
 
         with self.uowm.start() as uow:
             post_count = uow.author_activity.count_by_author(username)
-            return post_count >= MIN_POSTS_FOR_ANALYSIS
+            is_worth = post_count >= MIN_POSTS_FOR_ANALYSIS
+            log.debug('User %s has %d posts (min required: %d) -> worth_analyzing=%s',
+                      username, post_count, MIN_POSTS_FOR_ANALYSIS, is_worth)
+            return is_worth
 
     def check_username_pattern(self, username: str) -> Tuple[bool, float, List[str]]:
         """
@@ -161,6 +170,8 @@ class SpamFeatureExtractor:
             Tuple of (is_suspicious, confidence, matched_patterns)
         """
         analysis = analyze_username(username)
+        log.debug('Username pattern analysis for %s: suspicious=%s, confidence=%.2f, patterns=%s',
+                  username, analysis.is_suspicious, analysis.confidence, analysis.matched_patterns)
         return (
             analysis.is_suspicious,
             analysis.confidence,
@@ -177,10 +188,13 @@ class SpamFeatureExtractor:
         Returns:
             Dict with subreddit behavior metrics
         """
+        log.debug('Extracting subreddit behavior for user: %s', username)
+
         with self.uowm.start() as uow:
             distribution = uow.author_activity.get_author_subreddit_distribution(username)
 
         if not distribution:
+            log.debug('No subreddit distribution data for user: %s', username)
             return {
                 'distribution': {},
                 'concentration_hhi': 0.0,
@@ -195,11 +209,16 @@ class SpamFeatureExtractor:
                 share = count / total_posts
                 hhi += share * share
 
-        return {
+        result = {
             'distribution': distribution,
             'concentration_hhi': hhi,
             'unique_count': len(distribution),
         }
+
+        log.debug('Subreddit behavior for %s: unique_subs=%d, total_posts=%d, HHI=%.3f',
+                  username, len(distribution), total_posts, hhi)
+
+        return result
 
     def get_activity_timeline(self, username: str) -> dict:
         """
@@ -211,10 +230,13 @@ class SpamFeatureExtractor:
         Returns:
             Dict with timeline metrics (posting intervals, entropy, burst detection)
         """
+        log.debug('Extracting activity timeline for user: %s', username)
+
         with self.uowm.start() as uow:
             activities = uow.author_activity.get_by_author(username, limit=500)
 
         if not activities:
+            log.debug('No activity data for user: %s', username)
             return {
                 'first_post_date': None,
                 'last_post_date': None,
@@ -275,7 +297,7 @@ class SpamFeatureExtractor:
 
         burst_detected = any(count > 10 for count in hourly_counts.values())
 
-        return {
+        result = {
             'first_post_date': first_post,
             'last_post_date': last_post,
             'account_age_days': account_age_days,
@@ -285,6 +307,13 @@ class SpamFeatureExtractor:
             'burst_posting_detected': burst_detected,
             'avg_time_between_posts_minutes': avg_interval,
         }
+
+        log.debug('Activity timeline for %s: age_days=%d, posts_per_day=%.2f, max_per_day=%d, '
+                  'entropy=%.3f, burst=%s, avg_interval_min=%.1f',
+                  username, account_age_days, posts_per_day, max_posts_per_day,
+                  posting_entropy, burst_detected, avg_interval)
+
+        return result
 
     def extract_tier1_features(self, username: str) -> Optional[Tier1Features]:
         """
@@ -299,13 +328,16 @@ class SpamFeatureExtractor:
         Returns:
             Tier1Features object, or None if insufficient data
         """
+        log.info('Starting Tier 1 feature extraction for user: %s', username)
+
         if not self.is_user_worth_analyzing(username):
-            log.debug('User %s has insufficient data for analysis', username)
+            log.info('User %s has insufficient data for analysis, skipping', username)
             return None
 
         features = Tier1Features(username=username)
 
         # Get basic author stats
+        log.debug('Fetching author stats for %s', username)
         with self.uowm.start() as uow:
             stats = uow.author_activity.get_author_stats(username)
 
@@ -315,27 +347,40 @@ class SpamFeatureExtractor:
             features.short_link_post_count = stats.get('short_link_count', 0)
             features.unique_subreddits_posted = stats.get('unique_subreddits', 0)
 
+            log.debug('Author stats for %s: total=%d, nsfw=%d, adult=%d, short_links=%d, unique_subs=%d',
+                      username, features.total_posts_indexed, features.nsfw_post_count,
+                      features.adult_platform_post_count, features.short_link_post_count,
+                      features.unique_subreddits_posted)
+
             # Calculate ratios
             if features.total_posts_indexed > 0:
                 features.nsfw_post_ratio = features.nsfw_post_count / features.total_posts_indexed
                 features.adult_platform_ratio = features.adult_platform_post_count / features.total_posts_indexed
                 features.short_link_ratio = features.short_link_post_count / features.total_posts_indexed
+                log.debug('Ratios for %s: nsfw=%.3f, adult=%.3f, short_link=%.3f',
+                          username, features.nsfw_post_ratio, features.adult_platform_ratio,
+                          features.short_link_ratio)
 
             # Get repost count
             features.total_reposts_detected = uow.repost.count_reposts_by_author(username)
             if features.total_posts_indexed > 0:
                 features.repost_ratio = features.total_reposts_detected / features.total_posts_indexed
+            log.debug('Repost data for %s: reposts=%d, ratio=%.3f',
+                      username, features.total_reposts_detected, features.repost_ratio)
 
-            # Get summons count
-            features.summons_received = uow.summons.count_by_post_author(username)
+            # Summons count skipped - requires slow join on Post table (2B rows, no index)
+            # Not used in scoring algorithm anyway
+            features.summons_received = 0
 
         # Username pattern analysis
+        log.debug('Analyzing username pattern for %s', username)
         is_suspicious, confidence, patterns = self.check_username_pattern(username)
         features.username_suspicious_pattern = is_suspicious
         features.username_pattern_confidence = confidence
         features.username_pattern_matches = patterns
 
         # Subreddit behavior
+        log.debug('Extracting subreddit behavior for %s', username)
         sub_behavior = self.extract_subreddit_behavior(username)
         features.subreddit_distribution = sub_behavior['distribution']
         features.subreddit_concentration_hhi = sub_behavior['concentration_hhi']
@@ -352,7 +397,13 @@ class SpamFeatureExtractor:
                 elif category == 'easy_karma':
                     features.easy_karma_sub_posts += count
 
+        if features.spam_subreddit_posts > 0:
+            log.debug('Spam subreddit activity for %s: spam=%d, karma_farming=%d, easy_karma=%d',
+                      username, features.spam_subreddit_posts, features.karma_farming_sub_posts,
+                      features.easy_karma_sub_posts)
+
         # Activity timeline
+        log.debug('Extracting activity timeline for %s', username)
         timeline = self.get_activity_timeline(username)
         features.first_post_date = timeline['first_post_date']
         features.last_post_date = timeline['last_post_date']
@@ -362,6 +413,12 @@ class SpamFeatureExtractor:
         features.posting_entropy = timeline['posting_entropy']
         features.burst_posting_detected = timeline['burst_posting_detected']
         features.avg_time_between_posts_minutes = timeline['avg_time_between_posts_minutes']
+
+        log.info('Completed Tier 1 feature extraction for %s: posts=%d, reposts=%d (%.1f%%), '
+                 'nsfw_ratio=%.2f, adult_ratio=%.2f, karma_farm_posts=%d',
+                 username, features.total_posts_indexed, features.total_reposts_detected,
+                 features.repost_ratio * 100, features.nsfw_post_ratio,
+                 features.adult_platform_ratio, features.karma_farming_sub_posts)
 
         return features
 
@@ -375,6 +432,7 @@ class SpamFeatureExtractor:
         Returns:
             True if stored successfully
         """
+        log.debug('Storing features for user: %s', features.username)
         try:
             with self.uowm.start() as uow:
                 uow.spam_features.update_or_create(
@@ -391,9 +449,10 @@ class SpamFeatureExtractor:
                     feature_data=features.to_dict(),
                 )
                 uow.commit()
+            log.info('Successfully stored features for user: %s', features.username)
             return True
         except Exception as e:
-            log.error('Failed to store features for %s: %s', features.username, str(e))
+            log.error('Failed to store features for %s: %s', features.username, str(e), exc_info=True)
             return False
 
     def extract_and_store(self, username: str) -> Optional[Tier1Features]:
@@ -406,7 +465,14 @@ class SpamFeatureExtractor:
         Returns:
             Tier1Features if successful, None otherwise
         """
+        log.info('Extract and store requested for user: %s', username)
         features = self.extract_tier1_features(username)
         if features:
-            self.store_features(features)
+            stored = self.store_features(features)
+            if stored:
+                log.info('Extract and store completed successfully for user: %s', username)
+            else:
+                log.warning('Features extracted but storage failed for user: %s', username)
+        else:
+            log.info('No features extracted for user: %s (insufficient data)', username)
         return features
