@@ -198,9 +198,11 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
 
     has_adult_link = detect_adult_platform_link(url)
     has_short_link = detect_short_link(url)
+    has_telegram_link = detect_telegram_link(url)
 
-    if has_adult_link or has_short_link:
-        log.info('Detected short or adult link in %s', url)
+    if has_adult_link or has_short_link or has_telegram_link:
+        log.info('Detected suspicious link in %s (adult=%s, short=%s, telegram=%s)',
+                 url, has_adult_link, has_short_link, has_telegram_link)
 
     activity = AuthorActivityTracking(
         post_id=post_id,
@@ -210,7 +212,8 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
         post_type_id=post_type_id,
         is_nsfw=is_nsfw,
         has_adult_link=has_adult_link,
-        has_short_link=has_short_link
+        has_short_link=has_short_link,
+        has_telegram_link=has_telegram_link
     )
 
     try:

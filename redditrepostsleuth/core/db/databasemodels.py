@@ -832,6 +832,7 @@ class AuthorActivityTracking(Base):
     is_nsfw = Column(Boolean, default=False)
     has_adult_link = Column(Boolean, default=False)
     has_short_link = Column(Boolean, default=False)
+    has_telegram_link = Column(Boolean, default=False)
     tracked_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
 
 
