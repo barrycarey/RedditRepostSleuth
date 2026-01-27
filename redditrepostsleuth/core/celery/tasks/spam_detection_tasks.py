@@ -505,6 +505,10 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
                      username, tier2_features.account_age_days or 0, tier2_features.total_karma or 0,
                      tier2_features.account_suspended, tier2_features.has_adult_profile_links)
 
+        # Queue re-scoring with Tier 2 data (non-blocking)
+        log.info('Queueing Tier 2 re-scoring for %s', username)
+        rescore_user_with_tier2.delay(username)
+
         return tier2_features.to_dict()
 
     except RateLimitExceeded as e:
@@ -782,6 +786,114 @@ def score_user_spam(self, username: str) -> Optional[dict]:
 
     except Exception as e:
         log.error('Error scoring user %s: %s', username, str(e), exc_info=True)
+        raise
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=False, serializer='pickle')
+def rescore_user_with_tier2(self, username: str) -> Optional[dict]:
+    """
+    Re-score a user using both Tier 1 and Tier 2 features.
+
+    This should be called after Tier 2 enrichment to produce
+    an enhanced spam score incorporating API-sourced data.
+
+    Args:
+        username: Reddit username to re-score
+
+    Returns:
+        Dict with enhanced scoring results or None if insufficient data
+    """
+    from redditrepostsleuth.core.services.spam.spam_feature_extractor import SpamFeatureExtractor
+    from redditrepostsleuth.core.services.spam.spam_scorer import SpamScorerWithTier2
+    from redditrepostsleuth.core.db.databasemodels import UserReview
+
+    if not username or username == '[deleted]':
+        log.debug('Skipping Tier 2 re-scoring for invalid username: %s', username)
+        return None
+
+    log.info('Starting Tier 2 re-scoring for user: %s', username)
+
+    try:
+        # Extract Tier 1 features
+        extractor = SpamFeatureExtractor(self.uowm)
+        tier1_features = extractor.extract_tier1_features(username)
+
+        if not tier1_features:
+            log.warning('No Tier 1 features for %s, cannot re-score', username)
+            return None
+
+        # Get Tier 2 features from database
+        with self.uowm.start() as uow:
+            spam_features = uow.spam_features.get_by_username(username)
+
+            if not spam_features or not spam_features.tier2_enriched_at:
+                log.warning('No Tier 2 data for %s, cannot re-score', username)
+                return None
+
+            # Build Tier 2 dict from stored features
+            tier2_data = {
+                'account_age_days': spam_features.account_age_days,
+                'total_karma': spam_features.total_karma,
+                'post_karma': spam_features.post_karma,
+                'comment_karma': spam_features.comment_karma,
+                'karma_per_day': spam_features.karma_per_day,
+                'has_verified_email': spam_features.has_verified_email,
+                'is_gold': spam_features.is_gold,
+                'has_custom_avatar': spam_features.has_custom_avatar,
+                'account_suspended': spam_features.account_suspended,
+                'has_adult_profile_links': spam_features.has_adult_profile_links,
+                'has_telegram_links': spam_features.has_telegram_links,
+                'profile_link_sources': spam_features.profile_link_sources,
+            }
+
+        # Score with both tiers
+        scorer = SpamScorerWithTier2(self.uowm)
+        result = scorer.score_with_tier2(tier1_features, tier2_data)
+
+        log.info('Tier 2 re-scoring complete for %s: score=%.3f (was Tier1 only), risk=%s',
+                 username, result.score, result.risk_level)
+
+        # Update user_review table with enhanced score
+        with self.uowm.start() as uow:
+            review = uow.user_review.get_by_username(username)
+
+            if review:
+                review.spam_score = result.score
+                review.spam_score_confidence = result.confidence
+                review.spam_score_updated_at = datetime.utcnow()
+                review.risk_level = result.risk_level
+            else:
+                review = UserReview(
+                    username=username,
+                    spam_score=result.score,
+                    spam_score_confidence=result.confidence,
+                    spam_score_updated_at=datetime.utcnow(),
+                    risk_level=result.risk_level,
+                )
+                uow.user_review.add(review)
+
+            uow.commit()
+
+        # Also update spam_features table
+        with self.uowm.start() as uow:
+            spam_features = uow.spam_features.get_by_username(username)
+            if spam_features:
+                spam_features.spam_score = result.score
+                spam_features.spam_score_confidence = result.confidence
+                spam_features.computed_at = datetime.utcnow()
+                # Update feature_data with Tier 2 scoring info
+                feature_dict = tier1_features.to_dict()
+                feature_dict['rule_score'] = result.score
+                feature_dict['risk_level'] = result.risk_level
+                feature_dict['top_contributing_factors'] = result.reasons
+                feature_dict['tier2_enhanced'] = True
+                spam_features.feature_data = feature_dict
+            uow.commit()
+
+        return result.to_dict()
+
+    except Exception as e:
+        log.error('Error re-scoring user %s with Tier 2: %s', username, str(e), exc_info=True)
         raise
 
 
