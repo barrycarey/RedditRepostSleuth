@@ -98,6 +98,30 @@ utility_scripts/           # One-off utility scripts
 - `submonitor`: Subreddit monitoring
 - `reddit_actions`: Reddit API actions
 - `post_delete`: Post deletion handling
+- `spam_detection`: Spam scoring and user enrichment
+
+## Spam Detection System
+
+The bot includes a spam detection system that scores users based on behavioral patterns to identify potential spammers (OF promoters, karma farmers, etc.).
+
+### Key Components
+- **Tier 1 Features**: Database-derived signals (posting patterns, subreddit behavior, username patterns)
+- **Tier 2 Features**: Reddit API-enriched data (account age, karma, profile links, suspended status)
+- **Spam Scorer**: Rule-based scoring engine with configurable weights and thresholds
+- **SpamActionHandler**: Executes actions (remove post, ban user, notify modmail) via `reddit_actions` queue
+
+### Configuration
+- **Shadow Mode**: Actions logged but not executed (safe tuning)
+- **Auto Actions**: When enabled, configured actions execute automatically
+- Per-subreddit thresholds and action sets via `SpamDetectionConfig`
+
+### Documentation
+See `docs/SpamDetection/FinalDocs/` for detailed documentation:
+- `spam-detection-flow.md` - End-to-end flow diagram
+- `scoring-engine-reference.md` - Scoring rules and weights
+- `configuration-reference.md` - Configuration options
+- `tier2-enrichment-usage.md` - Tier 2 API enrichment
+- `phase4-trigger-integration.md` - Integration with monitored subs
 
 ## Code Style
 
