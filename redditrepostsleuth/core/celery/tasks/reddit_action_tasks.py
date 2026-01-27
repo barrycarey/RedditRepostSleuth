@@ -34,11 +34,15 @@ class RedditActionTask(Task):
     autoretry_for=(TooManyRequests,),
     retry_kwargs={'max_retries': 3}
 )
-def remove_submission_task(self, submission: Submission, removal_reason: str, mod_note: str = None) -> None:
+def remove_submission_task(self, submission: Submission, removal_reason: str, mod_note: str = None, spam: bool = False) -> None:
     try:
-        removal_reason_id = get_removal_reason_id(removal_reason, submission.subreddit)
-        log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
-        submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
+        if spam:
+            log.info('Attempting to remove post https://redd.it/%s as spam with mod_note: %s', submission.id, mod_note)
+            submission.mod.remove(spam=True, mod_note=mod_note)
+        else:
+            removal_reason_id = get_removal_reason_id(removal_reason, submission.subreddit)
+            log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
+            submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
         self.event_logger.save_event(
             RedditAdminActionEvent(
                 submission.subreddit.display_name,
@@ -67,12 +71,12 @@ def remove_submission_task(self, submission: Submission, removal_reason: str, mo
     autoretry_for=(TooManyRequests,),
     retry_kwargs={'max_retries': 3}
 )
-def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, note: str = None) -> None:
+def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, note: str = None, ban_message: str = None) -> None:
     log.info('Banning user %s from %s', username, subreddit_name)
 
     try:
         subreddit = self.reddit.subreddit(subreddit_name)
-        subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+        subreddit.banned.add(username, ban_reason=ban_reason, ban_message=ban_message, note=note)
         self.event_logger.save_event(
             RedditAdminActionEvent(
                 subreddit_name,
