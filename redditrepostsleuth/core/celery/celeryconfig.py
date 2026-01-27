@@ -39,6 +39,19 @@ task_routes = {
 
 }
 
+# Rate limiting for tasks that make Reddit API calls
+task_annotations = {
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.enrich_user_features_tier2': {
+        'rate_limit': '30/m',  # Max 30 enrichments per minute
+    },
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.check_user_suspended_task': {
+        'rate_limit': '20/m',  # Max 20 suspension checks per minute
+    },
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scan_user_for_telegram_links': {
+        'rate_limit': '20/m',  # Max 20 scans per minute
+    },
+}
+
 
 beat_schedule = {
     # 'update-proxy-list': {

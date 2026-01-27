@@ -63,9 +63,17 @@ SHORT_LINK_PATTERNS = [
     r'hoo\.be/',
 ]
 
+# Telegram link patterns for detection
+TELEGRAM_PATTERNS = [
+    r't\.me/',
+    r'telegram\.me/',
+    r'telegram\.org/',
+]
+
 # Compile patterns for efficiency
 _adult_pattern = re.compile('|'.join(ADULT_PLATFORM_PATTERNS), re.IGNORECASE)
 _short_link_pattern = re.compile('|'.join(SHORT_LINK_PATTERNS), re.IGNORECASE)
+_telegram_pattern = re.compile('|'.join(TELEGRAM_PATTERNS), re.IGNORECASE)
 
 
 def detect_adult_platform_link(url: Optional[str]) -> bool:
@@ -80,6 +88,13 @@ def detect_short_link(url: Optional[str]) -> bool:
     if not url:
         return False
     return bool(_short_link_pattern.search(url))
+
+
+def detect_telegram_link(text: Optional[str]) -> bool:
+    """Check if text contains a Telegram link."""
+    if not text:
+        return False
+    return bool(_telegram_pattern.search(text))
 
 
 class SpamDetectionTask(Task):
@@ -98,6 +113,52 @@ class SpamDetectionTask(Task):
         if self._uowm is None:
             self._uowm = UnitOfWorkManager(get_db_engine(self.config))
         return self._uowm
+
+
+class SpamDetectionTaskWithReddit(SpamDetectionTask):
+    """Base task for spam detection with Reddit API access."""
+    _reddit = None
+    _circuit_breaker = None
+    _rate_limiter = None
+
+    @property
+    def reddit(self):
+        if self._reddit is None:
+            from redditrepostsleuth.core.util.reddithelpers import get_reddit_instance
+            self._reddit = get_reddit_instance(self.config)
+        return self._reddit
+
+    @property
+    def circuit_breaker(self):
+        if self._circuit_breaker is None:
+            from redditrepostsleuth.core.services.spam.circuit_breaker import CircuitBreaker
+            self._circuit_breaker = CircuitBreaker(
+                failure_threshold=5,
+                success_threshold=2,
+                recovery_timeout=60
+            )
+        return self._circuit_breaker
+
+    @property
+    def rate_limiter(self):
+        if self._rate_limiter is None:
+            try:
+                import redis
+                redis_client = redis.Redis(
+                    host=self.config.redis_host,
+                    port=self.config.redis_port,
+                    password=self.config.redis_password,
+                    db=self.config.redis_database
+                )
+                from redditrepostsleuth.core.services.spam.rate_limiter import PerMinuteRateLimiter
+                self._rate_limiter = PerMinuteRateLimiter(
+                    redis_client,
+                    requests_per_minute=50
+                )
+            except Exception as e:
+                log.warning('Failed to create rate limiter: %s', e)
+                self._rate_limiter = None
+        return self._rate_limiter
 
 
 @celery.task(bind=True, base=SpamDetectionTask, ignore_results=True, serializer='pickle',
@@ -125,6 +186,11 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
     if not author or author == '[deleted]':
         return
 
+    # Skip posts without a valid post_type_id (required by author_activity_tracking table)
+    if post_type_id is None:
+        log.debug('Skipping author activity tracking for post %s: post_type_id is None', post_id)
+        return
+
     try:
         created_at = datetime.fromisoformat(created_at_iso)
     except (ValueError, TypeError):
@@ -132,6 +198,9 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
 
     has_adult_link = detect_adult_platform_link(url)
     has_short_link = detect_short_link(url)
+
+    if has_adult_link or has_short_link:
+        log.info('Detected short or adult link in %s', url)
 
     activity = AuthorActivityTracking(
         post_id=post_id,
@@ -331,3 +400,263 @@ def cleanup_old_feature_records(self, keep_per_user: int = 5) -> dict:
     # Currently a no-op since UserSpamFeatures has username as unique PK
     log.info('Feature cleanup task executed (no-op with current schema)')
     return {'deleted_count': 0}
+
+
+# ============================================================================
+# Tier 2 Tasks - Reddit API-based enrichment
+# ============================================================================
+
+
+@celery.task(
+    bind=True,
+    base=SpamDetectionTaskWithReddit,
+    ignore_results=False,
+    serializer='pickle',
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3, 'countdown': 60}
+)
+def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
+    """
+    Fetch Tier 2 features from Reddit API.
+
+    This task fetches additional user data from the Reddit API
+    and updates the user_spam_features record.
+
+    Args:
+        username: Reddit username to enrich
+
+    Returns:
+        Dict with Tier 2 features or None on failure
+    """
+    from redditrepostsleuth.core.services.spam.rate_limiter import RateLimitExceeded
+    from redditrepostsleuth.core.services.spam.user_data_fetcher import UserDataFetcher
+
+    if not username or username == '[deleted]':
+        return None
+
+    log.info('Enriching Tier 2 features for: %s', username)
+
+    try:
+        fetcher = UserDataFetcher(
+            self.reddit,
+            self.uowm,
+            circuit_breaker=self.circuit_breaker,
+            rate_limiter=self.rate_limiter
+        )
+        tier2_features = fetcher.fetch_and_enrich(username, scan_profile=True)
+
+        if not tier2_features:
+            log.warning('Failed to fetch Tier 2 data for %s', username)
+            # Mark as failed in database
+            with self.uowm.start() as uow:
+                uow.spam_features.mark_tier2_enrichment_failed(username, 'Fetch returned None')
+                uow.commit()
+            return None
+
+        # Update stored features
+        with self.uowm.start() as uow:
+            uow.spam_features.update_tier2_features(
+                username,
+                account_age_days=tier2_features.account_age_days,
+                total_karma=tier2_features.total_karma,
+                post_karma=tier2_features.post_karma,
+                comment_karma=tier2_features.comment_karma,
+                karma_per_day=tier2_features.karma_per_day,
+                has_verified_email=tier2_features.has_verified_email,
+                is_gold=tier2_features.is_gold,
+                has_custom_avatar=tier2_features.has_custom_avatar,
+                account_suspended=tier2_features.account_suspended,
+                has_adult_profile_links=tier2_features.has_adult_profile_links,
+                has_telegram_links=tier2_features.has_telegram_links,
+                profile_link_sources=tier2_features.profile_link_sources
+            )
+            uow.commit()
+
+            log.info('Updated Tier 2 features for %s', username)
+
+        return tier2_features.to_dict()
+
+    except RateLimitExceeded as e:
+        log.warning('Rate limited enriching %s, retry after %ds', username, e.retry_after)
+        raise self.retry(countdown=e.retry_after)
+
+    except Exception as e:
+        log.error('Error enriching %s: %s', username, str(e), exc_info=True)
+        # Mark as failed in database
+        try:
+            with self.uowm.start() as uow:
+                uow.spam_features.mark_tier2_enrichment_failed(username, str(e)[:200])
+                uow.commit()
+        except Exception:
+            pass
+        raise
+
+
+@celery.task(
+    bind=True,
+    base=SpamDetectionTaskWithReddit,
+    ignore_results=False,
+    serializer='pickle',
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3, 'countdown': 60}
+)
+def check_user_suspended_task(self, username: str) -> bool:
+    """
+    Quick check if user is suspended.
+
+    Used for training data collection - suspended users are confirmed spam.
+
+    Args:
+        username: Reddit username to check
+
+    Returns:
+        True if user is suspended/deleted
+    """
+    from redditrepostsleuth.core.services.spam.rate_limiter import RateLimitExceeded
+    from redditrepostsleuth.core.services.spam.user_data_fetcher import UserDataFetcher
+
+    if not username or username == '[deleted]':
+        return True
+
+    try:
+        fetcher = UserDataFetcher(
+            self.reddit,
+            self.uowm,
+            circuit_breaker=self.circuit_breaker,
+            rate_limiter=self.rate_limiter
+        )
+        is_suspended = fetcher.check_user_suspended(username)
+
+        # Update database if suspended
+        if is_suspended:
+            with self.uowm.start() as uow:
+                uow.spam_features.update_tier2_features(
+                    username,
+                    account_suspended=True
+                )
+                uow.commit()
+
+        return is_suspended
+
+    except RateLimitExceeded as e:
+        log.warning('Rate limited checking %s, retry after %ds', username, e.retry_after)
+        raise self.retry(countdown=e.retry_after)
+
+    except Exception as e:
+        log.error('Error checking suspension for %s: %s', username, str(e))
+        raise
+
+
+@celery.task(bind=True, base=SpamDetectionTaskWithReddit, ignore_results=False, serializer='pickle')
+def enrich_high_risk_users(self, min_score: float = 0.5, limit: int = 50) -> dict:
+    """
+    Enrich Tier 2 features for high-risk users.
+
+    Finds users with high spam scores but no Tier 2 data and fetches their data.
+
+    Args:
+        min_score: Minimum spam score to qualify
+        limit: Maximum users to enrich
+
+    Returns:
+        Dict with enrichment results
+    """
+    import time
+    from redditrepostsleuth.core.services.spam.rate_limiter import RateLimitExceeded
+
+    log.info('Enriching high-risk users (score >= %.2f)', min_score)
+
+    with self.uowm.start() as uow:
+        # Find users needing enrichment
+        high_risk = uow.spam_features.get_high_risk_unenriched(
+            min_score=min_score,
+            limit=limit
+        )
+        needs_enrichment = [f.username for f in high_risk]
+
+    if not needs_enrichment:
+        log.info('No users need Tier 2 enrichment')
+        return {'enriched': 0, 'total': 0, 'suspended': 0, 'failed': 0}
+
+    log.info('Enriching %d users', len(needs_enrichment))
+
+    results = {
+        'total': len(needs_enrichment),
+        'enriched': 0,
+        'suspended': 0,
+        'failed': 0,
+    }
+
+    for username in needs_enrichment:
+        try:
+            # Call the enrichment task directly (not async)
+            tier2 = enrich_user_features_tier2(username)
+
+            if tier2:
+                results['enriched'] += 1
+                if tier2.get('account_suspended'):
+                    results['suspended'] += 1
+            else:
+                results['failed'] += 1
+
+            # Small delay between users (rate limit protection)
+            time.sleep(1.5)
+
+        except RateLimitExceeded as e:
+            log.warning('Rate limited, pausing %ds', e.retry_after)
+            time.sleep(e.retry_after)
+
+        except Exception as e:
+            log.error('Failed to enrich %s: %s', username, str(e))
+            results['failed'] += 1
+
+    log.info('Enrichment complete: %s', results)
+    return results
+
+
+@celery.task(bind=True, base=SpamDetectionTaskWithReddit, ignore_results=False, serializer='pickle')
+def scan_user_for_telegram_links(self, username: str) -> dict:
+    """
+    Scan a user's profile and comments for Telegram links.
+
+    Args:
+        username: Reddit username to scan
+
+    Returns:
+        Dict with scan results
+    """
+    from redditrepostsleuth.core.services.spam.rate_limiter import RateLimitExceeded
+    from redditrepostsleuth.core.services.spam.user_data_fetcher import UserDataFetcher
+
+    if not username or username == '[deleted]':
+        return {'has_telegram_links': False, 'error': 'Invalid username'}
+
+    log.info('Scanning %s for Telegram links', username)
+
+    try:
+        fetcher = UserDataFetcher(
+            self.reddit,
+            self.uowm,
+            circuit_breaker=self.circuit_breaker,
+            rate_limiter=self.rate_limiter
+        )
+        result = fetcher.scan_user_profile_links(username)
+
+        # Update database with results
+        with self.uowm.start() as uow:
+            features = uow.spam_features.get_by_username(username)
+            if features:
+                features.has_telegram_links = result['has_telegram_links']
+                features.has_adult_profile_links = result['has_adult_links']
+                features.profile_link_sources = result['sources']
+                uow.commit()
+
+        return result
+
+    except RateLimitExceeded as e:
+        log.warning('Rate limited scanning %s, retry after %ds', username, e.retry_after)
+        return {'has_telegram_links': False, 'error': f'Rate limited, retry after {e.retry_after}s'}
+
+    except Exception as e:
+        log.error('Error scanning %s: %s', username, str(e))
+        return {'has_telegram_links': False, 'error': str(e)}
