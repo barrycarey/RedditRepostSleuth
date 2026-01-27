@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from redditrepostsleuth.core.logging import log
-from redditrepostsleuth.core.db.databasemodels import Summons
+from redditrepostsleuth.core.db.databasemodels import Post, Summons
 
 
 class SummonsRepository:
@@ -59,3 +59,16 @@ class SummonsRepository:
         query = query.filter(Summons.summons_received_at >= start, Summons.summons_received_at < end)
         r = query.first()
         return r[0] if r else 0
+
+    def count_by_post_author(self, author: str) -> int:
+        """
+        Count summons on posts by the specified author.
+
+        Args:
+            author: Reddit username (post author, not summons requestor)
+        """
+        return self.db_session.query(func.count(Summons.id)).join(
+            Post, Summons.post_id == Post.id
+        ).filter(
+            Post.author == author
+        ).scalar() or 0

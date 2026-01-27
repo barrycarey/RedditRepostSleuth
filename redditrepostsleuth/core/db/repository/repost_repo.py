@@ -124,3 +124,12 @@ class RepostRepo:
     def get_newest(self) -> Repost:
         """Return the most recent repost by id (correlates with detected_at)."""
         return self.db_session.query(Repost).order_by(Repost.id.desc()).limit(1).first()
+
+    def count_reposts_by_author(self, author: str) -> int:
+        """
+        Count reposts posted by the specified author.
+        Uses Repost.author directly (indexed, no join needed).
+        """
+        return self.db_session.query(func.count(Repost.id)).filter(
+            Repost.author == author
+        ).scalar() or 0

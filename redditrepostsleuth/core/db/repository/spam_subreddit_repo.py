@@ -63,3 +63,18 @@ class SpamSubredditRepo:
             SpamSubredditList.subreddit_name == subreddit_name
         ).delete(synchronize_session=False)
         return result > 0
+
+    def get_as_dict(self) -> dict:
+        """
+        Get all active spam subreddits as a dictionary.
+
+        Returns:
+            Dict mapping lowercase subreddit name to (category, weight) tuple
+        """
+        records = self.db_session.query(SpamSubredditList).filter(
+            SpamSubredditList.is_active == True
+        ).all()
+        return {
+            r.subreddit_name.lower(): (r.category, r.weight)
+            for r in records
+        }
