@@ -11,6 +11,10 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 
 from praw import Reddit
 
+from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import (
+    remove_submission_task, ban_user_task, send_modmail_task
+)
+
 if TYPE_CHECKING:
     from redditrepostsleuth.core.config import Config
     from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub
@@ -195,22 +199,28 @@ class SpamActionHandler:
 
     def _remove_post(self, post: 'Post', removal_reason: Optional[str]) -> bool:
         """
-        Remove the post as spam.
+        Queue the post for removal as spam.
 
         Args:
             post: The Post to remove
-            removal_reason: Optional removal reason
+            removal_reason: Optional removal reason (used as mod_note)
 
         Returns:
-            True if removal was successful
+            True if task was queued successfully
         """
         try:
             submission = self.reddit.submission(id=post.post_id)
-            submission.mod.remove(spam=True, mod_note=removal_reason or 'Spam detected by RepostSleuthBot')
-            log.info('Removed post %s as spam (reason: %s)', post.post_id, removal_reason)
+            remove_submission_task.apply_async(
+                (submission, None),  # No removal_reason, use mod_note instead
+                {
+                    'mod_note': removal_reason or 'Spam detected by RepostSleuthBot',
+                    'spam': True
+                }
+            )
+            log.info('Queued spam removal for post %s', post.post_id)
             return True
         except Exception as e:
-            log.error('Failed to remove post %s: %s', post.post_id, str(e))
+            log.error('Failed to queue removal for post %s: %s', post.post_id, str(e))
             return False
 
     def _ban_user(
@@ -220,29 +230,32 @@ class SpamActionHandler:
         ban_reason: Optional[str]
     ) -> bool:
         """
-        Ban the user from the subreddit.
+        Queue a ban for the user from the subreddit.
 
         Args:
             post: The Post (for author info)
             monitored_sub: The MonitoredSub
-            ban_reason: Optional ban reason
+            ban_reason: Optional ban reason (sent to user as ban_message)
 
         Returns:
-            True if ban was successful
+            True if task was queued successfully
         """
         try:
-            subreddit = self.reddit.subreddit(monitored_sub.name)
-            ban_message = ban_reason or 'You have been banned for spam activity detected by RepostSleuthBot.'
-            subreddit.banned.add(
-                post.author,
-                ban_reason='Spam detected by RepostSleuthBot',
-                ban_message=ban_message,
-                note=f'Auto-banned for spam (post: {post.post_id})'
+            ban_user_task.apply_async(
+                (
+                    post.author,
+                    monitored_sub.name,
+                    'Spam detected by RepostSleuthBot',  # ban_reason (mod note, 100 char max)
+                    f'Auto-banned for spam (post: {post.post_id})'  # note (internal)
+                ),
+                {
+                    'ban_message': ban_reason or 'You have been banned for spam activity detected by RepostSleuthBot.'
+                }
             )
-            log.info('Banned user %s from r/%s (reason: %s)', post.author, monitored_sub.name, ban_reason)
+            log.info('Queued ban for user %s from r/%s', post.author, monitored_sub.name)
             return True
         except Exception as e:
-            log.error('Failed to ban user %s from r/%s: %s', post.author, monitored_sub.name, str(e))
+            log.error('Failed to queue ban for %s: %s', post.author, str(e))
             return False
 
     def _notify_modmail(
@@ -253,7 +266,7 @@ class SpamActionHandler:
         spam_reasons: Optional[List[str]] = None
     ) -> bool:
         """
-        Send modmail notification about the spam detection.
+        Queue modmail notification about the spam detection.
 
         Args:
             post: The Post that triggered detection
@@ -262,11 +275,9 @@ class SpamActionHandler:
             spam_reasons: Optional list of reasons for the score
 
         Returns:
-            True if modmail was sent successfully
+            True if task was queued successfully
         """
         try:
-            subreddit = self.reddit.subreddit(monitored_sub.name)
-
             subject = f'[RepostSleuthBot] Spam Detected: u/{post.author}'
 
             reasons_text = ''
@@ -289,11 +300,18 @@ class SpamActionHandler:
 *View user details: [Admin Panel](https://repostsleuth.com/admin/spam/user/{post.author})*
 """
 
-            subreddit.modmail.create(subject=subject, body=message)
-            log.info('Sent modmail to r/%s about spam user %s', monitored_sub.name, post.author)
+            send_modmail_task.apply_async(
+                (
+                    monitored_sub.name,
+                    message,
+                    subject,
+                    'spam_detection'  # source
+                )
+            )
+            log.info('Queued modmail to r/%s about spam user %s', monitored_sub.name, post.author)
             return True
         except Exception as e:
-            log.error('Failed to send modmail to r/%s: %s', monitored_sub.name, str(e))
+            log.error('Failed to queue modmail to r/%s: %s', monitored_sub.name, str(e))
             return False
 
     def _log_detection(
