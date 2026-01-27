@@ -5,7 +5,6 @@ Handles actions taken when spam is detected, with shadow mode support
 for safe rollout.
 """
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional, TYPE_CHECKING
@@ -13,29 +12,12 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 from praw import Reddit
 
 if TYPE_CHECKING:
+    from redditrepostsleuth.core.config import Config
     from redditrepostsleuth.core.db.databasemodels import Post, MonitoredSub
     from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
     from redditrepostsleuth.core.services.spam.spam_config_helper import SpamDetectionConfig
 
 log = logging.getLogger(__name__)
-
-# Environment variables for controlling spam detection behavior
-# Shadow mode: log actions but don't execute them (default: True for safety)
-SHADOW_MODE_ENV = 'SPAM_DETECTION_SHADOW_MODE'
-# Auto actions: whether to automatically execute actions (default: False)
-AUTO_ACTIONS_ENV = 'SPAM_DETECTION_AUTO_ACTIONS_ENABLED'
-
-
-def _is_shadow_mode_enabled() -> bool:
-    """Check if shadow mode is enabled via environment variable."""
-    value = os.getenv(SHADOW_MODE_ENV, 'true').lower()
-    return value in ('true', '1', 'yes', 'on')
-
-
-def _is_auto_actions_enabled() -> bool:
-    """Check if automatic actions are enabled via environment variable."""
-    value = os.getenv(AUTO_ACTIONS_ENV, 'false').lower()
-    return value in ('true', '1', 'yes', 'on')
 
 
 @dataclass
@@ -85,8 +67,7 @@ class SpamActionHandler:
         self,
         reddit: Reddit,
         uowm: 'UnitOfWorkManager',
-        shadow_mode: Optional[bool] = None,
-        auto_actions: Optional[bool] = None
+        config: 'Config',
     ):
         """
         Initialize the spam action handler.
@@ -94,15 +75,15 @@ class SpamActionHandler:
         Args:
             reddit: PRAW Reddit instance for API calls
             uowm: Unit of Work Manager for database access
-            shadow_mode: Override shadow mode setting (None = use env var)
-            auto_actions: Override auto actions setting (None = use env var)
+            config: Application configuration with spam detection settings
         """
         self.reddit = reddit
         self.uowm = uowm
+        self.config = config
 
-        # Use provided values or fall back to environment variables
-        self.shadow_mode = shadow_mode if shadow_mode is not None else _is_shadow_mode_enabled()
-        self.auto_actions = auto_actions if auto_actions is not None else _is_auto_actions_enabled()
+        # Get settings from config (with safe defaults)
+        self.shadow_mode = getattr(config, 'spam_detection_shadow_mode', True)
+        self.auto_actions = getattr(config, 'spam_detection_auto_actions_enabled', False)
 
         log.info(
             'SpamActionHandler initialized: shadow_mode=%s, auto_actions=%s',
