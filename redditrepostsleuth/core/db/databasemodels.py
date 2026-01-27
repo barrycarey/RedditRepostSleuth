@@ -841,6 +841,8 @@ class UserSpamFeatures(Base):
     __table_args__ = (
         Index('idx_spam_score', 'spam_score'),
         Index('idx_computed_at', 'computed_at'),
+        Index('idx_tier2_enriched_at', 'tier2_enriched_at'),
+        Index('idx_account_suspended', 'account_suspended'),
     )
     username = Column(String(25), nullable=False, primary_key=True, unique=True)
     spam_score = Column(Float, nullable=True)
@@ -857,6 +859,27 @@ class UserSpamFeatures(Base):
     avg_posts_per_day = Column(Float, nullable=True)
     max_posts_per_day = Column(Integer, nullable=True)
     feature_data = Column(JSON, nullable=True)
+
+    # Tier 2: From single Reddit API call
+    account_age_days = Column(Integer, nullable=True)
+    total_karma = Column(Integer, nullable=True)
+    post_karma = Column(Integer, nullable=True)
+    comment_karma = Column(Integer, nullable=True)
+    karma_per_day = Column(Float, nullable=True)
+    has_verified_email = Column(Boolean, nullable=True)
+    is_gold = Column(Boolean, nullable=True)
+    has_custom_avatar = Column(Boolean, nullable=True)
+    account_suspended = Column(Boolean, default=False)
+
+    # Tier 2: From profile/comment scanning (adult + telegram links)
+    has_adult_profile_links = Column(Boolean, nullable=True)
+    has_telegram_links = Column(Boolean, nullable=True)
+    profile_link_sources = Column(JSON, nullable=True)
+
+    # Enrichment metadata
+    tier2_enriched_at = Column(DateTime, nullable=True)
+    tier2_enrichment_failed = Column(Boolean, default=False)
+    tier2_failure_reason = Column(String(200), nullable=True)
 
 
 class SpamSubredditList(Base):

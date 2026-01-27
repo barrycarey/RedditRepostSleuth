@@ -72,3 +72,151 @@ class SpamFeaturesRepo:
         """
         # Currently UserSpamFeatures has username as unique PK - one record per user
         return 0
+
+    def get_users_needing_tier2_enrichment(
+        self,
+        limit: int = 50,
+        min_tier1_score: float = 0.0
+    ) -> List[UserSpamFeatures]:
+        """
+        Get users that have Tier 1 features but no Tier 2 enrichment.
+
+        Args:
+            limit: Maximum users to return
+            min_tier1_score: Minimum spam score to be considered for enrichment
+
+        Returns:
+            List of UserSpamFeatures needing Tier 2 enrichment
+        """
+        return self.db_session.query(UserSpamFeatures).filter(
+            UserSpamFeatures.tier2_enriched_at.is_(None),
+            UserSpamFeatures.tier2_enrichment_failed.is_(False),
+            UserSpamFeatures.spam_score >= min_tier1_score
+        ).order_by(
+            UserSpamFeatures.spam_score.desc()
+        ).limit(limit).all()
+
+    def get_high_risk_unenriched(
+        self,
+        min_score: float = 0.5,
+        limit: int = 50
+    ) -> List[UserSpamFeatures]:
+        """
+        Get high-risk users that haven't had Tier 2 enrichment yet.
+
+        Args:
+            min_score: Minimum spam score to qualify
+            limit: Maximum users to return
+
+        Returns:
+            List of high-risk users without Tier 2 data
+        """
+        return self.db_session.query(UserSpamFeatures).filter(
+            UserSpamFeatures.spam_score >= min_score,
+            UserSpamFeatures.account_age_days.is_(None),
+            UserSpamFeatures.tier2_enrichment_failed.is_(False)
+        ).order_by(
+            UserSpamFeatures.spam_score.desc()
+        ).limit(limit).all()
+
+    def update_tier2_features(
+        self,
+        username: str,
+        account_age_days: int = None,
+        total_karma: int = None,
+        post_karma: int = None,
+        comment_karma: int = None,
+        karma_per_day: float = None,
+        has_verified_email: bool = None,
+        is_gold: bool = None,
+        has_custom_avatar: bool = None,
+        account_suspended: bool = None,
+        has_adult_profile_links: bool = None,
+        has_telegram_links: bool = None,
+        profile_link_sources: dict = None
+    ) -> Optional[UserSpamFeatures]:
+        """
+        Update Tier 2 features for a user.
+
+        Args:
+            username: Reddit username
+            **kwargs: Tier 2 feature values
+
+        Returns:
+            Updated UserSpamFeatures or None if user not found
+        """
+        features = self.get_by_username(username)
+        if not features:
+            return None
+
+        if account_age_days is not None:
+            features.account_age_days = account_age_days
+        if total_karma is not None:
+            features.total_karma = total_karma
+        if post_karma is not None:
+            features.post_karma = post_karma
+        if comment_karma is not None:
+            features.comment_karma = comment_karma
+        if karma_per_day is not None:
+            features.karma_per_day = karma_per_day
+        if has_verified_email is not None:
+            features.has_verified_email = has_verified_email
+        if is_gold is not None:
+            features.is_gold = is_gold
+        if has_custom_avatar is not None:
+            features.has_custom_avatar = has_custom_avatar
+        if account_suspended is not None:
+            features.account_suspended = account_suspended
+        if has_adult_profile_links is not None:
+            features.has_adult_profile_links = has_adult_profile_links
+        if has_telegram_links is not None:
+            features.has_telegram_links = has_telegram_links
+        if profile_link_sources is not None:
+            features.profile_link_sources = profile_link_sources
+
+        features.tier2_enriched_at = datetime.utcnow()
+        features.tier2_enrichment_failed = False
+        features.tier2_failure_reason = None
+
+        return features
+
+    def mark_tier2_enrichment_failed(
+        self,
+        username: str,
+        reason: str
+    ) -> Optional[UserSpamFeatures]:
+        """
+        Mark Tier 2 enrichment as failed for a user.
+
+        Args:
+            username: Reddit username
+            reason: Failure reason (truncated to 200 chars)
+
+        Returns:
+            Updated UserSpamFeatures or None if user not found
+        """
+        features = self.get_by_username(username)
+        if not features:
+            return None
+
+        features.tier2_enrichment_failed = True
+        features.tier2_failure_reason = reason[:200] if reason else None
+        features.tier2_enriched_at = datetime.utcnow()
+
+        return features
+
+    def get_suspended_users(self, limit: int = 100) -> List[UserSpamFeatures]:
+        """Get users that have been marked as suspended."""
+        return self.db_session.query(UserSpamFeatures).filter(
+            UserSpamFeatures.account_suspended.is_(True)
+        ).order_by(
+            UserSpamFeatures.tier2_enriched_at.desc()
+        ).limit(limit).all()
+
+    def get_users_with_telegram_links(self, limit: int = 100) -> List[UserSpamFeatures]:
+        """Get users that have Telegram links detected."""
+        return self.db_session.query(UserSpamFeatures).filter(
+            UserSpamFeatures.has_telegram_links.is_(True)
+        ).order_by(
+            UserSpamFeatures.tier2_enriched_at.desc()
+        ).limit(limit).all()

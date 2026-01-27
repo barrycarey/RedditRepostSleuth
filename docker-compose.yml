@@ -246,6 +246,7 @@ services:
             - db_user=spam_detection
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.spam_detection_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q spam_detection -n spam_detection_worker --autoscale=8,2
+            - CELERY_WORKER_CONCURRENCY=1  # Single worker for rate limiting
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q spam_detection -n spam_detection_worker -c 1 --loglevel=info
 
 
