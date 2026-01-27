@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from redditrepostsleuth.core.db.databasemodels import UserSpamFeatures
@@ -55,3 +55,20 @@ class SpamFeaturesRepo:
             UserSpamFeatures.username == username
         ).delete(synchronize_session=False)
         return result > 0
+
+    def user_was_recently_analyzed(self, username: str, within_days: int = 7) -> bool:
+        """Check if user was analyzed within the specified number of days."""
+        cutoff = datetime.utcnow() - timedelta(days=within_days)
+        result = self.db_session.query(UserSpamFeatures).filter(
+            UserSpamFeatures.username == username,
+            UserSpamFeatures.computed_at >= cutoff
+        ).first()
+        return result is not None
+
+    def delete_old_records(self, username: str, keep_count: int) -> int:
+        """
+        Delete old feature records for a user, keeping the most recent ones.
+        Note: UserSpamFeatures uses username as PK, so this is a no-op if only one record per user.
+        """
+        # Currently UserSpamFeatures has username as unique PK - one record per user
+        return 0

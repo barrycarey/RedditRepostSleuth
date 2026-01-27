@@ -80,3 +80,10 @@ class AuthorActivityRepo:
             AuthorActivityTracking.created_at < cutoff_date
         ).delete(synchronize_session=False)
         return result
+
+    def get_author_subreddit_distribution(self, username: str) -> dict:
+        """
+        Get subreddit post distribution for an author as a dictionary.
+        """
+        counts = self.get_author_subreddit_counts(username)
+        return {sub: count for sub, count in counts}
