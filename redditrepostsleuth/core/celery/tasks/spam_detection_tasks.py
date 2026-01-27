@@ -660,3 +660,257 @@ def scan_user_for_telegram_links(self, username: str) -> dict:
     except Exception as e:
         log.error('Error scanning %s: %s', username, str(e))
         return {'has_telegram_links': False, 'error': str(e)}
+
+
+# ============================================================================
+# Phase 2: Scoring Engine Tasks
+# ============================================================================
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=False, serializer='pickle',
+             autoretry_for=(Exception,), retry_kwargs={'max_retries': 3, 'countdown': 60})
+def score_user_spam(self, username: str) -> Optional[dict]:
+    """
+    Score a user for spam likelihood.
+
+    This task extracts Tier 1 features and calculates a spam score.
+    Results are stored in user_spam_features table.
+
+    Args:
+        username: Reddit username to score
+
+    Returns:
+        Dict with scoring results or None if insufficient data
+    """
+    from redditrepostsleuth.core.services.spam.spam_feature_extractor import SpamFeatureExtractor
+    from redditrepostsleuth.core.services.spam.spam_scorer import SpamScorer
+
+    if not username or username == '[deleted]':
+        return None
+
+    log.info('Scoring user for spam: %s', username)
+
+    try:
+        # Extract features
+        extractor = SpamFeatureExtractor(self.uowm)
+        features = extractor.extract_tier1_features(username)
+
+        if not features:
+            log.debug('Insufficient data to score user: %s', username)
+            return None
+
+        # Score the user
+        scorer = SpamScorer(self.uowm)
+        result = scorer.score_user(features)
+
+        # Update stored features with scoring results
+        with self.uowm.start() as uow:
+            spam_features = uow.spam_features.get_by_username(username)
+            if spam_features:
+                spam_features.spam_score = result.score
+                spam_features.spam_score_confidence = result.confidence
+                spam_features.computed_at = datetime.utcnow()
+                # Store feature data with scoring info
+                feature_dict = features.to_dict()
+                feature_dict['rule_score'] = result.score
+                feature_dict['risk_level'] = result.risk_level
+                feature_dict['top_contributing_factors'] = result.reasons
+                spam_features.feature_data = feature_dict
+            else:
+                # Create new record via extractor
+                extractor.store_features(features)
+                # Then update with scoring info
+                spam_features = uow.spam_features.get_by_username(username)
+                if spam_features:
+                    spam_features.spam_score = result.score
+                    spam_features.spam_score_confidence = result.confidence
+            uow.commit()
+
+        log.info(
+            'Scored user %s: %.2f (%s)',
+            username, result.score, result.risk_level
+        )
+        return result.to_dict()
+
+    except Exception as e:
+        log.error('Error scoring user %s: %s', username, str(e), exc_info=True)
+        raise
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=False, serializer='pickle',
+             autoretry_for=(Exception,), retry_kwargs={'max_retries': 3, 'countdown': 60})
+def score_and_flag_user(
+    self,
+    username: str,
+    update_user_review: bool = True
+) -> Optional[dict]:
+    """
+    Score a user and optionally update user_review table.
+
+    This is the main entry point for spam detection, combining
+    feature extraction, scoring, and flagging.
+
+    Args:
+        username: Reddit username to analyze
+        update_user_review: Whether to update user_review table
+
+    Returns:
+        Dict with scoring results or None if insufficient data
+    """
+    from redditrepostsleuth.core.db.databasemodels import UserReview
+
+    if not username or username == '[deleted]':
+        return None
+
+    # Score the user (calls the task directly, not async)
+    result_dict = score_user_spam(username)
+
+    if not result_dict:
+        return None
+
+    # Update user_review if requested
+    if update_user_review:
+        with self.uowm.start() as uow:
+            review = uow.user_review.get_by_username(username)
+
+            if review:
+                # Update existing review
+                review.spam_score = result_dict['score']
+                review.spam_score_confidence = result_dict['confidence']
+                review.spam_score_updated_at = datetime.utcnow()
+                review.risk_level = result_dict['risk_level']
+            else:
+                # Create new review entry
+                review = UserReview(
+                    username=username,
+                    spam_score=result_dict['score'],
+                    spam_score_confidence=result_dict['confidence'],
+                    spam_score_updated_at=datetime.utcnow(),
+                    risk_level=result_dict['risk_level'],
+                )
+                uow.user_review.add(review)
+
+            uow.commit()
+
+        log.info('Updated user_review for %s', username)
+
+    return result_dict
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=False, serializer='pickle')
+def batch_score_users(self, usernames: List[str]) -> dict:
+    """
+    Score multiple users in batch.
+
+    Args:
+        usernames: List of Reddit usernames to score
+
+    Returns:
+        Dict with results summary
+    """
+    log.info('Batch scoring %d users', len(usernames))
+
+    results = {
+        'total': len(usernames),
+        'scored': 0,
+        'skipped': 0,
+        'failed': 0,
+        'high_risk': 0,
+        'critical_risk': 0,
+    }
+
+    for username in usernames:
+        if not username or username == '[deleted]':
+            results['skipped'] += 1
+            continue
+
+        try:
+            result = score_and_flag_user(username, update_user_review=True)
+
+            if result:
+                results['scored'] += 1
+                if result['risk_level'] == 'CRITICAL':
+                    results['critical_risk'] += 1
+                elif result['risk_level'] == 'HIGH':
+                    results['high_risk'] += 1
+            else:
+                results['skipped'] += 1
+
+        except Exception as e:
+            log.error('Failed to score %s: %s', username, str(e))
+            results['failed'] += 1
+
+    log.info('Batch scoring complete: %s', results)
+    return results
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=False, serializer='pickle')
+def score_top_reposters(
+    self,
+    limit: int = 100,
+    days: int = 30,
+    min_reposts: int = 5
+) -> dict:
+    """
+    Score top reposters for spam detection.
+
+    Retrieves users with most reposts and scores them.
+
+    Args:
+        limit: Maximum users to analyze
+        days: Look back period
+        min_reposts: Minimum reposts to qualify
+
+    Returns:
+        Dict with results summary
+    """
+    from sqlalchemy import func
+    from redditrepostsleuth.core.db.databasemodels import Repost
+
+    log.info('Scoring top %d reposters from past %d days', limit, days)
+
+    usernames_to_score = []
+
+    with self.uowm.start() as uow:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        results = uow.session.query(
+            Repost.author,
+            func.count(Repost.id).label('repost_count')
+        ).filter(
+            Repost.detected_at >= cutoff,
+            Repost.author != None,
+            Repost.author != '[deleted]'
+        ).group_by(Repost.author).having(
+            func.count(Repost.id) >= min_reposts
+        ).order_by(
+            func.count(Repost.id).desc()
+        ).limit(limit).all()
+
+        for row in results:
+            if row.author:
+                usernames_to_score.append(row.author)
+
+    if not usernames_to_score:
+        log.info('No top reposters found matching criteria')
+        return {'analyzed': 0, 'total': 0}
+
+    # Filter out recently analyzed users
+    users_needing_scoring = []
+    with self.uowm.start() as uow:
+        for username in usernames_to_score:
+            features = uow.spam_features.get_by_username(username)
+            if not features or not features.spam_score:
+                users_needing_scoring.append(username)
+            elif features.computed_at:
+                # Re-score if older than 7 days
+                age = datetime.utcnow() - features.computed_at
+                if age.days > 7:
+                    users_needing_scoring.append(username)
+
+    log.info('Found %d users needing scoring (out of %d top reposters)',
+             len(users_needing_scoring), len(usernames_to_score))
+
+    if not users_needing_scoring:
+        return {'analyzed': 0, 'total': len(usernames_to_score), 'message': 'All already scored'}
+
+    return batch_score_users(users_needing_scoring)
