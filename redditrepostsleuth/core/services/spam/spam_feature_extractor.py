@@ -116,7 +116,7 @@ class SpamFeatureExtractor:
         Get spam subreddits with caching (1 hour TTL).
 
         Returns:
-            Dict mapping lowercase subreddit name to (category, weight) tuple
+            Dict mapping lowercase subreddit name to category
         """
         now = datetime.utcnow()
 
@@ -390,7 +390,7 @@ class SpamFeatureExtractor:
         for sub, count in features.subreddit_distribution.items():
             sub_lower = sub.lower()
             if sub_lower in spam_subs:
-                category, weight = spam_subs[sub_lower]
+                category = spam_subs[sub_lower]
                 features.spam_subreddit_posts += count
                 if category == 'karma_farming':
                     features.karma_farming_sub_posts += count

@@ -69,12 +69,12 @@ class SpamSubredditRepo:
         Get all active spam subreddits as a dictionary.
 
         Returns:
-            Dict mapping lowercase subreddit name to (category, weight) tuple
+            Dict mapping lowercase subreddit name to category
         """
         records = self.db_session.query(SpamSubredditList).filter(
             SpamSubredditList.is_active == True
         ).all()
         return {
-            r.subreddit_name.lower(): (r.category, r.weight)
+            r.subreddit_name.lower(): r.category
             for r in records
         }
