@@ -136,7 +136,9 @@ Endpoints for qualified moderators to vote on spam detection results and improve
 
 Get a queue of users pending moderator review.
 
-**Authentication:** Bearer token (100k+ subscriber subreddit moderator)
+**Authentication:** Bearer token (100k+ subscriber subreddit moderator OR site admin)
+
+**Site Admin Access:** Site admins bypass the 100k+ subscriber requirement and always receive all users (`filter=all`). For admins, `qualifying_sub` will be `{"name": "SITE_ADMIN", "subscribers": 0}`.
 
 **Query Parameters:**
 
@@ -144,7 +146,7 @@ Get a queue of users pending moderator review.
 |-----------|------|---------|-----|-------------|
 | `min_score` | float | 0.5 | 1.0 | Minimum spam score to include |
 | `limit` | int | 20 | 100 | Maximum users to return |
-| `filter` | string | "my_subs" | - | Filter mode: `my_subs` (only users who posted in moderator's subreddits) or `all` (all pending users) |
+| `filter` | string | "my_subs" | - | Filter mode: `my_subs` (only users who posted in moderator's subreddits) or `all` (all pending users). Site admins always get `all`. |
 
 **Request Example:**
 
@@ -164,6 +166,7 @@ User-Agent: MyClient/1.0
     "subscribers": 45000000
   },
   "filter": "my_subs",
+  "is_admin": false,
   "users": [
     {
       "username": "suspicious_user_1",
@@ -215,9 +218,25 @@ When `filter=my_subs` and the moderator has no subreddits with activity data:
     "subscribers": 45000000
   },
   "filter": "my_subs",
+  "is_admin": false,
   "users": [],
   "total": 0,
   "message": "No moderated subreddits found"
+}
+```
+
+**Response Example (200 OK - Site Admin):**
+
+```json
+{
+  "qualifying_sub": {
+    "name": "SITE_ADMIN",
+    "subscribers": 0
+  },
+  "filter": "all",
+  "is_admin": true,
+  "users": [...],
+  "total": 25
 }
 ```
 
@@ -1272,6 +1291,7 @@ Use these interfaces for frontend development and type safety.
 interface QueueResponse {
   qualifying_sub: QualifyingSub;
   filter: "my_subs" | "all";
+  is_admin: boolean;
   users: SpamUserSummary[];
   total: number;
   message?: string;  // Present when filter=my_subs and no moderated subs found
@@ -1612,6 +1632,7 @@ const mockQueueResponse: QueueResponse = {
     subscribers: 45000000
   },
   filter: "my_subs",
+  is_admin: false,
   users: [
     mockQueueUser,
     {

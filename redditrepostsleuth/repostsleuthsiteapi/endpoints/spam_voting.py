@@ -17,7 +17,7 @@ from falcon import Request, Response, HTTPUnauthorized, HTTPNotFound, HTTPBadReq
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import ModeratorSpamVote, SpamTrainingLabels
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header, is_site_admin
 from redditrepostsleuth.repostsleuthsiteapi.util.reddit_helpers import get_moderated_subs_cached
 
 log = logging.getLogger(__name__)
@@ -98,7 +98,8 @@ class SpamVotingEndpoint:
         """
         Verify authorization and return context.
 
-        Returns dict with 'user_data' and 'qualifying_sub'.
+        Returns dict with 'user_data', 'qualifying_sub', and 'is_admin'.
+        Site admins bypass the moderator qualification requirement.
         Raises HTTPUnauthorized or HTTPForbidden on failure.
         """
         token = get_token_from_header(req)
@@ -111,7 +112,16 @@ class SpamVotingEndpoint:
                 description='Could not verify your Reddit identity'
             )
 
-        # Check moderator qualification
+        # Check if user is a site admin (bypasses moderator requirement)
+        if is_site_admin(user_data, self.uowm):
+            return {
+                'user_data': user_data,
+                'qualifying_sub': {'name': 'SITE_ADMIN', 'subscribers': 0},
+                'token': token,
+                'is_admin': True,
+            }
+
+        # Check moderator qualification for non-admins
         qualifying_sub = get_moderator_qualifying_sub(token, self.user_agent)
         if not qualifying_sub:
             raise HTTPForbidden(
@@ -123,6 +133,7 @@ class SpamVotingEndpoint:
             'user_data': user_data,
             'qualifying_sub': qualifying_sub,
             'token': token,
+            'is_admin': False,
         }
 
     def on_get_queue(self, req: Request, resp: Response):
@@ -135,6 +146,7 @@ class SpamVotingEndpoint:
             min_score (float): Minimum spam score (default: 0.5)
             limit (int): Max users to return (default: 20, max: 100)
             filter (str): Filter mode - 'my_subs' (default) or 'all'
+                          Site admins always get 'all' regardless of parameter.
         """
         auth = self._get_auth_context(req)
         moderator_username = auth['user_data']['name']
@@ -144,9 +156,13 @@ class SpamVotingEndpoint:
         limit = min(limit, 100)  # Cap at 100
 
         # Filter mode: 'my_subs' (default) or 'all'
-        filter_mode = req.get_param('filter') or 'my_subs'
-        if filter_mode not in ('my_subs', 'all'):
-            filter_mode = 'my_subs'
+        # Site admins always see all users
+        if auth.get('is_admin'):
+            filter_mode = 'all'
+        else:
+            filter_mode = req.get_param('filter') or 'my_subs'
+            if filter_mode not in ('my_subs', 'all'):
+                filter_mode = 'my_subs'
 
         with self.uowm.start() as uow:
             if filter_mode == 'my_subs':
@@ -196,6 +212,7 @@ class SpamVotingEndpoint:
         resp.text = json.dumps({
             'qualifying_sub': auth['qualifying_sub'],
             'filter': filter_mode,
+            'is_admin': auth.get('is_admin', False),
             'users': filtered_users,
             'total': len(filtered_users),
         })
