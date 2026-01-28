@@ -220,7 +220,7 @@ def queue_users_async(usernames: list, update_user_review: bool = True) -> dict:
     for username in usernames:
         score_and_flag_user.apply_async(
             args=[username, update_user_review],
-            queue='spam_detection'
+            queue='spam_detection_temp'
         )
         queued += 1
 
@@ -422,7 +422,7 @@ def main():
     else:
         print(f"\nQueuing {len(usernames)} users for async processing...")
         results = queue_users_async(usernames, update_review)
-        print(f"Queued {results['queued']} users to spam_detection queue")
+        print(f"Queued {results['queued']} users to spam_detection_temp queue")
         print("Monitor progress with: celery -A redditrepostsleuth.core.celery inspect active")
 
 
