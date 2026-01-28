@@ -39,6 +39,7 @@ def get_unscored_users(uowm, min_posts: int, limit: int) -> list:
     Find users with enough activity but no spam score.
 
     Uses LEFT JOIN exclusion pattern for efficient query execution.
+    Note: Results are not ordered by post count for performance reasons.
 
     Args:
         uowm: Unit of work manager
@@ -46,13 +47,14 @@ def get_unscored_users(uowm, min_posts: int, limit: int) -> list:
         limit: Maximum users to return
 
     Returns:
-        List of usernames
+        List of (username, post_count) tuples
     """
     from sqlalchemy import func, and_
     from redditrepostsleuth.core.db.databasemodels import AuthorActivityTracking, UserSpamFeatures
 
     with uowm.start() as uow:
         # LEFT JOIN exclusion pattern - much faster than NOT IN subquery
+        # Note: ORDER BY removed - sorting 9M+ rows requires temp table + filesort
         results = uow.session.query(
             AuthorActivityTracking.author,
             func.count(AuthorActivityTracking.id).label('post_count')
@@ -70,8 +72,6 @@ def get_unscored_users(uowm, min_posts: int, limit: int) -> list:
             AuthorActivityTracking.author
         ).having(
             func.count(AuthorActivityTracking.id) >= min_posts
-        ).order_by(
-            func.count(AuthorActivityTracking.id).desc()
         ).limit(limit).all()
 
         return [(r.author, r.post_count) for r in results]
@@ -110,9 +110,10 @@ def get_stale_scored_users(uowm, stale_days: int, limit: int) -> list:
 
 def get_top_reposters(uowm, days: int, min_reposts: int, limit: int) -> list:
     """
-    Find top reposters that need scoring.
+    Find reposters that need scoring.
 
     Uses LEFT JOIN exclusion pattern for efficient query execution.
+    Note: Results are not ordered by repost count for performance reasons.
 
     Args:
         uowm: Unit of work manager
@@ -130,6 +131,7 @@ def get_top_reposters(uowm, days: int, min_reposts: int, limit: int) -> list:
 
     with uowm.start() as uow:
         # LEFT JOIN exclusion pattern - much faster than NOT IN subquery
+        # Note: ORDER BY removed for performance
         results = uow.session.query(
             Repost.author,
             func.count(Repost.id).label('repost_count')
@@ -149,8 +151,6 @@ def get_top_reposters(uowm, days: int, min_reposts: int, limit: int) -> list:
             Repost.author
         ).having(
             func.count(Repost.id) >= min_reposts
-        ).order_by(
-            func.count(Repost.id).desc()
         ).limit(limit).all()
 
         return [(r.author, r.repost_count) for r in results]
@@ -161,6 +161,7 @@ def get_high_activity_users(uowm, min_posts: int, days: int, limit: int) -> list
     Find users with high recent activity.
 
     Uses LEFT JOIN exclusion pattern for efficient query execution.
+    Note: Results are not ordered by post count for performance reasons.
 
     Args:
         uowm: Unit of work manager
@@ -178,6 +179,7 @@ def get_high_activity_users(uowm, min_posts: int, days: int, limit: int) -> list
 
     with uowm.start() as uow:
         # LEFT JOIN exclusion pattern - much faster than NOT IN subquery
+        # Note: ORDER BY removed for performance
         results = uow.session.query(
             AuthorActivityTracking.author,
             func.count(AuthorActivityTracking.id).label('post_count')
@@ -196,8 +198,6 @@ def get_high_activity_users(uowm, min_posts: int, days: int, limit: int) -> list
             AuthorActivityTracking.author
         ).having(
             func.count(AuthorActivityTracking.id) >= min_posts
-        ).order_by(
-            func.count(AuthorActivityTracking.id).desc()
         ).limit(limit).all()
 
         return [(r.author, r.post_count) for r in results]
