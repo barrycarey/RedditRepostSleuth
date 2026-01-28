@@ -99,6 +99,8 @@ class TestSpamFeatureExtractor(TestCase):
         self.mock_uowm.start.return_value.__enter__ = MagicMock(return_value=self.mock_uow)
         self.mock_uowm.start.return_value.__exit__ = MagicMock(return_value=False)
         self.extractor = SpamFeatureExtractor(self.mock_uowm)
+        # Clear spam subreddits cache between tests
+        self.extractor._spam_subreddits_cache = None
 
     def test__is_user_worth_analyzing__deleted_user(self):
         """Test that [deleted] users are not worth analyzing."""
@@ -174,7 +176,7 @@ class TestSpamFeatureExtractor(TestCase):
 
     def test__get_spam_subreddits__caching(self):
         """Test that spam subreddits are cached."""
-        self.mock_uow.spam_subreddit.get_as_dict.return_value = {
+        self.mock_uow.spam_subreddits.get_as_dict.return_value = {
             'freekarma4u': ('karma_farming', 1.0)
         }
 
@@ -185,7 +187,7 @@ class TestSpamFeatureExtractor(TestCase):
 
         self.assertEqual(result1, result2)
         # Should only call the database once
-        self.assertEqual(self.mock_uow.spam_subreddit.get_as_dict.call_count, 1)
+        self.assertEqual(self.mock_uow.spam_subreddits.get_as_dict.call_count, 1)
 
     def test__extract_tier1_features__insufficient_data(self):
         """Test extraction with insufficient data returns None."""
@@ -212,8 +214,12 @@ class TestSpamFeatureExtractor(TestCase):
             'unique_subreddits': 3
         }
 
-        # Mock repost count
-        self.mock_uow.repost.count_reposts_by_author.return_value = 3
+        # Mock earliest tracked date (triggers date-filtered repost count)
+        earliest = datetime.utcnow() - timedelta(days=7)
+        self.mock_uow.author_activity.get_earliest_tracked_date.return_value = earliest
+
+        # Mock date-filtered repost count
+        self.mock_uow.repost.count_reposts_by_author_since.return_value = 3
 
         # Mock summons count
         self.mock_uow.summons.count_by_post_author.return_value = 1
@@ -226,7 +232,7 @@ class TestSpamFeatureExtractor(TestCase):
         }
 
         # Mock spam subreddits
-        self.mock_uow.spam_subreddit.get_as_dict.return_value = {}
+        self.mock_uow.spam_subreddits.get_as_dict.return_value = {}
 
         # Mock activity timeline
         now = datetime.utcnow()
@@ -247,7 +253,7 @@ class TestSpamFeatureExtractor(TestCase):
         self.assertEqual(result.nsfw_post_count, 2)
         self.assertEqual(result.nsfw_post_ratio, 0.2)
         self.assertEqual(result.unique_subreddits_posted, 3)
-        self.assertEqual(result.summons_received, 1)
+        self.assertEqual(result.summons_received, 0)  # summons skipped for performance
         self.assertFalse(result.username_suspicious_pattern)
 
     def test__extract_tier1_features__with_spam_subreddits(self):
@@ -262,7 +268,10 @@ class TestSpamFeatureExtractor(TestCase):
             'unique_subreddits': 2
         }
 
-        self.mock_uow.repost.count_reposts_by_author.return_value = 0
+        # Mock earliest tracked date (triggers date-filtered repost count)
+        earliest = datetime.utcnow() - timedelta(days=7)
+        self.mock_uow.author_activity.get_earliest_tracked_date.return_value = earliest
+        self.mock_uow.repost.count_reposts_by_author_since.return_value = 0
         self.mock_uow.summons.count_by_post_author.return_value = 0
 
         self.mock_uow.author_activity.get_author_subreddit_distribution.return_value = {
@@ -271,8 +280,8 @@ class TestSpamFeatureExtractor(TestCase):
         }
 
         # Mock spam subreddits - freekarma4u is karma farming
-        self.mock_uow.spam_subreddit.get_as_dict.return_value = {
-            'freekarma4u': ('karma_farming', 1.0)
+        self.mock_uow.spam_subreddits.get_as_dict.return_value = {
+            'freekarma4u': 'karma_farming'
         }
 
         now = datetime.utcnow()
@@ -333,7 +342,7 @@ class TestSpamFeatureExtractor(TestCase):
             'funny': 2
         }
 
-        self.mock_uow.spam_subreddit.get_as_dict.return_value = {}
+        self.mock_uow.spam_subreddits.get_as_dict.return_value = {}
 
         now = datetime.utcnow()
         mock_activities = []
@@ -356,6 +365,61 @@ class TestSpamFeatureExtractor(TestCase):
         result = self.extractor.extract_and_store('test_user')
 
         self.assertIsNone(result)
+
+    def test__extract_tier1_features__uses_date_filtered_repost_count(self):
+        """Test that repost count is filtered by earliest tracking date."""
+        # Mock count check
+        self.mock_uow.author_activity.count_by_author.return_value = 10
+
+        # Mock author stats
+        self.mock_uow.author_activity.get_author_stats.return_value = {
+            'total_posts': 10, 'nsfw_count': 0, 'adult_link_count': 0,
+            'short_link_count': 0, 'unique_subreddits': 1
+        }
+
+        # Mock earliest tracked date exists
+        earliest = datetime.utcnow() - timedelta(days=7)
+        self.mock_uow.author_activity.get_earliest_tracked_date.return_value = earliest
+
+        # Mock filtered repost count (should use this)
+        self.mock_uow.repost.count_reposts_by_author_since.return_value = 2
+
+        # Mock other required methods
+        self.mock_uow.author_activity.get_author_subreddit_distribution.return_value = {}
+        self.mock_uow.spam_subreddits.get_as_dict.return_value = {}
+        self.mock_uow.author_activity.get_by_author.return_value = []
+
+        result = self.extractor.extract_tier1_features('test_user')
+
+        # Verify date-filtered count was used
+        self.mock_uow.repost.count_reposts_by_author_since.assert_called_once_with('test_user', earliest)
+        self.assertEqual(result.total_reposts_detected, 2)
+        self.assertEqual(result.repost_ratio, 0.2)
+
+    def test__extract_tier1_features__no_tracking_falls_back_to_full_count(self):
+        """Test fallback to full repost count when no tracking data exists."""
+        self.mock_uow.author_activity.count_by_author.return_value = 10
+        self.mock_uow.author_activity.get_author_stats.return_value = {
+            'total_posts': 10, 'nsfw_count': 0, 'adult_link_count': 0,
+            'short_link_count': 0, 'unique_subreddits': 1
+        }
+
+        # No earliest tracked date
+        self.mock_uow.author_activity.get_earliest_tracked_date.return_value = None
+
+        # Full repost count should be used
+        self.mock_uow.repost.count_reposts_by_author.return_value = 5
+
+        self.mock_uow.author_activity.get_author_subreddit_distribution.return_value = {}
+        self.mock_uow.spam_subreddits.get_as_dict.return_value = {}
+        self.mock_uow.author_activity.get_by_author.return_value = []
+
+        result = self.extractor.extract_tier1_features('test_user')
+
+        # Verify full count was used (not date-filtered)
+        self.mock_uow.repost.count_reposts_by_author.assert_called_once_with('test_user')
+        self.assertEqual(result.total_reposts_detected, 5)
+        self.assertEqual(result.repost_ratio, 0.5)
 
 
 class TestActivityTimeline(TestCase):

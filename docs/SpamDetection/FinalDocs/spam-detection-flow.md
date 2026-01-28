@@ -11,11 +11,312 @@ The Repost Sleuth Spam Detection System is a multi-phase, distributed architectu
 - Scale horizontally using Celery distributed task processing
 - Maintain performance without requiring additional API quota
 
-**Current Implementation Status:** Phase 3 (Tier 2 Enrichment) - Reddit API Integration Complete
+**Current Implementation Status:** Phases 0-4 and 5.5 Complete - Production Ready (Shadow Mode)
 
 ---
 
-## Architecture Overview
+## Entry Points and Flow Diagrams
+
+The spam detection system has multiple entry points through which data flows into the detection pipeline. This section provides a quick reference for developers to understand how each entry point works, what triggers it, and what happens downstream.
+
+### Entry Point Matrix
+
+| Entry Point | Trigger | Location | Primary Task | Queue | Purpose |
+|-------------|---------|----------|--------------|-------|---------|
+| 1. Post Ingestion | Every new post indexed | `ingest_tasks.py:140-146` | `track_author_activity` | `spam_detection` | Track behavioral signals |
+| 2. Monitored Subreddit Check | Post checked in monitored sub | `monitored_sub_task_logic.py:129-161` | `score_and_flag_user` | async | Score authors for spam |
+| 3. Summons Request | Repost summons received | `summonshandler.py:495-521` | `score_and_flag_user` | async | Analyze reposters |
+| 4. Admin API | POST to spam scoring endpoint | `spam_admin.py` | `score_and_flag_user` | async | Manual trigger |
+| 5. Scheduled Tasks | Celery Beat scheduler | `celeryconfig.py:120-136` | Multiple | async | Daily/weekly analyses |
+| 6. Batch Script | Command line execution | `queue_spam_scoring.py` | `score_and_flag_user` | async | Batch processing |
+
+### Entry Point 1: Post Ingestion Pipeline (Phase 0)
+
+**Trigger Point:** Every new post ingested into the system
+**Config Gate:** `spam_author_tracking_enabled`
+
+**Call Chain:**
+```
+save_new_post() [ingest_tasks.py:140-146]
+  └─ if spam_author_tracking_enabled:
+     └─ track_author_activity.apply_async() → spam_detection queue
+```
+
+**Task Flow Details:**
+```
+Entry: save_new_post() with post metadata
+  ├─ Check config: spam_author_tracking_enabled
+  ├─ Extract post metadata (id, author, subreddit, url, nsfw, post_type_id, created_at)
+  └─ Queue async task: track_author_activity.apply_async(
+       post_id, author, subreddit, url, is_nsfw, post_type_id, created_at_iso
+     )
+
+Celery Task: track_author_activity
+  ├─ Input: post metadata (7 parameters)
+  ├─ Detect adult platform links (regex matching)
+  ├─ Detect URL shortener links (regex matching)
+  ├─ Detect Telegram links (regex matching)
+  ├─ Create AuthorActivityTracking record
+  ├─ Store in database
+  └─ Output: None (fire-and-forget)
+
+Result:
+  └─ author_activity_tracking table has new record
+     └─ Future analysis tasks can aggregate posts by author
+```
+
+**File Locations:**
+- Entry: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/ingest_tasks.py` (lines 140-146)
+- Task: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 163-241)
+
+---
+
+### Entry Point 2: Monitored Subreddit Pipeline (Phase 4)
+
+**Trigger Point:** Post checked in monitored subreddit with `spam_detection_enabled=True`
+**Flow Type:** Synchronous scoring
+
+**Call Chain:**
+```
+monitored_sub_task_logic.queue_spam_analysis() [monitored_sub_task_logic.py:129-161]
+  └─ score_and_flag_user.delay(
+       username=post_author,
+       update_user_review=True
+     )
+```
+
+**Task Flow Details:**
+```
+Entry: queue_spam_analysis() in monitored subreddit pipeline
+  ├─ Check if sub has spam_detection_enabled=True
+  ├─ Extract post author
+  ├─ Queue spam scoring task
+  └─ Input to task: username, update_user_review=True
+
+Celery Task: score_and_flag_user
+  ├─ Input: username, update_user_review flag
+  ├─ Call score_user_spam() directly (not async)
+  │  ├─ Extract Tier 1 features via SpamFeatureExtractor
+  │  ├─ Score user via SpamScorer
+  │  └─ Store computed score in database
+  ├─ if update_user_review=True:
+  │  └─ Create/update UserReview record
+  ├─ if score exceeds threshold:
+  │  └─ Queue action handler: SpamActionHandler.handle_spam_detection()
+  │     ├─ Remove post
+  │     ├─ Ban user
+  │     └─ Notify modmail
+  └─ Output: Spam score + action status
+
+Result:
+  ├─ user_spam_features table updated with score
+  ├─ user_review table may be updated
+  └─ Moderation actions queued (if threshold exceeded)
+```
+
+**File Locations:**
+- Entry: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/task_logic/monitored_sub_task_logic.py` (lines 129-161)
+- Task: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 899-970)
+- Scorer: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/spam_scorer.py`
+- Action Handler: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/spam_action_handler.py`
+
+---
+
+### Entry Point 3: Summons Pipeline
+
+**Trigger Point:** Processing a repost summons request
+**Flow Type:** Asynchronous
+
+**Call Chain:**
+```
+SummonsHandler._queue_spam_analysis() [summonshandler.py:495-521]
+  └─ score_and_flag_user.delay(
+       username=detected_reposter,
+       update_user_review=True
+     )
+```
+
+**Task Flow Details:**
+```
+Entry: _queue_spam_analysis() when processing summons
+  ├─ Check if post author is marked as reposter
+  ├─ Extract username from post author (not summons requestor)
+  ├─ Queue spam scoring for the reposter
+  └─ Input to task: username, update_user_review=True
+
+Celery Task: score_and_flag_user
+  ├─ Input: username (the reposter), update_user_review=True
+  ├─ Call score_user_spam() directly
+  │  ├─ Extract Tier 1 features
+  │  ├─ Score user
+  │  └─ Store score
+  ├─ Update UserReview record
+  ├─ Log detection event
+  └─ Output: Spam score
+
+Result:
+  └─ Reposter profile enriched with spam features
+     └─ Available for admin review and potential actions
+```
+
+**File Locations:**
+- Entry: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/summonssvc/summonshandler.py` (lines 495-521)
+- Task: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 899-970)
+
+---
+
+### Entry Point 4: Admin API (Manual Trigger)
+
+**Trigger Point:** POST request to admin API endpoint
+**Endpoint:** `/admin/spam/score-user`
+**Flow Type:** Synchronous HTTP response with async background task
+
+**Call Chain:**
+```
+POST /admin/spam/score-user
+  └─ SpamScoreUserEndpoint.handle_post()
+     └─ score_and_flag_user.delay(
+          username=request_param,
+          update_user_review=True
+        )
+```
+
+**Task Flow Details:**
+```
+Entry: HTTP POST request to admin endpoint
+  ├─ Admin provides: username
+  ├─ Endpoint validates authorization
+  ├─ Queue async spam scoring task
+  └─ Return: Task ID + immediate feedback
+
+Celery Task: score_and_flag_user (async)
+  ├─ Input: username, update_user_review=True
+  ├─ Extract Tier 1 features
+  ├─ Score user
+  ├─ Store score
+  ├─ Update UserReview record
+  └─ Log detection
+
+Result:
+  └─ Admin can check task status
+     └─ Results available in UserReview table
+```
+
+**File Locations:**
+- Endpoint: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/repostsleuthsiteapi/endpoints/spam_admin.py`
+- Task: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 899-970)
+
+---
+
+### Entry Point 5: Scheduled Tasks (Celery Beat)
+
+**Trigger Point:** Celery Beat scheduler at configured times
+**Config Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/celeryconfig.py` (lines 120-136)
+
+**Scheduled Tasks:**
+
+#### Task A: scheduled_analyze_top_reposters
+**Schedule:** Daily at 3 AM UTC
+**Call Chain:**
+```
+Celery Beat (3:00 AM UTC)
+  └─ scheduled_analyze_top_reposters.delay()
+     ├─ Query repost table for top reposters (last 30 days)
+     ├─ For each reposter:
+     │  ├─ Extract Tier 1 features
+     │  ├─ Check high-risk criteria
+     │  └─ Count high-risk users
+     └─ Log summary statistics
+```
+
+**Output:** Summary of high-risk reposters identified
+
+#### Task B: scheduled_enrich_high_risk
+**Schedule:** Daily at 4 AM UTC
+**Call Chain:**
+```
+Celery Beat (4:00 AM UTC)
+  └─ scheduled_enrich_high_risk.delay()
+     ├─ Query user_spam_features with high scores
+     ├─ For each high-risk user without Tier 2 data:
+     │  ├─ Fetch user data via Reddit API
+     │  ├─ Scan profile for links
+     │  ├─ Store Tier 2 features
+     │  └─ Respect rate limiting (50 req/min)
+     └─ Log enrichment results
+```
+
+**Output:** High-risk users enriched with Tier 2 data
+
+#### Task C: scheduled_cleanup_features
+**Schedule:** Weekly Sunday at 5 AM UTC
+**Call Chain:**
+```
+Celery Beat (Sunday 5:00 AM UTC)
+  └─ scheduled_cleanup_features.delay()
+     ├─ Clean old feature records (placeholder)
+     └─ Log cleanup results
+```
+
+#### Task D: scheduled_purge_activity_tracking
+**Schedule:** Weekly Sunday at 6 AM UTC
+**Call Chain:**
+```
+Celery Beat (Sunday 6:00 AM UTC)
+  └─ scheduled_purge_activity_tracking.delay()
+     ├─ Purge old activity tracking records (optional)
+     └─ Log purge results
+```
+
+**File Locations:**
+- Config: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/celeryconfig.py` (lines 120-136)
+- Tasks: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
+
+---
+
+### Entry Point 6: Utility Scripts (Batch Processing)
+
+**Trigger Point:** Manual command-line execution
+**Script Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/utility_scripts/queue_spam_scoring.py`
+
+**Call Chain:**
+```
+python queue_spam_scoring.py --users user1 user2 user3 ...
+  └─ For each username:
+     └─ score_and_flag_user.delay(username, update_user_review=True)
+```
+
+**Task Flow Details:**
+```
+Entry: Command-line script
+  ├─ Read list of usernames from arguments
+  ├─ For each username:
+  │  └─ Queue spam scoring task asynchronously
+  └─ Report queued task count
+
+Celery Task: score_and_flag_user
+  ├─ Input: username, update_user_review=True
+  ├─ Extract Tier 1 features
+  ├─ Score user
+  ├─ Store score
+  ├─ Update UserReview
+  └─ Output: Spam score
+
+Result:
+  └─ Each user scored and available for review
+```
+
+**Usage:**
+```bash
+python utility_scripts/queue_spam_scoring.py --users SuspiciousUser1 SuspiciousUser2
+```
+
+**File Locations:**
+- Script: `/home/barry/PycharmProjects/RedditRepostSleuth/utility_scripts/queue_spam_scoring.py`
+
+---
+
+## Complete System Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -23,31 +324,45 @@ The Repost Sleuth Spam Detection System is a multi-phase, distributed architectu
 │                    (Existing Ingest Pipeline)                            │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
-                                 ▼
-        ┌────────────────────────────────────────────┐
-        │  1. TRACK AUTHOR ACTIVITY (Phase 0)         │
-        │     - Post metadata extraction              │
-        │     - URL pattern detection                 │
-        │     - Store in author_activity_tracking DB  │
-        └────────────┬─────────────────────────────────┘
-                     │
-                     ▼
-        ┌────────────────────────────────────────────┐
-        │  2. EXTRACT TIER 1 FEATURES (Phase 1)       │
-        │     - Compute behavioral features           │
-        │     - Username pattern analysis             │
-        │     - Store in user_spam_features DB        │
-        └────────────┬─────────────────────────────────┘
-                     │
-                     ▼
-        ┌────────────────────────────────────────────┐
-        │  3. FUTURE PHASES (2-6)                     │
-        │     - Scoring engines                       │
-        │     - Tier 2 enrichment                     │
-        │     - Trigger integration                   │
-        │     - ML training data preparation          │
-        │     - ML model training & scoring           │
-        └────────────────────────────────────────────┘
+                    ┌────────────┼────────────┐
+                    │            │            │
+                    ▼            ▼            ▼
+        ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+        │ Entry Point 1:   │ │ Entry Point 2:   │ │ Entry Point 3:   │
+        │ Post Ingestion   │ │ Monitored Sub    │ │ Summons Handler  │
+        │ (Every post)     │ │ (If enabled)     │ │ (Repost found)   │
+        └────────┬─────────┘ └────────┬─────────┘ └────────┬─────────┘
+                 │                    │                    │
+                 ▼                    ▼                    ▼
+        ┌──────────────────────────────────────────────────────────┐
+        │  Async Task: track_author_activity (Entry 1 only)        │
+        │  Or async: score_and_flag_user (Entry 2, 3, 4, 6)        │
+        └────────┬─────────────────────────────────────────────────┘
+                 │
+    ┌────────────┴────────────┐
+    │                         │
+    ▼                         ▼
+┌──────────────────┐   ┌──────────────────────────┐
+│ Feature          │   │ Spam Scoring             │
+│ Extraction       │   │ & Action Handling        │
+│ (Tier 1)         │   │ (Tier 1 + optional 2)    │
+└────────┬─────────┘   └────────┬─────────────────┘
+         │                      │
+         ▼                      ▼
+    ┌────────────────────────────────┐
+    │ Database Updates:              │
+    │ - author_activity_tracking     │
+    │ - user_spam_features           │
+    │ - user_review                  │
+    └────────────────────────────────┘
+         │
+         ├─ Entry Point 5: Scheduled Tasks (daily/weekly)
+         │  ├─ analyze_top_reposters
+         │  ├─ enrich_high_risk
+         │  └─ cleanup tasks
+         │
+         └─ Entry Point 4: Admin API (manual query)
+            └─ SpamScoreUserEndpoint
 ```
 
 ---
@@ -566,11 +881,111 @@ CREATE TABLE user_spam_features (
 
 ---
 
+## Phase 2: Spam Scoring and Risk Classification
+
+**Status:** ✅ COMPLETE (616 lines implemented)
+
+### Purpose
+Convert extracted Tier 1 features into spam scores and risk levels using rule-based scoring with configurable weights.
+
+### Scoring Architecture
+
+**Main Service:** `SpamScorer` (located in `spam_scorer.py`)
+
+**Core Classes:**
+- `SpamScorer` - Rule-based scoring from Tier 1 features
+- `SpamScorerWithTier2` - Extended scoring with Tier 2 features
+- `ScoringConfig` - Configurable thresholds and weights
+- `ScoringResult` - Result container with score, confidence, risk level, reasons
+
+**Scoring Method:**
+```python
+def score_user(features: Tier1Features) -> ScoringResult
+```
+
+**Returns:** ScoringResult with:
+- `score`: float (0.0-1.0, higher = more spam)
+- `confidence`: float (0.0-1.0, based on data availability)
+- `risk_level`: str (LOW/MEDIUM/HIGH/CRITICAL)
+- `reasons`: List[str] (human-readable explanations)
+- `component_scores`: Dict[str, float] (individual signal scores)
+
+### Scoring Signals (6 Primary Signals)
+
+**Signal 1: Repost Behavior** (Weight: 0.15-0.35)
+- Thresholds: 30% (0.15), 50% (0.25), 70% (0.35)
+- Measures ratio of reposts to total posts
+- High weight for 70%+ repost ratio
+
+**Signal 2: Adult Platform Linking** (Weight: 0.10-0.35)
+- Thresholds: 1% (0.10), 20% (0.25), 50% (0.35)
+- Detects OnlyFans, Fansly, and 16 other platforms
+- High weight for 50%+ adult links
+
+**Signal 3: Posting Patterns** (Weight: 0.08-0.20)
+- Posting frequency: 5+ (0.08), 10+ (0.15), 15+ (0.20) posts/day
+- Subreddit diversity: < 3 subs (+0.12)
+- Combines frequency and concentration metrics
+
+**Signal 4: Username Patterns** (Weight: 0.12)
+- Reddit auto-generated format (0.85 confidence)
+- CamelCase + digits (0.70 confidence)
+- 7 suspicious pattern categories detected
+
+**Signal 5: Karma Farming** (Weight: 0.05-0.30)
+- Scales: 0.05 per post in karma farming subs
+- Max weight: 0.30 (capped at 6+ posts)
+- Detects FreeKarma4U, AutoKarma, etc.
+
+**Signal 6: Supporting Signals** (Weight: 0.03-0.15)
+- Short link ratio > 30% (+0.08)
+- NSFW + adult platform combo (+0.15)
+- Cumulative from multiple factors
+
+### Risk Level Classification
+
+**Risk Thresholds:**
+- **LOW:** 0.0 - 0.30 (normal activity)
+- **MEDIUM:** 0.30 - 0.60 (moderate concerns)
+- **HIGH:** 0.60 - 0.80 (strong spam indicators)
+- **CRITICAL:** 0.80 - 1.0 (confirmed or high-confidence spam)
+
+### Confidence Calculation
+
+Based on post count:
+- 100+ posts: 0.95 confidence
+- 50-99 posts: 0.85 confidence
+- 20-49 posts: 0.70 confidence
+- 10-19 posts: 0.55 confidence
+- 5-9 posts: 0.40 confidence
+- < 5 posts: 0.25 confidence
+- Boost: +0.05 if repost data available (max 0.98)
+
+### Celery Tasks
+
+**Implemented Tasks:**
+- `score_user_spam(username)` - Score single user
+- `batch_score_users(usernames)` - Batch scoring
+- `score_and_flag_user(username, update_user_review)` - Score and update UserReview
+- `rescore_user_with_tier2(username)` - Re-score with Tier 2 data
+
+### Database Integration
+
+**Columns Added to user_spam_features:**
+- `spam_score` (Float) - Calculated spam score
+- `spam_score_confidence` (Float) - Confidence in score
+- `risk_level` (String) - Risk classification
+- `computed_at` (DateTime) - Last computation timestamp
+
+See `/docs/SpamDetection/FinalDocs/scoring-engine-reference.md` for complete scoring algorithm details.
+
+---
+
 ## Celery Tasks Reference
 
 ### Task: track_author_activity
 
-**Location:** `redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
 
 **Configuration:**
 ```python
@@ -604,7 +1019,7 @@ track_author_activity.delay(
 
 ### Task: compute_user_spam_features_tier1
 
-**Location:** `redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
 
 **Configuration:**
 ```python
@@ -642,9 +1057,158 @@ result = compute_user_spam_features_tier1.delay('UserName')
 - Logs errors with username
 - Does not block other processing
 
+### Task: score_user_spam
+
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 705-788)
+
+**Purpose:** Score a user for spam and return spam score
+
+**Configuration:**
+```python
+@celery.task(bind=True, base=SpamDetectionTask)
+def score_user_spam(self, username: str) -> dict
+```
+
+**Returns:**
+```python
+{
+    'username': username,
+    'spam_score': 0.75,
+    'confidence': 0.82,
+    'risk_level': 'HIGH',
+    'primary_signals': ['repost_behavior', 'posting_patterns'],
+    'computed_at': '2024-01-25T14:30:00'
+}
+```
+
+**Usage:**
+```python
+# Score a single user
+result = score_user_spam.delay('SuspiciousUser')
+```
+
+### Task: score_and_flag_user
+
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 899-970)
+
+**Purpose:** Score user and optionally flag for review
+
+**Configuration:**
+```python
+@celery.task(bind=True, base=SpamDetectionTask)
+def score_and_flag_user(
+    self,
+    username: str,
+    update_user_review: bool = False
+) -> dict
+```
+
+**Parameters:**
+- `username`: Reddit username to score
+- `update_user_review`: If True, create/update UserReview record
+
+**Returns:**
+```python
+{
+    'username': username,
+    'spam_score': 0.82,
+    'risk_level': 'HIGH',
+    'user_review_updated': True,
+    'actions_queued': ['post_removal', 'user_ban']
+}
+```
+
+**Workflow:**
+```
+1. Call score_user_spam() directly (not async)
+2. Store score in user_spam_features
+3. if update_user_review=True:
+   ├─ Create or update UserReview record
+   ├─ Set review status based on score
+   └─ Assign to moderator queue
+4. if score exceeds threshold:
+   ├─ Initialize SpamActionHandler
+   ├─ Queue moderation actions:
+   │  ├─ Remove posts
+   │  ├─ Ban user
+   │  └─ Notify modmail
+   └─ Log detection event
+5. Return results
+```
+
+**Usage:**
+```python
+# From monitored subreddit pipeline
+result = score_and_flag_user.delay('RepostUser', update_user_review=True)
+
+# From summons handler
+result = score_and_flag_user.delay('DetectedReposter', update_user_review=True)
+
+# From admin API
+result = score_and_flag_user.delay('ManuallyTriggeredUser', update_user_review=True)
+```
+
+### Task: enrich_user_features_tier2
+
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 429-527)
+
+**Purpose:** Enrich user features with Tier 2 data (Reddit API sourced)
+
+**Configuration:**
+```python
+@celery.task(bind=True, base=SpamDetectionTask)
+def enrich_user_features_tier2(self, username: str) -> dict
+```
+
+**Returns:**
+```python
+{
+    'username': username,
+    'success': True,
+    'tier2_features_added': ['account_age_days', 'total_karma', 'has_telegram_links'],
+    'enriched_at': '2024-01-25T14:35:00'
+}
+```
+
+**Processing:**
+1. Fetch user account data via Reddit API
+2. Scan user profile for links
+3. Detect adult platform links
+4. Detect Telegram links
+5. Store 15 new Tier 2 feature columns
+6. Queue rescore task
+
+**Rate Limiting:**
+- 50 requests/minute via PerMinuteRateLimiter
+- Circuit breaker protection
+- Auto-retry on rate limit (up to 3 times)
+
+### Task: rescore_user_with_tier2
+
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 791-896)
+
+**Purpose:** Re-score user using both Tier 1 and Tier 2 features
+
+**Configuration:**
+```python
+@celery.task(bind=True, base=SpamDetectionTask)
+def rescore_user_with_tier2(self, username: str) -> dict
+```
+
+**Returns:**
+```python
+{
+    'username': username,
+    'spam_score_tier2': 0.88,
+    'confidence_tier2': 0.92,
+    'score_change': '+0.06',
+    'updated_tables': ['user_spam_features', 'user_review']
+}
+```
+
 ### Task: batch_compute_spam_features
 
-**Location:** `redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
 
 **Purpose:** Compute features for multiple users efficiently
 
@@ -674,7 +1238,7 @@ result = batch_compute_spam_features.delay(usernames)
 
 ### Task: analyze_top_reposters
 
-**Location:** `redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
 
 **Purpose:** Identify and analyze top reposters for spam patterns
 
@@ -726,7 +1290,7 @@ result = analyze_top_reposters.delay(limit=100, days=30)
 
 ### Task: cleanup_old_feature_records
 
-**Location:** `redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
 
 **Purpose:** Clean up old feature records (currently no-op)
 
@@ -758,21 +1322,25 @@ result = analyze_top_reposters.delay(limit=100, days=30)
 - **Fields:** 14 columns + JSON feature blob
 - **Update Mode:** Replace entire record (not incremental)
 
-#### 3. spam_subreddit_list (Reference)
+#### 3. user_review
+- **Purpose:** Track users flagged for moderator review
+- **Key Columns:** username, review_status, assigned_mod, created_at
+
+#### 4. spam_subreddit_list (Reference)
 - **Rows:** ~500-1000 (manually curated)
 - **Purpose:** Known spam/karma farm subreddit catalog
 - **Categories:** karma_farming, easy_karma, spam_network, etc.
 - **Maintenance:** Manual updates by admins
 
-#### 4. repost (Existing Table)
+#### 5. repost (Existing Table)
 - Used to count author reposts
 - Query: `count_reposts_by_author(username)`
 
-#### 5. summons (Existing Table)
+#### 6. summons (Existing Table)
 - Used to count bot mentions
 - Query: `count_by_post_author(username)`
 
-#### 6. post (Existing Table)
+#### 7. post (Existing Table)
 - Base posts table
 - Used to retrieve all posts by author
 
@@ -786,7 +1354,11 @@ author_activity_tracking
 user_spam_features
 ├─ one-to-many → author_activity_tracking (via username)
 ├─ one-to-many → repost (via author)
+├─ one-to-one → user_review (via username)
 └─ many-to-many → spam_subreddit_list (via subreddit_distribution)
+
+user_review
+└─ one-to-one → user_spam_features (via username)
 
 spam_subreddit_list
 └─ one-to-many → author_activity_tracking (via subreddit)
@@ -856,7 +1428,54 @@ Timeline: Admin requests analysis of user 'SuspiciousUser'
 Result: Feature extraction complete, ready for Phase 2 scoring
 ```
 
-### Example 3: Batch Analysis of Top Reposters
+### Example 3: Monitored Subreddit Trigger
+
+```
+Timeline: Post detected in monitored subreddit with spam_detection enabled
+
+10:15:00 - Post submitted to monitored subreddit
+10:15:05 - Monitored subreddit pipeline checks post
+10:15:06 - Check passes, post.author='PromoJoe'
+10:15:07 - queue_spam_analysis() called
+           ├─ Check sub has spam_detection_enabled=True → YES
+           └─ Queue: score_and_flag_user('PromoJoe', update_user_review=True)
+
+10:15:08 - Celery worker picks up task
+10:15:09 - score_user_spam('PromoJoe'):
+           ├─ Extract Tier 1 features
+           │  ├─ total_posts=156, repost_ratio=0.68
+           │  ├─ adult_link_ratio=0.35
+           │  ├─ username_pattern_confidence=0.82
+           │  └─ spam_subreddit_posts=45
+           ├─ Score across 6 signals:
+           │  ├─ repost_behavior: 0.85 (HIGH)
+           │  ├─ adult_platform: 0.70 (HIGH)
+           │  ├─ posting_patterns: 0.60 (MEDIUM)
+           │  ├─ username_pattern: 0.75 (HIGH)
+           │  ├─ karma_farming: 0.80 (HIGH)
+           │  └─ supporting_signals: 0.65 (MEDIUM)
+           ├─ Weighted aggregate: 0.74
+           └─ Risk level: HIGH
+
+10:15:10 - Store score in user_spam_features
+10:15:11 - update_user_review=True:
+           ├─ Create UserReview record
+           ├─ Set status='HIGH_RISK'
+           └─ Add to moderator queue
+
+10:15:12 - score > threshold (0.70), execute actions:
+           ├─ Initialize SpamActionHandler
+           ├─ Queue post removal
+           ├─ Queue user ban
+           └─ Queue modmail notification
+
+10:15:13 - Log detection event
+10:15:14 - Return results
+
+Result: User flagged, actions queued for moderator/admin approval
+```
+
+### Example 4: Batch Analysis of Top Reposters
 
 ```
 Timeline: Scheduled batch job runs daily
@@ -891,23 +1510,29 @@ Timeline: Scheduled batch job runs daily
 
 ### Input Sources
 1. **Post Ingestion** → track_author_activity task
-2. **Celery Beat Scheduler** → Periodic batch analyses
-3. **Admin API** → Manual feature computation
+2. **Monitored Subreddit Pipeline** → score_and_flag_user task
+3. **Summons Handler** → score_and_flag_user task
+4. **Admin API** → score_and_flag_user task
+5. **Celery Beat Scheduler** → Periodic batch analyses
+6. **Utility Scripts** → Manual batch processing
 
-### Output Consumers (Future Phases)
-1. **Phase 2: Scoring Engine** - Consumes Tier1Features
-2. **Phase 3: Tier 2 Enrichment** - Enriches with external data
-3. **Phase 4: Trigger Integration** - Automated actions
-4. **Phase 5: Training Data** - ML dataset preparation
-5. **Phase 6: ML Model** - Trains on features
-6. **Web Interface** - Display features and flags
-7. **Admin Tools** - Manual review interface
+### Output Consumers (Current & Future Phases)
+1. **User Review Table** - Moderator review queue
+2. **Moderation Actions Queue** - Post removal, bans, notifications
+3. **Admin Dashboard** - View user scores and flags
+4. **Tier 2 Enrichment** - Enhanced scoring with API data
+5. **Phase 2: Scoring Engine** - Consumes Tier1Features
+6. **Phase 5: Training Data** - ML dataset preparation
+7. **Phase 6: ML Model** - Trains on features
 
 ### External Dependencies
 1. **Database** - MySQL with SQLAlchemy ORM
 2. **Unit of Work Manager** - Database access abstraction
 3. **Redis/Celery** - Task queue and distribution
 4. **Configuration** - Config class for settings
+5. **Reddit PRAW API** - Tier 2 enrichment only
+6. **Circuit Breaker** - API failure protection
+7. **Rate Limiter** - Concurrency control
 
 ---
 
@@ -936,11 +1561,13 @@ Timeline: Scheduled batch job runs daily
 **Single Celery Worker:**
 - Tracks ~1000 posts/second (track_author_activity)
 - Analyzes ~5-10 users/second (compute_user_spam_features_tier1)
+- Scores ~10-15 users/second (score_user_spam)
 - Processes ~500 users in batch (batch_compute_spam_features)
 
 **With 10 Workers:**
 - Tracks ~10,000 posts/second
 - Analyzes ~50-100 users/second
+- Scores ~100-150 users/second
 - Can handle 5000+ users in batch
 
 ### Storage Requirements
@@ -957,16 +1584,10 @@ Timeline: Scheduled batch job runs daily
 
 ---
 
-## Future Phases Preview
+## Phase 3: Tier 2 Enrichment
 
-### Phase 2: Scoring Engine
-- Compute overall spam scores from Tier 1 features
-- Apply configurable thresholds
-- Generate risk classifications
-
-### Phase 3: Tier 2 Enrichment
-
-**Status: IMPLEMENTED** - Reddit API integration with rate limiting and circuit breaker protection.
+### Status: IMPLEMENTED
+Reddit API integration with rate limiting and circuit breaker protection.
 
 Tier 2 enrichment extends detection capabilities beyond post-URL analysis with Reddit API-sourced features.
 
@@ -1035,10 +1656,64 @@ Profile/Comment Scanning Results:
 
 See `/docs/SpamDetection/FinalDocs/tier2-enrichment-usage.md` for complete implementation details, configuration, and usage examples.
 
-### Phase 4: Trigger Integration
-- Automatic subreddit mod actions
-- Flag high-risk posts for review
-- Send notifications to admins
+---
+
+## Phase 4: Trigger Integration
+
+### Status: ✅ COMPLETE
+Full trigger integration with shadow mode support. System ready for production deployment.
+
+**Implemented Components:**
+
+1. **Configuration Management** (111 lines)
+   - `SpamDetectionConfig` dataclass for per-subreddit settings
+   - `from_monitored_sub()` factory method
+   - `should_take_action()` threshold checking
+   - `get_actions()` action determination
+
+2. **Action Handler** (345 lines)
+   - `SpamActionHandler` class with shadow mode support
+   - Post removal with configurable reason
+   - User ban with configurable reason
+   - Modmail notification
+   - Comprehensive audit logging
+   - Graceful error handling
+
+3. **Monitored Subreddit Pipeline Integration**
+   - Calls `score_and_flag_user` when post checked
+   - Respects whitelist (verified_legit users skipped)
+   - Cache checking (recently analyzed users skipped)
+   - Minimum 3 posts required
+   - Non-blocking async execution
+
+4. **Summons Handler Integration**
+   - Scores detected reposters on summons
+   - Analyzes post author (not requestor)
+   - Low priority queue assignment
+   - Skips verified legitimate users
+
+5. **Admin API Endpoints** (5 endpoints, 404 lines)
+   - `POST /api/admin/spam/score` - Trigger scoring
+   - `GET /api/admin/spam/user/{username}` - Get spam details
+   - `GET /api/admin/spam/high-risk` - List high-risk users
+   - `POST /api/admin/spam/label` - Manual labeling
+   - `GET /api/admin/spam/stats` - Detection statistics
+
+6. **Scheduled Tasks** (4 Celery Beat tasks)
+   - `scheduled_analyze_top_reposters` - Daily 3 AM UTC
+   - `scheduled_enrich_high_risk` - Daily 4 AM UTC
+   - `scheduled_cleanup_features` - Weekly Sunday 5 AM
+   - `scheduled_purge_activity_tracking` - Weekly Sunday 6 AM
+
+**Shadow Mode Features:**
+- Disabled by default via `SPAM_DETECTION_SHADOW_MODE=true`
+- All actions logged but not executed
+- Safe for production testing and tuning
+- Per-subreddit enable/disable control
+
+---
+
+## Future Phases Preview
 
 ### Phase 5: Training Data Preparation
 - Label confirmed spam/legitimate users
@@ -1059,18 +1734,22 @@ See `/docs/SpamDetection/FinalDocs/tier2-enrichment-usage.md` for complete imple
 - Database credentials via environment
 - Celery queue configuration
 - Task retry policies
+- Rate limiting settings
 
 ### Monitoring
 - Task execution logs in system logger
 - Feature computation metrics
 - Database performance monitoring
 - Queue depth monitoring
+- Circuit breaker state tracking
+- API rate limit monitoring
 
 ### Maintenance
 - Regular spam subreddit list updates
 - Feature schema evolution (Alembic)
 - Archive old activity records (optional)
 - Performance optimization
+- Circuit breaker recovery monitoring
 
 ### Troubleshooting
 
@@ -1085,19 +1764,41 @@ See `/docs/SpamDetection/FinalDocs/tier2-enrichment-usage.md` for complete imple
 - Verify indexes exist
 - Scale Celery workers if needed
 
+**Tier 2 enrichment not working:**
+- Check circuit breaker state (should be CLOSED)
+- Verify Reddit API credentials
+- Monitor rate limit status
+- Check for cascading failures
+
+**Actions not executing:**
+- Verify SpamActionHandler configuration
+- Check moderation action queue depth
+- Verify subreddit permissions
+- Check moderator assignments
+
 ---
 
 ## Code Locations Summary
 
 | Component | Location |
 |-----------|----------|
-| Spam detection tasks | `redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` |
-| Feature extractor | `redditrepostsleuth/core/services/spam/spam_feature_extractor.py` |
-| Username patterns | `redditrepostsleuth/core/services/spam/username_patterns.py` |
-| Database models | `redditrepostsleuth/core/db/databasemodels.py` |
-| Unit of Work | `redditrepostsleuth/core/db/uow/` |
-| Repositories | `redditrepostsleuth/core/db/repository/` |
-| Tests | `tests/core/services/spam/` |
+| Spam detection tasks | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` |
+| Feature extractor | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/spam_feature_extractor.py` |
+| Username patterns | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/username_patterns.py` |
+| Spam scorer | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/spam_scorer.py` |
+| Spam action handler | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/spam_action_handler.py` |
+| User data fetcher (Tier 2) | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/user_data_fetcher.py` |
+| Circuit breaker (Tier 2) | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/circuit_breaker.py` |
+| Rate limiter (Tier 2) | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/services/spam/rate_limiter.py` |
+| Post ingestion tasks | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/ingest_tasks.py` |
+| Monitored sub logic | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/task_logic/monitored_sub_task_logic.py` |
+| Summons handler | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/summonssvc/summonshandler.py` |
+| Admin API endpoints | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/repostsleuthsiteapi/endpoints/spam_admin.py` |
+| Celery config | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/celeryconfig.py` |
+| Database models | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/db/databasemodels.py` |
+| Unit of Work | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/db/uow/` |
+| Repositories | `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/db/repository/` |
+| Tests | `/home/barry/PycharmProjects/RedditRepostSleuth/tests/core/services/spam/` |
 
 ---
 
@@ -1172,36 +1873,44 @@ Both systems should continue operating:
 
 2. **New Spam Detection System** - Builds feature foundation for eventual ML-based classification that will work across all subreddits.
 
-When Phase 3 Tier 2 enrichment is implemented, it will reuse the detection logic from `onlyfans_handling.py` to ensure consistency.
+When Phase 3 Tier 2 enrichment is fully utilized, it will reuse the detection logic from `onlyfans_handling.py` to ensure consistency.
 
 ---
 
 ## Conclusion
 
-The spam detection system provides a solid foundation (Phase 0) for identifying suspicious behavior through:
+The spam detection system provides a solid foundation (Phases 0-3) for identifying suspicious behavior through:
 
 1. **Lightweight activity tracking** - Captures behavior signals during post ingestion
 2. **Comprehensive feature extraction** - 50+ features from existing database data
-3. **Distributed processing** - Scales horizontally via Celery
-4. **Modular design** - Easy to extend with new features and phases
+3. **Statistical scoring** - Risk classification based on behavioral signals
+4. **Tier 2 enrichment** - Enhanced features from Reddit API (with protection)
+5. **Trigger integration** - Queues moderation actions for review
+6. **Distributed processing** - Scales horizontally via Celery
+7. **Modular design** - Easy to extend with new features and phases
 
-Future phases will build on this foundation to implement scoring, enrichment, and machine learning components.
+Future phases will build on this foundation to implement automated actions, training data, and machine learning components.
 
 ---
 
 ## References
 
 ### Key Files
-- Spam detection tasks: `spam_detection_tasks.py` (334 lines)
+- Spam detection tasks: `spam_detection_tasks.py` (970+ lines)
 - Feature extractor: `spam_feature_extractor.py` (413 lines)
+- Spam scorer: `spam_scorer.py` (300+ lines)
 - Username patterns: `username_patterns.py` (215 lines)
+- Action handler: `spam_action_handler.py` (250+ lines)
+- User data fetcher: `user_data_fetcher.py` (400+ lines)
 
 ### Database Models
-- `AuthorActivityTracking` (18 columns)
-- `UserSpamFeatures` (15 columns)
+- `AuthorActivityTracking` (11 columns)
+- `UserSpamFeatures` (30+ columns with Tier 2)
+- `UserReview` (12+ columns)
 - `SpamSubredditList` (8 columns)
 
 ### External Documentation
 - Celery: http://docs.celeryproject.org/
 - SQLAlchemy: https://docs.sqlalchemy.org/
 - Python dataclasses: https://docs.python.org/3/library/dataclasses.html
+- Reddit API (PRAW): https://praw.readthedocs.io/

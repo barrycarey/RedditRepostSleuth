@@ -1,11 +1,13 @@
 # Reddit Repost Sleuth Bot
 
 ## Important Development Practices
+- You NEVER run database migrations.  You can create them but I have to run them
 - Run all unit tests before and after making changes
 - All new code requires test coverage
 - When implementing new features or updates, make a commit when finished
 - When you finish implementing a plan, create a commit
 - When making any changes involving duplicateimageservice.py, extra thought must be given to unintended impacts.  This is core to the bot.
+- If ou need to connect to the database, use the credentials in claude_db_access.json
 
 ## Project Overview
 
