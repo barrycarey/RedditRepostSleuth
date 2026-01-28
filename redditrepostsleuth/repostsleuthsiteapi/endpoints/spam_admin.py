@@ -4,18 +4,34 @@ Spam Admin Endpoints - Phase 4: Admin API for Spam Detection
 Provides administrative endpoints for managing and monitoring the
 spam detection system.
 """
+import html
 import json
 import logging
 from datetime import datetime
 from typing import Optional
 
-from falcon import Request, Response, HTTPBadRequest, HTTPNotFound
+from falcon import Request, Response, HTTPBadRequest, HTTPNotFound, HTTPForbidden
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import SpamTrainingLabels
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.util.reddithelpers import get_user_data
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header, is_site_admin
 
 log = logging.getLogger(__name__)
+
+
+def _require_admin_auth(req: Request, uowm: UnitOfWorkManager) -> dict:
+    """Verify the request is from an authenticated site admin."""
+    token = get_token_from_header(req)
+    user_data = get_user_data(token)
+    if not user_data:
+        raise HTTPForbidden(title='Authentication Failed',
+                           description='Could not verify your Reddit identity')
+    if not is_site_admin(user_data, uowm):
+        raise HTTPForbidden(title='Access Denied',
+                           description='You must be a site administrator')
+    return user_data
 
 
 class SpamScoreUserEndpoint:
@@ -42,6 +58,8 @@ class SpamScoreUserEndpoint:
                 "message": "string"
             }
         """
+        _require_admin_auth(req, self.uowm)
+
         try:
             body = json.load(req.bounded_stream)
         except json.JSONDecodeError:
@@ -109,6 +127,8 @@ class SpamUserDetailsEndpoint:
                 "activity_stats": {...}
             }
         """
+        _require_admin_auth(req, self.uowm)
+
         with self.uowm.start() as uow:
             # Get spam features
             features = uow.spam_features.get_by_username(username)
@@ -184,6 +204,8 @@ class SpamHighRiskUsersEndpoint:
                 "total": int
             }
         """
+        _require_admin_auth(req, self.uowm)
+
         min_score = req.get_param_as_float('min_score') or 0.6
         limit = req.get_param_as_int('limit') or 50
         limit = min(limit, 200)
@@ -233,7 +255,6 @@ class SpamLabelUserEndpoint:
                 "username": "string",
                 "label": "SPAM" | "LEGITIMATE" | "UNKNOWN",
                 "confidence": float (0.0-1.0),
-                "labeled_by": "string",
                 "notes": "string" (optional)
             }
 
@@ -245,6 +266,8 @@ class SpamLabelUserEndpoint:
                 "label": "string"
             }
         """
+        user_data = _require_admin_auth(req, self.uowm)
+
         try:
             body = json.load(req.bounded_stream)
         except json.JSONDecodeError:
@@ -256,7 +279,7 @@ class SpamLabelUserEndpoint:
         username = body.get('username')
         label = body.get('label')
         confidence = body.get('confidence', 1.0)
-        labeled_by = body.get('labeled_by', 'admin')
+        labeled_by = user_data['name']
         notes = body.get('notes', '')
 
         # Validate required fields
@@ -291,7 +314,7 @@ class SpamLabelUserEndpoint:
                 confidence=confidence,
                 label_source='admin_manual',
                 labeled_by=labeled_by,
-                notes=notes[:500] if notes else None,
+                notes=html.escape(notes[:500]) if notes else None,
                 feature_snapshot=feature_snapshot,
             )
             uow.spam_training_labels.add(training_label)
@@ -332,6 +355,8 @@ class SpamStatsEndpoint:
                 "score_distribution": {...}
             }
         """
+        _require_admin_auth(req, self.uowm)
+
         with self.uowm.start() as uow:
             # Get total users analyzed
             all_features = uow.spam_features.get_all()

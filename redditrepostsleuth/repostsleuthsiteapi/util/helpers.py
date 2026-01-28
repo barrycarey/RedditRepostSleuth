@@ -12,13 +12,15 @@ from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImag
 
 
 def is_site_admin(user_data: dict, uowm: UnitOfWorkManager) -> bool:
+    """Check if a user is a site administrator."""
     if not user_data:
-        return False;
+        return False
     if 'name' not in user_data:
         return False
-    if user_data['name'].lower() in ['barrycarey', 'repostsleuthbot']:
-        return True
-    return False
+
+    with uowm.start() as uow:
+        admin = uow.site_admin.get_by_username(user_data['name'])
+        return admin is not None
 
 
 def get_token_from_header(req: Request) -> str:
