@@ -140,23 +140,17 @@ class ModSpamUserLookupEndpoint:
         """
         Look up spam details for a user.
 
-        If scan is complete, returns spam_features, user_review, and activity_stats.
-        If scan is incomplete, triggers a full scan and returns the task_id.
+        Returns spam_features, user_review, and activity_stats if available.
+        If user has no data or incomplete data, returns null for missing fields.
+        Use POST /api/mod/spam/user/{username}/scan to trigger a scan.
 
-        Response (complete):
+        Response:
             {
-                "status": "complete",
                 "username": "string",
-                "spam_features": {...},
-                "user_review": {...},
-                "activity_stats": {...}
-            }
-
-        Response (scanning):
-            {
-                "status": "scanning",
-                "task_id": "string",
-                "message": "Poll /api/mod/spam/scan/{task_id} for results"
+                "scan_complete": bool,
+                "spam_features": {...} | null,
+                "user_review": {...} | null,
+                "activity_stats": {...} | null
             }
         """
         auth = _require_moderator_auth(req, self.config)
@@ -171,46 +165,73 @@ class ModSpamUserLookupEndpoint:
 
         with self.uowm.start() as uow:
             features = uow.spam_features.get_by_username(username)
+            scan_complete = _is_scan_complete(features)
 
-            if _is_scan_complete(features):
-                # Return complete data
+            features_dict = None
+            if features:
                 features_dict = features.to_dict_for_moderator()
 
-                # Get user review (public fields only)
-                review = uow.user_review.get_by_username(username)
-                review_dict = None
-                if review:
-                    review_dict = {
-                        'username': review.username,
-                        'spam_score': review.spam_score,
-                        'spam_score_confidence': review.spam_score_confidence,
-                        'spam_score_updated_at': review.spam_score_updated_at.isoformat() if review.spam_score_updated_at else None,
-                        'risk_level': review.risk_level,
-                    }
+            # Get user review (public fields only)
+            review = uow.user_review.get_by_username(username)
+            review_dict = None
+            if review:
+                review_dict = {
+                    'username': review.username,
+                    'spam_score': review.spam_score,
+                    'spam_score_confidence': review.spam_score_confidence,
+                    'spam_score_updated_at': review.spam_score_updated_at.isoformat() if review.spam_score_updated_at else None,
+                    'risk_level': review.risk_level,
+                }
 
-                # Get activity stats
-                activity_stats = uow.author_activity.get_author_stats(username)
+            # Get activity stats
+            activity_stats = uow.author_activity.get_author_stats(username)
 
-                resp.text = json.dumps({
-                    'status': 'complete',
-                    'username': username,
-                    'spam_features': features_dict,
-                    'user_review': review_dict,
-                    'activity_stats': activity_stats,
-                })
-                return
+        resp.text = json.dumps({
+            'username': username,
+            'scan_complete': scan_complete,
+            'spam_features': features_dict,
+            'user_review': review_dict,
+            'activity_stats': activity_stats,
+        })
 
-        # Scan is incomplete - trigger full scan
+
+class ModSpamTriggerScanEndpoint:
+    """POST /api/mod/spam/user/{username}/scan - Trigger a user scan."""
+
+    def __init__(self, uowm: UnitOfWorkManager, config: Config):
+        self.uowm = uowm
+        self.config = config
+
+    def on_post(self, req: Request, resp: Response, username: str):
+        """
+        Trigger a full scan (Tier 1 + Tier 2) for a user.
+
+        Response:
+            {
+                "status": "scanning",
+                "task_id": "string",
+                "username": "string",
+                "message": "Poll /api/mod/spam/scan/{task_id} for results"
+            }
+        """
+        auth = _require_moderator_auth(req, self.config)
+        moderator_username = auth['user_data']['name']
+        qualifying_sub = auth['qualifying_sub']
+
+        log.info(
+            'Moderator %s (%s, %d subs) triggering scan for user: %s',
+            moderator_username, qualifying_sub['name'],
+            qualifying_sub['subscribers'], username
+        )
+
         from redditrepostsleuth.core.celery.tasks.spam_detection_tasks import scan_user_full
-
-        log.info('Triggering full scan for user %s (requested by moderator %s)',
-                 username, moderator_username)
 
         task = scan_user_full.delay(username)
 
         resp.text = json.dumps({
             'status': 'scanning',
             'task_id': task.id,
+            'username': username,
             'message': f'Poll /api/mod/spam/scan/{task.id} for results',
         })
 
@@ -301,6 +322,9 @@ def register_spam_moderator_endpoints(api, uowm: UnitOfWorkManager, config: Conf
     """
     # GET /api/mod/spam/user/{username} - Look up user spam details
     api.add_route('/api/mod/spam/user/{username}', ModSpamUserLookupEndpoint(uowm, config))
+
+    # POST /api/mod/spam/user/{username}/scan - Trigger user scan
+    api.add_route('/api/mod/spam/user/{username}/scan', ModSpamTriggerScanEndpoint(uowm, config))
 
     # GET /api/mod/spam/scan/{task_id} - Check scan status
     api.add_route('/api/mod/spam/scan/{task_id}', ModSpamScanStatusEndpoint(uowm, config))

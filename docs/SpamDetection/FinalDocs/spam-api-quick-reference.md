@@ -24,7 +24,8 @@ Authorization: Bearer {reddit_oauth_token}
 | POST | `/api/spam/voting/vote` | Submit moderator vote | Mod (100k+) | Vote result + consensus |
 | GET | `/api/spam/voting/user/{username}` | Get vote history | Mod (100k+) | Votes + aggregates |
 | GET | `/api/spam/voting/stats` | Get mod voting stats | Mod (100k+) | Moderator statistics |
-| GET | `/api/mod/spam/user/{username}` | Look up user spam details | Mod (10k+) | Features or task ID |
+| GET | `/api/mod/spam/user/{username}` | Look up user spam details | Mod (10k+) | Features (or null) |
+| POST | `/api/mod/spam/user/{username}/scan` | Trigger user scan | Mod (10k+) | Task ID |
 | GET | `/api/mod/spam/scan/{task_id}` | Poll scan status | Mod (10k+) | Scan result |
 | POST | `/api/admin/spam/score` | Trigger spam scoring | Admin | Queue status |
 | GET | `/api/admin/spam/user/{username}` | Get user details | Admin | Full spam features |
@@ -188,11 +189,11 @@ Authorization: Bearer {token}
 
 **Auth:** Moderator of 10k+ subscriber subreddit
 
-**Response 200 (Complete):**
+**Response 200 (Has Data):**
 ```json
 {
-  "status": "complete",
   "username": "suspicious_user",
+  "scan_complete": true,
   "spam_features": {
     "username": "suspicious_user",
     "spam_score": 0.82,
@@ -210,16 +211,43 @@ Authorization: Bearer {token}
 }
 ```
 
-**Response 200 (Scanning):**
+**Response 200 (No Data):**
 ```json
 {
-  "status": "scanning",
-  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "message": "Poll /api/mod/spam/scan/{task_id} for results"
+  "username": "unknown_user",
+  "scan_complete": false,
+  "spam_features": null,
+  "user_review": null,
+  "activity_stats": null
 }
 ```
 
 **Note:** Excludes `feature_data`, `profile_link_sources`, `tier2_failure_reason`, and `mod_vote_*` fields.
+
+**Errors:** 401 (Invalid Token), 403 (Not Qualified - need 10k+ sub)
+
+---
+
+### POST /api/mod/spam/user/{username}/scan
+
+```http
+POST /api/mod/spam/user/unknown_user/scan
+Authorization: Bearer {token}
+```
+
+**Auth:** Moderator of 10k+ subscriber subreddit
+
+**Response 200:**
+```json
+{
+  "status": "scanning",
+  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "username": "unknown_user",
+  "message": "Poll /api/mod/spam/scan/{task_id} for results"
+}
+```
+
+**Use when:** `scan_complete` is false in the lookup response.
 
 **Errors:** 401 (Invalid Token), 403 (Not Qualified - need 10k+ sub)
 
