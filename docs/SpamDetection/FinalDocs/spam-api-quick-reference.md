@@ -51,11 +51,14 @@ Authorization: Bearer {token}
   - `my_subs` - Only users who posted in moderator's subreddits (default)
   - `all` - All pending users regardless of subreddit
 
+**Site Admin Access:** Site admins bypass the 100k+ subscriber requirement and always receive all users (`filter=all`).
+
 **Response 200:**
 ```json
 {
   "qualifying_sub": { "name": "AskReddit", "subscribers": 45000000 },
   "filter": "my_subs",
+  "is_admin": false,
   "users": [
     {
       "username": "user",
@@ -75,7 +78,7 @@ Authorization: Bearer {token}
 
 **Note:** When `filter=my_subs` and the moderator has no subreddits, returns empty list with `"message": "No moderated subreddits found"`.
 
-**Errors:** 401 (Invalid Token), 403 (Not Qualified)
+**Errors:** 401 (Invalid Token), 403 (Not Qualified - does not apply to site admins)
 
 ---
 
@@ -588,6 +591,7 @@ interface SpamUserSummary {
 interface QueueResponse {
   qualifying_sub: { name: string; subscribers: number };
   filter: "my_subs" | "all";
+  is_admin: boolean;
   users: SpamUserSummary[];
   total: number;
   message?: string; // Present when filter=my_subs and no moderated subs found
