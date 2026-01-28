@@ -528,7 +528,7 @@ Endpoints for qualified moderators (10k+ subscriber subreddits) to look up user 
 
 ### GET /api/mod/spam/user/{username}
 
-Look up spam detection details for a user. If the user has incomplete data (missing Tier 1 or Tier 2 enrichment), automatically triggers a full scan and returns a task ID for polling.
+Look up spam detection details for a user. Returns whatever data is available. Use the `scan_complete` field to determine if a scan should be triggered.
 
 **Authentication:** Bearer token (10k+ subscriber subreddit moderator)
 
@@ -551,8 +551,8 @@ User-Agent: MyClient/1.0
 
 ```json
 {
-  "status": "complete",
   "username": "suspicious_user_1",
+  "scan_complete": true,
   "spam_features": {
     "username": "suspicious_user_1",
     "spam_score": 0.82,
@@ -601,13 +601,15 @@ User-Agent: MyClient/1.0
 }
 ```
 
-**Response Example (200 OK) - Scan Required:**
+**Response Example (200 OK) - No Data:**
 
 ```json
 {
-  "status": "scanning",
-  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "message": "Poll /api/mod/spam/scan/a1b2c3d4-e5f6-7890-abcd-ef1234567890 for results"
+  "username": "unknown_user",
+  "scan_complete": false,
+  "spam_features": null,
+  "user_review": null,
+  "activity_stats": null
 }
 ```
 
@@ -618,6 +620,62 @@ The `spam_features` object excludes sensitive internal fields that are only avai
 - `profile_link_sources` - Detailed link breakdown
 - `tier2_failure_reason` - Internal error details
 - `mod_vote_total`, `mod_vote_count`, `mod_vote_weighted`, `mod_vote_updated_at`, `mod_vote_consensus` - Voting aggregates
+
+**Error Responses:**
+
+```http
+401 Unauthorized
+Content-Type: application/json
+
+{
+  "title": "Invalid Token",
+  "description": "Could not verify your Reddit identity"
+}
+```
+
+```http
+403 Forbidden
+Content-Type: application/json
+
+{
+  "title": "Not Qualified",
+  "description": "You must moderate a subreddit with 10,000+ subscribers"
+}
+```
+
+---
+
+### POST /api/mod/spam/user/{username}/scan
+
+Trigger a full scan (Tier 1 + Tier 2) for a user. Use this when `scan_complete` is false in the lookup response.
+
+**Authentication:** Bearer token (10k+ subscriber subreddit moderator)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `username` | string | Reddit username to scan |
+
+**Request Example:**
+
+```http
+POST /api/mod/spam/user/unknown_user/scan HTTP/1.1
+Host: repostsleuth.example.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+User-Agent: MyClient/1.0
+```
+
+**Response Example (200 OK):**
+
+```json
+{
+  "status": "scanning",
+  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "username": "unknown_user",
+  "message": "Poll /api/mod/spam/scan/a1b2c3d4-e5f6-7890-abcd-ef1234567890 for results"
+}
+```
 
 **Error Responses:**
 
@@ -1283,13 +1341,18 @@ interface ModeratorStats {
 // ============= Moderator Endpoints =============
 
 interface ModUserLookupResponse {
-  status: "complete" | "scanning";
-  username?: string;
-  task_id?: string;
-  message?: string;
-  spam_features?: ModeratorSpamFeatures;
-  user_review?: ModeratorUserReview;
-  activity_stats?: ActivityStats;
+  username: string;
+  scan_complete: boolean;
+  spam_features: ModeratorSpamFeatures | null;
+  user_review: ModeratorUserReview | null;
+  activity_stats: ActivityStats | null;
+}
+
+interface ModTriggerScanResponse {
+  status: "scanning";
+  task_id: string;
+  username: string;
+  message: string;
 }
 
 interface ModeratorSpamFeatures {
