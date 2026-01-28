@@ -3,7 +3,11 @@ from typing import List, Optional, Dict, Any
 
 from sqlalchemy import func
 
-from redditrepostsleuth.core.db.databasemodels import ModeratorSpamVote, UserSpamFeatures
+from redditrepostsleuth.core.db.databasemodels import (
+    AuthorActivityTracking,
+    ModeratorSpamVote,
+    UserSpamFeatures,
+)
 
 
 class ModeratorSpamVoteRepo:
@@ -127,6 +131,73 @@ class ModeratorSpamVoteRepo:
             # Either no votes or fewer than max_votes
             (subquery.c.vote_count.is_(None)) |
             (subquery.c.vote_count < max_votes)
+        ).order_by(
+            UserSpamFeatures.spam_score.desc()
+        ).limit(limit).all()
+
+        result = []
+        for user in users:
+            result.append({
+                'username': user.username,
+                'spam_score': user.spam_score,
+                'risk_level': self._get_risk_level(user.spam_score),
+                'total_posts': user.total_posts,
+                'nsfw_ratio': user.nsfw_post_ratio,
+                'adult_link_count': user.adult_link_count,
+                'computed_at': user.computed_at.isoformat() if user.computed_at else None,
+                'existing_votes': user.mod_vote_count or 0,
+            })
+
+        return result
+
+    def get_users_needing_review_by_subreddits(
+        self,
+        subreddits: List[str],
+        min_score: float = 0.5,
+        max_votes: int = 4,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """
+        Get users needing review who posted in specified subreddits.
+
+        Args:
+            subreddits: List of subreddit names to filter by
+            min_score: Minimum spam score to include
+            max_votes: Maximum existing votes (users with consensus excluded)
+            limit: Maximum results
+
+        Returns:
+            List of dicts with user info for review queue
+        """
+        if not subreddits:
+            return []
+
+        # Subquery for vote counts
+        vote_subquery = self.db_session.query(
+            ModeratorSpamVote.target_username,
+            func.count(ModeratorSpamVote.id).label('vote_count')
+        ).group_by(ModeratorSpamVote.target_username).subquery()
+
+        # Subquery for users who posted in target subreddits
+        activity_subquery = self.db_session.query(
+            AuthorActivityTracking.author.distinct().label('author')
+        ).filter(
+            AuthorActivityTracking.subreddit.in_(subreddits)
+        ).subquery()
+
+        # Main query joining spam features with activity filter
+        users = self.db_session.query(UserSpamFeatures).join(
+            activity_subquery,
+            UserSpamFeatures.username == activity_subquery.c.author
+        ).outerjoin(
+            vote_subquery,
+            UserSpamFeatures.username == vote_subquery.c.target_username
+        ).filter(
+            UserSpamFeatures.spam_score >= min_score,
+            UserSpamFeatures.mod_vote_consensus.is_(None)
+        ).filter(
+            (vote_subquery.c.vote_count.is_(None)) |
+            (vote_subquery.c.vote_count < max_votes)
         ).order_by(
             UserSpamFeatures.spam_score.desc()
         ).limit(limit).all()

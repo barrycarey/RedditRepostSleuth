@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 
+import redis
 import requests
 from falcon import Request, Response, HTTPUnauthorized, HTTPNotFound, HTTPBadRequest, HTTPForbidden
 
@@ -17,6 +18,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import ModeratorSpamVote, SpamTrainingLabels
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
+from redditrepostsleuth.repostsleuthsiteapi.util.reddit_helpers import get_moderated_subs_cached
 
 log = logging.getLogger(__name__)
 
@@ -86,10 +88,11 @@ def get_moderator_qualifying_sub(token: str, user_agent: str) -> Optional[Dict[s
 class SpamVotingEndpoint:
     """API endpoint for moderator spam voting."""
 
-    def __init__(self, uowm: UnitOfWorkManager, config: Config):
+    def __init__(self, uowm: UnitOfWorkManager, config: Config, redis_client: redis.Redis):
         self.uowm = uowm
         self.config = config
         self.user_agent = config.reddit_useragent
+        self.redis_client = redis_client
 
     def _get_auth_context(self, req: Request) -> Dict[str, Any]:
         """
@@ -127,6 +130,11 @@ class SpamVotingEndpoint:
         GET /api/spam/voting/queue
 
         Get users pending moderator review.
+
+        Query Parameters:
+            min_score (float): Minimum spam score (default: 0.5)
+            limit (int): Max users to return (default: 20, max: 100)
+            filter (str): Filter mode - 'my_subs' (default) or 'all'
         """
         auth = self._get_auth_context(req)
         moderator_username = auth['user_data']['name']
@@ -135,13 +143,44 @@ class SpamVotingEndpoint:
         limit = req.get_param_as_int('limit') or 20
         limit = min(limit, 100)  # Cap at 100
 
+        # Filter mode: 'my_subs' (default) or 'all'
+        filter_mode = req.get_param('filter') or 'my_subs'
+        if filter_mode not in ('my_subs', 'all'):
+            filter_mode = 'my_subs'
+
         with self.uowm.start() as uow:
-            # Get users needing review, excluding those this mod already voted on
-            users = uow.moderator_spam_vote.get_users_needing_review(
-                min_score=min_score,
-                max_votes=4,  # Exclude users close to consensus threshold
-                limit=limit + 10  # Fetch extra in case some are filtered
-            )
+            if filter_mode == 'my_subs':
+                # Get moderator's subreddits (cached)
+                moderated_subs = get_moderated_subs_cached(
+                    auth['token'],
+                    self.user_agent,
+                    moderator_username,
+                    self.redis_client
+                )
+
+                if not moderated_subs:
+                    resp.text = json.dumps({
+                        'qualifying_sub': auth['qualifying_sub'],
+                        'filter': filter_mode,
+                        'users': [],
+                        'total': 0,
+                        'message': 'No moderated subreddits found'
+                    })
+                    return
+
+                users = uow.moderator_spam_vote.get_users_needing_review_by_subreddits(
+                    subreddits=moderated_subs,
+                    min_score=min_score,
+                    max_votes=4,
+                    limit=limit + 10  # Fetch extra in case some are filtered
+                )
+            else:
+                # 'all' mode - existing behavior
+                users = uow.moderator_spam_vote.get_users_needing_review(
+                    min_score=min_score,
+                    max_votes=4,
+                    limit=limit + 10  # Fetch extra in case some are filtered
+                )
 
             # Filter out users this moderator already voted on
             filtered_users = []
@@ -156,6 +195,7 @@ class SpamVotingEndpoint:
 
         resp.text = json.dumps({
             'qualifying_sub': auth['qualifying_sub'],
+            'filter': filter_mode,
             'users': filtered_users,
             'total': len(filtered_users),
         })

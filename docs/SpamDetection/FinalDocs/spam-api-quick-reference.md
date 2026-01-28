@@ -40,16 +40,22 @@ Authorization: Bearer {reddit_oauth_token}
 ### GET /api/spam/voting/queue
 
 ```http
-GET /api/spam/voting/queue?min_score=0.6&limit=25
+GET /api/spam/voting/queue?min_score=0.6&limit=25&filter=my_subs
 Authorization: Bearer {token}
 ```
 
-**Query Params:** `min_score` (float, def: 0.5), `limit` (int, def: 20, max: 100)
+**Query Params:**
+- `min_score` (float, def: 0.5) - Minimum spam score
+- `limit` (int, def: 20, max: 100) - Number of users to return
+- `filter` (string, def: "my_subs") - Filter mode:
+  - `my_subs` - Only users who posted in moderator's subreddits (default)
+  - `all` - All pending users regardless of subreddit
 
 **Response 200:**
 ```json
 {
   "qualifying_sub": { "name": "AskReddit", "subscribers": 45000000 },
+  "filter": "my_subs",
   "users": [
     {
       "username": "user",
@@ -66,6 +72,8 @@ Authorization: Bearer {token}
   "total": 1
 }
 ```
+
+**Note:** When `filter=my_subs` and the moderator has no subreddits, returns empty list with `"message": "No moderated subreddits found"`.
 
 **Errors:** 401 (Invalid Token), 403 (Not Qualified)
 
@@ -579,8 +587,10 @@ interface SpamUserSummary {
 
 interface QueueResponse {
   qualifying_sub: { name: string; subscribers: number };
+  filter: "my_subs" | "all";
   users: SpamUserSummary[];
   total: number;
+  message?: string; // Present when filter=my_subs and no moderated subs found
 }
 ```
 

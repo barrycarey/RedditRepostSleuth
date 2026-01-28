@@ -1,6 +1,7 @@
 import os
 
 import falcon
+import redis
 import sentry_sdk
 from falcon import CORSMiddleware
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -66,6 +67,15 @@ config_updater = SubredditConfigUpdater(
     notification_svc=notification_svc
 )
 patreon_token_manager = PatreonTokenManager(config)
+
+# Redis client for caching (moderated subreddits, etc.)
+redis_client = redis.Redis(
+    host=config.redis_host,
+    port=int(config.redis_port) if config.redis_port else 6379,
+    password=config.redis_password if config.redis_password else None,
+    db=int(config.redis_database) if config.redis_database else 0,
+    decode_responses=True
+)
 
 if os.getenv('SENTRY_DNS', None):
     import sentry_sdk
@@ -136,10 +146,11 @@ api.add_route('/api/health/bot', BotHealth(uowm))
 api.add_route('/api/health/bot/queues', QueueHealth(influx_query_service))
 
 # Spam voting endpoints (Phase 5.5: Community-Assisted Training)
-api.add_route('/api/spam/voting/queue', SpamVotingEndpoint(uowm, config), suffix='queue')
-api.add_route('/api/spam/voting/vote', SpamVotingEndpoint(uowm, config), suffix='vote')
-api.add_route('/api/spam/voting/user/{username}', SpamVotingEndpoint(uowm, config), suffix='user_votes')
-api.add_route('/api/spam/voting/stats', SpamVotingEndpoint(uowm, config), suffix='stats')
+spam_voting_endpoint = SpamVotingEndpoint(uowm, config, redis_client)
+api.add_route('/api/spam/voting/queue', spam_voting_endpoint, suffix='queue')
+api.add_route('/api/spam/voting/vote', spam_voting_endpoint, suffix='vote')
+api.add_route('/api/spam/voting/user/{username}', spam_voting_endpoint, suffix='user_votes')
+api.add_route('/api/spam/voting/stats', spam_voting_endpoint, suffix='stats')
 
 # Spam admin endpoints (Phase 4: Trigger Integration)
 register_spam_admin_endpoints(api, uowm, config)
