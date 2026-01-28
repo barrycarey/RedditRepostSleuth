@@ -45,6 +45,17 @@ class MonitoredSub:
             resp.body = json.dumps(sub.to_dict())
 
     def on_get_all(self, req: Request, resp: Response):
+        """Get all monitored subs with full config. Requires site admin.
+        For public stats, use /api/stats/monitored-subs instead."""
+        token = get_token_from_header(req)
+        user_data = get_user_data(token)
+        if not user_data:
+            raise HTTPForbidden(title='Authentication Failed',
+                               description='Could not verify your Reddit identity')
+        if not is_site_admin(user_data, self.uowm):
+            raise HTTPForbidden(title='Access Denied',
+                               description='Site admin required. For public stats, use /api/stats/monitored-subs')
+
         with self.uowm.start() as uow:
             subs = uow.monitored_sub.get_all()
         resp.body = json.dumps([sub.to_dict() for sub in subs])

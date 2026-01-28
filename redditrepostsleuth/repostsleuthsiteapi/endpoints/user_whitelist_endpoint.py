@@ -1,7 +1,7 @@
 import json
 import logging
 
-from falcon import Request, Response, HTTPUnauthorized, HTTPNotFound, HTTPBadRequest
+from falcon import Request, Response, HTTPUnauthorized, HTTPNotFound, HTTPBadRequest, HTTPForbidden
 from praw import Reddit
 
 from redditrepostsleuth.core.config import Config
@@ -114,6 +114,17 @@ class UserWhitelistEndpoint:
             if not existing_whitelist:
                 raise HTTPNotFound(title=f'Cannot find whitelist with ID {id_to_delete}',
                                    description=f'Cannot find whitelist with ID {id_to_delete}')
+
+            # SECURITY: Verify whitelist belongs to the subreddit the mod is authorized for
+            if existing_whitelist.monitored_sub_id != monitored_sub.id:
+                log.warning(
+                    'IDOR attempt: User tried to delete whitelist %d belonging to sub %d via sub %d',
+                    id_to_delete, existing_whitelist.monitored_sub_id, monitored_sub.id
+                )
+                raise HTTPForbidden(
+                    title='Access Denied',
+                    description='You do not have permission to delete this whitelist entry'
+                )
 
             uow.user_whitelist.remove(existing_whitelist)
             uow.commit()

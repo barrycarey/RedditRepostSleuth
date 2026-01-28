@@ -4,6 +4,7 @@ Spam Voting Endpoint - Phase 5.5: Community-Assisted Training
 Allows qualified moderators (100k+ subscriber subreddits) to vote on
 spam detection results to improve training data quality.
 """
+import html
 import json
 import logging
 from datetime import datetime
@@ -212,7 +213,7 @@ class SpamVotingEndpoint:
             if existing_vote:
                 # Update existing vote
                 existing_vote.vote = vote
-                existing_vote.notes = notes[:500] if notes else None
+                existing_vote.notes = html.escape(notes[:500]) if notes else None
                 existing_vote.voted_at = datetime.utcnow()
                 existing_vote.subreddit = qualifying_sub['name']
                 existing_vote.subreddit_subscribers = qualifying_sub['subscribers']
@@ -226,7 +227,7 @@ class SpamVotingEndpoint:
                     subreddit=qualifying_sub['name'],
                     subreddit_subscribers=qualifying_sub['subscribers'],
                     vote=vote,
-                    notes=notes[:500] if notes else None,
+                    notes=html.escape(notes[:500]) if notes else None,
                     spam_score_at_vote=features.spam_score,
                 )
                 uow.moderator_spam_vote.add(new_vote)
