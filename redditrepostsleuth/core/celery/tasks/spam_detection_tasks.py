@@ -466,8 +466,8 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
             rate_limiter=self.rate_limiter
         )
 
-        log.debug('Fetching Tier 2 data for %s (scan_profile=True)', username)
-        tier2_features = fetcher.fetch_and_enrich(username, scan_profile=True)
+        log.debug('Fetching Tier 2 data for %s (scan_profile=True, scan_posts=True)', username)
+        tier2_features = fetcher.fetch_and_enrich(username, scan_profile=True, scan_posts=True)
 
         if not tier2_features:
             log.warning('Failed to fetch Tier 2 data for %s (returned None)', username)
@@ -497,7 +497,8 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
                 account_suspended=tier2_features.account_suspended,
                 has_adult_profile_links=tier2_features.has_adult_profile_links,
                 has_telegram_links=tier2_features.has_telegram_links,
-                profile_link_sources=tier2_features.profile_link_sources
+                profile_link_sources=tier2_features.profile_link_sources,
+                has_promotional_post_links=tier2_features.has_promotional_post_links
             )
             uow.commit()
 
@@ -844,6 +845,7 @@ def rescore_user_with_tier2(self, username: str) -> Optional[dict]:
                 'has_adult_profile_links': spam_features.has_adult_profile_links,
                 'has_telegram_links': spam_features.has_telegram_links,
                 'profile_link_sources': spam_features.profile_link_sources,
+                'has_promotional_post_links': spam_features.has_promotional_post_links,
             }
 
         # Score with both tiers
@@ -1217,4 +1219,70 @@ def scheduled_purge_activity_tracking(self) -> dict:
         return result
     except Exception as e:
         log.error('scheduled_purge_activity_tracking failed: %s', str(e), exc_info=True)
+        raise
+
+
+# ============================================================================
+# Moderator API Support Tasks
+# ============================================================================
+
+
+@celery.task(
+    bind=True,
+    base=SpamDetectionTaskWithReddit,
+    ignore_results=False,
+    serializer='pickle',
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3, 'countdown': 60}
+)
+def scan_user_full(self, username: str) -> Optional[dict]:
+    """
+    Perform full user scan (Tier 1 + Tier 2) synchronously.
+
+    Used by moderator API to trigger a complete scan when a user
+    has incomplete data. Returns the final features for the frontend.
+
+    Args:
+        username: Reddit username to scan
+
+    Returns:
+        Dict with spam features via to_dict_for_moderator(), or None on failure
+    """
+    if not username or username == '[deleted]':
+        log.debug('Skipping full scan for invalid username: %s', username)
+        return None
+
+    log.info('Starting full user scan for moderator API: %s', username)
+
+    try:
+        # Step 1: Run Tier 1 feature extraction synchronously
+        log.info('Running Tier 1 feature extraction for %s', username)
+        tier1_result = compute_user_spam_features_tier1(username)
+
+        if not tier1_result:
+            log.warning('Tier 1 extraction failed for %s (insufficient data)', username)
+            return None
+
+        # Step 2: Run Tier 2 enrichment synchronously
+        log.info('Running Tier 2 enrichment for %s', username)
+        tier2_result = enrich_user_features_tier2(username)
+
+        if not tier2_result:
+            log.warning('Tier 2 enrichment failed for %s', username)
+            # Continue anyway - Tier 1 data is still available
+
+        # Step 3: Fetch final features and return via to_dict_for_moderator()
+        with self.uowm.start() as uow:
+            features = uow.spam_features.get_by_username(username)
+            if features:
+                log.info('Full scan complete for %s: score=%.3f, tier2_enriched=%s',
+                         username, features.spam_score or 0,
+                         features.tier2_enriched_at is not None)
+                return features.to_dict_for_moderator()
+            else:
+                log.warning('No features found after full scan for %s', username)
+                return None
+
+    except Exception as e:
+        log.error('Error during full scan for %s: %s', username, str(e), exc_info=True)
         raise

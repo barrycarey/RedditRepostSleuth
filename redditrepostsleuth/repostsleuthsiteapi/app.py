@@ -39,6 +39,7 @@ from redditrepostsleuth.repostsleuthsiteapi.endpoints.repost_history import Repo
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.user_whitelist_endpoint import UserWhitelistEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.spam_voting import SpamVotingEndpoint
 from redditrepostsleuth.repostsleuthsiteapi.endpoints.spam_admin import register_spam_admin_endpoints
+from redditrepostsleuth.repostsleuthsiteapi.endpoints.spam_moderator import register_spam_moderator_endpoints
 from redditrepostsleuth.repostsleuthsiteapi.util.image_store import ImageStore
 
 config = Config()
@@ -142,6 +143,9 @@ api.add_route('/api/spam/voting/stats', SpamVotingEndpoint(uowm, config), suffix
 
 # Spam admin endpoints (Phase 4: Trigger Integration)
 register_spam_admin_endpoints(api, uowm, config)
+
+# Spam moderator endpoints (moderator-facing user lookup)
+register_spam_moderator_endpoints(api, uowm, config)
 
 api = SentryWsgiMiddleware(api)
 

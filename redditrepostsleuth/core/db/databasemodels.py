@@ -877,6 +877,9 @@ class UserSpamFeatures(Base):
     has_telegram_links = Column(Boolean, nullable=True)
     profile_link_sources = Column(JSON, nullable=True)
 
+    # Tier 2: From post scanning (promotional links like linktree, discord, patreon)
+    has_promotional_post_links = Column(Boolean, nullable=True)
+
     # Enrichment metadata
     tier2_enriched_at = Column(DateTime, nullable=True)
     tier2_enrichment_failed = Column(Boolean, default=False)
@@ -888,6 +891,91 @@ class UserSpamFeatures(Base):
     mod_vote_weighted = Column(Float, default=0.0)    # Subscriber-weighted score
     mod_vote_updated_at = Column(DateTime, nullable=True)
     mod_vote_consensus = Column(String(20), nullable=True)  # 'spam', 'legit', 'disputed'
+
+    def to_dict(self) -> dict:
+        """Return full dictionary representation for admin/internal use."""
+        return {
+            'username': self.username,
+            'spam_score': self.spam_score,
+            'spam_score_confidence': self.spam_score_confidence,
+            'computed_at': self.computed_at.isoformat() if self.computed_at else None,
+            'total_posts': self.total_posts,
+            'nsfw_post_count': self.nsfw_post_count,
+            'nsfw_post_ratio': self.nsfw_post_ratio,
+            'unique_subreddit_count': self.unique_subreddit_count,
+            'adult_link_count': self.adult_link_count,
+            'short_link_count': self.short_link_count,
+            'spam_subreddit_count': self.spam_subreddit_count,
+            'avg_posts_per_day': self.avg_posts_per_day,
+            'max_posts_per_day': self.max_posts_per_day,
+            'feature_data': self.feature_data,
+            # Tier 2 fields
+            'account_age_days': self.account_age_days,
+            'total_karma': self.total_karma,
+            'post_karma': self.post_karma,
+            'comment_karma': self.comment_karma,
+            'karma_per_day': self.karma_per_day,
+            'has_verified_email': self.has_verified_email,
+            'is_gold': self.is_gold,
+            'has_custom_avatar': self.has_custom_avatar,
+            'account_suspended': self.account_suspended,
+            'has_adult_profile_links': self.has_adult_profile_links,
+            'has_telegram_links': self.has_telegram_links,
+            'profile_link_sources': self.profile_link_sources,
+            'has_promotional_post_links': self.has_promotional_post_links,
+            # Enrichment metadata
+            'tier2_enriched_at': self.tier2_enriched_at.isoformat() if self.tier2_enriched_at else None,
+            'tier2_enrichment_failed': self.tier2_enrichment_failed,
+            'tier2_failure_reason': self.tier2_failure_reason,
+            # Moderator voting aggregates
+            'mod_vote_total': self.mod_vote_total,
+            'mod_vote_count': self.mod_vote_count,
+            'mod_vote_weighted': self.mod_vote_weighted,
+            'mod_vote_updated_at': self.mod_vote_updated_at.isoformat() if self.mod_vote_updated_at else None,
+            'mod_vote_consensus': self.mod_vote_consensus,
+        }
+
+    def to_dict_for_moderator(self) -> dict:
+        """
+        Return filtered dictionary representation for moderators.
+
+        Excludes sensitive internal fields:
+        - feature_data (internal scoring data)
+        - profile_link_sources (detailed link info)
+        - tier2_failure_reason (internal error details)
+        - mod_vote_* (voting aggregates are admin-only)
+        """
+        return {
+            'username': self.username,
+            'spam_score': self.spam_score,
+            'spam_score_confidence': self.spam_score_confidence,
+            'computed_at': self.computed_at.isoformat() if self.computed_at else None,
+            'total_posts': self.total_posts,
+            'nsfw_post_count': self.nsfw_post_count,
+            'nsfw_post_ratio': self.nsfw_post_ratio,
+            'unique_subreddit_count': self.unique_subreddit_count,
+            'adult_link_count': self.adult_link_count,
+            'short_link_count': self.short_link_count,
+            'spam_subreddit_count': self.spam_subreddit_count,
+            'avg_posts_per_day': self.avg_posts_per_day,
+            'max_posts_per_day': self.max_posts_per_day,
+            # Tier 2 fields (excluding profile_link_sources)
+            'account_age_days': self.account_age_days,
+            'total_karma': self.total_karma,
+            'post_karma': self.post_karma,
+            'comment_karma': self.comment_karma,
+            'karma_per_day': self.karma_per_day,
+            'has_verified_email': self.has_verified_email,
+            'is_gold': self.is_gold,
+            'has_custom_avatar': self.has_custom_avatar,
+            'account_suspended': self.account_suspended,
+            'has_adult_profile_links': self.has_adult_profile_links,
+            'has_telegram_links': self.has_telegram_links,
+            'has_promotional_post_links': self.has_promotional_post_links,
+            # Enrichment metadata (excluding tier2_failure_reason)
+            'tier2_enriched_at': self.tier2_enriched_at.isoformat() if self.tier2_enriched_at else None,
+            'tier2_enrichment_failed': self.tier2_enrichment_failed,
+        }
 
 
 class SpamSubredditList(Base):
