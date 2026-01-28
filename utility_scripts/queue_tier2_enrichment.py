@@ -131,7 +131,7 @@ def queue_enrichment_async(usernames: list) -> dict:
     for username in usernames:
         enrich_user_features_tier2.apply_async(
             args=[username],
-            queue='spam_detection'
+            queue='spam_detection_temp'
         )
         queued += 1
 
@@ -154,7 +154,7 @@ def queue_rescore_async(usernames: list) -> dict:
     for username in usernames:
         rescore_user_with_tier2.apply_async(
             args=[username],
-            queue='spam_detection'
+            queue='spam_detection_temp'
         )
         queued += 1
 
@@ -383,7 +383,7 @@ def main():
         else:
             print(f"\nQueuing {len(usernames)} users for async re-scoring...")
             results = queue_rescore_async(usernames)
-            print(f"Queued {results['queued']} users to spam_detection queue")
+            print(f"Queued {results['queued']} users to spam_detection_temp queue")
     else:
         if args.sync:
             print(f"\nEnriching {len(usernames)} users synchronously (delay={args.delay}s)...")
@@ -398,7 +398,7 @@ def main():
         else:
             print(f"\nQueuing {len(usernames)} users for async enrichment...")
             results = queue_enrichment_async(usernames)
-            print(f"Queued {results['queued']} users to spam_detection queue")
+            print(f"Queued {results['queued']} users to spam_detection_temp queue")
             print("Monitor progress with: celery -A redditrepostsleuth.core.celery inspect active")
 
 
