@@ -823,6 +823,7 @@ class AuthorActivityTracking(Base):
         Index('idx_author_subreddit', 'author', 'subreddit'),
         Index('idx_created_at', 'created_at'),
         Index('idx_subreddit', 'subreddit'),
+        Index('idx_author', 'author'),
     )
     id = Column(BigInteger, primary_key=True)
     post_id = Column(String(15), nullable=False, unique=True)
