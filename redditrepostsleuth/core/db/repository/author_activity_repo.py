@@ -69,6 +69,12 @@ class AuthorActivityRepo:
             'unique_subreddits': 0
         }
 
+    def get_earliest_tracked_date(self, author: str) -> Optional[datetime]:
+        """Get the earliest tracked_at date for a user."""
+        return self.db_session.query(func.min(AuthorActivityTracking.tracked_at)).filter(
+            AuthorActivityTracking.author == author
+        ).scalar()
+
     def count_by_author(self, author: str) -> int:
         return self.db_session.query(func.count(AuthorActivityTracking.id)).filter(
             AuthorActivityTracking.author == author

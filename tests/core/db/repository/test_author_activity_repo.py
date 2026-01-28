@@ -107,3 +107,26 @@ class TestAuthorActivityRepoGetAuthorSubredditCounts(TestCase):
         result = self.repo.get_author_subreddit_counts('testuser')
 
         self.assertEqual([], result)
+
+
+class TestAuthorActivityRepoGetEarliestTrackedDate(TestCase):
+    """Tests for get_earliest_tracked_date method."""
+
+    def setUp(self):
+        self.mock_session = Mock()
+        self.repo = AuthorActivityRepo(self.mock_session)
+
+    def test_returns_earliest_date_when_exists(self):
+        expected_date = datetime(2026, 1, 27, 12, 0, 0)
+        self.mock_session.query.return_value.filter.return_value.scalar.return_value = expected_date
+
+        result = self.repo.get_earliest_tracked_date('testuser')
+
+        self.assertEqual(expected_date, result)
+
+    def test_returns_none_when_no_tracking_data(self):
+        self.mock_session.query.return_value.filter.return_value.scalar.return_value = None
+
+        result = self.repo.get_earliest_tracked_date('testuser')
+
+        self.assertIsNone(result)

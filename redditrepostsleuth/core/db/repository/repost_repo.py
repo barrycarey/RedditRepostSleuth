@@ -133,3 +133,13 @@ class RepostRepo:
         return self.db_session.query(func.count(Repost.id)).filter(
             Repost.author == author
         ).scalar() or 0
+
+    def count_reposts_by_author_since(self, author: str, since: datetime) -> int:
+        """
+        Count reposts posted by the author since a given date.
+        Used to align repost counts with author_activity_tracking timeframe.
+        """
+        return self.db_session.query(func.count(Repost.id)).filter(
+            Repost.author == author,
+            Repost.detected_at >= since
+        ).scalar() or 0

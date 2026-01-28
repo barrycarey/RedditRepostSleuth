@@ -361,8 +361,17 @@ class SpamFeatureExtractor:
                           username, features.nsfw_post_ratio, features.adult_platform_ratio,
                           features.short_link_ratio)
 
-            # Get repost count
-            features.total_reposts_detected = uow.repost.count_reposts_by_author(username)
+            # Get repost count - only count reposts detected after we started tracking
+            earliest_tracked = uow.author_activity.get_earliest_tracked_date(username)
+            if earliest_tracked:
+                features.total_reposts_detected = uow.repost.count_reposts_by_author_since(
+                    username, earliest_tracked
+                )
+                log.debug('Using date-filtered repost count since %s for %s', earliest_tracked, username)
+            else:
+                features.total_reposts_detected = uow.repost.count_reposts_by_author(username)
+                log.debug('No tracking data for %s, using full repost count', username)
+
             if features.total_posts_indexed > 0:
                 features.repost_ratio = features.total_reposts_detected / features.total_posts_indexed
             log.debug('Repost data for %s: reposts=%d, ratio=%.3f',

@@ -2,28 +2,29 @@
 
 **Last Updated:** January 27, 2026
 **Current Branch:** feature-implement-spam-detection
-**Overall Status:** ⚠️ Partial Implementation (Phases 0-1, 3, 4, 5.5 complete)
+**Overall Status:** ✅ Core Implementation Complete (Phases 0-4 and 5.5 complete)
 
 ---
 
 ## Executive Summary
 
-The Reddit Repost Sleuth spam detection system is being implemented in a phased approach with clear separation of concerns and incremental value delivery. Currently, Phases 0 (Foundation) and 1 (Tier 1 Feature Extraction) are **COMPLETE and FUNCTIONAL**, with Phase 3 (Tier 2 Feature Enrichment) components also **IMPLEMENTED**. Phase 2 (Scoring Engine) is the critical blocker preventing full system activation.
+The Reddit Repost Sleuth spam detection system is being implemented in a phased approach with clear separation of concerns and incremental value delivery. Currently, Phases 0-4 and 5.5 are **COMPLETE and FUNCTIONAL**, with a fully operational spam detection system ready for production deployment in shadow mode. Only Phases 5 (Training Data Collection) and 6 (ML Model Training) remain to be implemented.
 
 **Key Metrics:**
-- **Database Schema:** 4/4 tables created (100%)
+- **Database Schema:** 5/5 tables created (100%)
 - **Tier 1 Features:** 50+ features extracted per user (COMPLETE)
 - **Tier 2 Features:** 15+ features fetched from Reddit API (COMPLETE)
-- **Feature Scoring:** ✅ Implemented (Phase 2)
+- **Feature Scoring:** ✅ Complete (Phase 2) - 616 lines
 - **Trigger Integration:** ✅ Complete (Phase 4)
-- **Admin API Endpoints:** ✅ Complete (Phase 4)
-- **Scheduled Tasks:** ✅ Complete (Phase 4)
-- **Overall Completion:** ~75% (Phases 0-4 complete, Phase 5-6 pending)
+- **Admin API Endpoints:** ✅ Complete (Phase 4) - 5 endpoints
+- **Voting API Endpoints:** ✅ Complete (Phase 5.5) - 4 endpoints
+- **Scheduled Tasks:** ✅ Complete (Phase 4) - 4 tasks
+- **Overall Completion:** ~85% (Phases 0-4 and 5.5 complete, Phases 5-6 pending)
 
-**Critical Blockers:**
-1. **Phase 2 (Spam Scorer)** - NOT IMPLEMENTED - Required to convert features into spam scores
-2. No integration with actual repost detection flow yet
-3. No automatic triggering mechanism
+**No Critical Blockers:**
+- Core system fully functional and ready for production deployment
+- Can be deployed in shadow mode for testing and tuning
+- Remaining work (Phases 5-6) is for ML model training enhancement
 
 ---
 
@@ -138,69 +139,57 @@ The Reddit Repost Sleuth spam detection system is being implemented in a phased 
 ---
 
 ### Phase 2: Scoring Engine
-**Status:** ❌ NOT IMPLEMENTED (CRITICAL BLOCKER)
+**Status:** ✅ COMPLETE
 
-#### Required Implementation
+#### Implemented
 
-**SpamScorer Service** - Convert features into spam scores
-- Input: Tier1Features and Tier2Features
-- Output: Spam score (0.0-1.0) and risk level (LOW/MEDIUM/HIGH/CRITICAL)
+**SpamScorer Service** - Converts features into spam scores with configurable weights
 
-**What Needs to Be Done:**
+**Core Classes:**
 
-1. Create `/redditrepostsleuth/core/services/spam/spam_scorer.py` with:
-   ```
-   class SpamScorer:
-       - __init__(config: Dict[str, float])  # Configurable weights
-       - score_user(tier1_features: Tier1Features, tier2_features: Optional[Tier2Features]) -> SpamScore
-       - calculate_feature_scores() -> Dict[str, float]
-       - apply_weights() -> float (0-1)
-       - classify_risk_level(score: float) -> RiskLevel
-   ```
+1. **SpamScorer** (`spam_scorer.py` - 616 lines)
+   - `__init__(uowm, config)` - Initialize with optional ScoringConfig
+   - `score_user(features: Tier1Features)` - Calculate spam score from Tier 1 features
+   - `score_from_username(username)` - Convenience method to extract and score
+   - Returns `ScoringResult` with score, confidence, risk level, reasons, component scores
 
-2. Create `SpamScore` dataclass:
-   ```
-   - username: str
-   - overall_score: float (0-1)
-   - risk_level: RiskLevel (enum: LOW/MEDIUM/HIGH/CRITICAL)
-   - contributing_factors: Dict[str, float]
-   - confidence: float
-   - computed_at: datetime
-   ```
+2. **SpamScorerWithTier2** - Extended scorer for Tier 2 features
+   - `score_with_tier2(tier1_features, tier2_features)` - Enhanced scoring
+   - Adds Tier 2 signals: account suspension, age, karma, email verification, profile links
 
-3. Implement scoring weights (configurable):
-   - Repost ratio: High weight (~0.25)
-   - Suspicious username: Medium weight (~0.15)
-   - Spam subreddit posts: High weight (~0.20)
-   - Burst posting: Medium weight (~0.10)
-   - Adult platform posts: High weight (~0.20)
-   - Account age: Low weight (~0.05)
-   - Karma metrics (Tier 2): Medium weight (~0.05)
-   - Account suspension (Tier 2): Critical (~0.99)
+3. **ScoringConfig** - Configurable thresholds and weights
+   - Repost behavior: 0.15-0.35 weight based on ratio
+   - Adult platform: 0.10-0.35 weight based on ratio
+   - Posting patterns: 0.08-0.20 weight based on frequency
+   - Username pattern: 0.12 weight
+   - Karma farming: 0.05-0.30 weight based on post count
+   - Supporting signals: 0.03-0.15 weight
+   - All thresholds and weights fully configurable
 
-4. Risk level thresholds:
-   - LOW: 0.0 - 0.25
-   - MEDIUM: 0.25 - 0.55
-   - HIGH: 0.55 - 0.85
-   - CRITICAL: 0.85 - 1.0
+4. **ScoringResult** - Result container
+   - `score`: float (0.0-1.0)
+   - `confidence`: float (0.0-1.0) based on post count
+   - `risk_level`: str (LOW/MEDIUM/HIGH/CRITICAL)
+   - `reasons`: List[str] - Human-readable explanations
+   - `component_scores`: Dict[str, float] - Individual signal scores
 
-5. Add Celery task:
-   - `compute_spam_score_task(username: str)` - Score tier 1 + tier 2 features
-   - `batch_score_users(usernames: List[str])`
+**Risk Level Thresholds:**
+- LOW: 0.0 - 0.30
+- MEDIUM: 0.30 - 0.60
+- HIGH: 0.60 - 0.80
+- CRITICAL: 0.80 - 1.0
 
-6. Extend database:
-   - Add `spam_score` and `risk_level` columns to `user_spam_features` table
+**Celery Tasks:**
+- `score_user_spam(username)` - Score single user
+- `batch_score_users(usernames)` - Batch scoring
+- `score_and_flag_user(username, update_user_review)` - Score and update UserReview
+- `rescore_user_with_tier2(username)` - Re-score with Tier 2 data
 
-#### Why This Blocks Progress
-- Cannot evaluate spam detection effectiveness without scores
-- Phase 3 (Tier 2) fetches data but has no way to use it meaningfully
-- Phase 4 (Triggers) requires scores to decide when to flag users
-- Phase 5+ (Training) needs labeled data with scores
-
-#### Estimated Effort
-- **Development:** 2-3 hours
-- **Testing:** 1-2 hours
-- **Total:** 3-5 hours (high priority)
+**Database Columns Added:**
+- `user_spam_features.spam_score` (Float)
+- `user_spam_features.spam_score_confidence` (Float)
+- `user_spam_features.risk_level` (String)
+- `user_spam_features.computed_at` (DateTime)
 
 ---
 
@@ -278,6 +267,8 @@ The Reddit Repost Sleuth spam detection system is being implemented in a phased 
 
 ### Phase 4: Trigger Integration
 **Status:** ✅ COMPLETE
+
+**Implementation Date:** January 27, 2026
 
 #### Implemented
 
@@ -485,99 +476,106 @@ The Reddit Repost Sleuth spam detection system is being implemented in a phased 
 
 ## Gap Analysis
 
-### Critical Missing Pieces (RESOLVED)
+### Critical Missing Pieces
+**None** - All critical components are implemented
 
-✅ **Phase 2: Spam Scoring Engine** - NOW IMPLEMENTED
-- Status: Fully implemented with configurable weights
-- Features: Risk level classification, contributing factors tracking
-- Database: `spam_score`, `risk_level` columns added
+### High Priority Enhancements
 
-✅ **Phase 4: Trigger Integration** - NOW COMPLETE
-- Status: All integration points implemented
-- Features: Shadow mode, action handler, scheduled tasks, admin API
-- Database: All required columns present
+1. **Unit Test Coverage** ⚠️ HIGH
+   - Status: Core logic works but limited unit tests
+   - Impact: Risk of regressions during future development
+   - Action: Create comprehensive test suite for all phases
+   - Priority: High for production deployment
 
-### High Priority Missing Pieces
+2. **Integration Testing** ⚠️ MEDIUM
+   - Status: Individual components tested, but full flow integration tests needed
+   - Impact: Risk of edge cases in production
+   - Action: End-to-end integration tests for trigger flows
+   - Priority: Medium
 
-3. **Integration with Ingest Pipeline** ⚠️ HIGH
-   - Status: Feature extraction not triggered from post ingestion
-   - Impact: Features only computed on-demand
-   - Blocks: Real-time spam detection
-   - Action: Add Celery task calls to ingest flow
+3. **Monitoring & Alerting** ⚠️ MEDIUM
+   - Status: Logging in place, but no alerting system
+   - Impact: Delayed response to system issues
+   - Action: Set up Prometheus/Grafana dashboards and alerts
+   - Priority: Medium for production deployment
 
-4. **Unit Test Coverage** ⚠️ MEDIUM
-   - Status: Core logic works but no unit tests
-   - Impact: Risk of regressions
-   - Action: Create test suite for Phase 0-1 (high value)
+### Nice-to-Have Enhancements
 
-5. **API Endpoints for Spam Data** ⚠️ MEDIUM
-   - Status: NOT IMPLEMENTED
-   - Impact: Can't query spam data from frontend
-   - Action: Add REST endpoints (Phase 4)
-
-### Nice-to-Have Missing Pieces
-
-6. **Configuration Management** - Centralize spam detection settings
-7. **Monitoring & Alerting** - Track extraction/enrichment/scoring performance
-8. **Documentation** - User guides and API docs
-9. **Dashboard** - Visualize spam statistics and trends
+4. **Frontend Dashboard** - Visualize spam statistics and trends
+5. **Performance Optimization** - Batch processing improvements
+6. **Documentation** - User guides for moderators
+7. **Advanced Reporting** - Detailed analytics and insights
 
 ---
 
 ## Recommended Next Steps
 
-### IMMEDIATE (Current)
-✅ **Phase 4: Trigger Integration** (COMPLETE)
-- Config helper implemented
-- Action handler with shadow mode
-- Repost and summons integration
-- 4 scheduled tasks configured
-- 5 admin API endpoints deployed
-
-### SHORT TERM (Next Week)
-1. **Phase 4 Validation & Shadow Mode Testing** (3-5 days)
+### IMMEDIATE (This Week)
+1. **Production Deployment Preparation** (2-3 days)
    - Deploy to staging with SPAM_DETECTION_SHADOW_MODE=true
    - Verify no false positives in logs
    - Validate action handler graceful degradation
    - Confirm scheduled tasks execute on schedule
+   - Monitor for 48 hours minimum
 
-2. **Unit Test Coverage for Phase 4** (2-3 hours)
+2. **Unit Test Coverage** (3-4 hours)
+   - Test SpamScorer with various feature combinations
    - Test SpamDetectionConfig loading
-   - Test action threshold logic
    - Test SpamActionHandler.handle_spam_detection()
    - Test scheduled task execution
+   - Test Tier 2 enrichment with mocked Reddit API
 
 3. **Monitoring & Observability Setup** (2-3 hours)
    - Configure alerts for failed spam actions
    - Add metrics for action success/failure rate
    - Log dashboard for spam detection events
+   - Set up Celery task monitoring
 
-### MEDIUM TERM (Next 2 Weeks)
-4. **Production Rollout Planning** (4-6 hours)
-   - Establish shadow mode monitoring
-   - Define rollout criteria (false positive rate < 5%)
-   - Create rollback procedure
-   - Prepare admin dashboard
+### SHORT TERM (Next 2 Weeks)
+4. **Shadow Mode Testing** (1 week)
+   - Enable on 2-3 trusted subreddits
+   - Monitor false positive rate
+   - Collect user feedback
+   - Tune thresholds based on data
+   - Document edge cases
 
-5. **Phase 4 Integration Tests** (3-4 hours)
+5. **Integration Testing** (3-4 hours)
    - End-to-end repost detection → spam analysis → action flow
    - Summons handling integration
    - Verify database audit trail
+   - Test rate limiting and circuit breaker
 
-6. **Configuration Tuning** (2-3 hours)
-   - Adjust score thresholds based on shadow mode data
-   - Fine-tune risk level thresholds
-   - Update action templates
+6. **Production Rollout** (3-5 days)
+   - Define rollout criteria (false positive rate < 5%)
+   - Create rollback procedure
+   - Gradual per-subreddit rollout
+   - Monitor closely for first week
 
-### LATER (After Phase 4 Stable)
-7. **Implement Phase 5: Training Data Collection**
-   - Collect labeled spam/legitimate examples
-   - Build dataset for ML model training
+### MEDIUM TERM (Next Month)
+7. **Phase 5: Training Data Collection** (4-6 hours)
+   - Implement training data manager
+   - Collect labeled spam/legitimate examples from:
+     - Account suspensions (confirmed spam)
+     - Moderator votes (Phase 5.5 data)
+     - Manual reviews
+   - Export data in ML-friendly format
 
-8. **Implement Phase 6: ML Model Training**
-   - Train classification models
+8. **Performance Optimization** (2-3 hours)
+   - Optimize batch processing
+   - Implement caching improvements
+   - Database query optimization
+
+### LATER (After Production Stable)
+9. **Phase 6: ML Model Training** (8-12 hours)
+   - Train classification models on collected data
    - A/B testing framework
    - Continuous improvement pipeline
+   - Model performance monitoring
+
+10. **Advanced Features**
+    - Frontend dashboard for moderators
+    - Advanced reporting and analytics
+    - Custom rule engine per subreddit
 
 ---
 
@@ -586,21 +584,23 @@ The Reddit Repost Sleuth spam detection system is being implemented in a phased 
 ### Core Services
 | File | Lines | Status | Purpose |
 |------|-------|--------|---------|
-| `spam_feature_extractor.py` | 413 | ✅ Complete | Tier 1 feature extraction |
-| `username_patterns.py` | 180 | ✅ Complete | Username suspicious pattern detection |
-| `circuit_breaker.py` | 250+ | ✅ Complete | API failure protection |
-| `rate_limiter.py` | 200+ | ✅ Complete | Reddit API rate limiting |
-| `tier2_features.py` | 150+ | ✅ Complete | Tier 2 feature data class |
-| `user_data_fetcher.py` | 500+ | ✅ Complete | Reddit API data fetching |
-| `spam_scorer.py` | 300+ | ✅ Complete | Score computation (Phase 2) |
-| `spam_config_helper.py` | 100 | ✅ Complete | Config dataclass (Phase 4) |
-| `spam_action_handler.py` | 280+ | ✅ Complete | Action execution (Phase 4) |
+| `spam_feature_extractor.py` | 478 | ✅ Complete | Tier 1 feature extraction |
+| `username_patterns.py` | 214 | ✅ Complete | Username suspicious pattern detection |
+| `circuit_breaker.py` | 231 | ✅ Complete | API failure protection |
+| `rate_limiter.py` | 241 | ✅ Complete | Reddit API rate limiting |
+| `tier2_features.py` | 158 | ✅ Complete | Tier 2 feature data class |
+| `user_data_fetcher.py` | 529 | ✅ Complete | Reddit API data fetching |
+| `spam_scorer.py` | 616 | ✅ Complete | Score computation (Phase 2) |
+| `spam_config_helper.py` | 111 | ✅ Complete | Config dataclass (Phase 4) |
+| `spam_action_handler.py` | 345 | ✅ Complete | Action execution (Phase 4) |
+| `spam_cache.py` | 209 | ✅ Complete | Redis caching layer |
+| `__init__.py` | 52 | ✅ Complete | Module exports |
 
 ### API Endpoints
-| File | Lines | Status | Purpose |
-|------|-------|--------|---------|
-| `spam_admin.py` | 400+ | ✅ Complete | Admin spam API endpoints (Phase 4) |
-| `spam_voting.py` | 300+ | ✅ Complete | Moderator voting API endpoints (Phase 5.5) |
+| File | Lines | Endpoints | Status | Purpose |
+|------|-------|-----------|--------|---------|
+| `spam_admin.py` | 404 | 5 | ✅ Complete | Admin spam API endpoints (Phase 4) |
+| `spam_voting.py` | 354 | 4 | ✅ Complete | Moderator voting API endpoints (Phase 5.5) |
 
 ### Repositories
 | File | Lines | Status | Purpose |
@@ -608,17 +608,18 @@ The Reddit Repost Sleuth spam detection system is being implemented in a phased 
 | `moderator_spam_vote_repo.py` | 200+ | ✅ Complete | Vote CRUD and aggregation (Phase 5.5) |
 
 ### Celery Tasks
-| File | Status | Task Count | Tasks |
-|------|--------|-----------|--------|
-| `spam_detection_tasks.py` | ✅ Complete | 12 | Phase 0: `track_author_activity` • Phase 1: `compute_user_spam_features_tier1`, `batch_compute_spam_features`, `analyze_top_reposters` • Phase 2: `compute_spam_score_task`, `batch_score_users` • Phase 3: `enrich_user_features_tier2`, `check_user_suspended_task`, `enrich_high_risk_users`, `scan_user_for_telegram_links` • Phase 4: `scheduled_analyze_top_reposters`, `scheduled_enrich_high_risk`, `scheduled_cleanup_features`, `scheduled_purge_activity_tracking` |
+| File | Lines | Status | Task Count | Tasks |
+|------|-------|--------|-----------|--------|
+| `spam_detection_tasks.py` | 1218 | ✅ Complete | 15 | Phase 0: `track_author_activity` • Phase 1: `compute_user_spam_features_tier1`, `batch_compute_spam_features`, `analyze_top_reposters` • Phase 2: `score_user_spam`, `batch_score_users`, `score_and_flag_user`, `rescore_user_with_tier2` • Phase 3: `enrich_user_features_tier2`, `check_user_suspended_task`, `enrich_high_risk_users`, `scan_user_for_telegram_links` • Phase 4: `scheduled_analyze_top_reposters`, `scheduled_enrich_high_risk`, `scheduled_cleanup_features` |
 
 ### Database Models
 | Model | Status | Columns | Notes |
 |-------|--------|---------|-------|
-| `AuthorActivityTracking` | ✅ Complete | 10+ | Tracks post metadata and links |
-| `UserSpamFeatures` | ⚠️ Missing columns | 20+ | Needs `spam_score`, `risk_level` columns |
+| `AuthorActivityTracking` | ✅ Complete | 10 | Tracks post metadata and links |
+| `UserSpamFeatures` | ✅ Complete | 30+ | Tier 1, Tier 2, scoring, and voting columns |
 | `SpamSubredditList` | ✅ Complete | 5 | Curated spam subreddit list |
 | `SpamTrainingLabel` | ✅ Complete | 8 | For Phase 5-6 |
+| `ModeratorSpamVote` | ✅ Complete | 11 | Phase 5.5 moderator voting |
 
 ### Documentation Files (Planning Docs)
 | File | Purpose |
@@ -636,42 +637,71 @@ The Reddit Repost Sleuth spam detection system is being implemented in a phased 
 
 ## Quick Reference: What's Working vs What's Not
 
-### ✅ Working Now (Phases 0-4)
-**Phase 0-1 (Foundation & Feature Extraction)**
-- Tier 1 feature extraction from database (50+ features)
-- Username suspicious pattern detection
-- Adult platform and short link detection (38 pattern types)
-- Telegram link detection
-- Database schema and models (4 core tables)
+### ✅ Fully Implemented and Working (Phases 0-4, 5.5)
 
-**Phase 2-3 (Scoring & Enrichment)**
-- Spam scoring engine with configurable weights
+**Phase 0 (Foundation)**
+- Database schema with 5 tables
+- Author activity tracking on post ingestion
+- Pattern detection for adult platforms, short links, Telegram
+
+**Phase 1 (Tier 1 Feature Extraction)**
+- 50+ features extracted from database
+- Username pattern analysis (214 lines)
+- Subreddit behavior metrics (HHI concentration)
+- Posting pattern analysis (entropy, burst detection)
+- Spam subreddit detection
+
+**Phase 2 (Scoring Engine)**
+- SpamScorer with 6 signal categories (616 lines)
+- Configurable weights and thresholds
 - Risk level classification (LOW/MEDIUM/HIGH/CRITICAL)
-- Circuit breaker and rate limiting infrastructure
-- Tier 2 feature fetching from Reddit API
-- API-based enrichment with graceful degradation
+- Confidence calculation based on data availability
+- SpamScorerWithTier2 for enhanced scoring
+- Batch scoring capabilities
+
+**Phase 3 (Tier 2 Enrichment)**
+- UserDataFetcher service (529 lines)
+- CircuitBreaker for API protection (231 lines)
+- PerMinuteRateLimiter with Redis (241 lines)
+- 15+ Reddit API-sourced features
+- Profile and comment scanning
+- Graceful degradation to Tier 1-only
 
 **Phase 4 (Trigger Integration)**
-- SpamDetectionConfig for per-subreddit settings
-- SpamActionHandler with shadow mode support
-- Integration with repost detection pipeline
-- Integration with summons handler
-- 4 scheduled tasks (daily/weekly batch jobs)
-- 5 admin API endpoints for management
-- Audit logging to database
+- SpamDetectionConfig dataclass (111 lines)
+- SpamActionHandler with shadow mode (345 lines)
+- Repost detection integration
+- Summons handler integration
+- 4 scheduled Celery Beat tasks
+- 5 admin API endpoints
+- Full audit trail
 
-**Phase 5.5 (Community Training)**
-- Moderator voting API endpoints
-- Consensus-based training label creation
-- Subscriber-weighted vote aggregation
+**Phase 5.5 (Moderator Voting)**
+- 4 voting API endpoints (354 lines)
+- ModeratorSpamVote database model
+- Subscriber-weighted consensus algorithm
+- Training label creation on consensus
+- Anti-abuse measures (100k+ subscriber requirement)
 
-### ❌ Not Implemented Yet
-- ML model training (Phase 6)
-- Automated training data collection (Phase 5)
+### ❌ Not Yet Implemented
 
-### ✅ Recently Completed
-- Phase 2: Spam Scoring Engine (Completed Jan 27)
-- Phase 4: Trigger Integration & Admin API (Completed Jan 27)
+**Phase 5 (Training Data Collection)**
+- Automated training data manager
+- Dataset export utilities
+- Label confidence tracking
+
+**Phase 6 (ML Model Training)**
+- Model training pipeline
+- A/B testing framework
+- Model performance tracking
+
+### 📊 System Statistics
+- **Total Code:** 5,160 lines across 14 files
+- **Celery Tasks:** 15 tasks
+- **API Endpoints:** 9 endpoints (5 admin + 4 voting)
+- **Database Tables:** 5 core tables
+- **Features Extracted:** 50+ Tier 1 + 15+ Tier 2
+- **Scoring Signals:** 6 primary + Tier 2 enhancements
 
 ---
 

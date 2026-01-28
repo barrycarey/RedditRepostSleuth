@@ -933,8 +933,10 @@ def score_and_flag_user(
         log.info('No scoring result for %s (insufficient data)', username)
         return None
 
-    log.debug('Scoring result for %s: score=%.3f, risk=%s',
-              username, result_dict['score'], result_dict['risk_level'])
+    reasons = result_dict.get('reasons', [])
+    log.debug('Scoring result for %s: score=%.3f, risk=%s, reasons=%s',
+              username, result_dict['score'], result_dict['risk_level'],
+              ', '.join(reasons) if reasons else 'none')
 
     # Update user_review if requested
     if update_user_review:
