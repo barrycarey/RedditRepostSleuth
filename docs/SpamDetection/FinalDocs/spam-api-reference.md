@@ -144,11 +144,12 @@ Get a queue of users pending moderator review.
 |-----------|------|---------|-----|-------------|
 | `min_score` | float | 0.5 | 1.0 | Minimum spam score to include |
 | `limit` | int | 20 | 100 | Maximum users to return |
+| `filter` | string | "my_subs" | - | Filter mode: `my_subs` (only users who posted in moderator's subreddits) or `all` (all pending users) |
 
 **Request Example:**
 
 ```http
-GET /api/spam/voting/queue?min_score=0.6&limit=25 HTTP/1.1
+GET /api/spam/voting/queue?min_score=0.6&limit=25&filter=my_subs HTTP/1.1
 Host: repostsleuth.example.com
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 User-Agent: MyClient/1.0
@@ -162,6 +163,7 @@ User-Agent: MyClient/1.0
     "name": "AskReddit",
     "subscribers": 45000000
   },
+  "filter": "my_subs",
   "users": [
     {
       "username": "suspicious_user_1",
@@ -199,6 +201,23 @@ User-Agent: MyClient/1.0
     }
   ],
   "total": 2
+}
+```
+
+**Response Example (200 OK - No Moderated Subreddits):**
+
+When `filter=my_subs` and the moderator has no subreddits with activity data:
+
+```json
+{
+  "qualifying_sub": {
+    "name": "AskReddit",
+    "subscribers": 45000000
+  },
+  "filter": "my_subs",
+  "users": [],
+  "total": 0,
+  "message": "No moderated subreddits found"
 }
 ```
 
@@ -1252,8 +1271,10 @@ Use these interfaces for frontend development and type safety.
 
 interface QueueResponse {
   qualifying_sub: QualifyingSub;
+  filter: "my_subs" | "all";
   users: SpamUserSummary[];
   total: number;
+  message?: string;  // Present when filter=my_subs and no moderated subs found
 }
 
 interface QualifyingSub {
@@ -1590,6 +1611,7 @@ const mockQueueResponse: QueueResponse = {
     name: "AskReddit",
     subscribers: 45000000
   },
+  filter: "my_subs",
   users: [
     mockQueueUser,
     {
@@ -1725,9 +1747,9 @@ const mockStatsResponse: StatsResponse = {
 ```typescript
 // Example mock service for development
 class MockSpamDetectionAPI {
-  async getQueue(minScore: number = 0.5, limit: number = 20): Promise<QueueResponse> {
+  async getQueue(minScore: number = 0.5, limit: number = 20, filter: "my_subs" | "all" = "my_subs"): Promise<QueueResponse> {
     return new Promise((resolve) => {
-      setTimeout(() => resolve(mockQueueResponse), 500);
+      setTimeout(() => resolve({ ...mockQueueResponse, filter }), 500);
     });
   }
 
