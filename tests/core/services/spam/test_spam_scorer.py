@@ -133,7 +133,7 @@ class TestSpamScorer(TestCase):
             'posts_per_day_avg': 2.0,
             'first_post_date': datetime.utcnow() - timedelta(days=30),
             'last_post_date': datetime.utcnow(),
-            'account_age_days': 30,
+            'tracked_span_days': 30,
             'nsfw_post_count': 0,
             'nsfw_post_ratio': 0.0,
             'summons_received': 0,
@@ -274,6 +274,48 @@ class TestSpamScorer(TestCase):
 
         # Should be capped at 0.30
         self.assertEqual(result.component_scores['karma_farming'], 0.30)
+
+    def test__score_user__easy_karma_concentrated(self):
+        """Test that concentrated easy karma sub posts trigger score."""
+        # User with 60% of posts in easy karma subs (above 50% threshold)
+        features = self._make_features(
+            total_posts_indexed=100,
+            easy_karma_sub_posts=60
+        )
+        result = self.scorer.score_user(features)
+
+        self.assertGreater(result.score, 0.0)
+        self.assertTrue(any('easy karma' in r.lower() for r in result.reasons))
+        # 60 posts * 0.02 = 1.2, capped at 0.15
+        self.assertEqual(result.component_scores['karma_farming'], 0.15)
+
+    def test__score_user__easy_karma_not_concentrated(self):
+        """Test that sparse easy karma sub posts don't trigger score."""
+        # User with only 30% of posts in easy karma subs (below 50% threshold)
+        features = self._make_features(
+            total_posts_indexed=100,
+            easy_karma_sub_posts=30
+        )
+        result = self.scorer.score_user(features)
+
+        # Should not trigger easy karma scoring
+        self.assertEqual(result.component_scores['karma_farming'], 0.0)
+        self.assertFalse(any('easy karma' in r.lower() for r in result.reasons))
+
+    def test__score_user__karma_farming_and_easy_karma_combined(self):
+        """Test that both karma farming and easy karma are scored together."""
+        features = self._make_features(
+            total_posts_indexed=100,
+            karma_farming_sub_posts=5,  # 5 * 0.05 = 0.25
+            easy_karma_sub_posts=60  # Above threshold, 60 * 0.02 = 1.2, capped at 0.15
+        )
+        result = self.scorer.score_user(features)
+
+        # Should have both components: 0.25 + 0.15 = 0.40, but karma_farm caps at 0.30
+        # Actually: karma_farm_score = 0.25, easy_karma_score = 0.15, total = 0.40
+        self.assertGreater(result.component_scores['karma_farming'], 0.35)
+        self.assertTrue(any('karma farming' in r.lower() for r in result.reasons))
+        self.assertTrue(any('easy karma' in r.lower() for r in result.reasons))
 
     def test__score_user__combined_signals(self):
         """Test that combined signals produce high score."""
@@ -471,7 +513,7 @@ class TestSpamScorerWithTier2(TestCase):
             'posts_per_day_avg': 2.0,
             'first_post_date': datetime.utcnow() - timedelta(days=30),
             'last_post_date': datetime.utcnow(),
-            'account_age_days': 30,
+            'tracked_span_days': 30,
             'nsfw_post_count': 0,
             'nsfw_post_ratio': 0.0,
             'summons_received': 0,
