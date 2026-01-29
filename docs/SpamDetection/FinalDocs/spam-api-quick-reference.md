@@ -50,6 +50,7 @@ Authorization: Bearer {token}
 - `filter` (string, def: "my_subs") - Filter mode:
   - `my_subs` - Only users who posted in moderator's subreddits (default)
   - `all` - All pending users regardless of subreddit
+- `exclude_suspended` (bool, def: true) - Exclude suspended Reddit accounts
 
 **Site Admin Access:** Site admins bypass the 100k+ subscriber requirement and always receive all users (`filter=all`).
 
