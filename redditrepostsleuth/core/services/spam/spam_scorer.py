@@ -91,6 +91,11 @@ class ScoringConfig:
     karma_farm_weight_per_post: float = 0.05
     karma_farm_weight_max: float = 0.30
 
+    # Easy karma subreddit weights
+    easy_karma_weight_per_post: float = 0.02
+    easy_karma_weight_max: float = 0.15
+    easy_karma_ratio_threshold: float = 0.50
+
     # Short link weight
     short_link_weight: float = 0.08
 
@@ -369,21 +374,30 @@ class SpamScorer:
         """Score based on karma farming subreddit participation."""
         cfg = self.config
         karma_posts = features.karma_farming_sub_posts
+        easy_posts = features.easy_karma_sub_posts
 
-        log.debug('Evaluating karma farming: karma_farm_posts=%d (weight_per_post=%.3f, max=%.3f)',
-                  karma_posts, cfg.karma_farm_weight_per_post, cfg.karma_farm_weight_max)
+        log.debug('Evaluating karma farming: karma_farm_posts=%d, easy_karma_posts=%d',
+                  karma_posts, easy_posts)
 
+        score = 0.0
+        reasons = []
+
+        # Full weight for explicit karma farm subs (FreeKarma4You etc)
         if karma_posts > 0:
-            # Scale score by number of karma farm posts, capped
-            score = min(
-                cfg.karma_farm_weight_max,
-                karma_posts * cfg.karma_farm_weight_per_post
-            )
-            return {
-                'score': score,
-                'reason': f"Karma farming subreddit posts: {karma_posts}"
-            }
+            karma_score = min(cfg.karma_farm_weight_max, karma_posts * cfg.karma_farm_weight_per_post)
+            score += karma_score
+            reasons.append(f"Karma farming subreddit posts: {karma_posts}")
 
+        # Lower weight for easy karma subs, only if concentrated
+        if easy_posts > 0 and features.total_posts_indexed > 0:
+            easy_ratio = easy_posts / features.total_posts_indexed
+            if easy_ratio > cfg.easy_karma_ratio_threshold:
+                easy_score = min(cfg.easy_karma_weight_max, easy_posts * cfg.easy_karma_weight_per_post)
+                score += easy_score
+                reasons.append(f"Concentrated in easy karma subs: {easy_posts} posts ({easy_ratio:.0%})")
+
+        if reasons:
+            return {'score': score, 'reason': '; '.join(reasons)}
         return {'score': 0.0, 'reason': None}
 
     def _score_supporting_signals(self, features: Tier1Features) -> dict:
@@ -611,6 +625,36 @@ class SpamScorerWithTier2:
             score += 0.15
             reasons.append("Telegram links for off-platform communication")
             log.debug('Signal: telegram links (+0.15)')
+
+        # Promotional links in posts (tiered by count)
+        if tier2.get('has_promotional_post_links'):
+            sources = tier2.get('profile_link_sources', {})
+            promo_post_count = len(sources.get('promotional_posts', []))
+            adult_post_count = len(sources.get('adult_posts', []))
+            telegram_post_count = len(sources.get('telegram_posts', []))
+            total_flagged_posts = promo_post_count + adult_post_count + telegram_post_count
+
+            if total_flagged_posts >= 10:
+                score += 0.18
+                reasons.append(f"Many promotional links in posts ({total_flagged_posts} flagged posts)")
+                log.debug('Signal: many promotional posts %d (+0.18)', total_flagged_posts)
+            elif total_flagged_posts >= 5:
+                score += 0.12
+                reasons.append(f"Moderate promotional links in posts ({total_flagged_posts} flagged posts)")
+                log.debug('Signal: moderate promotional posts %d (+0.12)', total_flagged_posts)
+            else:
+                score += 0.05
+                reasons.append("Some promotional links in posts")
+                log.debug('Signal: some promotional posts (+0.05)')
+
+        # Cross-channel correlation: promotional activity in BOTH profile/comments AND posts
+        has_profile_promo = tier2.get('has_adult_profile_links') or tier2.get('has_telegram_links')
+        has_post_promo = tier2.get('has_promotional_post_links')
+
+        if has_profile_promo and has_post_promo:
+            score += 0.15
+            reasons.append("Promotional activity in both profile and posts")
+            log.debug('Signal: cross-channel promotional activity (+0.15)')
 
         log.debug('Tier 2 signal scoring complete: total=%.3f, reasons=%d', score, len(reasons))
         return {'score': score, 'reasons': reasons}
