@@ -147,6 +147,7 @@ Get a queue of users pending moderator review.
 | `min_score` | float | 0.5 | 1.0 | Minimum spam score to include |
 | `limit` | int | 20 | 100 | Maximum users to return |
 | `filter` | string | "my_subs" | - | Filter mode: `my_subs` (only users who posted in moderator's subreddits) or `all` (all pending users). Site admins always get `all`. |
+| `exclude_suspended` | bool | true | - | Exclude accounts that Reddit has suspended. Set to `false` to include suspended accounts. |
 
 **Request Example:**
 
