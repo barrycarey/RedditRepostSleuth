@@ -140,15 +140,26 @@ class ModeratorSpamVoteRepo:
 
         result = []
         for user in users:
+            # Extract repost_ratio from feature_data if available
+            repost_ratio = 0.0
+            if user.feature_data:
+                repost_ratio = user.feature_data.get('repost_ratio', 0.0)
+
             result.append({
                 'username': user.username,
                 'spam_score': user.spam_score,
                 'spam_score_confidence': user.spam_score_confidence,
                 'total_posts_indexed': user.total_posts,
                 'nsfw_post_ratio': user.nsfw_post_ratio,
+                'adult_link_count': user.adult_link_count,
+                'short_link_count': user.short_link_count,
+                'repost_ratio': repost_ratio,
                 'account_age_days': user.account_age_days,
                 'avg_posts_per_day': user.avg_posts_per_day,
+                'computed_at': user.computed_at.isoformat() if user.computed_at else None,
+                'tier2_enriched_at': user.tier2_enriched_at.isoformat() if user.tier2_enriched_at else None,
                 'mod_vote_count': user.mod_vote_count or 0,
+                'mod_vote_total': user.mod_vote_total or 0,
                 'mod_vote_consensus': user.mod_vote_consensus,
             })
 
@@ -211,15 +222,26 @@ class ModeratorSpamVoteRepo:
 
         result = []
         for user in users:
+            # Extract repost_ratio from feature_data if available
+            repost_ratio = 0.0
+            if user.feature_data:
+                repost_ratio = user.feature_data.get('repost_ratio', 0.0)
+
             result.append({
                 'username': user.username,
                 'spam_score': user.spam_score,
                 'spam_score_confidence': user.spam_score_confidence,
                 'total_posts_indexed': user.total_posts,
                 'nsfw_post_ratio': user.nsfw_post_ratio,
+                'adult_link_count': user.adult_link_count,
+                'short_link_count': user.short_link_count,
+                'repost_ratio': repost_ratio,
                 'account_age_days': user.account_age_days,
                 'avg_posts_per_day': user.avg_posts_per_day,
+                'computed_at': user.computed_at.isoformat() if user.computed_at else None,
+                'tier2_enriched_at': user.tier2_enriched_at.isoformat() if user.tier2_enriched_at else None,
                 'mod_vote_count': user.mod_vote_count or 0,
+                'mod_vote_total': user.mod_vote_total or 0,
                 'mod_vote_consensus': user.mod_vote_consensus,
             })
 
