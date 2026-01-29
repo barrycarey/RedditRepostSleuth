@@ -236,10 +236,59 @@ def track_author_activity(self, post_id: str, author: str, subreddit: str,
             uow.commit()
             log.debug('Successfully tracked activity for author %s on post %s in r/%s',
                       author, post_id, subreddit)
+
+        # Queue user for spam scoring evaluation (non-blocking)
+        queue_user_for_scoring.delay(author)
+
     except Exception as e:
         log.warning('Failed to track author activity for post %s by %s: %s',
                     post_id, author, str(e), exc_info=True)
         raise
+
+
+@celery.task(bind=True, base=SpamDetectionTask, ignore_results=True, serializer='pickle',
+             autoretry_for=(Exception,), retry_kwargs={'max_retries': 3, 'countdown': 60})
+def queue_user_for_scoring(self, username: str) -> Optional[dict]:
+    """
+    Check if user should be scored and queue scoring if appropriate.
+
+    This task is called after every track_author_activity to ensure
+    all users are evaluated for spam scoring. It checks:
+    - Whether the user was recently scored (within cooldown period)
+    - Whether the user has enough posts for meaningful analysis
+
+    Args:
+        username: Reddit username to potentially score
+
+    Returns:
+        Dict with status ('skipped' or 'queued') and reason
+    """
+    if not username or username == '[deleted]':
+        log.debug('Skipping scoring queue for invalid username: %s', username)
+        return {'status': 'skipped', 'reason': 'invalid_username'}
+
+    # Get configurable thresholds
+    cooldown_days = self.config._get_int('spam_scoring_cooldown_days', 7)
+    min_posts = self.config._get_int('spam_min_posts_for_scoring', 5)
+
+    with self.uowm.start() as uow:
+        # Check if recently analyzed
+        if uow.spam_features.user_was_recently_analyzed(username, within_days=cooldown_days):
+            log.debug('User %s was recently scored (within %d days), skipping',
+                      username, cooldown_days)
+            return {'status': 'skipped', 'reason': 'recently_analyzed'}
+
+        # Check minimum post count
+        post_count = uow.author_activity.count_by_author(username)
+        if post_count < min_posts:
+            log.debug('User %s has %d posts, below minimum %d for scoring',
+                      username, post_count, min_posts)
+            return {'status': 'skipped', 'reason': 'insufficient_posts', 'post_count': post_count}
+
+    # User qualifies for scoring - queue the actual scoring task
+    log.info('Queueing spam scoring for user %s (%d posts)', username, post_count)
+    score_and_flag_user.delay(username, update_user_review=True)
+    return {'status': 'queued', 'post_count': post_count}
 
 
 @celery.task(bind=True, base=SpamDetectionTask, ignore_results=True, serializer='pickle',
