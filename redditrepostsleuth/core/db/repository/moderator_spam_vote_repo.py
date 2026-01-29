@@ -126,7 +126,10 @@ class ModeratorSpamVoteRepo:
         ).filter(
             UserSpamFeatures.spam_score >= min_score,
             # Exclude users with consensus already (mod_vote_consensus is null)
-            UserSpamFeatures.mod_vote_consensus.is_(None)
+            UserSpamFeatures.mod_vote_consensus.is_(None),
+            # Only include users with successful tier 2 enrichment
+            UserSpamFeatures.tier2_enriched_at.isnot(None),
+            UserSpamFeatures.tier2_enrichment_failed.is_(False)
         ).filter(
             # Either no votes or fewer than max_votes
             (subquery.c.vote_count.is_(None)) |
@@ -140,12 +143,13 @@ class ModeratorSpamVoteRepo:
             result.append({
                 'username': user.username,
                 'spam_score': user.spam_score,
-                'risk_level': self._get_risk_level(user.spam_score),
-                'total_posts': user.total_posts,
-                'nsfw_ratio': user.nsfw_post_ratio,
-                'adult_link_count': user.adult_link_count,
-                'computed_at': user.computed_at.isoformat() if user.computed_at else None,
-                'existing_votes': user.mod_vote_count or 0,
+                'spam_score_confidence': user.spam_score_confidence,
+                'total_posts_indexed': user.total_posts,
+                'nsfw_post_ratio': user.nsfw_post_ratio,
+                'account_age_days': user.account_age_days,
+                'avg_posts_per_day': user.avg_posts_per_day,
+                'mod_vote_count': user.mod_vote_count or 0,
+                'mod_vote_consensus': user.mod_vote_consensus,
             })
 
         return result
@@ -194,7 +198,10 @@ class ModeratorSpamVoteRepo:
             UserSpamFeatures.username == vote_subquery.c.target_username
         ).filter(
             UserSpamFeatures.spam_score >= min_score,
-            UserSpamFeatures.mod_vote_consensus.is_(None)
+            UserSpamFeatures.mod_vote_consensus.is_(None),
+            # Only include users with successful tier 2 enrichment
+            UserSpamFeatures.tier2_enriched_at.isnot(None),
+            UserSpamFeatures.tier2_enrichment_failed.is_(False)
         ).filter(
             (vote_subquery.c.vote_count.is_(None)) |
             (vote_subquery.c.vote_count < max_votes)
@@ -207,12 +214,13 @@ class ModeratorSpamVoteRepo:
             result.append({
                 'username': user.username,
                 'spam_score': user.spam_score,
-                'risk_level': self._get_risk_level(user.spam_score),
-                'total_posts': user.total_posts,
-                'nsfw_ratio': user.nsfw_post_ratio,
-                'adult_link_count': user.adult_link_count,
-                'computed_at': user.computed_at.isoformat() if user.computed_at else None,
-                'existing_votes': user.mod_vote_count or 0,
+                'spam_score_confidence': user.spam_score_confidence,
+                'total_posts_indexed': user.total_posts,
+                'nsfw_post_ratio': user.nsfw_post_ratio,
+                'account_age_days': user.account_age_days,
+                'avg_posts_per_day': user.avg_posts_per_day,
+                'mod_vote_count': user.mod_vote_count or 0,
+                'mod_vote_consensus': user.mod_vote_consensus,
             })
 
         return result
