@@ -101,7 +101,8 @@ class ModeratorSpamVoteRepo:
         self,
         min_score: float = 0.5,
         max_votes: int = 4,
-        limit: int = 50
+        limit: int = 50,
+        exclude_suspended: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Get users with high spam scores that need moderator review.
@@ -110,6 +111,7 @@ class ModeratorSpamVoteRepo:
             min_score: Minimum spam score to include
             max_votes: Maximum existing votes (users with consensus excluded)
             limit: Maximum results
+            exclude_suspended: Whether to exclude suspended accounts (default True)
 
         Returns:
             List of dicts with user info for review queue
@@ -120,7 +122,7 @@ class ModeratorSpamVoteRepo:
             func.count(ModeratorSpamVote.id).label('vote_count')
         ).group_by(ModeratorSpamVote.target_username).subquery()
 
-        users = self.db_session.query(UserSpamFeatures).outerjoin(
+        query = self.db_session.query(UserSpamFeatures).outerjoin(
             subquery,
             UserSpamFeatures.username == subquery.c.target_username
         ).filter(
@@ -134,7 +136,12 @@ class ModeratorSpamVoteRepo:
             # Either no votes or fewer than max_votes
             (subquery.c.vote_count.is_(None)) |
             (subquery.c.vote_count < max_votes)
-        ).order_by(
+        )
+
+        if exclude_suspended:
+            query = query.filter(UserSpamFeatures.account_suspended.is_(False))
+
+        users = query.order_by(
             UserSpamFeatures.spam_score.desc()
         ).limit(limit).all()
 
@@ -170,7 +177,8 @@ class ModeratorSpamVoteRepo:
         subreddits: List[str],
         min_score: float = 0.5,
         max_votes: int = 4,
-        limit: int = 50
+        limit: int = 50,
+        exclude_suspended: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Get users needing review who posted in specified subreddits.
@@ -180,6 +188,7 @@ class ModeratorSpamVoteRepo:
             min_score: Minimum spam score to include
             max_votes: Maximum existing votes (users with consensus excluded)
             limit: Maximum results
+            exclude_suspended: Whether to exclude suspended accounts (default True)
 
         Returns:
             List of dicts with user info for review queue
@@ -201,7 +210,7 @@ class ModeratorSpamVoteRepo:
         ).subquery()
 
         # Main query joining spam features with activity filter
-        users = self.db_session.query(UserSpamFeatures).join(
+        query = self.db_session.query(UserSpamFeatures).join(
             activity_subquery,
             UserSpamFeatures.username == activity_subquery.c.author
         ).outerjoin(
@@ -216,7 +225,12 @@ class ModeratorSpamVoteRepo:
         ).filter(
             (vote_subquery.c.vote_count.is_(None)) |
             (vote_subquery.c.vote_count < max_votes)
-        ).order_by(
+        )
+
+        if exclude_suspended:
+            query = query.filter(UserSpamFeatures.account_suspended.is_(False))
+
+        users = query.order_by(
             UserSpamFeatures.spam_score.desc()
         ).limit(limit).all()
 

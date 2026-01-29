@@ -147,6 +147,7 @@ class SpamVotingEndpoint:
             limit (int): Max users to return (default: 20, max: 100)
             filter (str): Filter mode - 'my_subs' (default) or 'all'
                           Site admins always get 'all' regardless of parameter.
+            exclude_suspended (bool): Exclude suspended accounts (default: true)
         """
         auth = self._get_auth_context(req)
         moderator_username = auth['user_data']['name']
@@ -154,6 +155,13 @@ class SpamVotingEndpoint:
         min_score = req.get_param_as_float('min_score') or 0.5
         limit = req.get_param_as_int('limit') or 20
         limit = min(limit, 100)  # Cap at 100
+
+        # Parse exclude_suspended param (default True)
+        exclude_suspended_param = req.get_param('exclude_suspended')
+        if exclude_suspended_param is None:
+            exclude_suspended = True
+        else:
+            exclude_suspended = exclude_suspended_param.lower() not in ('false', '0', 'no')
 
         # Filter mode: 'my_subs' (default) or 'all'
         # Site admins always see all users
@@ -188,14 +196,16 @@ class SpamVotingEndpoint:
                     subreddits=moderated_subs,
                     min_score=min_score,
                     max_votes=4,
-                    limit=limit + 10  # Fetch extra in case some are filtered
+                    limit=limit + 10,  # Fetch extra in case some are filtered
+                    exclude_suspended=exclude_suspended
                 )
             else:
                 # 'all' mode - existing behavior
                 users = uow.moderator_spam_vote.get_users_needing_review(
                     min_score=min_score,
                     max_votes=4,
-                    limit=limit + 10  # Fetch extra in case some are filtered
+                    limit=limit + 10,  # Fetch extra in case some are filtered
+                    exclude_suspended=exclude_suspended
                 )
 
             # Filter out users this moderator already voted on
