@@ -61,6 +61,56 @@ ADULT_PLATFORM_PATTERNS = [
 _adult_pattern = re.compile('|'.join(ADULT_PLATFORM_PATTERNS), re.IGNORECASE)
 
 
+# Map patterns to platform names for detection
+ADULT_PLATFORM_NAMES = {
+    r'onlyfans\.com': 'onlyfans',
+    r'fansly\.com': 'fansly',
+    r'fancentro\.com': 'fancentro',
+    r'manyvids\.com': 'manyvids',
+    r'pornhub\.com': 'pornhub',
+    r'xvideos\.com': 'xvideos',
+    r'chaturbate\.com': 'chaturbate',
+    r'myfreecams\.com': 'myfreecams',
+    r'stripchat\.com': 'stripchat',
+    r'cam4\.com': 'cam4',
+    r'bongacams\.com': 'bongacams',
+    r'livejasmin\.com': 'livejasmin',
+    r'streamate\.com': 'streamate',
+    r'camsoda\.com': 'camsoda',
+    r'loyalfans\.com': 'loyalfans',
+    r'admireme\.vip': 'admireme',
+    r'frisk\.chat': 'frisk',
+}
+
+
+# Promotional platform patterns (link shorteners, e-commerce, monetization)
+PROMOTIONAL_PLATFORM_PATTERNS = [
+    # Link aggregators/shorteners
+    r'bit\.ly/',
+    r'tinyurl\.com/',
+    r'linktr\.ee/',
+    r'beacons\.ai/',
+    r'allmylinks\.com/',
+    r'linkin\.bio/',
+    # E-commerce/self-promotion
+    r'etsy\.com/shop/',
+    r'redbubble\.com/',
+    r'gumroad\.com/',
+    r'ko-fi\.com/',
+    r'buymeacoffee\.com/',
+    r'patreon\.com/',
+    r'throne\.com/',
+    # Off-platform messaging
+    r'discord\.gg/',
+    r'discord\.com/invite/',
+    # Monetization/tips
+    r'cash\.app/',
+    r'paypal\.me/',
+    r'venmo\.com/',
+]
+_promotional_pattern = re.compile('|'.join(PROMOTIONAL_PLATFORM_PATTERNS), re.IGNORECASE)
+
+
 def detect_telegram_link(text: Optional[str]) -> bool:
     """Check if text contains a Telegram link."""
     if not text:
@@ -73,6 +123,27 @@ def detect_adult_platform_link(text: Optional[str]) -> bool:
     if not text:
         return False
     return bool(_adult_pattern.search(text))
+
+
+def detect_adult_platform_names(text: Optional[str]) -> List[str]:
+    """Detect which adult platforms are linked in text.
+
+    Returns list of unique platform names found (e.g., ['onlyfans', 'fansly'])
+    """
+    if not text:
+        return []
+    found = []
+    for pattern, name in ADULT_PLATFORM_NAMES.items():
+        if re.search(pattern, text, re.IGNORECASE) and name not in found:
+            found.append(name)
+    return found
+
+
+def detect_promotional_link(text: Optional[str]) -> bool:
+    """Check if text contains a promotional platform link."""
+    if not text:
+        return False
+    return bool(_promotional_pattern.search(text))
 
 
 class UserDataFetcher:
@@ -279,7 +350,7 @@ class UserDataFetcher:
             username: Reddit username to scan
 
         Returns:
-            Dict with 'has_adult_links', 'has_telegram_links', 'sources'
+            Dict with 'has_adult_links', 'has_telegram_links', 'sources', 'detected_platforms'
         """
         self._enforce_rate_limit()
 
@@ -287,6 +358,7 @@ class UserDataFetcher:
             'has_adult_links': False,
             'has_telegram_links': False,
             'sources': {},
+            'detected_platforms': [],
         }
 
         try:
@@ -300,6 +372,11 @@ class UserDataFetcher:
                     if detect_adult_platform_link(public_description):
                         result['has_adult_links'] = True
                         result['sources'].setdefault('profile', []).append('public_description')
+                        # Extract platform names
+                        platforms = detect_adult_platform_names(public_description)
+                        for p in platforms:
+                            if p not in result['detected_platforms']:
+                                result['detected_platforms'].append(p)
                     if detect_telegram_link(public_description):
                         result['has_telegram_links'] = True
                         result['sources'].setdefault('telegram', []).append('public_description')
@@ -309,13 +386,18 @@ class UserDataFetcher:
             # Check recent comments (limited to 10 to conserve API calls)
             self._enforce_rate_limit()
             try:
-                for i, comment in enumerate(redditor.comments.new(limit=10)):
+                for i, comment in enumerate(redditor.comments.new(limit=100)):
                     if i >= 10:
                         break
                     body = getattr(comment, 'body', '')
                     if detect_adult_platform_link(body):
                         result['has_adult_links'] = True
                         result['sources'].setdefault('comments', []).append(comment.id)
+                        # Extract platform names
+                        platforms = detect_adult_platform_names(body)
+                        for p in platforms:
+                            if p not in result['detected_platforms']:
+                                result['detected_platforms'].append(p)
                     if detect_telegram_link(body):
                         result['has_telegram_links'] = True
                         result['sources'].setdefault('telegram_comments', []).append(comment.id)
@@ -338,6 +420,84 @@ class UserDataFetcher:
             self._consecutive_errors += 1
             self.circuit_breaker.record_failure(e)
             log.error(f"Error scanning profile for {username}: {e}")
+
+        return result
+
+    def scan_user_posts(self, username: str, limit: int = 100) -> dict:
+        """
+        Scan user's recent posts for adult/Telegram/promotional links.
+
+        Scans post title, selftext, and url for each submission.
+
+        Args:
+            username: Reddit username to scan
+            limit: Maximum number of posts to scan (default 100, PRAW max)
+
+        Returns:
+            Dict with 'has_adult_links', 'has_telegram_links',
+            'has_promotional_links', 'sources', 'detected_platforms'
+        """
+        self._enforce_rate_limit()
+
+        result = {
+            'has_adult_links': False,
+            'has_telegram_links': False,
+            'has_promotional_links': False,
+            'sources': {},
+            'detected_platforms': [],
+        }
+
+        try:
+            redditor = self.reddit.redditor(username)
+
+            # Scan recent posts (submissions)
+            for submission in redditor.submissions.new(limit=limit):
+                post_id = submission.id
+
+                # Combine title, selftext, and url for scanning
+                texts_to_scan = [
+                    getattr(submission, 'title', '') or '',
+                    getattr(submission, 'selftext', '') or '',
+                    getattr(submission, 'url', '') or '',
+                ]
+                combined_text = ' '.join(texts_to_scan)
+
+                # Check for adult links
+                if detect_adult_platform_link(combined_text):
+                    result['has_adult_links'] = True
+                    result['sources'].setdefault('adult_posts', []).append(post_id)
+                    # Extract platform names
+                    platforms = detect_adult_platform_names(combined_text)
+                    for p in platforms:
+                        if p not in result['detected_platforms']:
+                            result['detected_platforms'].append(p)
+
+                # Check for Telegram links
+                if detect_telegram_link(combined_text):
+                    result['has_telegram_links'] = True
+                    result['sources'].setdefault('telegram_posts', []).append(post_id)
+
+                # Check for promotional links
+                if detect_promotional_link(combined_text):
+                    result['has_promotional_links'] = True
+                    result['sources'].setdefault('promotional_posts', []).append(post_id)
+
+            self._consecutive_errors = 0
+            self.circuit_breaker.record_success()
+
+        except (NotFound, Forbidden):
+            # User suspended/deleted
+            log.debug(f"User {username} not accessible for post scan")
+
+        except TooManyRequests as e:
+            self._consecutive_errors += 1
+            self.circuit_breaker.record_failure(e)
+            raise RateLimitExceeded(retry_after=getattr(e, 'retry_after', 60))
+
+        except Exception as e:
+            self._consecutive_errors += 1
+            self.circuit_breaker.record_failure(e)
+            log.error(f"Error scanning posts for {username}: {e}")
 
         return result
 
@@ -379,13 +539,14 @@ class UserDataFetcher:
             log.error(f"Error checking suspension for {username}: {e}")
             raise
 
-    def fetch_and_enrich(self, username: str, scan_profile: bool = False) -> Optional[Tier2Features]:
+    def fetch_and_enrich(self, username: str, scan_profile: bool = False, scan_posts: bool = False) -> Optional[Tier2Features]:
         """
-        Complete Tier 2 enrichment: fetch user data and optionally scan profile.
+        Complete Tier 2 enrichment: fetch user data and optionally scan profile/posts.
 
         Args:
             username: Reddit username
             scan_profile: Whether to scan profile for adult/Telegram links
+            scan_posts: Whether to scan posts for adult/Telegram/promotional links
 
         Returns:
             Tier2Features with all available data, or None on failure
@@ -396,7 +557,7 @@ class UserDataFetcher:
         if not features:
             return None
 
-        # If user is suspended, no need to scan profile
+        # If user is suspended, no need to scan profile or posts
         if features.account_suspended:
             return features
 
@@ -407,9 +568,45 @@ class UserDataFetcher:
                 features.has_adult_profile_links = profile_scan['has_adult_links']
                 features.has_telegram_links = profile_scan['has_telegram_links']
                 features.profile_link_sources = profile_scan['sources']
+                # Collect detected platforms from profile scan
+                for p in profile_scan.get('detected_platforms', []):
+                    if p not in features.detected_platforms:
+                        features.detected_platforms.append(p)
             except RateLimitExceeded:
                 # Don't fail the whole enrichment, just skip profile scan
                 log.warning(f"Rate limited during profile scan for {username}, skipping")
+
+        # Optionally scan posts for links
+        if scan_posts:
+            try:
+                post_scan = self.scan_user_posts(username)
+
+                # Merge adult links from posts (OR with profile results)
+                if post_scan['has_adult_links']:
+                    features.has_adult_profile_links = True
+
+                # Merge telegram links from posts (OR with profile results)
+                if post_scan['has_telegram_links']:
+                    features.has_telegram_links = True
+
+                # Promotional links from posts (new field)
+                features.has_promotional_post_links = post_scan['has_promotional_links']
+
+                # Merge post sources into profile_link_sources
+                if not features.profile_link_sources:
+                    features.profile_link_sources = {}
+
+                for key, value in post_scan['sources'].items():
+                    features.profile_link_sources[key] = value
+
+                # Merge detected platforms from post scan
+                for p in post_scan.get('detected_platforms', []):
+                    if p not in features.detected_platforms:
+                        features.detected_platforms.append(p)
+
+            except RateLimitExceeded:
+                # Don't fail the whole enrichment, just skip post scan
+                log.warning(f"Rate limited during post scan for {username}, skipping")
 
         return features
 
@@ -521,6 +718,7 @@ class CachedUserDataFetcher(UserDataFetcher):
                             has_adult_profile_links=cached.has_adult_profile_links or False,
                             has_telegram_links=cached.has_telegram_links or False,
                             profile_link_sources=cached.profile_link_sources or {},
+                            has_promotional_post_links=cached.has_promotional_post_links or False,
                             fetched_at=cached.tier2_enriched_at,
                             fetch_success=True,
                         )
