@@ -133,7 +133,9 @@ class SpamFeaturesRepo:
         account_suspended: bool = None,
         has_adult_profile_links: bool = None,
         has_telegram_links: bool = None,
-        profile_link_sources: dict = None
+        profile_link_sources: dict = None,
+        has_promotional_post_links: bool = None,
+        detected_platforms: list = None
     ) -> Optional[UserSpamFeatures]:
         """
         Update Tier 2 features for a user.
@@ -173,6 +175,17 @@ class SpamFeaturesRepo:
             features.has_telegram_links = has_telegram_links
         if profile_link_sources is not None:
             features.profile_link_sources = profile_link_sources
+        if has_promotional_post_links is not None:
+            features.has_promotional_post_links = has_promotional_post_links
+
+        # Merge detected_platforms into feature_data
+        if detected_platforms:
+            if features.feature_data is None:
+                features.feature_data = {}
+            # Merge with existing platforms (in case of re-enrichment)
+            existing = features.feature_data.get('detected_platforms', [])
+            merged = list(set(existing + detected_platforms))
+            features.feature_data = {**features.feature_data, 'detected_platforms': merged}
 
         features.tier2_enriched_at = datetime.utcnow()
         features.tier2_enrichment_failed = False

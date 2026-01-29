@@ -498,7 +498,8 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
                 has_adult_profile_links=tier2_features.has_adult_profile_links,
                 has_telegram_links=tier2_features.has_telegram_links,
                 profile_link_sources=tier2_features.profile_link_sources,
-                has_promotional_post_links=tier2_features.has_promotional_post_links
+                has_promotional_post_links=tier2_features.has_promotional_post_links,
+                detected_platforms=tier2_features.detected_platforms
             )
             uow.commit()
 

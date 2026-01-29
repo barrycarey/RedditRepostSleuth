@@ -34,6 +34,12 @@ class Tier2Features:
     has_telegram_links: bool = False
     profile_link_sources: Dict[str, List[str]] = field(default_factory=dict)
 
+    # Post scanning results (promotional links like linktree, discord, patreon)
+    has_promotional_post_links: bool = False
+
+    # Detected adult platform names (e.g., ['onlyfans', 'fansly'])
+    detected_platforms: List[str] = field(default_factory=list)
+
     # Metadata
     fetched_at: Optional[datetime] = None
     fetch_success: bool = True
@@ -55,6 +61,8 @@ class Tier2Features:
             'has_adult_profile_links': self.has_adult_profile_links,
             'has_telegram_links': self.has_telegram_links,
             'profile_link_sources': self.profile_link_sources,
+            'has_promotional_post_links': self.has_promotional_post_links,
+            'detected_platforms': self.detected_platforms,
             'fetched_at': self.fetched_at.isoformat() if self.fetched_at else None,
             'fetch_success': self.fetch_success,
             'error_message': self.error_message,
@@ -81,6 +89,8 @@ class Tier2Features:
             has_adult_profile_links=data.get('has_adult_profile_links', False),
             has_telegram_links=data.get('has_telegram_links', False),
             profile_link_sources=data.get('profile_link_sources', {}),
+            has_promotional_post_links=data.get('has_promotional_post_links', False),
+            detected_platforms=data.get('detected_platforms', []),
             fetched_at=fetched_at,
             fetch_success=data.get('fetch_success', True),
             error_message=data.get('error_message'),
@@ -123,6 +133,7 @@ class Tier2Features:
             not self.has_verified_email,
             self.has_telegram_links,
             self.has_adult_profile_links,
+            self.has_promotional_post_links,
         ]
         # Account is suspicious if 3+ indicators are true
         return sum(suspicious_indicators) >= 3
@@ -154,5 +165,8 @@ class Tier2Features:
 
         if self.has_adult_profile_links:
             reasons.append("Has adult platform links in profile")
+
+        if self.has_promotional_post_links:
+            reasons.append("Has promotional links in posts")
 
         return reasons
