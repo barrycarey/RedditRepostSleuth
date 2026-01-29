@@ -942,12 +942,15 @@ class UserSpamFeatures(Base):
         Return filtered dictionary representation for moderators.
 
         Excludes sensitive internal fields:
-        - feature_data (internal scoring data)
         - profile_link_sources (detailed link info)
         - tier2_failure_reason (internal error details)
         - mod_vote_* (voting aggregates are admin-only)
+        - username_pattern_matches (could help gaming detection)
+
+        Includes selected feature_data fields to help moderators make
+        informed voting decisions on spam users.
         """
-        return {
+        result = {
             'username': self.username,
             'spam_score': self.spam_score,
             'spam_score_confidence': self.spam_score_confidence,
@@ -978,6 +981,32 @@ class UserSpamFeatures(Base):
             'tier2_enriched_at': self.tier2_enriched_at.isoformat() if self.tier2_enriched_at else None,
             'tier2_enrichment_failed': self.tier2_enrichment_failed,
         }
+
+        # Add parsed feature_data fields if available
+        if self.feature_data:
+            fd = self.feature_data  # Already a dict from JSON column
+            result.update({
+                # Repost signals
+                'total_reposts_detected': fd.get('total_reposts_detected', 0),
+                'repost_ratio': fd.get('repost_ratio', 0.0),
+                # Platform details
+                'detected_platforms': fd.get('detected_platforms', []),
+                # Posting behavior
+                'subreddit_concentration_hhi': fd.get('subreddit_concentration_hhi', 0.0),
+                'karma_farming_sub_posts': fd.get('karma_farming_sub_posts', 0),
+                'easy_karma_sub_posts': fd.get('easy_karma_sub_posts', 0),
+                'posting_entropy': fd.get('posting_entropy', 0.0),
+                'burst_posting_detected': fd.get('burst_posting_detected', False),
+                'avg_time_between_posts_minutes': fd.get('avg_time_between_posts_minutes', 0.0),
+                # Username analysis (no pattern details)
+                'username_suspicious_pattern': fd.get('username_suspicious_pattern', False),
+                'username_pattern_confidence': fd.get('username_pattern_confidence', 0.0),
+                # Timeline
+                'first_post_date': fd.get('first_post_date'),
+                'last_post_date': fd.get('last_post_date'),
+            })
+
+        return result
 
 
 class SpamSubredditList(Base):
