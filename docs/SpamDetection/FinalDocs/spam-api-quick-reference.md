@@ -212,13 +212,17 @@ Authorization: Bearer {token}
     "nsfw_post_ratio": 0.78,
     "account_age_days": 156,
     "has_adult_profile_links": true,
-    "tier2_enriched_at": "2026-01-27T16:45:00Z"
+    "tier2_enriched_at": "2026-01-27T16:45:00Z",
+    "total_reposts_detected": 98,
+    "repost_ratio": 0.34,
+    "detected_platforms": ["onlyfans"],
+    "burst_posting_detected": true,
+    "username_suspicious_pattern": true
   },
   "user_review": {
     "spam_score": 0.82,
     "risk_level": "high"
-  },
-  "activity_stats": { ... }
+  }
 }
 ```
 
@@ -228,12 +232,11 @@ Authorization: Bearer {token}
   "username": "unknown_user",
   "scan_complete": false,
   "spam_features": null,
-  "user_review": null,
-  "activity_stats": null
+  "user_review": null
 }
 ```
 
-**Note:** Excludes `feature_data`, `profile_link_sources`, `tier2_failure_reason`, and `mod_vote_*` fields.
+**Note:** Includes selected `feature_data` fields (repost signals, platform detection, posting behavior including `karma_farming_sub_posts` and `easy_karma_sub_posts`, username analysis). Excludes `profile_link_sources`, `tier2_failure_reason`, `mod_vote_*`, and `username_pattern_matches`.
 
 **Errors:** 401 (Invalid Token), 403 (Not Qualified - need 10k+ sub)
 
@@ -382,9 +385,11 @@ Authorization: Bearer {admin_token}
     }
   ],
   "activity_stats": {
-    "total_posts_indexed": 287,
-    "repost_ratio": 0.34,
-    "nsfw_posts_percentage": 78
+    "total_posts": 287,
+    "nsfw_count": 224,
+    "adult_link_count": 15,
+    "short_link_count": 8,
+    "unique_subreddits": 12
   }
 }
 ```
@@ -633,4 +638,4 @@ async function submitVote(
 
 **For complete documentation with all examples and details, see: `spam-api-reference.md`**
 
-Last Updated: January 28, 2026
+Last Updated: January 29, 2026

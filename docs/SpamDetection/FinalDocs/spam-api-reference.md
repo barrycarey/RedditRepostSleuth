@@ -1,7 +1,7 @@
 # Spam Detection API Reference
 
 **Status:** Production Ready (Phase 5.5)
-**Last Updated:** January 28, 2026
+**Last Updated:** January 29, 2026
 
 This document provides complete API reference for the Repost Sleuth Spam Detection System. It includes two primary endpoint groups: moderator voting endpoints for community-assisted training and admin endpoints for system management.
 
@@ -618,7 +618,20 @@ User-Agent: MyClient/1.0
     "has_telegram_links": true,
     "has_promotional_post_links": true,
     "tier2_enriched_at": "2026-01-27T16:45:00Z",
-    "tier2_enrichment_failed": false
+    "tier2_enrichment_failed": false,
+    "total_reposts_detected": 98,
+    "repost_ratio": 0.34,
+    "detected_platforms": ["onlyfans", "fansly"],
+    "subreddit_concentration_hhi": 0.42,
+    "karma_farming_sub_posts": 12,
+    "easy_karma_sub_posts": 8,
+    "posting_entropy": 0.76,
+    "burst_posting_detected": true,
+    "avg_time_between_posts_minutes": 45.2,
+    "username_suspicious_pattern": true,
+    "username_pattern_confidence": 0.85,
+    "first_post_date": "2025-08-15T10:00:00Z",
+    "last_post_date": "2026-01-27T20:15:00Z"
   },
   "user_review": {
     "username": "suspicious_user_1",
@@ -626,15 +639,6 @@ User-Agent: MyClient/1.0
     "spam_score_confidence": 0.92,
     "spam_score_updated_at": "2026-01-27T14:32:00Z",
     "risk_level": "high"
-  },
-  "activity_stats": {
-    "total_posts_indexed": 287,
-    "repost_count": 98,
-    "repost_ratio": 0.34,
-    "first_post_date": "2025-08-15T10:00:00Z",
-    "last_post_date": "2026-01-27T20:15:00Z",
-    "most_active_subreddit": "nsfw",
-    "nsfw_posts_percentage": 78
   }
 }
 ```
@@ -646,18 +650,26 @@ User-Agent: MyClient/1.0
   "username": "unknown_user",
   "scan_complete": false,
   "spam_features": null,
-  "user_review": null,
-  "activity_stats": null
+  "user_review": null
 }
 ```
+
+**Fields Exposed from `feature_data`:**
+
+The `spam_features` object now includes selected fields parsed from the internal `feature_data` to help moderators make informed voting decisions:
+- `total_reposts_detected`, `repost_ratio` - Repost detection signals
+- `detected_platforms` - List of adult platforms found (e.g., ["onlyfans", "fansly"])
+- `subreddit_concentration_hhi`, `karma_farming_sub_posts`, `easy_karma_sub_posts`, `posting_entropy`, `burst_posting_detected`, `avg_time_between_posts_minutes` - Posting behavior metrics
+- `username_suspicious_pattern`, `username_pattern_confidence` - Username analysis (pattern details excluded)
+- `first_post_date`, `last_post_date` - Activity timeline
 
 **Fields Excluded from Moderator Response:**
 
 The `spam_features` object excludes sensitive internal fields that are only available to admins:
-- `feature_data` - Internal scoring calculations
 - `profile_link_sources` - Detailed link breakdown
 - `tier2_failure_reason` - Internal error details
 - `mod_vote_total`, `mod_vote_count`, `mod_vote_weighted`, `mod_vote_updated_at`, `mod_vote_consensus` - Voting aggregates
+- `username_pattern_matches` - Specific pattern matches (could help gaming detection)
 
 **Error Responses:**
 
@@ -1028,13 +1040,11 @@ User-Agent: AdminClient/1.0
     }
   ],
   "activity_stats": {
-    "total_posts_indexed": 287,
-    "repost_count": 98,
-    "repost_ratio": 0.34,
-    "first_post_date": "2025-08-15T10:00:00Z",
-    "last_post_date": "2026-01-27T20:15:00Z",
-    "most_active_subreddit": "nsfw",
-    "nsfw_posts_percentage": 78
+    "total_posts": 287,
+    "nsfw_count": 224,
+    "adult_link_count": 15,
+    "short_link_count": 8,
+    "unique_subreddits": 12
   }
 }
 ```
@@ -1386,7 +1396,6 @@ interface ModUserLookupResponse {
   scan_complete: boolean;
   spam_features: ModeratorSpamFeatures | null;
   user_review: ModeratorUserReview | null;
-  activity_stats: ActivityStats | null;
 }
 
 interface ModTriggerScanResponse {
@@ -1430,6 +1439,21 @@ interface ModeratorSpamFeatures {
   // Enrichment Metadata (excludes tier2_failure_reason)
   tier2_enriched_at: string | null;
   tier2_enrichment_failed: boolean;
+
+  // Parsed feature_data fields (when available)
+  total_reposts_detected?: number;
+  repost_ratio?: number;
+  detected_platforms?: string[];
+  subreddit_concentration_hhi?: number;
+  karma_farming_sub_posts?: number;
+  easy_karma_sub_posts?: number;
+  posting_entropy?: number;
+  burst_posting_detected?: boolean;
+  avg_time_between_posts_minutes?: number;
+  username_suspicious_pattern?: boolean;
+  username_pattern_confidence?: number;
+  first_post_date?: string | null;  // ISO 8601 timestamp
+  last_post_date?: string | null;   // ISO 8601 timestamp
 }
 
 interface ModeratorUserReview {
@@ -1536,13 +1560,11 @@ interface TrainingLabel {
 }
 
 interface ActivityStats {
-  total_posts_indexed: number;
-  repost_count: number;
-  repost_ratio: number;
-  first_post_date: string;  // ISO 8601 timestamp
-  last_post_date: string;   // ISO 8601 timestamp
-  most_active_subreddit: string;
-  nsfw_posts_percentage: number;
+  total_posts: number;
+  nsfw_count: number;
+  adult_link_count: number;
+  short_link_count: number;
+  unique_subreddits: number;
 }
 
 interface HighRiskResponse {
@@ -1919,6 +1941,6 @@ async function handleVoteError(error: any) {
 ---
 
 **Document Version:** 1.0
-**Last Updated:** January 28, 2026
+**Last Updated:** January 29, 2026
 **Author:** Documentation Engineer
 **Status:** Production Ready
