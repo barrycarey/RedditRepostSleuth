@@ -995,6 +995,7 @@ class UserSpamFeatures(Base):
                 'subreddit_concentration_hhi': fd.get('subreddit_concentration_hhi', 0.0),
                 'karma_farming_sub_posts': fd.get('karma_farming_sub_posts', 0),
                 'easy_karma_sub_posts': fd.get('easy_karma_sub_posts', 0),
+                'subreddit_distribution': fd.get('subreddit_distribution', {}),
                 'posting_entropy': fd.get('posting_entropy', 0.0),
                 'burst_posting_detected': fd.get('burst_posting_detected', False),
                 'avg_time_between_posts_minutes': fd.get('avg_time_between_posts_minutes', 0.0),

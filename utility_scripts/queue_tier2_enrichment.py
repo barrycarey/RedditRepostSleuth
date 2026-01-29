@@ -24,6 +24,12 @@ Usage:
 
     # Include users where previous enrichment failed (retry failures)
     python queue_tier2_enrichment.py --limit 50 --include-failed
+
+    # Re-enrich all users regardless of current status (refresh data)
+    python queue_tier2_enrichment.py --limit 100 --force-all
+
+    # Enrich and automatically re-score afterward
+    python queue_tier2_enrichment.py --limit 50 --rescore-after
 """
 
 import argparse
@@ -38,7 +44,7 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 
 
-def get_unenriched_users(uowm, min_score: float, limit: int, include_failed: bool = False) -> list:
+def get_unenriched_users(uowm, min_score: float, limit: int, include_failed: bool = False, force_all: bool = False) -> list:
     """
     Find users with spam scores but no Tier 2 enrichment.
 
@@ -47,6 +53,7 @@ def get_unenriched_users(uowm, min_score: float, limit: int, include_failed: boo
         min_score: Minimum spam score to qualify
         limit: Maximum users to return
         include_failed: Whether to include users where enrichment previously failed
+        force_all: If True, include all users regardless of current enrichment status
 
     Returns:
         List of (username, spam_score) tuples
@@ -59,8 +66,12 @@ def get_unenriched_users(uowm, min_score: float, limit: int, include_failed: boo
             UserSpamFeatures.spam_score
         ).filter(
             UserSpamFeatures.spam_score >= min_score,
-            UserSpamFeatures.account_age_days.is_(None),  # No Tier 2 data yet
         )
+
+        if not force_all:
+            query = query.filter(
+                UserSpamFeatures.account_age_days.is_(None),  # No Tier 2 data yet
+            )
 
         if not include_failed:
             query = query.filter(
@@ -131,7 +142,7 @@ def queue_enrichment_async(usernames: list) -> dict:
     for username in usernames:
         enrich_user_features_tier2.apply_async(
             args=[username],
-            queue='spam_detection_temp'
+            queue='spam_detection'
         )
         queued += 1
 
@@ -154,7 +165,7 @@ def queue_rescore_async(usernames: list) -> dict:
     for username in usernames:
         rescore_user_with_tier2.apply_async(
             args=[username],
-            queue='spam_detection_temp'
+            queue='spam_detection'
         )
         queued += 1
 
@@ -301,6 +312,14 @@ def main():
         '--include-failed', action='store_true',
         help='Include users where previous enrichment failed'
     )
+    parser.add_argument(
+        '--force-all', action='store_true',
+        help='Include all users regardless of current enrichment status (re-enrich everyone)'
+    )
+    parser.add_argument(
+        '--rescore-after', action='store_true',
+        help='Automatically queue re-scoring after enrichment completes'
+    )
 
     # Execution options
     parser.add_argument(
@@ -344,9 +363,13 @@ def main():
 
     else:  # Default: unenriched
         include_failed_str = " (including failed)" if args.include_failed else ""
-        print(f"\nFinding unenriched users (score >= {args.min_score}){include_failed_str}...")
-        users = get_unenriched_users(uowm, args.min_score, args.limit, args.include_failed)
-        print(f"Found {len(users)} users needing Tier 2 enrichment")
+        force_all_str = " [FORCE ALL]" if args.force_all else ""
+        print(f"\nFinding users (score >= {args.min_score}){include_failed_str}{force_all_str}...")
+        users = get_unenriched_users(uowm, args.min_score, args.limit, args.include_failed, args.force_all)
+        if args.force_all:
+            print(f"Found {len(users)} users for Tier 2 enrichment (including already enriched)")
+        else:
+            print(f"Found {len(users)} users needing Tier 2 enrichment")
 
     if not users:
         print("No users to process.")
@@ -354,7 +377,8 @@ def main():
 
     # Show preview
     action = "re-score" if is_rescore else "enrich"
-    print(f"\nUsers to {action} ({len(users)}):")
+    rescore_suffix = " (+ re-score)" if args.rescore_after and not is_rescore else ""
+    print(f"\nUsers to {action}{rescore_suffix} ({len(users)}):")
     for i, (username, score) in enumerate(users[:10]):
         print(f"  {i+1}. {username} (score: {score:.3f})")
 
@@ -366,6 +390,8 @@ def main():
 
     if args.dry_run:
         print(f"\n[DRY RUN] Would queue {len(usernames)} users for {action}")
+        if args.rescore_after and not is_rescore:
+            print(f"[DRY RUN] Would also queue {len(usernames)} users for re-scoring after enrichment")
         return
 
     # Queue or process users
@@ -389,16 +415,33 @@ def main():
             print(f"\nEnriching {len(usernames)} users synchronously (delay={args.delay}s)...")
             print("Note: This makes Reddit API calls. Be patient.\n")
             results = process_enrichment_sync(usernames, args.delay)
-            print(f"\nResults:")
+            print(f"\nEnrichment Results:")
             print(f"  Processed: {results['processed']}")
             print(f"  Enriched: {results['enriched']}")
             print(f"  Suspended: {results['suspended']}")
             print(f"  Skipped: {results['skipped']}")
             print(f"  Failed: {results['failed']}")
+
+            if args.rescore_after:
+                print(f"\nRe-scoring {len(usernames)} users synchronously...")
+                rescore_results = process_rescore_sync(usernames)
+                print(f"\nRe-scoring Results:")
+                print(f"  Processed: {rescore_results['processed']}")
+                print(f"  Re-scored: {rescore_results['rescored']}")
+                print(f"  Skipped: {rescore_results['skipped']}")
+                print(f"  Failed: {rescore_results['failed']}")
+                print(f"  High Risk: {rescore_results['high_risk']}")
+                print(f"  Critical Risk: {rescore_results['critical_risk']}")
         else:
             print(f"\nQueuing {len(usernames)} users for async enrichment...")
             results = queue_enrichment_async(usernames)
             print(f"Queued {results['queued']} users to spam_detection_temp queue")
+
+            if args.rescore_after:
+                print(f"\nQueuing {len(usernames)} users for async re-scoring...")
+                rescore_results = queue_rescore_async(usernames)
+                print(f"Queued {rescore_results['queued']} users for re-scoring to spam_detection_temp queue")
+
             print("Monitor progress with: celery -A redditrepostsleuth.core.celery inspect active")
 
 

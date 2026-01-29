@@ -42,7 +42,7 @@ class Tier1Features:
     posts_per_day_avg: float = 0.0
     first_post_date: Optional[datetime] = None
     last_post_date: Optional[datetime] = None
-    account_age_days: int = 0
+    tracked_span_days: int = 0  # Span of tracked activity (max ~90 days due to retention)
     nsfw_post_count: int = 0
     nsfw_post_ratio: float = 0.0
     summons_received: int = 0
@@ -240,7 +240,7 @@ class SpamFeatureExtractor:
             return {
                 'first_post_date': None,
                 'last_post_date': None,
-                'account_age_days': 0,
+                'tracked_span_days': 0,
                 'posts_per_day_avg': 0.0,
                 'max_posts_per_day': 0,
                 'posting_entropy': 0.0,
@@ -253,8 +253,8 @@ class SpamFeatureExtractor:
 
         first_post = activities[0].created_at
         last_post = activities[-1].created_at
-        account_age_days = max(1, (last_post - first_post).days)
-        posts_per_day = len(activities) / account_age_days
+        tracked_span_days = max(1, (last_post - first_post).days)
+        posts_per_day = len(activities) / tracked_span_days
 
         # Calculate daily post counts
         daily_counts = Counter()
@@ -300,7 +300,7 @@ class SpamFeatureExtractor:
         result = {
             'first_post_date': first_post,
             'last_post_date': last_post,
-            'account_age_days': account_age_days,
+            'tracked_span_days': tracked_span_days,
             'posts_per_day_avg': posts_per_day,
             'max_posts_per_day': max_posts_per_day,
             'posting_entropy': posting_entropy,
@@ -308,9 +308,9 @@ class SpamFeatureExtractor:
             'avg_time_between_posts_minutes': avg_interval,
         }
 
-        log.debug('Activity timeline for %s: age_days=%d, posts_per_day=%.2f, max_per_day=%d, '
+        log.debug('Activity timeline for %s: tracked_span_days=%d, posts_per_day=%.2f, max_per_day=%d, '
                   'entropy=%.3f, burst=%s, avg_interval_min=%.1f',
-                  username, account_age_days, posts_per_day, max_posts_per_day,
+                  username, tracked_span_days, posts_per_day, max_posts_per_day,
                   posting_entropy, burst_detected, avg_interval)
 
         return result
@@ -416,7 +416,7 @@ class SpamFeatureExtractor:
         timeline = self.get_activity_timeline(username)
         features.first_post_date = timeline['first_post_date']
         features.last_post_date = timeline['last_post_date']
-        features.account_age_days = timeline['account_age_days']
+        features.tracked_span_days = timeline['tracked_span_days']
         features.posts_per_day_avg = timeline['posts_per_day_avg']
         features.max_posts_per_day = timeline['max_posts_per_day']
         features.posting_entropy = timeline['posting_entropy']

@@ -525,10 +525,7 @@ User-Agent: MyClient/1.0
     "total_votes": 23,
     "spam_votes": 17,
     "legit_votes": 6,
-    "consensus_contributed_to": 4,
-    "average_note_length": 45,
-    "first_vote": "2026-01-20T09:15:00Z",
-    "last_vote": "2026-01-27T14:32:00Z"
+    "last_vote_at": "2026-01-27T14:32:00Z"
   }
 }
 ```
@@ -626,6 +623,11 @@ User-Agent: MyClient/1.0
     "subreddit_concentration_hhi": 0.42,
     "karma_farming_sub_posts": 12,
     "easy_karma_sub_posts": 8,
+    "subreddit_distribution": {
+      "gonewild": 45,
+      "AskReddit": 12,
+      "pics": 8
+    },
     "posting_entropy": 0.76,
     "burst_posting_detected": true,
     "avg_time_between_posts_minutes": 45.2,
@@ -660,7 +662,8 @@ User-Agent: MyClient/1.0
 The `spam_features` object now includes selected fields parsed from the internal `feature_data` to help moderators make informed voting decisions:
 - `total_reposts_detected`, `repost_ratio` - Repost detection signals
 - `detected_platforms` - List of adult platforms found (e.g., ["onlyfans", "fansly"])
-- `subreddit_concentration_hhi`, `karma_farming_sub_posts`, `easy_karma_sub_posts`, `posting_entropy`, `burst_posting_detected`, `avg_time_between_posts_minutes` - Posting behavior metrics
+- `subreddit_concentration_hhi`, `karma_farming_sub_posts`, `easy_karma_sub_posts`, `subreddit_distribution`, `posting_entropy`, `burst_posting_detected`, `avg_time_between_posts_minutes` - Posting behavior metrics
+- `subreddit_distribution` - Dictionary mapping subreddit names to post counts (e.g., {"pics": 45, "funny": 12})
 - `username_suspicious_pattern`, `username_pattern_confidence` - Username analysis (pattern details excluded)
 - `first_post_date`, `last_post_date` - Activity timeline
 
@@ -1173,10 +1176,11 @@ Manually label a user for training data.
   "username": string;              // Required: Reddit username
   "label": "SPAM" | "LEGITIMATE" | "UNKNOWN";  // Required: Label value
   "confidence"?: number;           // Optional: 0.0-1.0 (default: 1.0)
-  "labeled_by"?: string;           // Optional: Person/system labeling (default: "admin")
   "notes"?: string;                // Optional: Explanation (max 500 chars)
 }
 ```
+
+**Note:** The `labeled_by` field is automatically set to the authenticated admin's Reddit username and cannot be overridden via the request body.
 
 **Request Example:**
 
@@ -1191,7 +1195,6 @@ User-Agent: AdminClient/1.0
   "username": "suspicious_user_1",
   "label": "SPAM",
   "confidence": 0.95,
-  "labeled_by": "admin_john",
   "notes": "Clear spam account - adult links, high repost rate, telegram promotions"
 }
 ```
@@ -1384,10 +1387,7 @@ interface ModeratorStats {
   total_votes: number;
   spam_votes: number;
   legit_votes: number;
-  consensus_contributed_to: number;
-  average_note_length: number;
-  first_vote: string;  // ISO 8601 timestamp
-  last_vote: string;   // ISO 8601 timestamp
+  last_vote_at: string | null;  // ISO 8601 timestamp
 }
 
 // ============= Moderator Endpoints =============
@@ -1448,6 +1448,7 @@ interface ModeratorSpamFeatures {
   subreddit_concentration_hhi?: number;
   karma_farming_sub_posts?: number;
   easy_karma_sub_posts?: number;
+  subreddit_distribution?: Record<string, number>;
   posting_entropy?: number;
   burst_posting_detected?: boolean;
   avg_time_between_posts_minutes?: number;
@@ -1592,8 +1593,8 @@ interface LabelUserRequest {
   username: string;
   label: "SPAM" | "LEGITIMATE" | "UNKNOWN";
   confidence?: number;
-  labeled_by?: string;
   notes?: string;
+  // Note: labeled_by is automatically set to authenticated admin's username
 }
 
 interface LabelUserResponse {

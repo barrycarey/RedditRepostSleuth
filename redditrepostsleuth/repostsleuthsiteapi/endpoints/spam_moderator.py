@@ -140,7 +140,7 @@ class ModSpamUserLookupEndpoint:
         """
         Look up spam details for a user.
 
-        Returns spam_features, user_review, and activity_stats if available.
+        Returns spam_features and user_review if available.
         If user has no data or incomplete data, returns null for missing fields.
         Use POST /api/mod/spam/user/{username}/scan to trigger a scan.
 
@@ -149,8 +149,7 @@ class ModSpamUserLookupEndpoint:
                 "username": "string",
                 "scan_complete": bool,
                 "spam_features": {...} | null,
-                "user_review": {...} | null,
-                "activity_stats": {...} | null
+                "user_review": {...} | null
             }
         """
         auth = _require_moderator_auth(req, self.config)
@@ -183,15 +182,11 @@ class ModSpamUserLookupEndpoint:
                     'risk_level': review.risk_level,
                 }
 
-            # Get activity stats
-            activity_stats = uow.author_activity.get_author_stats(username)
-
         resp.text = json.dumps({
             'username': username,
             'scan_complete': scan_complete,
             'spam_features': features_dict,
             'user_review': review_dict,
-            'activity_stats': activity_stats,
         })
 
 

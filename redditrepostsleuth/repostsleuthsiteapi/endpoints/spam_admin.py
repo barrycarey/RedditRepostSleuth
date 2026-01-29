@@ -218,13 +218,15 @@ class SpamHighRiskUsersEndpoint:
 
             users = []
             for f in high_risk:
+                # Extract fields from feature_data JSON
+                fd = f.feature_data or {}
                 users.append({
                     'username': f.username,
                     'spam_score': f.spam_score,
                     'spam_score_confidence': f.spam_score_confidence,
-                    'repost_ratio': f.repost_ratio,
-                    'total_posts_indexed': f.total_posts_indexed,
-                    'total_reposts_detected': f.total_reposts_detected,
+                    'repost_ratio': fd.get('repost_ratio', 0.0),
+                    'total_posts_indexed': f.total_posts,
+                    'total_reposts_detected': fd.get('total_reposts_detected', 0),
                     'account_age_days': f.account_age_days,
                     'account_suspended': f.account_suspended,
                     'computed_at': f.computed_at.isoformat() if f.computed_at else None,

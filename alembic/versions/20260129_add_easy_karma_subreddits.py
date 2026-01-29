@@ -1,7 +1,7 @@
 """Add easy_karma subreddits to spam_subreddit_list
 
 Revision ID: 20260129_easy_karma
-Revises: 20260127_add_post_scanning
+Revises: 20260128_authidx
 Create Date: 2026-01-29
 
 """
@@ -9,7 +9,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '20260129_easy_karma'
-down_revision = '20260127_add_post_scanning'
+down_revision = '20260128_authidx'
 branch_labels = None
 depends_on = None
 
