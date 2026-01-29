@@ -579,7 +579,7 @@ class Tier1Features:
     posts_per_day_avg: float
     first_post_date: Optional[datetime]
     last_post_date: Optional[datetime]
-    account_age_days: int
+    tracked_span_days: int  # Span of tracked activity (max ~90 days due to retention)
     nsfw_post_count: int
     nsfw_post_ratio: float
     summons_received: int
@@ -622,9 +622,12 @@ class Tier1Features:
 | `total_reposts_detected` | COUNT of matching reposts | Repost frequency |
 | `repost_ratio` | reposts / total_posts | 0.0-1.0, higher = more reposts |
 | `unique_subreddits_posted` | DISTINCT subreddit count | Spread across communities |
-| `posts_per_day_avg` | total_posts / account_age_days | Activity velocity |
-| `account_age_days` | MAX(created_at) - MIN(created_at) | Time span of posts |
+| `posts_per_day_avg` | total_posts / tracked_span_days | Activity velocity |
+| `tracked_span_days` | MAX(created_at) - MIN(created_at) | Span of tracked activity (max ~90 days) |
 | `nsfw_post_count` | COUNT where is_nsfw=true | NSFW content volume |
+
+> **Note:** `tracked_span_days` in Tier1Features is the span of tracked activity data (limited to ~90 days due to `author_activity_tracking` retention). For the actual Reddit account age, see `account_age_days` in Tier2Features (fetched from Reddit API).
+
 | `nsfw_post_ratio` | nsfw_count / total_posts | 0.0-1.0, higher = more NSFW |
 | `summons_received` | COUNT from summons table | User mentions by bot |
 

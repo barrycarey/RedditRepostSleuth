@@ -53,7 +53,7 @@ class TestTier1Features(TestCase):
             'total_reposts_detected': 0,
             'unique_subreddits_posted': 0,
             'posts_per_day_avg': 0.0,
-            'account_age_days': 0,
+            'tracked_span_days': 0,
             'nsfw_post_count': 0,
             'nsfw_post_ratio': 0.0,
             'summons_received': 0,
@@ -441,7 +441,7 @@ class TestActivityTimeline(TestCase):
 
         self.assertIsNone(result['first_post_date'])
         self.assertIsNone(result['last_post_date'])
-        self.assertEqual(result['account_age_days'], 0)
+        self.assertEqual(result['tracked_span_days'], 0)
         self.assertEqual(result['posts_per_day_avg'], 0.0)
 
     def test__get_activity_timeline__single_day_activity(self):
@@ -456,7 +456,7 @@ class TestActivityTimeline(TestCase):
 
         result = self.extractor.get_activity_timeline('test_user')
 
-        self.assertEqual(result['account_age_days'], 1)  # Minimum 1 day
+        self.assertEqual(result['tracked_span_days'], 1)  # Minimum 1 day
         self.assertEqual(result['max_posts_per_day'], 5)
 
     def test__get_activity_timeline__burst_detection(self):

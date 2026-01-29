@@ -55,7 +55,7 @@ class NewActivationMonitor:
         except TooManyRequests:
             raise
         except Exception as e:
-            log.exception('Failed to accept invite', exc_info=True)
+            log.exception('Failed to accept invite for %s', msg.subreddit.display_name, exc_info=True)
             return
         
         # Check if sub exists in DB

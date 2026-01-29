@@ -15,6 +15,9 @@ Usage:
     # Re-score users whose scores are older than 7 days
     python queue_spam_scoring.py --rescore-stale --stale-days 7 --limit 100
 
+    # Re-score all users regardless of staleness
+    python queue_spam_scoring.py --rescore-all --limit 100
+
     # Dry run - show what would be queued without actually queuing
     python queue_spam_scoring.py --limit 100 --dry-run
 
@@ -75,6 +78,33 @@ def get_unscored_users(uowm, min_posts: int, limit: int) -> list:
         ).limit(limit).all()
 
         return [(r.author, r.post_count) for r in results]
+
+
+def get_all_scored_users(uowm, limit: int) -> list:
+    """
+    Get all users with existing spam scores for re-scoring.
+
+    Args:
+        uowm: Unit of work manager
+        limit: Maximum users to return
+
+    Returns:
+        List of (username, post_count, last_scored) tuples
+    """
+    from redditrepostsleuth.core.db.databasemodels import UserSpamFeatures
+
+    with uowm.start() as uow:
+        results = uow.session.query(
+            UserSpamFeatures.username,
+            UserSpamFeatures.total_posts,
+            UserSpamFeatures.computed_at
+        ).filter(
+            UserSpamFeatures.spam_score.isnot(None)
+        ).order_by(
+            UserSpamFeatures.computed_at.asc()
+        ).limit(limit).all()
+
+        return [(r.username, r.total_posts, r.computed_at) for r in results]
 
 
 def get_stale_scored_users(uowm, stale_days: int, limit: int) -> list:
@@ -220,7 +250,7 @@ def queue_users_async(usernames: list, update_user_review: bool = True) -> dict:
     for username in usernames:
         score_and_flag_user.apply_async(
             args=[username, update_user_review],
-            queue='spam_detection_temp'
+            queue='spam_detection'
         )
         queued += 1
 
@@ -299,6 +329,10 @@ def main():
         help='Re-score users with old scores'
     )
     mode_group.add_argument(
+        '--rescore-all', action='store_true',
+        help='Re-score all users regardless of staleness'
+    )
+    mode_group.add_argument(
         '--high-activity', action='store_true',
         help='Queue users with high recent activity'
     )
@@ -371,6 +405,11 @@ def main():
         print(f"\nFinding users with stale scores (>{args.stale_days} days old)...")
         users = get_stale_scored_users(uowm, args.stale_days, args.limit)
         print(f"Found {len(users)} users with stale scores")
+
+    elif args.rescore_all:
+        print(f"\nFinding all scored users for re-scoring...")
+        users = get_all_scored_users(uowm, args.limit)
+        print(f"Found {len(users)} scored users")
 
     elif args.high_activity:
         print(f"\nFinding high activity users (last {args.days} days, min {args.min_posts} posts)...")
