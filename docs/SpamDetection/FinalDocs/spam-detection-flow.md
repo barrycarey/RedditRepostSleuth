@@ -23,14 +23,14 @@ The spam detection system has multiple entry points through which data flows int
 
 | Entry Point | Trigger | Location | Primary Task | Queue | Purpose |
 |-------------|---------|----------|--------------|-------|---------|
-| 1. Post Ingestion | Every new post indexed | `ingest_tasks.py:140-146` | `track_author_activity` | `spam_detection` | Track behavioral signals |
+| 1. Post Ingestion | Every new post indexed | `ingest_tasks.py:140-146` | `track_author_activity` → `queue_user_for_scoring` | `spam_detection` | Track signals & auto-score |
 | 2. Monitored Subreddit Check | Post checked in monitored sub | `monitored_sub_task_logic.py:129-161` | `score_and_flag_user` | async | Score authors for spam |
 | 3. Summons Request | Repost summons received | `summonshandler.py:495-521` | `score_and_flag_user` | async | Analyze reposters |
 | 4. Admin API | POST to spam scoring endpoint | `spam_admin.py` | `score_and_flag_user` | async | Manual trigger |
 | 5. Scheduled Tasks | Celery Beat scheduler | `celeryconfig.py:120-136` | Multiple | async | Daily/weekly analyses |
 | 6. Batch Script | Command line execution | `queue_spam_scoring.py` | `score_and_flag_user` | async | Batch processing |
 
-### Entry Point 1: Post Ingestion Pipeline (Phase 0)
+### Entry Point 1: Post Ingestion Pipeline (Phase 0 + Automatic Scoring)
 
 **Trigger Point:** Every new post ingested into the system
 **Config Gate:** `spam_author_tracking_enabled`
@@ -40,6 +40,7 @@ The spam detection system has multiple entry points through which data flows int
 save_new_post() [ingest_tasks.py:140-146]
   └─ if spam_author_tracking_enabled:
      └─ track_author_activity.apply_async() → spam_detection queue
+        └─ queue_user_for_scoring.delay() → automatic scoring evaluation
 ```
 
 **Task Flow Details:**
@@ -58,16 +59,30 @@ Celery Task: track_author_activity
   ├─ Detect Telegram links (regex matching)
   ├─ Create AuthorActivityTracking record
   ├─ Store in database
-  └─ Output: None (fire-and-forget)
+  └─ Call: queue_user_for_scoring.delay(author) → NEW: Automatic scoring evaluation
+
+Celery Task: queue_user_for_scoring (NEW)
+  ├─ Input: author (username)
+  ├─ Check if recently scored (within spam_scoring_cooldown_days, default 7)
+  │  └─ If yes → Skip (avoid redundant scoring)
+  ├─ Check if user has minimum posts (spam_min_posts_for_scoring, default 5)
+  │  └─ If no → Skip (insufficient data)
+  └─ If both checks pass:
+     └─ Queue: score_and_flag_user.delay(author, update_user_review=True)
+        ├─ Extract Tier 1 features
+        ├─ Compute spam score
+        ├─ Store in user_spam_features
+        └─ Create/update user_review record
 
 Result:
-  └─ author_activity_tracking table has new record
-     └─ Future analysis tasks can aggregate posts by author
+  ├─ author_activity_tracking table has new record
+  └─ Users automatically evaluated and scored based on configurable criteria
+     └─ High-risk users flagged for review without manual intervention
 ```
 
 **File Locations:**
 - Entry: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/ingest_tasks.py` (lines 140-146)
-- Task: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py` (lines 163-241)
+- Task: `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
 
 ---
 
@@ -333,36 +348,52 @@ python utility_scripts/queue_spam_scoring.py --users SuspiciousUser1 SuspiciousU
         │ (Every post)     │ │ (If enabled)     │ │ (Repost found)   │
         └────────┬─────────┘ └────────┬─────────┘ └────────┬─────────┘
                  │                    │                    │
-                 ▼                    ▼                    ▼
-        ┌──────────────────────────────────────────────────────────┐
-        │  Async Task: track_author_activity (Entry 1 only)        │
-        │  Or async: score_and_flag_user (Entry 2, 3, 4, 6)        │
-        └────────┬─────────────────────────────────────────────────┘
+                 ▼                    │                    │
+        ┌────────────────────┐        │                    │
+        │ track_author_      │        │                    │
+        │   activity         │        │                    │
+        └────────┬───────────┘        │                    │
+                 │                    │                    │
+                 ▼                    │                    │
+        ┌────────────────────┐        │                    │
+        │ queue_user_for_    │        │                    │
+        │   scoring (NEW)    │        │                    │
+        │ ├─ cooldown check  │        │                    │
+        │ └─ min posts check │        │                    │
+        └────────┬───────────┘        │                    │
+                 │                    │                    │
+                 └────────────────────┴────────────────────┘
+                                      │
+                                      ▼
+                        ┌──────────────────────────┐
+                        │  score_and_flag_user     │
+                        │  (All entry points)      │
+                        └────────┬─────────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+                    ▼                         ▼
+        ┌──────────────────┐   ┌──────────────────────────┐
+        │ Feature          │   │ Spam Scoring             │
+        │ Extraction       │   │ & Action Handling        │
+        │ (Tier 1)         │   │ (Tier 1 + optional 2)    │
+        └────────┬─────────┘   └────────┬─────────────────┘
+                 │                      │
+                 ▼                      ▼
+            ┌────────────────────────────────┐
+            │ Database Updates:              │
+            │ - author_activity_tracking     │
+            │ - user_spam_features           │
+            │ - user_review                  │
+            └────────────────────────────────┘
                  │
-    ┌────────────┴────────────┐
-    │                         │
-    ▼                         ▼
-┌──────────────────┐   ┌──────────────────────────┐
-│ Feature          │   │ Spam Scoring             │
-│ Extraction       │   │ & Action Handling        │
-│ (Tier 1)         │   │ (Tier 1 + optional 2)    │
-└────────┬─────────┘   └────────┬─────────────────┘
-         │                      │
-         ▼                      ▼
-    ┌────────────────────────────────┐
-    │ Database Updates:              │
-    │ - author_activity_tracking     │
-    │ - user_spam_features           │
-    │ - user_review                  │
-    └────────────────────────────────┘
-         │
-         ├─ Entry Point 5: Scheduled Tasks (daily/weekly)
-         │  ├─ analyze_top_reposters
-         │  ├─ enrich_high_risk
-         │  └─ cleanup tasks
-         │
-         └─ Entry Point 4: Admin API (manual query)
-            └─ SpamScoreUserEndpoint
+                 ├─ Entry Point 5: Scheduled Tasks (daily/weekly)
+                 │  ├─ analyze_top_reposters
+                 │  ├─ enrich_high_risk
+                 │  └─ cleanup tasks
+                 │
+                 └─ Entry Point 4: Admin API (manual query)
+                    └─ SpamScoreUserEndpoint
 ```
 
 ---
@@ -1020,6 +1051,77 @@ track_author_activity.delay(
 )
 ```
 
+### Task: queue_user_for_scoring (NEW)
+
+**Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
+
+**Configuration:**
+```python
+@celery.task(
+    bind=True,
+    base=SpamDetectionTask,
+    ignore_results=True,
+    serializer='pickle',
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3, 'countdown': 60}
+)
+```
+
+**Purpose:** Evaluate whether a user should be scored and queue scoring task if criteria are met
+
+**Trigger:** Called automatically after every `track_author_activity` completes (post ingestion)
+
+**Evaluation Criteria:**
+1. **Cooldown Check:** Has user been scored recently?
+   - Checks `user_spam_features.computed_at` timestamp
+   - Skip if scored within `spam_scoring_cooldown_days` (default: 7 days)
+   - Prevents redundant re-scoring of recently analyzed users
+
+2. **Minimum Posts Check:** Does user have sufficient data?
+   - Queries `author_activity_tracking` for post count
+   - Skip if less than `spam_min_posts_for_scoring` (default: 5 posts)
+   - Ensures meaningful feature extraction
+
+**Workflow:**
+```
+queue_user_for_scoring(author)
+  ├─ Check last scoring timestamp
+  │  └─ If scored within cooldown → Log & Skip
+  ├─ Check post count
+  │  └─ If < minimum posts → Log & Skip
+  └─ If both checks pass:
+     └─ Queue: score_and_flag_user.delay(author, update_user_review=True)
+```
+
+**Configuration Options:**
+
+| Config Key | Default | Purpose |
+|------------|---------|---------|
+| `spam_scoring_cooldown_days` | 7 | Days before re-scoring a user |
+| `spam_min_posts_for_scoring` | 5 | Minimum posts required for scoring |
+
+**Usage:**
+```python
+# Called automatically after track_author_activity
+queue_user_for_scoring.delay('SomeUser')
+
+# Evaluates user and queues scoring if appropriate
+# No return value (fire-and-forget)
+```
+
+**Benefits:**
+- **Automatic Coverage:** All users with sufficient activity are automatically evaluated
+- **Efficient:** Cooldown prevents redundant scoring
+- **Configurable:** Thresholds tunable per deployment needs
+- **Non-blocking:** Fire-and-forget design maintains ingest pipeline performance
+
+**Error Handling:**
+- Max 3 retries on exception
+- Logs skipped users with reason
+- Database errors logged but don't block pipeline
+
+---
+
 ### Task: compute_user_spam_features_tier1
 
 **Location:** `/home/barry/PycharmProjects/RedditRepostSleuth/redditrepostsleuth/core/celery/tasks/spam_detection_tasks.py`
@@ -1371,7 +1473,7 @@ spam_subreddit_list
 
 ## Data Flow Examples
 
-### Example 1: New Post Ingestion
+### Example 1: New Post Ingestion with Automatic Scoring
 
 ```
 Timeline: Post found at 12:00 UTC
@@ -1387,10 +1489,33 @@ Timeline: Post found at 12:00 UTC
 12:00:06 - Detects has_short_link=true (bit.ly match)
 12:00:07 - Creates AuthorActivityTracking record
 12:00:08 - Record committed to database
+12:00:09 - Calls queue_user_for_scoring.delay('PromoBob')
 
-12:00:10 - Task complete
+12:00:10 - queue_user_for_scoring task starts
+12:00:11 - Check last scoring timestamp for 'PromoBob'
+           └─ Last scored: 2 days ago (within 7-day cooldown)
+           └─ Decision: SKIP (recently scored)
+           └─ Log: "User PromoBob scored 2 days ago, skipping (cooldown: 7 days)"
 
-Future: compute_user_spam_features_tier1('PromoBob') can now analyze all tracked posts
+12:00:12 - Task complete (no scoring needed)
+
+Alternative flow (if not recently scored):
+
+12:00:11 - Check last scoring timestamp for 'PromoBob'
+           └─ Last scored: 10 days ago (outside 7-day cooldown)
+12:00:12 - Check post count
+           └─ Query: SELECT COUNT(*) FROM author_activity_tracking WHERE author='PromoBob'
+           └─ Result: 8 posts (>= 5 minimum)
+           └─ Decision: PROCEED with scoring
+12:00:13 - Queue: score_and_flag_user.delay('PromoBob', update_user_review=True)
+
+12:00:15 - score_and_flag_user task starts
+           ├─ Extract Tier 1 features (8 posts analyzed)
+           ├─ Compute spam score: 0.42 (MEDIUM risk)
+           ├─ Store in user_spam_features
+           └─ Create/update user_review record
+
+12:00:17 - Automatic scoring complete
 ```
 
 ### Example 2: Feature Extraction on Demand
@@ -1512,12 +1637,15 @@ Timeline: Scheduled batch job runs daily
 ## Integration Points
 
 ### Input Sources
-1. **Post Ingestion** → track_author_activity task
-2. **Monitored Subreddit Pipeline** → score_and_flag_user task
-3. **Summons Handler** → score_and_flag_user task
-4. **Admin API** → score_and_flag_user task
+1. **Post Ingestion** → track_author_activity task → **queue_user_for_scoring (automatic evaluation)** → score_and_flag_user (if criteria met)
+2. **Monitored Subreddit Pipeline** → score_and_flag_user task (direct)
+3. **Summons Handler** → score_and_flag_user task (direct)
+4. **Admin API** → score_and_flag_user task (direct)
 5. **Celery Beat Scheduler** → Periodic batch analyses
 6. **Utility Scripts** → Manual batch processing
+
+**New Automatic Scoring Path (Entry Point 1):**
+Previously, users tracked via `author_activity_tracking` were only scored through monitored subreddits, summons, admin API, or batch scripts. Now, ALL users are automatically evaluated for scoring after activity tracking, with configurable cooldown and minimum post requirements. This provides comprehensive coverage without manual intervention.
 
 ### Output Consumers (Current & Future Phases)
 1. **User Review Table** - Moderator review queue
@@ -1590,72 +1718,304 @@ Timeline: Scheduled batch job runs daily
 ## Phase 3: Tier 2 Enrichment
 
 ### Status: IMPLEMENTED
-Reddit API integration with rate limiting and circuit breaker protection.
 
-Tier 2 enrichment extends detection capabilities beyond post-URL analysis with Reddit API-sourced features.
+Reddit API integration with rate limiting and circuit breaker protection. Tier 2 enrichment extends detection capabilities beyond post-URL analysis with Reddit API-sourced features.
 
-**Implemented Tier 2 Enrichment Tasks:**
+---
 
-1. **enrich_user_features_tier2(username)**
-   - Fetch user account data via Reddit API (single Redditor call)
-   - Scan user's profile description and recent comments for links
-   - Detect Telegram links, adult platform links
-   - Update database with 15 new Tier 2 feature columns
-   - Includes circuit breaker protection and rate limiting
-   - Auto-retries on rate limit (up to 3 times)
+### 3.1 Entry Points for Tier 2 Enrichment
 
-2. **check_user_suspended_task(username)**
-   - Quick check if user is suspended/deleted (single API call)
-   - Used for training data collection (confirmed spam)
-   - Returns boolean: True if suspended, False if active
+| Entry Point | Trigger | Task Called | Sync/Async |
+|-------------|---------|-------------|------------|
+| Scheduled (4 AM UTC) | Celery Beat | `scheduled_enrich_high_risk` → `enrich_high_risk_users` | Sync loop |
+| Moderator API | `POST /api/mod/spam/user/{username}/scan` | `scan_user_full.delay()` | Async |
+| Utility Script | `queue_tier2_enrichment.py` | `enrich_user_features_tier2.apply_async()` | Async |
 
-3. **enrich_high_risk_users(min_score, limit)**
-   - Batch enrichment of high-risk users without Tier 2 data
-   - Finds users with high spam scores needing API enrichment
-   - Processes ~40-50 users per day (rate-limited at 50 req/min)
-   - Respects circuit breaker state
+---
 
-4. **scan_user_for_telegram_links(username)**
-   - Focused Telegram link detection in profile and comments
-   - Identifies promotional accounts using off-platform services
-   - Updates database with findings
+### 3.2 Complete Call Flow Diagram
 
-**Tier 2 Features Collected:**
+```
+═══════════════════════════════════════════════════════════════════════════════════════════
+ENTRY POINT A: SCHEDULED TASK (Daily @ 4 AM UTC)
+═══════════════════════════════════════════════════════════════════════════════════════════
 
-Account Info (from single API call):
+Celery Beat (4:00 AM UTC)
+    │
+    ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ scheduled_enrich_high_risk()                                       │
+│ [spam_detection_tasks.py:1204-1222]                                │
+├────────────────────────────────────────────────────────────────────┤
+│ Calls: enrich_high_risk_users(min_score=0.5, limit=50) [SYNC]      │
+└──────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ enrich_high_risk_users(min_score=0.5, limit=50)                    │
+│ [spam_detection_tasks.py:636-700]                                  │
+├────────────────────────────────────────────────────────────────────┤
+│ 1. Query: uow.spam_features.get_high_risk_unenriched()             │
+│    └─ WHERE spam_score >= 0.5 AND account_age_days IS NULL         │
+│       AND tier2_enrichment_failed = False                          │
+│ 2. Loop with 1.5s delay:                                           │
+│    └─ enrich_user_features_tier2(username) [SYNC call]             │
+│ Returns: {total, enriched, suspended, failed}                      │
+└──────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           ▼
+                    [CORE PIPELINE]
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+ENTRY POINT B: MODERATOR API
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+POST /api/mod/spam/user/{username}/scan
+[spam_moderator.py:202-240]
+    │
+    ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ scan_user_full.delay(username)                                     │
+│ [spam_detection_tasks.py:1279-1337]                                │
+├────────────────────────────────────────────────────────────────────┤
+│ Step 1: compute_user_spam_features_tier1(username) [SYNC]          │
+│ Step 2: enrich_user_features_tier2(username) [SYNC]                │
+│         └─ Auto-queues rescore_user_with_tier2.delay() [ASYNC]     │
+│ Step 3: Return features.to_dict_for_moderator()                    │
+└──────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           ▼
+                    [CORE PIPELINE]
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+CORE TIER 2 ENRICHMENT PIPELINE
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+┌────────────────────────────────────────────────────────────────────┐
+│ enrich_user_features_tier2(username)                               │
+│ [spam_detection_tasks.py:478-578]                                  │
+├────────────────────────────────────────────────────────────────────┤
+│ 1. Initialize UserDataFetcher(reddit, uowm, circuit_breaker,       │
+│    rate_limiter)                                                   │
+│                                                                    │
+│ 2. Call: fetcher.fetch_and_enrich(username, scan_profile=True,     │
+│                                   scan_posts=True)                 │
+│    └─ See UserDataFetcher Internals (Section 3.3)                  │
+│                                                                    │
+│ 3. ON SUCCESS:                                                     │
+│    ├─ DB WRITE: uow.spam_features.update_tier2_features()          │
+│    │   └─ 15 columns updated (see Side Effects table)              │
+│    └─ ASYNC QUEUE: rescore_user_with_tier2.delay(username) ────────┤
+│                                                                    │
+│ 4. ON FAILURE:                                                     │
+│    └─ DB WRITE: uow.spam_features.mark_tier2_enrichment_failed()   │
+│                                                                    │
+│ Returns: Tier2Features.to_dict() or None                           │
+└────────────────────────────────────────────────────────────────────┘
+                           │
+                           │ [ASYNC]
+                           ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ rescore_user_with_tier2(username)                                  │
+│ [spam_detection_tasks.py:842-948]                                  │
+│ Base: SpamDetectionTask (NO Reddit API access)                     │
+├────────────────────────────────────────────────────────────────────┤
+│ 1. Extract Tier 1: SpamFeatureExtractor.extract_tier1_features()   │
+│                                                                    │
+│ 2. Read Tier 2 from DB: uow.spam_features.get_by_username()        │
+│    └─ Build tier2_data dict from stored columns                    │
+│                                                                    │
+│ 3. Score: SpamScorerWithTier2().score_with_tier2(tier1, tier2_data)│
+│                                                                    │
+│ 4. DB WRITE: user_review table                                     │
+│    └─ spam_score, spam_score_confidence, spam_score_updated_at,    │
+│       risk_level (create or update)                                │
+│                                                                    │
+│ 5. DB WRITE: user_spam_features table                              │
+│    └─ spam_score, spam_score_confidence, computed_at               │
+│    └─ feature_data merged: rule_score, risk_level,                 │
+│       top_contributing_factors, tier2_enhanced=True                │
+│                                                                    │
+│ Returns: ScoringResult.to_dict() or None                           │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3.3 UserDataFetcher Service Internals
+
+```
+fetch_and_enrich(username, scan_profile=True, scan_posts=True)
+[user_data_fetcher.py:541-610]
+    │
+    ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ Step 1: fetch_basic_user_data(username)                            │
+│ [user_data_fetcher.py:240-340]                                     │
+│ API Calls: 1                                                       │
+├────────────────────────────────────────────────────────────────────┤
+│ a. Check circuit breaker (raise CircuitBreakerOpen if OPEN)        │
+│ b. Enforce rate limit (1.5s min interval + 50 req/min)             │
+│ c. API: reddit.redditor(username).created_utc (forces fetch)       │
+│ d. Extract: account_age_days, total_karma, karma_per_day,          │
+│             has_verified_email, is_gold, has_custom_avatar         │
+│                                                                    │
+│ Exceptions:                                                        │
+│ └─ NotFound/Forbidden → Tier2Features.suspended_user()             │
+│ └─ TooManyRequests → RateLimitExceeded(retry_after)                │
+└──────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           │ [If NOT suspended AND scan_profile=True]
+                           ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ Step 2: scan_user_profile_links(username)                          │
+│ [user_data_fetcher.py:342-423]                                     │
+│ API Calls: 2+ (profile description + comments iterator)            │
+├────────────────────────────────────────────────────────────────────┤
+│ a. API: redditor.subreddit.public_description                      │
+│ b. Detect: adult_platform_link, telegram_link                      │
+│ c. API: redditor.comments.new(limit=100) (scans first 10)          │
+│ d. For each comment: detect adult/telegram links                   │
+│                                                                    │
+│ Returns: {has_adult_links, has_telegram_links, sources,            │
+│           detected_platforms}                                      │
+└──────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           │ [If NOT suspended AND scan_posts=True]
+                           ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ Step 3: scan_user_posts(username, limit=100)                       │
+│ [user_data_fetcher.py:425-501]                                     │
+│ API Calls: 1 (submissions iterator)                                │
+├────────────────────────────────────────────────────────────────────┤
+│ a. API: redditor.submissions.new(limit=100)                        │
+│ b. For each: scan title + selftext + url                           │
+│ c. Detect: adult_platform, telegram, promotional links             │
+│                                                                    │
+│ Returns: {has_adult_links, has_telegram_links,                     │
+│           has_promotional_links, sources, detected_platforms}      │
+└──────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ Step 4: Merge all results into single Tier2Features                │
+│ [user_data_fetcher.py:564-610]                                     │
+├────────────────────────────────────────────────────────────────────┤
+│ - Combine has_adult_profile_links from profile + posts (OR)        │
+│ - Combine has_telegram_links from profile + posts (OR)             │
+│ - Add has_promotional_post_links from posts                        │
+│ - Merge detected_platforms lists (union)                           │
+│ - Merge profile_link_sources dicts                                 │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3.4 Database Side Effects Reference
+
+| Task/Function | Table | Columns Updated | Condition |
+|---------------|-------|-----------------|-----------|
+| `enrich_user_features_tier2` (success) | `user_spam_features` | `account_age_days`, `total_karma`, `post_karma`, `comment_karma`, `karma_per_day`, `has_verified_email`, `is_gold`, `has_custom_avatar`, `account_suspended`, `has_adult_profile_links`, `has_telegram_links`, `profile_link_sources`, `has_promotional_post_links`, `tier2_enriched_at`, `tier2_enrichment_failed=False`, `feature_data.detected_platforms` | On success |
+| `enrich_user_features_tier2` (failure) | `user_spam_features` | `tier2_enrichment_failed=True`, `tier2_failure_reason` | On exception |
+| `rescore_user_with_tier2` | `user_review` | `spam_score`, `spam_score_confidence`, `spam_score_updated_at`, `risk_level` | Create or update |
+| `rescore_user_with_tier2` | `user_spam_features` | `spam_score`, `spam_score_confidence`, `computed_at`, `feature_data` (merged: `rule_score`, `risk_level`, `top_contributing_factors`, `tier2_enhanced=True`) | Always |
+| `check_user_suspended_task` | `user_spam_features` | `account_suspended=True` | If suspended |
+| `scan_user_for_telegram_links` | `user_spam_features` | `has_telegram_links`, `has_adult_profile_links`, `profile_link_sources` | Always |
+
+---
+
+### 3.5 Tier 2 Tasks Quick Reference
+
+| Task | Lines | API Calls | Queues Rescore? | Returns |
+|------|-------|-----------|-----------------|---------|
+| `enrich_user_features_tier2` | 478-578 | 1-4 | Yes (async) | `Tier2Features.to_dict()` |
+| `rescore_user_with_tier2` | 842-948 | 0 | N/A | `ScoringResult.to_dict()` |
+| `check_user_suspended_task` | 581-633 | 1 | No | `bool` |
+| `scan_user_for_telegram_links` | 703-748 | 2+ | No | `dict` |
+| `enrich_high_risk_users` | 636-700 | N×(1-4) | Via enrich | `{total, enriched, suspended, failed}` |
+| `scan_user_full` | 1279-1337 | 1-4 | Via enrich | `to_dict_for_moderator()` |
+| `scheduled_enrich_high_risk` | 1204-1222 | N×(1-4) | Via enrich | Same as enrich_high_risk |
+
+---
+
+### 3.6 Protection Mechanisms
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                    RATE LIMITING STACK                            │
+├───────────────────────────────────────────────────────────────────┤
+│ Layer 1: PerMinuteRateLimiter (Redis-backed)                      │
+│          └─ 50 requests/minute                                    │
+│                                                                   │
+│ Layer 2: _enforce_rate_limit()                                    │
+│          └─ min_interval=1.5s between API calls                   │
+│          └─ Exponential backoff on consecutive errors             │
+│                                                                   │
+│ Layer 3: CircuitBreaker                                           │
+│          └─ failure_threshold=5                                   │
+│          └─ success_threshold=2                                   │
+│          └─ recovery_timeout=60s (with backoff)                   │
+│          └─ States: CLOSED → OPEN → HALF_OPEN                     │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3.7 Error Handling Paths
+
+```
+enrich_user_features_tier2
+    │
+    ├─ RateLimitExceeded → self.retry(countdown=retry_after)
+    │
+    ├─ Exception → mark_tier2_enrichment_failed() + raise (Celery retry)
+    │
+    └─ CircuitBreakerOpen → Task fails, retry later
+
+UserDataFetcher.fetch_basic_user_data
+    │
+    ├─ NotFound (404) → Tier2Features.suspended_user() [NOT an error]
+    │
+    ├─ Forbidden (403) → Tier2Features.suspended_user() [NOT an error]
+    │
+    ├─ TooManyRequests (429) → RateLimitExceeded(retry_after)
+    │
+    └─ Other Exception → Return None, record circuit breaker failure
+```
+
+---
+
+### 3.8 Tier 2 Features Collected
+
+**Account Info (from single API call):**
 - `account_age_days`, `total_karma`, `post_karma`, `comment_karma`
 - `karma_per_day`, `has_verified_email`, `is_gold`, `has_custom_avatar`
 - `account_suspended`, `is_mod`
 
-Profile/Comment Scanning Results:
+**Profile/Comment Scanning Results:**
 - `has_adult_profile_links` - Adult platforms in profile/comments
 - `has_telegram_links` - Telegram links for off-platform communication
+- `has_promotional_post_links` - Promotional links found in posts
 - `profile_link_sources` - Map of where links were found
+- `detected_platforms` - List of specific platforms detected (e.g., "onlyfans", "fansly")
 
-**Core Components:**
+---
+
+### 3.9 Core Components
 
 - **CircuitBreaker** (`circuit_breaker.py`) - Protects against cascading API failures with CLOSED/OPEN/HALF_OPEN states
 - **PerMinuteRateLimiter** (`rate_limiter.py`) - Redis-based sliding window limiting to 50 req/min
 - **UserDataFetcher** (`user_data_fetcher.py`) - Service for fetching user data with protection mechanisms
 - **Tier2Features** (`tier2_features.py`) - Dataclass for API-sourced features with helper methods
 
-**Rate Limiting Strategy:**
-- Single-worker queue for effective concurrency control
-- 50 requests/minute (conservative, 10 req/min below Reddit's 60 limit)
-- 1.5 second minimum interval between API calls
-- Exponential backoff on consecutive errors
-- Automatic recovery testing when API unavailable
+---
 
-**Graceful Degradation:**
+### 3.10 Graceful Degradation
+
 - Falls back to Tier 1-only scoring if API unavailable (circuit breaker OPEN)
 - Continues processing without blocking other operations
 - Automatic recovery attempts every 60 seconds (increasing timeout on repeated failures)
-
-**Database Changes:**
-- 15 new columns added to `user_spam_features` table
-- `tier2_enriched_at` timestamp for cache freshness
-- `tier2_enrichment_failed` flag for tracking failures
-- All updates are non-blocking
+- RateLimitExceeded exceptions trigger task retries with appropriate countdown
 
 See `/docs/SpamDetection/FinalDocs/tier2-enrichment-usage.md` for complete implementation details, configuration, and usage examples.
 
@@ -1733,11 +2093,34 @@ Full trigger integration with shadow mode support. System ready for production d
 ## Deployment and Operations
 
 ### Configuration
+
+**Core System Configuration:**
 - Uses Config class for environment/file settings
 - Database credentials via environment
 - Celery queue configuration
 - Task retry policies
 - Rate limiting settings
+
+**Spam Detection Configuration Options:**
+
+| Config Key | Type | Default | Purpose |
+|------------|------|---------|---------|
+| `spam_author_tracking_enabled` | bool | True | Enable/disable activity tracking |
+| `spam_scoring_cooldown_days` | int | 7 | Days before re-scoring a user |
+| `spam_min_posts_for_scoring` | int | 5 | Minimum posts required for scoring |
+| `spam_detection_shadow_mode` | bool | True | Log actions without executing (testing mode) |
+
+**Automatic Scoring Behavior:**
+When `track_author_activity` completes, `queue_user_for_scoring` evaluates:
+- **Skip if recently scored:** User scored within `spam_scoring_cooldown_days`
+- **Skip if insufficient data:** User has fewer than `spam_min_posts_for_scoring` posts
+- **Queue scoring:** If both checks pass, queue `score_and_flag_user` task
+
+**Tuning Recommendations:**
+- **High-volume deployments:** Increase `spam_scoring_cooldown_days` to 14+ to reduce scoring frequency
+- **Fast detection:** Reduce `spam_min_posts_for_scoring` to 3 for earlier detection (less accurate)
+- **Conservative approach:** Increase `spam_min_posts_for_scoring` to 10+ for higher confidence
+- **Testing:** Keep `spam_detection_shadow_mode=true` until scoring accuracy validated
 
 ### Monitoring
 - Task execution logs in system logger

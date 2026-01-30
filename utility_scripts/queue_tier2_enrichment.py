@@ -142,7 +142,7 @@ def queue_enrichment_async(usernames: list) -> dict:
     for username in usernames:
         enrich_user_features_tier2.apply_async(
             args=[username],
-            queue='spam_detection'
+            queue='spam_detection_temp'
         )
         queued += 1
 
@@ -165,7 +165,7 @@ def queue_rescore_async(usernames: list) -> dict:
     for username in usernames:
         rescore_user_with_tier2.apply_async(
             args=[username],
-            queue='spam_detection'
+            queue='spam_detection_temp'
         )
         queued += 1
 

@@ -249,4 +249,20 @@ services:
             - CELERY_WORKER_CONCURRENCY=1  # Single worker for rate limiting
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q spam_detection -n spam_detection_worker -c 1 --loglevel=info
 
+    spam_detection_tier2_worker:
+        container_name: spam-detection-tier2-worker
+        restart: unless-stopped
+        user: '1001'
+        build:
+            context: .
+            dockerfile: docker/WorkerDockerFile
+        env_file:
+            - .env
+        environment:
+            - RUN_ENV=production
+            - db_user=spam_detection
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.spam_detection_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q spam_detection_tier2 -n spam_detection_tier2_worker -c 4 --loglevel=info
+
 

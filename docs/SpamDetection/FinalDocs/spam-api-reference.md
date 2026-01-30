@@ -857,6 +857,120 @@ Content-Type: application/json
 
 ---
 
+### GET /api/mod/spam/users
+
+List high-risk spam users with pagination.
+
+**Authentication:** Bearer token (10k+ subscriber subreddit moderator)
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Max | Description |
+|-----------|------|---------|-----|-------------|
+| `limit` | int | 20 | 100 | Maximum users to return |
+| `offset` | int | 0 | - | Number of users to skip |
+| `min_score` | float | 0.60 | 1.0 | Minimum spam score (0.60 = HIGH risk) |
+
+**Request Example:**
+
+```http
+GET /api/mod/spam/users HTTP/1.1
+Host: repostsleuth.example.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+User-Agent: MyClient/1.0
+```
+
+**Response Example (200 OK):**
+
+```json
+{
+  "users": [
+    {
+      "username": "suspicious_user_1",
+      "scan_complete": true,
+      "spam_features": {
+        "username": "suspicious_user_1",
+        "spam_score": 0.82,
+        "spam_score_confidence": 0.92,
+        "computed_at": "2026-01-27T14:32:00Z",
+        "total_posts": 287,
+        "nsfw_post_count": 224,
+        "nsfw_post_ratio": 0.78,
+        "unique_subreddit_count": 12,
+        "adult_link_count": 45,
+        "short_link_count": 89,
+        "spam_subreddit_count": 3,
+        "avg_posts_per_day": 2.3,
+        "max_posts_per_day": 8,
+        "account_age_days": 156,
+        "total_karma": 12450,
+        "post_karma": 11200,
+        "comment_karma": 1250,
+        "karma_per_day": 79.8,
+        "has_verified_email": true,
+        "is_gold": false,
+        "has_custom_avatar": true,
+        "account_suspended": false,
+        "has_adult_profile_links": true,
+        "has_telegram_links": true,
+        "has_promotional_post_links": true,
+        "tier2_enriched_at": "2026-01-27T16:45:00Z",
+        "tier2_enrichment_failed": false
+      },
+      "user_review": {
+        "username": "suspicious_user_1",
+        "spam_score": 0.82,
+        "spam_score_confidence": 0.92,
+        "spam_score_updated_at": "2026-01-27T14:32:00Z",
+        "risk_level": "high"
+      }
+    }
+  ],
+  "total": 1547,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**Note:** Each user object in the `users` array has the same structure as the single-user lookup response from `GET /api/mod/spam/user/{username}`.
+
+**Example Requests:**
+
+```http
+# Basic usage
+GET /api/mod/spam/users HTTP/1.1
+
+# With pagination
+GET /api/mod/spam/users?limit=10&offset=10 HTTP/1.1
+
+# Critical risk only
+GET /api/mod/spam/users?min_score=0.80 HTTP/1.1
+```
+
+**Error Responses:**
+
+```http
+401 Unauthorized
+Content-Type: application/json
+
+{
+  "title": "Invalid Token",
+  "description": "Could not verify your Reddit identity"
+}
+```
+
+```http
+403 Forbidden
+Content-Type: application/json
+
+{
+  "title": "Not Qualified",
+  "description": "You must moderate a subreddit with 10,000+ subscribers"
+}
+```
+
+---
+
 ## Spam Admin Endpoints
 
 Base URL: `/api/admin/spam/`
@@ -1397,6 +1511,13 @@ interface ModUserLookupResponse {
   scan_complete: boolean;
   spam_features: ModeratorSpamFeatures | null;
   user_review: ModeratorUserReview | null;
+}
+
+interface ModSpamUserListResponse {
+  users: ModUserLookupResponse[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 interface ModTriggerScanResponse {

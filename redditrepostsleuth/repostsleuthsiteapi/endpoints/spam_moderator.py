@@ -14,6 +14,7 @@ from falcon import Request, Response, HTTPUnauthorized, HTTPNotFound, HTTPForbid
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.util.reddithelpers import is_sleuth_admin
 from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
 
 log = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ def _get_moderator_qualifying_sub(token: str, user_agent: str) -> Optional[Dict[
 
 def _require_moderator_auth(req: Request, config: Config) -> Dict[str, Any]:
     """
-    Verify the request is from an authenticated moderator of 10k+ sub.
+    Verify the request is from an authenticated moderator of 10k+ sub or site admin.
 
     Returns dict with 'user_data', 'qualifying_sub', and 'token'.
     Raises HTTPUnauthorized or HTTPForbidden on failure.
@@ -94,6 +95,14 @@ def _require_moderator_auth(req: Request, config: Config) -> Dict[str, Any]:
             title='Invalid Token',
             description='Could not verify your Reddit identity'
         )
+
+    # Check if user is a site admin (RepostSleuthBot moderator)
+    if is_sleuth_admin(token, user_data, user_agent):
+        return {
+            'user_data': user_data,
+            'qualifying_sub': {'name': 'RepostSleuthBot (Admin)', 'subscribers': 0},
+            'token': token,
+        }
 
     # Check moderator qualification
     qualifying_sub = _get_moderator_qualifying_sub(token, user_agent)
@@ -306,6 +315,77 @@ class ModSpamScanStatusEndpoint:
             })
 
 
+
+class ModSpamUserListEndpoint:
+    """GET /api/mod/spam/users - List high-risk spam users."""
+
+    def __init__(self, uowm: UnitOfWorkManager, config: Config):
+        self.uowm = uowm
+        self.config = config
+
+    def on_get(self, req: Request, resp: Response):
+        """
+        List users flagged for spam with risk HIGH or above.
+
+        Query Parameters:
+            limit (int): Max users to return (default: 20, max: 100)
+            offset (int): Users to skip (default: 0)
+            min_score (float): Minimum spam score (default: 0.60)
+        """
+        auth = _require_moderator_auth(req, self.config)
+        moderator_username = auth['user_data']['name']
+        qualifying_sub = auth['qualifying_sub']
+
+        # Parse pagination parameters
+        limit = req.get_param_as_int('limit') or 20
+        limit = min(limit, 100)
+        offset = req.get_param_as_int('offset') or 0
+        min_score = req.get_param_as_float('min_score') or 0.60
+
+        log.info(
+            'Moderator %s (%s, %d subs) listing spam users: min_score=%.2f, limit=%d, offset=%d',
+            moderator_username, qualifying_sub['name'],
+            qualifying_sub['subscribers'], min_score, limit, offset
+        )
+
+        with self.uowm.start() as uow:
+            features_list, total = uow.spam_features.get_high_spam_scores_paginated(
+                threshold=min_score,
+                limit=limit,
+                offset=offset
+            )
+
+            users = []
+            for features in features_list:
+                scan_complete = _is_scan_complete(features)
+                features_dict = features.to_dict_for_moderator() if features else None
+
+                review = uow.user_review.get_by_username(features.username)
+                review_dict = None
+                if review:
+                    review_dict = {
+                        'username': review.username,
+                        'spam_score': review.spam_score,
+                        'spam_score_confidence': review.spam_score_confidence,
+                        'spam_score_updated_at': review.spam_score_updated_at.isoformat() if review.spam_score_updated_at else None,
+                        'risk_level': review.risk_level,
+                    }
+
+                users.append({
+                    'username': features.username,
+                    'scan_complete': scan_complete,
+                    'spam_features': features_dict,
+                    'user_review': review_dict,
+                })
+
+        resp.text = json.dumps({
+            'users': users,
+            'total': total,
+            'limit': limit,
+            'offset': offset,
+        })
+
+
 def register_spam_moderator_endpoints(api, uowm: UnitOfWorkManager, config: Config):
     """
     Register all spam moderator endpoints with the Falcon API.
@@ -323,5 +403,8 @@ def register_spam_moderator_endpoints(api, uowm: UnitOfWorkManager, config: Conf
 
     # GET /api/mod/spam/scan/{task_id} - Check scan status
     api.add_route('/api/mod/spam/scan/{task_id}', ModSpamScanStatusEndpoint(uowm, config))
+
+    # GET /api/mod/spam/users - List high-risk spam users
+    api.add_route('/api/mod/spam/users', ModSpamUserListEndpoint(uowm, config))
 
     log.info('Registered spam moderator endpoints')
