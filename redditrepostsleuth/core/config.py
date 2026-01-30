@@ -136,6 +136,18 @@ class Config:
             return value
         return str(value).lower() in ('true', '1', 'yes', 'on')
 
+    def _get_int(self, key: str, default: int = 0) -> int:
+        """Parse a config value as integer."""
+        value = getattr(self, key, None)
+        if value is None:
+            return default
+        if isinstance(value, int):
+            return value
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+
     def _initialize_attributes(self):
         attrbs = [
             'redis_host',

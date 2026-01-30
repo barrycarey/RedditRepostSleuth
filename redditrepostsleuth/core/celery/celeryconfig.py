@@ -36,7 +36,14 @@ task_routes = {
     'redditrepostsleuth.core.celery.tasks.reddit_action_tasks.*': {'queue': 'reddit_actions'},
     'redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data': {'queue': 'update_subreddit_data'},
     'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit': {'queue': 'update_subreddit_data'},
-'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit_batch': {'queue': 'update_subreddit_data'},
+    'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit_batch': {'queue': 'update_subreddit_data'},
+    # Tier 2 spam detection tasks (Reddit API calls) - separate queue for slow tasks
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.enrich_user_features_tier2': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.rescore_user_with_tier2': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.enrich_high_risk_users': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scan_user_full': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_enrich_high_risk': {'queue': 'spam_detection_tier2'},
+    # Tier 1 spam detection tasks (fast, no API calls)
     'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.*': {'queue': 'spam_detection'},
 
 }

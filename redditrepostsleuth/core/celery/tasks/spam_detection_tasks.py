@@ -102,6 +102,17 @@ class SpamDetectionTask(Task):
     _config = None
     _uowm = None
 
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        """Log task failures to ensure visibility."""
+        log.error('Task %s[%s] failed after retries: %s\nArgs: %s\nKwargs: %s\nTraceback:\n%s',
+                  self.name, task_id, exc, args, kwargs, einfo.traceback)
+        super().on_failure(exc, task_id, args, kwargs, einfo)
+
+    def on_retry(self, exc, task_id, args, kwargs, einfo):
+        """Log retries to help identify flaky failures."""
+        log.warning('Task %s[%s] retrying due to: %s', self.name, task_id, exc)
+        super().on_retry(exc, task_id, args, kwargs, einfo)
+
     @property
     def config(self):
         if self._config is None:

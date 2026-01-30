@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from redditrepostsleuth.core.db.databasemodels import UserSpamFeatures
 
@@ -28,6 +28,31 @@ class SpamFeaturesRepo:
         return self.db_session.query(UserSpamFeatures).filter(
             UserSpamFeatures.spam_score >= threshold
         ).order_by(UserSpamFeatures.spam_score.desc()).limit(limit).all()
+
+
+    def get_high_spam_scores_paginated(
+        self,
+        threshold: float = 0.60,
+        limit: int = 20,
+        offset: int = 0
+    ) -> Tuple[List[UserSpamFeatures], int]:
+        """
+        Get users with spam scores at or above threshold with pagination.
+
+        Returns:
+            Tuple of (list of UserSpamFeatures, total count matching threshold)
+        """
+        base_query = self.db_session.query(UserSpamFeatures).filter(
+            UserSpamFeatures.spam_score >= threshold
+        )
+
+        total = base_query.count()
+
+        results = base_query.order_by(
+            UserSpamFeatures.spam_score.desc()
+        ).offset(offset).limit(limit).all()
+
+        return results, total
 
     def get_stale_features(self, older_than: datetime, limit: int = 100) -> List[UserSpamFeatures]:
         """Get features that need recomputation."""
