@@ -656,5 +656,48 @@ class SpamScorerWithTier2:
             reasons.append("Promotional activity in both profile and posts")
             log.debug('Signal: cross-channel promotional activity (+0.15)')
 
+        # Comment-based signals (Phase 4a)
+        comment_features = tier2.get('comment_features', {})
+        if comment_features:
+            # High duplicate ratio = template spam
+            dup_ratio = comment_features.get('duplicate_comment_ratio', 0)
+            if dup_ratio > 0.20:
+                score += 0.25
+                reasons.append(f"High duplicate comment ratio: {dup_ratio:.0%}")
+                log.debug('Signal: high duplicate comment ratio %.2f (+0.25)', dup_ratio)
+            elif dup_ratio > 0.10:
+                score += 0.12
+                reasons.append(f"Elevated duplicate comment ratio: {dup_ratio:.0%}")
+                log.debug('Signal: elevated duplicate comment ratio %.2f (+0.12)', dup_ratio)
+
+            # Similar comments (fuzzy match) = template spam
+            sim_ratio = comment_features.get('similar_comment_ratio', 0)
+            if sim_ratio > 0.15:
+                score += 0.20
+                reasons.append(f"Many similar comments detected: {sim_ratio:.0%}")
+                log.debug('Signal: high similar comment ratio %.2f (+0.20)', sim_ratio)
+
+            # Negative karma comments = poor reception
+            neg_ratio = comment_features.get('negative_karma_comment_ratio', 0)
+            if neg_ratio > 0.30:
+                score += 0.15
+                reasons.append(f"High negative karma comment ratio: {neg_ratio:.0%}")
+                log.debug('Signal: high negative karma comment ratio %.2f (+0.15)', neg_ratio)
+
+            # Low comment engagement (posts >> comments)
+            c2p_ratio = comment_features.get('comment_to_post_ratio', 1.0)
+            user_post_count = tier2.get('total_posts', 0)
+            if c2p_ratio < 0.2 and user_post_count > 20:
+                score += 0.10
+                reasons.append("Very few comments relative to posts")
+                log.debug('Signal: low comment-to-post ratio %.2f (+0.10)', c2p_ratio)
+
+            # High link ratio in comments = promotional spam
+            link_ratio = comment_features.get('link_comment_ratio', 0)
+            if link_ratio > 0.20:
+                score += 0.10
+                reasons.append(f"High link ratio in comments: {link_ratio:.0%}")
+                log.debug('Signal: high link comment ratio %.2f (+0.10)', link_ratio)
+
         log.debug('Tier 2 signal scoring complete: total=%.3f, reasons=%d', score, len(reasons))
         return {'score': score, 'reasons': reasons}

@@ -268,6 +268,9 @@ class Repost(Base):
         Index('idx_repost_of_date',  'author', 'detected_at',unique=False),
         Index('idx_repost_by_subreddit', 'subreddit', 'post_type_id', 'detected_at', unique=False),
         Index('idx_repost_by_author', 'author', unique=False),
+        # Indexes for scheduled task optimization (update_top_reposts, update_top_reposters)
+        Index('idx_repost_of_id_posttype', 'post_type_id', 'repost_of_id', unique=False),
+        Index('idx_repost_author_stats', 'post_type_id', 'detected_at', 'author', unique=False),
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
@@ -894,6 +897,10 @@ class UserSpamFeatures(Base):
     mod_vote_updated_at = Column(DateTime, nullable=True)
     mod_vote_consensus = Column(String(20), nullable=True)  # 'spam', 'legit', 'disputed'
 
+    # Comment analysis (Phase 4a) - stored as JSON blob
+    comment_features = Column(JSON, nullable=True)
+    comment_analysis_at = Column(DateTime, nullable=True)
+
     def to_dict(self) -> dict:
         """Return full dictionary representation for admin/internal use."""
         return {
@@ -935,6 +942,9 @@ class UserSpamFeatures(Base):
             'mod_vote_weighted': self.mod_vote_weighted,
             'mod_vote_updated_at': self.mod_vote_updated_at.isoformat() if self.mod_vote_updated_at else None,
             'mod_vote_consensus': self.mod_vote_consensus,
+            # Comment analysis
+            'comment_features': self.comment_features,
+            'comment_analysis_at': self.comment_analysis_at.isoformat() if self.comment_analysis_at else None,
         }
 
     def to_dict_for_moderator(self) -> dict:
@@ -1005,6 +1015,19 @@ class UserSpamFeatures(Base):
                 # Timeline
                 'first_post_date': fd.get('first_post_date'),
                 'last_post_date': fd.get('last_post_date'),
+            })
+
+        # Add comment analysis fields if available
+        if self.comment_features:
+            cf = self.comment_features
+            result.update({
+                'comment_count': cf.get('comment_count', 0),
+                'duplicate_comment_ratio': cf.get('duplicate_comment_ratio', 0.0),
+                'similar_comment_ratio': cf.get('similar_comment_ratio', 0.0),
+                'negative_karma_comment_ratio': cf.get('negative_karma_comment_ratio', 0.0),
+                'comment_to_post_ratio': cf.get('comment_to_post_ratio', 0.0),
+                'link_comment_ratio': cf.get('link_comment_ratio', 0.0),
+                'comment_analysis_at': self.comment_analysis_at.isoformat() if self.comment_analysis_at else None,
             })
 
         return result

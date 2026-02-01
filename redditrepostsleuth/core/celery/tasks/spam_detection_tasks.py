@@ -567,6 +567,28 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
                      username, tier2_features.account_age_days or 0, tier2_features.total_karma or 0,
                      tier2_features.account_suspended, tier2_features.has_adult_profile_links)
 
+        # Comment analysis (Phase 4a) - analyze user comments for spam patterns
+        if not tier2_features.account_suspended:
+            try:
+                log.debug('Starting comment analysis for %s', username)
+                # Get user's post count for comment-to-post ratio
+                with self.uowm.start() as uow:
+                    features_record = uow.spam_features.get_by_username(username)
+                    user_post_count = features_record.total_posts if features_record else 0
+
+                comment_features = fetcher.analyze_comments(username, user_post_count)
+                if comment_features:
+                    with self.uowm.start() as uow:
+                        uow.spam_features.update_comment_features(username, comment_features)
+                        uow.commit()
+                    log.info('Comment analysis complete for %s: count=%d, dup_ratio=%.2f',
+                             username, comment_features.get('comment_count', 0),
+                             comment_features.get('duplicate_comment_ratio', 0))
+            except RateLimitExceeded:
+                log.warning('Rate limited during comment analysis for %s, skipping', username)
+            except Exception as e:
+                log.warning('Error during comment analysis for %s: %s', username, str(e))
+
         # BACKWARDS COMPATIBILITY: Update user_review.content_links_found for submonitor
         # TODO: Remove this once submonitor is updated to use spam_features.has_adult_profile_links
         if tier2_features.has_adult_profile_links:
@@ -575,7 +597,8 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
                 user_review = uow.user_review.get_by_username(username)
                 if user_review:
                     user_review.content_links_found = True
-                    user_review.notes = f"Spam detection: {tier2_features.detected_platforms or 'adult links found'}"
+                    if not user_review.notes or 'adult' not in user_review.notes.lower():
+                        user_review.notes = f"Spam detection: {tier2_features.detected_platforms or 'adult links found'}"
                 else:
                     user_review = UserReview(
                         username=username,
@@ -859,6 +882,27 @@ def score_user_spam(self, username: str) -> Optional[dict]:
         log.info('Spam scoring complete for %s: score=%.3f, risk=%s, confidence=%.2f, reasons=%d',
                  username, result.score, result.risk_level, result.confidence, len(result.reasons))
 
+        # BACKWARDS COMPATIBILITY: Update user_review.content_links_found for submonitor
+        # TODO: Remove this once submonitor is updated to use spam_features directly
+        if features.adult_platform_post_count > 0:
+            with self.uowm.start() as uow:
+                from redditrepostsleuth.core.db.databasemodels import UserReview
+                user_review = uow.user_review.get_by_username(username)
+                if user_review:
+                    user_review.content_links_found = True
+                    if not user_review.notes or 'adult' not in user_review.notes.lower():
+                        user_review.notes = f"Spam detection: {features.adult_platform_post_count} posts with adult links"
+                else:
+                    user_review = UserReview(
+                        username=username,
+                        content_links_found=True,
+                        notes=f"Spam detection: {features.adult_platform_post_count} posts with adult links"
+                    )
+                    uow.user_review.add(user_review)
+                uow.commit()
+                log.info('Updated user_review.content_links_found=True for %s (Tier 1, %d posts)',
+                         username, features.adult_platform_post_count)
+
         if result.risk_level in ('HIGH', 'CRITICAL'):
             log.info('High-risk user detected: %s (score=%.3f, risk=%s) - reasons: %s',
                      username, result.score, result.risk_level, ', '.join(result.reasons[:3]))
@@ -926,6 +970,9 @@ def rescore_user_with_tier2(self, username: str) -> Optional[dict]:
                 'has_telegram_links': spam_features.has_telegram_links,
                 'profile_link_sources': spam_features.profile_link_sources,
                 'has_promotional_post_links': spam_features.has_promotional_post_links,
+                # Phase 4a: Comment analysis features
+                'comment_features': spam_features.comment_features,
+                'total_posts': spam_features.total_posts,  # For comment-to-post ratio
             }
 
         # Score with both tiers
