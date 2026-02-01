@@ -567,6 +567,25 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
                      username, tier2_features.account_age_days or 0, tier2_features.total_karma or 0,
                      tier2_features.account_suspended, tier2_features.has_adult_profile_links)
 
+        # BACKWARDS COMPATIBILITY: Update user_review.content_links_found for submonitor
+        # TODO: Remove this once submonitor is updated to use spam_features.has_adult_profile_links
+        if tier2_features.has_adult_profile_links:
+            with self.uowm.start() as uow:
+                from redditrepostsleuth.core.db.databasemodels import UserReview
+                user_review = uow.user_review.get_by_username(username)
+                if user_review:
+                    user_review.content_links_found = True
+                    user_review.notes = f"Spam detection: {tier2_features.detected_platforms or 'adult links found'}"
+                else:
+                    user_review = UserReview(
+                        username=username,
+                        content_links_found=True,
+                        notes=f"Spam detection: {tier2_features.detected_platforms or 'adult links found'}"
+                    )
+                    uow.user_review.add(user_review)
+                uow.commit()
+                log.info('Updated user_review.content_links_found=True for %s (backwards compat)', username)
+
         # Queue re-scoring with Tier 2 data (non-blocking)
         log.info('Queueing Tier 2 re-scoring for %s', username)
         rescore_user_with_tier2.delay(username)
