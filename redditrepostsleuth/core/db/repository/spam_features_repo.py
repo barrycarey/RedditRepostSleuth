@@ -258,3 +258,27 @@ class SpamFeaturesRepo:
         ).order_by(
             UserSpamFeatures.tier2_enriched_at.desc()
         ).limit(limit).all()
+
+    def update_comment_features(
+        self,
+        username: str,
+        comment_features: dict
+    ) -> Optional[UserSpamFeatures]:
+        """
+        Update comment analysis results for a user.
+
+        Args:
+            username: Reddit username
+            comment_features: Dict of comment analysis metrics (stored as JSON)
+
+        Returns:
+            Updated UserSpamFeatures or None if user not found
+        """
+        features = self.get_by_username(username)
+        if not features:
+            return None
+
+        features.comment_features = comment_features
+        features.comment_analysis_at = datetime.utcnow()
+
+        return features

@@ -610,6 +610,50 @@ class UserDataFetcher:
 
         return features
 
+    def analyze_comments(
+        self,
+        username: str,
+        user_post_count: int = 0
+    ) -> Optional[dict]:
+        """
+        Analyze user's comments for spam patterns.
+
+        Fetches up to 1000 comments and computes various metrics useful
+        for spam detection including duplicate detection and similarity analysis.
+
+        Args:
+            username: Reddit username to analyze
+            user_post_count: User's post count (for comment_to_post_ratio)
+
+        Returns:
+            Dict of comment features (suitable for JSON storage) or None on error
+        """
+        from redditrepostsleuth.core.services.spam.comment_analyzer import CommentAnalyzer
+
+        try:
+            self._enforce_rate_limit()
+
+            log.debug('Starting comment analysis for %s', username)
+            analyzer = CommentAnalyzer(self.reddit)
+            features = analyzer.analyze_user_comments(username, user_post_count)
+
+            if features:
+                self._consecutive_errors = 0
+                self.circuit_breaker.record_success()
+                return features.to_dict()
+            return None
+
+        except TooManyRequests as e:
+            self._consecutive_errors += 1
+            self.circuit_breaker.record_failure(e)
+            raise RateLimitExceeded(retry_after=getattr(e, 'retry_after', 60))
+
+        except Exception as e:
+            self._consecutive_errors += 1
+            self.circuit_breaker.record_failure(e)
+            log.error(f"Error analyzing comments for {username}: {e}")
+            return None
+
     def batch_fetch_users(
         self,
         usernames: List[str],
