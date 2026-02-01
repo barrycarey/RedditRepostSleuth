@@ -80,6 +80,10 @@ class RedditTokenExpiredException(RepostSleuthException):
     def __init__(self, message):
         super(RedditTokenExpiredException, self).__init__(message)
 
+class RedditServerException(RepostSleuthException):
+    def __init__(self, message):
+        super(RedditServerException, self).__init__(message)
+
 class PatreonTokenException(RepostSleuthException):
     def __init__(self, message):
         super(PatreonTokenException, self).__init__(message)

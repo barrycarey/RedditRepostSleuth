@@ -2,8 +2,8 @@ import asyncio
 import itertools
 import json
 import os
-import time
 from asyncio import ensure_future, gather, run, TimeoutError, CancelledError
+from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Union, Generator
 
@@ -13,10 +13,10 @@ from praw import Reddit
 
 from redditrepostsleuth.core.celery.tasks.ingest_tasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
-from redditrepostsleuth.core.db.databasemodels import Post
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
-from redditrepostsleuth.core.exception import RateLimitException, UtilApiException, RedditTokenExpiredException
+from redditrepostsleuth.core.exception import RateLimitException, UtilApiException, RedditTokenExpiredException, \
+    RedditServerException
 from redditrepostsleuth.core.logging import configure_logger
 from redditrepostsleuth.core.model.misc_models import BatchedPostRequestJob, JobStatus
 from redditrepostsleuth.core.util.helpers import get_reddit_instance, get_newest_praw_post_id, get_next_ids, \
@@ -33,18 +33,37 @@ if os.getenv('SENTRY_DNS', None):
         environment=os.getenv('RUN_ENV', 'dev')
     )
 
-
+# Configuration constants
+BATCH_SIZE = 100
+MAX_CONCURRENT_JOBS = 50
+TOKEN_REFRESH_INTERVAL_SECONDS = 600
+DEFAULT_REQUEST_DELAY = 0
+RATE_LIMIT_SLEEP_SECONDS = 10
+ERROR_SLEEP_SECONDS = 2
+TARGET_INGEST_DELAY_SECONDS = 90
 
 config = Config()
 REMOVAL_REASONS_TO_SKIP = ['deleted', 'author', 'reddit', 'copyright_takedown']
 HEADERS = {'User-Agent': 'u/RepostSleuthBot - Submission Ingest (by u/BarryCarey)'}
 
-async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
+
+@dataclass
+class IngestionState:
+    """Tracks state of the main ingestion loop"""
+    newest_id: str
+    request_delay: int
+    auth_headers: dict
+    last_token_refresh: datetime
+
+
+async def fetch_page(url: str, session: ClientSession) -> Optional[dict]:
     """
-    Fetch a single URL with AIOHTTP
+    Fetch a single URL with AIOHTTP and parse JSON response.
+
     :param url: URL to fetch
     :param session: AIOHttp session to use
-    :return: raw response from request
+    :return: Parsed JSON response
+    :raises: RateLimitException, RedditTokenExpiredException, RedditServerException
     """
     log.debug('Page fetch')
 
@@ -53,33 +72,34 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[str]:
             if resp.status == 200:
                 log.debug('Successful fetch')
                 try:
-                    return await resp.text()
+                    text = await resp.text()
+                    return json.loads(text)
                 except CancelledError:
                     log.error('Canceled on getting text')
                     raise UtilApiException('Canceled')
+            elif resp.status == 429:
+                raise RateLimitException('Reddit rate limit')
+            elif resp.status == 401:
+                raise RedditTokenExpiredException('Token expired')
+            elif resp.status == 500:
+                log.warning('Reddit server error (500) for URL: %s', url)
+                raise RedditServerException('Reddit server error')
             else:
-                if resp.status == 429:
-                    text = await resp.text()
-                    raise RateLimitException('Data API rate limit')
-                elif resp.status == 401:
-                    raise RedditTokenExpiredException('Token expired')
-                else:
-                    log.info('Unexpected request status %s - %s', resp.status, url)
-                    return
-
+                log.info('Unexpected request status %s - %s', resp.status, url)
+                return None
         except (ClientOSError, TimeoutError):
             log.exception('')
+            return None
 
 
 async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) -> BatchedPostRequestJob:
     """
-    Take a batch job, fetch the URL, added the response data to the job and return.
+    Take a batch job, fetch the URL, add the response data to the job and return.
 
     Allows us to fetch a large number of tasks at once.
     :param job: Job to run
     :param session: AIOHTTP session to use
     :return: Job with the result status and response data
-    :rtype: BatchedPostRequestJob
     """
     try:
         async with session.get(job.url, timeout=ClientTimeout(total=10), headers=HEADERS) as resp:
@@ -92,29 +112,34 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
                 log.warning('Data API Rate Limit')
                 job.status = JobStatus.RATELIMIT
             elif resp.status == 500:
-                text = await resp.text()
-                log.warning('Reddit Server Error')
+                log.warning('Reddit Server Error for URL: %s', job.url)
                 job.status = JobStatus.ERROR
             else:
                 log.warning('Unexpected request status %s - %s', resp.status, job.url)
                 job.status = JobStatus.ERROR
-    except TimeoutError as e:
+    except TimeoutError:
         log.error('Request Timeout')
         job.status = JobStatus.TIMEOUT
     except ClientConnectorError as e:
         log.error('Client Connection Error: %s', e)
         await asyncio.sleep(5)
         job.status = JobStatus.ERROR
-    except ServerDisconnectedError as e:
+    except ServerDisconnectedError:
         log.error('Server disconnect Error')
         job.status = JobStatus.ERROR
-    except Exception as e:
+    except Exception:
         job.status = JobStatus.ERROR
         log.exception('Unexpected issue fetching posts')
 
     return job
 
+
 async def ingest_range(newest_post_id: Union[str, int], oldest_post_id: Union[str, int], alt_headers: dict = None) -> None:
+    """
+    Ingest all posts between oldest_post_id and newest_post_id.
+
+    Used for backfilling missed posts.
+    """
     if isinstance(newest_post_id, str):
         newest_post_id = base36decode(newest_post_id)
 
@@ -126,16 +151,12 @@ async def ingest_range(newest_post_id: Union[str, int], oldest_post_id: Union[st
     await ingest_sequence(missing_ids, alt_headers=alt_headers)
 
 
-
 async def ingest_sequence(ids: Union[list[int], Generator[int, None, None]], alt_headers: dict = None) -> None:
     """
-    Take a range of posts and attempt to ingest them.
+    Take a sequence of post IDs and attempt to ingest them.
 
-    Mainly used to catch any missed posts while script is down
-    :param newest_post_id: Most recent Post ID, usually pulled from Praw
-    :param oldest_post_id: Oldest post ID, is usually the most recent post ingested in the database
+    Mainly used to catch any missed posts while script is down.
     """
-
     if isinstance(ids, list):
         def id_gen(list_of_ids):
             for id in list_of_ids:
@@ -149,15 +170,15 @@ async def ingest_sequence(ids: Union[list[int], Generator[int, None, None]], alt
     async with ClientSession(connector=conn, headers=alt_headers or HEADERS) as session:
         while True:
             try:
-                chunk = list(itertools.islice(ids, 100))
+                chunk = list(itertools.islice(ids, BATCH_SIZE))
             except StopIteration:
                 break
 
-            #url = f'{config.util_api}/reddit/info?submission_ids={build_reddit_query_string(chunk)}'
             url = f'https://oauth.reddit.com/api/info?id={build_reddit_query_string(chunk)}'
             job = BatchedPostRequestJob(url, chunk, JobStatus.STARTED)
             tasks.append(ensure_future(fetch_page_as_job(job, session)))
-            if len(tasks) >= 50 or len(chunk) == 0:
+
+            if len(tasks) >= MAX_CONCURRENT_JOBS or len(chunk) == 0:
                 posts_to_save = []
                 while tasks:
                     log.info('Gathering %s task results', len(tasks))
@@ -186,134 +207,168 @@ async def ingest_sequence(ids: Union[list[int], Generator[int, None, None]], alt
                     any_rate_limit = next((x for x in results if x.status == JobStatus.RATELIMIT), None)
                     if any_rate_limit:
                         log.info('Some jobs hit data rate limit, waiting')
-                        await asyncio.sleep(10)
+                        await asyncio.sleep(RATE_LIMIT_SLEEP_SECONDS)
 
                 log.info('Sending %s posts to save queue', len(posts_to_save))
-
-                # save_new_posts.apply_async(([reddit_submission_to_post(submission) for submission in posts_to_save],))
                 save_new_posts.apply_async((posts_to_save, True))
+
             if len(chunk) == 0:
                 break
 
     log.info('Saved posts: %s', saved_posts)
-    log.info('Finished backfill ')
+    log.info('Finished backfill')
 
 
-def queue_posts_for_ingest(posts: List[Post]):
+def queue_posts_for_ingest(posts: List[dict]) -> None:
     """
-    Ship the package posts off to Celery for ingestion
-    :param posts: List of Posts to save
+    Ship the posts off to Celery for ingestion.
+
+    :param posts: List of post data dicts to save
     """
     log.info('Sending batch of %s posts to ingest queue', len(posts))
     for post in posts:
         save_new_post.apply_async((post,))
 
-def get_request_delay(submissions: list[dict], current_req_delay: int, target_ingest_delay: int = 30) -> int:
+
+def filter_valid_posts(res_data: dict) -> list[dict]:
+    """Filter out deleted/removed posts from API response."""
+    posts = []
+    for post in res_data['data']['children']:
+        if post['data']['removed_by_category'] not in REMOVAL_REASONS_TO_SKIP:
+            posts.append(post['data'])
+    return posts
+
+
+def update_request_delay(submissions: list[dict], current_delay: int) -> int:
+    """
+    Adjust request delay based on how far behind we are from real-time.
+
+    If we're behind target, decrease delay to catch up.
+    If we're ahead of target, increase delay to avoid hitting rate limits.
+    """
+    if not submissions:
+        return current_delay
+
     ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(
         submissions[0]['data']['created_utc'])
     log.info('Current Delay: %s', ingest_delay)
 
-    if ingest_delay.seconds > target_ingest_delay:
-        new_delay = current_req_delay - 1 if current_req_delay > 0 else 0
+    if ingest_delay.seconds > TARGET_INGEST_DELAY_SECONDS:
+        new_delay = max(0, current_delay - 1)
     else:
-        new_delay = current_req_delay + 1
+        new_delay = current_delay + 1
 
     log.info('New Delay: %s', new_delay)
     return new_delay
 
+
 def get_auth_headers(reddit: Reddit) -> dict:
     """
-    For praw to make a call.
+    Get OAuth headers from PRAW.
 
-    Hackey but I'd rather let Praw deal handle the tokens
-    :param reddit:
-    :return:
+    Forces PRAW to make a call so we can steal the token.
     """
-    list(reddit.subreddit('all').new(limit=1)) # Force praw to make a req so we can steal the token
+    list(reddit.subreddit('all').new(limit=1))
     return {**HEADERS, **{'Authorization': f'Bearer {reddit.auth._reddit._core._authorizer.access_token}'}}
 
-async def main() -> None:
-    log.info('Starting post ingestor')
-    reddit = get_reddit_instance(config)
-    allowed_submission_delay_seconds = 90
-    missed_id_retry_count = 3000
 
-    newest_id = get_newest_praw_post_id(reddit)
-    uowm = UnitOfWorkManager(get_db_engine(config))
-    auth_headers = get_auth_headers(reddit)
+def maybe_refresh_token(state: IngestionState, reddit: Reddit) -> None:
+    """Refresh OAuth token if it's been too long since last refresh."""
+    if (datetime.utcnow() - state.last_token_refresh).seconds > TOKEN_REFRESH_INTERVAL_SECONDS:
+        log.info('Refreshing token')
+        state.auth_headers = get_auth_headers(reddit)
+        state.last_token_refresh = datetime.utcnow()
 
-    with uowm.start() as uow:
-        oldest_post = uow.posts.get_newest_post()
-        oldest_id = oldest_post.post_id
 
-    await ingest_range(newest_id, oldest_id, alt_headers=auth_headers)
+async def fetch_batch(ids_to_get: list[str], auth_headers: dict) -> Optional[dict]:
+    """
+    Fetch a batch of posts from Reddit API.
 
-    request_delay = 0
-    missed_ids = [] # IDs that we didn't get results back for or had a removal reason
-    last_token_refresh = datetime.utcnow()
+    :param ids_to_get: List of post IDs to fetch
+    :param auth_headers: OAuth headers
+    :return: Parsed JSON response or None
+    :raises: RateLimitException, RedditTokenExpiredException, RedditServerException
+    """
+    url = f'https://oauth.reddit.com/api/info?id={build_reddit_query_string(ids_to_get)}'
+    async with ClientSession(headers=auth_headers) as session:
+        return await fetch_page(url, session)
+
+
+async def run_ingestion_loop(state: IngestionState, reddit: Reddit) -> None:
+    """Main loop that continuously fetches and processes new posts."""
     while True:
+        maybe_refresh_token(state, reddit)
+        ids_to_get = get_next_ids(state.newest_id, BATCH_SIZE)
 
-        if (datetime.utcnow() - last_token_refresh).seconds > 600:
-            log.info('Refreshing token')
-            auth_headers = get_auth_headers(reddit)
-            last_token_refresh = datetime.utcnow()
+        try:
+            log.debug('Sending fetch request')
+            res_data = await fetch_batch(ids_to_get, state.auth_headers)
+        except RedditServerException:
+            log.warning('Reddit server error for batch starting at %s, skipping to %s',
+                       state.newest_id, ids_to_get[-1])
+            state.newest_id = ids_to_get[-1]
+            await asyncio.sleep(ERROR_SLEEP_SECONDS)
+            continue
+        except RateLimitException:
+            log.warning('Hit Reddit rate limit')
+            await asyncio.sleep(RATE_LIMIT_SLEEP_SECONDS)
+            continue
+        except RedditTokenExpiredException:
+            state.auth_headers = get_auth_headers(reddit)
+            continue
+        except (ServerDisconnectedError, ClientConnectorError, ClientOSError,
+                TimeoutError, CancelledError, UtilApiException):
+            log.warning('Network error during fetch')
+            await asyncio.sleep(ERROR_SLEEP_SECONDS)
+            continue
 
-        ids_to_get = get_next_ids(newest_id, 100)
-
-        url = f'https://oauth.reddit.com/api/info?id={build_reddit_query_string(ids_to_get)}'
-        async with ClientSession(headers=auth_headers) as session:
-            try:
-                log.debug('Sending fetch request')
-                results = await fetch_page(url, session)
-            except (ServerDisconnectedError, ClientConnectorError, ClientOSError, TimeoutError, CancelledError, UtilApiException) as e:
-                log.warning('Error during fetch')
-                await asyncio.sleep(2)
-                continue
-            except RateLimitException:
-                log.warning('Hit Data API Rate Limit')
-                await asyncio.sleep(10)
-                continue
-            except RedditTokenExpiredException:
-                auth_headers = get_auth_headers(reddit)
-                continue
-
-        if not results:
+        if not res_data:
             log.debug('No results')
             continue
 
-        res_data = json.loads(results)
-
-        if not res_data or not len(res_data['data']['children']):
-            log.info('No results')
+        if not res_data.get('data', {}).get('children'):
+            log.info('No children in response')
             continue
 
         log.info('%s results returned from API', len(res_data['data']['children']))
 
-        posts_to_save = []
-        for post in res_data['data']['children']:
-            if post['data']['removed_by_category'] in REMOVAL_REASONS_TO_SKIP:
-                continue
-            posts_to_save.append(post['data'])
-
+        posts_to_save = filter_valid_posts(res_data)
         log.info('Sending %s posts to save queue', len(posts_to_save))
 
         queue_posts_for_ingest(posts_to_save)
 
-        request_delay = get_request_delay(res_data['data']['children'], request_delay, allowed_submission_delay_seconds)
+        state.request_delay = update_request_delay(res_data['data']['children'], state.request_delay)
+        state.newest_id = res_data['data']['children'][-1]['data']['id']
 
-        newest_id = res_data['data']['children'][-1]['data']['id']
-
-        time.sleep(request_delay)
-
-        # saved_ids = [x['id'] for x in posts_to_save]
-        # missing_ids_in_this_req = list(set(ids_to_get).difference(saved_ids))
-        # missed_ids += [base36decode(x) for x in missing_ids_in_this_req]
+        await asyncio.sleep(state.request_delay)
 
 
-        # log.info('Missed IDs: %s', len(missed_ids))
-        # if len(missed_ids) > missed_id_retry_count:
-        #     await ingest_sequence(missed_ids, alt_headers=auth_headers)
-        #     missed_ids = []
+async def main() -> None:
+    log.info('Starting post ingestor')
+    reddit = get_reddit_instance(config)
+    uowm = UnitOfWorkManager(get_db_engine(config))
+
+    # Get starting point from database
+    with uowm.start() as uow:
+        oldest_post = uow.posts.get_newest_post()
+        oldest_id = oldest_post.post_id
+
+    newest_id = get_newest_praw_post_id(reddit)
+    auth_headers = get_auth_headers(reddit)
+
+    # Backfill any missed posts
+    await ingest_range(newest_id, oldest_id, alt_headers=auth_headers)
+
+    # Initialize state and run main loop
+    state = IngestionState(
+        newest_id=newest_id,
+        request_delay=DEFAULT_REQUEST_DELAY,
+        auth_headers=auth_headers,
+        last_token_refresh=datetime.utcnow()
+    )
+
+    await run_ingestion_loop(state, reddit)
+
 
 if __name__ == '__main__':
     run(main())
