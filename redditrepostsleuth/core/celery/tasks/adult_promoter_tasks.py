@@ -75,4 +75,4 @@ def check_user_comments_for_only_fans(self, username: str) -> None:
     except IntegrityError:
         pass
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to check user %s comments for promoter links', username)

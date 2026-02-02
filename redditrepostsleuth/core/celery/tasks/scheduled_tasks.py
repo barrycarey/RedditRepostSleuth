@@ -45,8 +45,11 @@ def record_task_status(func):
             log.warning('Task class %s does not have an event logger, cannot record task time', self.__name__)
             return func(self, *args, **kwargs)
 
+        task_start = perf_counter()
+        task_status = 'started'
+        exception_to_raise = None
+
         try:
-            task_start = perf_counter()
             self.event_logger.write_raw_points(
                 get_task_influx_points(
                     func.__name__,
@@ -58,16 +61,27 @@ def record_task_status(func):
             task_status = 'finished'
 
         except Exception as e:
-            log.exception('')
+            log.exception('Scheduled task %s failed', func.__name__)
             task_status = 'failed'
+            exception_to_raise = e
 
-        self.event_logger.write_raw_points(
-            get_task_influx_points(
-                func.__name__,
-                task_status,
-                perf_counter() - task_start,
-            )
-        )
+        finally:
+            # Always record task status, even if an exception occurred
+            try:
+                self.event_logger.write_raw_points(
+                    get_task_influx_points(
+                        func.__name__,
+                        task_status,
+                        perf_counter() - task_start,
+                    )
+                )
+            except Exception as metrics_err:
+                log.warning('Failed to record task metrics for %s: %s', func.__name__, metrics_err)
+
+        # Re-raise the exception AFTER recording metrics
+        if exception_to_raise is not None:
+            raise exception_to_raise
+
     return dec
 
 
@@ -197,7 +211,8 @@ def check_for_subreddit_config_update_task(self, subreddit_name: str) -> None:
                 monitored_sub.active = False
                 uow.commit()
         except Exception as e:
-            log.exception('')
+            log.exception('Failed to check config update for subreddit %s', subreddit_name)
+
 
 @celery.task(bind=True, base=RedditTask)
 @record_task_status
@@ -292,7 +307,8 @@ def update_monitored_sub_stats_task(self, sub_name: str) -> None:
     except ServerError as e:
         log.warning('Server error checking %s', sub_name)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to update monitored sub stats for r/%s', sub_name)
+
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 @record_task_status
@@ -319,7 +335,8 @@ def delete_search_batch(self, ids: list[int]):
             uow.commit()
             log.info('Finished range %s:%s', ids[0], ids[-1])
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to delete search batch (IDs: %s to %s)', ids[0] if ids else 'none', ids[-1] if ids else 'none')
+
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 @record_task_status

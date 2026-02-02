@@ -155,7 +155,8 @@ def save_subreddit(self, subreddit_name: str):
             log.debug('Saved Subreddit %s', subreddit_name)
             update_subreddit_data.apply_async((subreddit_name,))
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to save subreddit %s', subreddit_name)
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle')
 def save_subreddit_batch(self, subreddit_names: list[str]):
@@ -182,4 +183,4 @@ def save_subreddit_batch(self, subreddit_names: list[str]):
                     uow.session.rollback()
 
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to save subreddit batch of %d names', len(subreddit_names))

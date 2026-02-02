@@ -36,11 +36,12 @@ def process_monitored_subreddit_submission(post_id: str, monitored_sub_svc: Moni
 
     monitored_sub = uow.monitored_sub.get_by_sub(post.subreddit)
 
-    if monitored_sub.adult_promoter_remove_post or monitored_sub.adult_promoter_ban_user or monitored_sub.adult_promoter_notify_mod_mail:
-        try:
-            check_user_for_only_fans(uow, post.author, monitored_sub_svc.reddit)
-        except (UtilApiException, ConnectionError, TooManyRequests) as e:
-            log.warning('Failed to do onlyfans check for user %s', post.author)
+    # Disabling since the new Spam detection system will populate these fields
+    #if monitored_sub.adult_promoter_remove_post or monitored_sub.adult_promoter_ban_user or monitored_sub.adult_promoter_notify_mod_mail:
+    #    try:
+    #        check_user_for_only_fans(uow, post.author, monitored_sub_svc.reddit)
+    #    except (UtilApiException, ConnectionError, TooManyRequests) as e:
+    #        log.warning('Failed to do onlyfans check for user %s', post.author)
 
     whitelisted_user = uow.user_whitelist.get_by_username_and_subreddit(post.author, monitored_sub.id)
 
@@ -71,10 +72,10 @@ def process_monitored_subreddit_submission(post_id: str, monitored_sub_svc: Moni
         log.exception('Unexpected Reddit API error')
         raise
     except RedditAPIException:
-        log.exception('')
+        log.exception('Reddit API error while checking submission %s in r/%s', post.post_id, monitored_sub.name)
         raise
     except Exception as e:
-        log.exception('')
+        log.exception('Unexpected error checking submission %s in r/%s', post.post_id, monitored_sub.name)
         return
 
     if results:

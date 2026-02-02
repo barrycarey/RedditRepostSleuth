@@ -115,22 +115,21 @@ def import_image_repost(self, rows: list[dict]):
                     repost.hamming_distance = row['hamming_distance']
                 reposts_to_save.append(repost)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to process image repost batch of %d rows', len(rows))
         return
     log.info('Saving %s reposts', len(reposts_to_save))
     with self.uowm.start() as uow:
         try:
             uow.session.bulk_save_objects(reposts_to_save)
         except Exception as e:
-            print('')
-            log.exception('')
+            log.exception('Failed to bulk save %d image reposts', len(reposts_to_save))
         try:
             uow.commit()
             log.info('Batch saved')
         except IntegrityError as e:
             log.error('duplicate')
         except Exception as e:
-            log.exception('')
+            log.exception('Failed to commit image repost batch')
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_bot_comment_task(self, rows: list[dict]):
@@ -158,16 +157,17 @@ def import_bot_comment_task(self, rows: list[dict]):
             try:
                 uow.session.bulk_save_objects(comments_to_save)
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to bulk save %d bot comments', len(comments_to_save))
             try:
                 uow.commit()
                 log.info('Batch saved')
             except IntegrityError as e:
                 log.error('duplicate')
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to commit bot comment batch')
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to process bot comment batch of %d rows', len(rows))
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_bot_summons_task(self, rows: list[dict]):
@@ -201,7 +201,7 @@ def import_bot_summons_task(self, rows: list[dict]):
                 log.error('duplicate')
                 uow.session.rollback()
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to bulk save %d bot summons', len(items))
             try:
                 uow.commit()
                 log.info('Batch saved')
@@ -210,9 +210,10 @@ def import_bot_summons_task(self, rows: list[dict]):
                 uow.session.rollback()
             except Exception as e:
                 uow.session.rollback()
-                log.exception('')
+                log.exception('Failed to commit bot summons batch')
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to process bot summons batch of %d rows', len(rows))
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_bot_pm_task(self, rows: list[dict]):
@@ -234,16 +235,17 @@ def import_bot_pm_task(self, rows: list[dict]):
             try:
                 uow.session.bulk_save_objects(items)
             except Exception as e:
-                print('')
+                log.exception('Failed to bulk save %d bot PMs', len(items))
             try:
                 uow.commit()
                 log.info('Batch saved')
             except IntegrityError as e:
                 log.error('duplicate')
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to commit bot PM batch')
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to process bot PM batch of %d rows', len(rows))
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_mon_sub_checks_task(self, rows: list[dict]):
@@ -271,16 +273,17 @@ def import_mon_sub_checks_task(self, rows: list[dict]):
             try:
                 uow.session.bulk_save_objects(items)
             except Exception as e:
-                print('')
+                log.exception('Failed to bulk save %d monitored sub checks', len(items))
             try:
                 uow.commit()
                 log.info('Batch saved')
             except IntegrityError as e:
                 log.error('duplicate')
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to commit monitored sub checks batch')
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to process monitored sub checks batch of %d rows', len(rows))
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_mon_sub_config_change_task(self, row: dict):
@@ -306,16 +309,17 @@ def import_mon_sub_config_change_task(self, row: dict):
             try:
                 uow.session.bulk_save_objects([item])
             except Exception as e:
-                print('')
+                log.exception('Failed to save monitored sub config change for r/%s', row.get('subreddit', 'unknown'))
             try:
                 uow.commit()
                 log.info('Batch saved')
             except IntegrityError as e:
                 log.error('duplicate')
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to commit monitored sub config change for r/%s', row.get('subreddit', 'unknown'))
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to import monitored sub config change for r/%s', row.get('subreddit', 'unknown'))
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_mon_sub_config_revision_task(self, row: dict):
@@ -341,16 +345,17 @@ def import_mon_sub_config_revision_task(self, row: dict):
             try:
                 uow.session.bulk_save_objects([item])
             except Exception as e:
-                print('')
+                log.exception('Failed to save monitored sub config revision for r/%s', row.get('subreddit', 'unknown'))
             try:
                 uow.commit()
                 log.info('Batch saved')
             except IntegrityError as e:
                 log.error('duplicate')
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to commit monitored sub config revision for r/%s', row.get('subreddit', 'unknown'))
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to import monitored sub config revision for r/%s', row.get('subreddit', 'unknown'))
+
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
 def import_repost_watch_task(self, rows: list[dict]):
@@ -379,16 +384,16 @@ def import_repost_watch_task(self, rows: list[dict]):
             try:
                 uow.session.bulk_save_objects(items)
             except Exception as e:
-                print('')
+                log.exception('Failed to bulk save %d repost watches', len(items))
             try:
                 uow.commit()
                 log.info('Batch saved')
             except IntegrityError as e:
                 log.error('duplicate')
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to commit repost watch batch')
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to process repost watch batch of %d rows', len(rows))
 
 
 @celery.task(bind=True, base=SqlAlchemyTask, ignore_results=True, serializer='pickle', retry_kwargs={'max_retries': 20, 'countdown': 300})
@@ -425,7 +430,7 @@ def import_post(self, rows: list[dict]):
                     uow.posts.add(post)
 
                 except Exception as e:
-                    log.exception('')
+                    log.exception('Failed to add post %s', row.get('post_id', 'unknown'))
 
             try:
                 uow.commit()
@@ -433,8 +438,8 @@ def import_post(self, rows: list[dict]):
             except IntegrityError as e:
                 log.exception('duplicate')
             except Exception as e:
-                log.exception('')
+                log.exception('Failed to commit post import batch')
 
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to process post import batch of %d rows', len(rows))
         return

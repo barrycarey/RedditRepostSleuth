@@ -164,8 +164,9 @@ def lock_comment_task(self, comment: Comment) -> None:
     except Forbidden as e:
         log.warning('Failed to lock comment on r/%s, no permissions', comment.submission.display_name)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to lock comment %s on r/%s', comment.id, comment.subreddit.display_name)
         raise e
+
 
 @celery.task(
     bind=True,
@@ -190,8 +191,9 @@ def sticky_comment_task(self, comment: Comment) -> None:
     except Forbidden as e:
         log.warning('Failed to sticky comment on r/%s, no permissions', comment.subreddit.display_name)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to sticky comment %s on r/%s', comment.id, comment.subreddit.display_name)
         raise e
+
 
 @celery.task(
     bind=True,
@@ -223,8 +225,9 @@ def mark_as_oc_task(self, submission: Submission) -> None:
             )
         )
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to mark submission %s as OC on r/%s', submission.id, submission.subreddit.display_name)
         raise e
+
 
 @celery.task(
     bind=True,
