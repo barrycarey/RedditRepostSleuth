@@ -83,6 +83,7 @@ class ScoringConfig:
     # Subreddit diversity thresholds
     low_diversity_threshold: int = 3  # Less than this is suspicious
     min_posts_for_diversity: int = 20  # Need this many posts to judge
+    problematic_concentration_threshold: float = 0.30  # Ratio above which low diversity is suspicious
 
     # Username pattern weight
     username_pattern_weight: float = 0.12
@@ -321,16 +322,41 @@ class SpamScorer:
             score += cfg.posting_weight_elevated
             reasons.append(f"Elevated posting frequency: {ppd:.1f} posts/day")
 
-        # Subreddit diversity (only meaningful with enough posts)
+        # Subreddit diversity - REFINED LOGIC
+        # Low diversity alone isn't suspicious - what matters is WHAT subs they're concentrated in
         if features.total_posts_indexed >= cfg.min_posts_for_diversity:
             log.debug('Evaluating subreddit diversity: unique_subs=%d, total_posts=%d, threshold=%d',
                       features.unique_subreddits_posted, features.total_posts_indexed, cfg.low_diversity_threshold)
+
+            # Calculate problematic posts (spam, karma farming, easy karma subs)
+            problematic_posts = (
+                features.spam_subreddit_posts +
+                features.karma_farming_sub_posts +
+                features.easy_karma_sub_posts
+            )
+
+            # NSFW posts only count as problematic if user has adult platform links
+            # This catches OnlyFans/Fansly bots without penalizing legitimate adult content creators
+            if features.adult_platform_post_count > 0:
+                problematic_posts += features.nsfw_post_count
+
+            problematic_ratio = problematic_posts / features.total_posts_indexed if features.total_posts_indexed > 0 else 0.0
+
+            log.debug('Problematic content analysis: problematic_posts=%d, ratio=%.2f, threshold=%.2f',
+                      problematic_posts, problematic_ratio, cfg.problematic_concentration_threshold)
+
             if features.unique_subreddits_posted < cfg.low_diversity_threshold:
-                score += 0.12
-                reasons.append(
-                    f"Low subreddit diversity: {features.unique_subreddits_posted} subs "
-                    f"for {features.total_posts_indexed} posts"
-                )
+                # Low diversity is only suspicious if concentrated in problematic subs
+                if problematic_ratio > cfg.problematic_concentration_threshold:
+                    score += 0.15  # Slightly higher than old blanket penalty
+                    reasons.append(
+                        f"Concentrated in problematic subreddits: "
+                        f"{features.unique_subreddits_posted} subs, "
+                        f"{problematic_ratio:.0%} problematic"
+                    )
+                else:
+                    log.debug('Low diversity in legitimate subreddits - no penalty applied')
+                # else: low diversity in legitimate subs = not suspicious, no penalty
 
         return {'score': score, 'reasons': reasons}
 
