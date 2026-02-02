@@ -870,11 +870,18 @@ def score_user_spam(self, username: str) -> Optional[dict]:
                 spam_features.spam_score = result.score
                 spam_features.spam_score_confidence = result.confidence
                 spam_features.computed_at = datetime.utcnow()
+                # Preserve Tier 2 enrichment data before overwriting
+                existing_detected_platforms = []
+                if spam_features.feature_data:
+                    existing_detected_platforms = spam_features.feature_data.get('detected_platforms', [])
                 # Store feature data with scoring info
                 feature_dict = features.to_dict()
                 feature_dict['rule_score'] = result.score
                 feature_dict['risk_level'] = result.risk_level
                 feature_dict['top_contributing_factors'] = result.reasons
+                # Restore Tier 2 data
+                if existing_detected_platforms:
+                    feature_dict['detected_platforms'] = existing_detected_platforms
                 spam_features.feature_data = feature_dict
                 log.debug('Updated existing spam_features record for %s', username)
             else:
@@ -1019,12 +1026,19 @@ def rescore_user_with_tier2(self, username: str) -> Optional[dict]:
                 spam_features.spam_score = result.score
                 spam_features.spam_score_confidence = result.confidence
                 spam_features.computed_at = datetime.utcnow()
+                # Preserve Tier 2 enrichment data before overwriting
+                existing_detected_platforms = []
+                if spam_features.feature_data:
+                    existing_detected_platforms = spam_features.feature_data.get('detected_platforms', [])
                 # Update feature_data with Tier 2 scoring info
                 feature_dict = tier1_features.to_dict()
                 feature_dict['rule_score'] = result.score
                 feature_dict['risk_level'] = result.risk_level
                 feature_dict['top_contributing_factors'] = result.reasons
                 feature_dict['tier2_enhanced'] = True
+                # Restore Tier 2 data
+                if existing_detected_platforms:
+                    feature_dict['detected_platforms'] = existing_detected_platforms
                 spam_features.feature_data = feature_dict
             uow.commit()
 
@@ -1447,11 +1461,18 @@ def _score_user_sync(uowm, username: str) -> Optional[dict]:
                 spam_features.spam_score = result.score
                 spam_features.spam_score_confidence = result.confidence
                 spam_features.computed_at = datetime.utcnow()
+                # Preserve Tier 2 enrichment data before overwriting
+                existing_detected_platforms = []
+                if spam_features.feature_data:
+                    existing_detected_platforms = spam_features.feature_data.get('detected_platforms', [])
                 feature_dict = tier1_features.to_dict()
                 feature_dict['rule_score'] = result.score
                 feature_dict['risk_level'] = result.risk_level
                 feature_dict['top_contributing_factors'] = result.reasons
                 feature_dict['tier2_enhanced'] = True
+                # Restore Tier 2 data
+                if existing_detected_platforms:
+                    feature_dict['detected_platforms'] = existing_detected_platforms
                 spam_features.feature_data = feature_dict
             uow.commit()
 
