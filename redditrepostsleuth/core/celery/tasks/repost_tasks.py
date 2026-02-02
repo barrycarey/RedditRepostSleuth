@@ -37,7 +37,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
             return
 
         search_settings = get_default_image_search_settings(self.config)
-        search_settings.max_matches = 50
+        search_settings.max_matches = 25
         # search_results = self.dup_service.check_image(
         #     post.url,
         #     post=post,
@@ -66,7 +66,7 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
     except TypeError as e:
         log.warning('Type Error During Search: %s', str(e))
     except Exception as e:
-        log.exception('')
+        log.exception('Unexpected error during image repost check for post %s (URL: %s)', post.post_id, post.url)
 
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
@@ -89,7 +89,7 @@ def link_repost_check(self, post):
 
 
     except Exception as e:
-        log.exception('')
+        log.exception('Unexpected error during link repost check for post %s (URL: %s)', post.post_id, post.url)
 
 
 @celery.task(
