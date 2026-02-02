@@ -74,7 +74,7 @@ class CommentAnalyzer:
     useful for spam detection.
     """
 
-    SIMILARITY_THRESHOLD = 80  # Fuzzy match threshold (0-100)
+    SIMILARITY_THRESHOLD = 85  # Fuzzy match threshold (0-100), raised from 80 to reduce false positives
     SHORT_COMMENT_LENGTH = 20
     COMMENT_LIMIT = 1000  # PRAW maximum
 
