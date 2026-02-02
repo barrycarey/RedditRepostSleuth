@@ -126,7 +126,7 @@ Returns daily repost counts for building trend charts.
 
 **Endpoint:** `GET /api/monitored-sub/{subreddit}/stats/top-reposters`
 
-Returns users with the most detected reposts in this subreddit.
+Returns users with the most detected reposts in this subreddit, along with their spam risk scores.
 
 **Query Parameters:**
 - `token` (required): Reddit OAuth token
@@ -140,13 +140,17 @@ Returns users with the most detected reposts in this subreddit.
     "username": "serial_reposter",
     "repost_count": 47,
     "last_detected": "2026-01-15T14:32:00",
-    "profile_url": "https://reddit.com/u/serial_reposter"
+    "profile_url": "https://reddit.com/u/serial_reposter",
+    "spam_score": 0.85,
+    "risk_level": "CRITICAL"
   },
   {
     "username": "another_user",
     "repost_count": 31,
     "last_detected": "2026-01-14T09:15:00",
-    "profile_url": "https://reddit.com/u/another_user"
+    "profile_url": "https://reddit.com/u/another_user",
+    "spam_score": null,
+    "risk_level": null
   }
 ]
 ```
@@ -155,6 +159,13 @@ Returns users with the most detected reposts in this subreddit.
 - Results sorted by `repost_count` descending
 - `last_detected` is ISO 8601 format
 - Excludes deleted users and null authors
+- `spam_score` (0.0-1.0): User's spam likelihood, or `null` if not analyzed
+- `risk_level`: Classification based on spam_score thresholds:
+  - `CRITICAL`: score >= 0.80
+  - `HIGH`: score >= 0.60
+  - `MEDIUM`: score >= 0.30
+  - `LOW`: score < 0.30
+  - `null`: User not analyzed
 
 ---
 
@@ -162,7 +173,7 @@ Returns users with the most detected reposts in this subreddit.
 
 **Endpoint:** `GET /api/monitored-sub/{subreddit}/stats/top-reposts`
 
-Returns the most frequently reposted content in this subreddit.
+Returns the most frequently reposted content in this subreddit. This shows the *original* posts that are being copied by reposters.
 
 **Query Parameters:**
 - `token` (required): Reddit OAuth token
@@ -197,6 +208,7 @@ Returns the most frequently reposted content in this subreddit.
 - Results sorted by `repost_count` descending
 - `url` can be used for thumbnail display
 - `shortlink` links to the original post on Reddit
+- `author` is the creator of the original content (often a victim of content theft, not a spammer)
 
 ---
 

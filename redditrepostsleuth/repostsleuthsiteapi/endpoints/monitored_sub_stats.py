@@ -10,6 +10,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.services.reddit_traffic_service import get_subreddit_traffic_praw
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_token
+from redditrepostsleuth.core.util.helpers import classify_spam_risk_level
 from redditrepostsleuth.repostsleuthsiteapi.cache import cache
 from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
 
@@ -190,7 +191,7 @@ class MonitoredSubStats:
     def on_get_top_reposters(self, req: Request, resp: Response, subreddit: str):
         """
         Get top reposters in the subreddit.
-        Returns usernames, counts, and last detected dates.
+        Returns usernames, counts, last detected dates, and spam scores.
         Cached for 15 minutes per subreddit, limit, and days combination.
         
         Query params:
@@ -214,13 +215,28 @@ class MonitoredSubStats:
         with self.uowm.start() as uow:
             top_reposters = uow.repost.get_top_reposters_by_subreddit(subreddit, limit=limit, days=days)
 
+            # Batch fetch spam features for reposters
+            usernames = [
+                row.author for row in top_reposters
+                if row.author and row.author != '[deleted]'
+            ]
+            spam_features = uow.spam_features.get_by_usernames(usernames)
+            spam_by_username = {sf.username: sf for sf in spam_features}
+
             result = []
             for row in top_reposters:
+                # Get spam data for reposter
+                spam_data = spam_by_username.get(row.author) if row.author else None
+                spam_score = spam_data.spam_score if spam_data and spam_data.spam_score is not None else None
+                risk_level = classify_spam_risk_level(spam_score) if spam_score is not None else None
+
                 result.append({
                     'username': row.author,
                     'repost_count': row.repost_count,
                     'last_detected': row.last_detected.isoformat() if row.last_detected else None,
-                    'profile_url': f'https://reddit.com/u/{row.author}'
+                    'profile_url': f'https://reddit.com/u/{row.author}',
+                    'spam_score': spam_score,
+                    'risk_level': risk_level
                 })
 
         result_json = json.dumps(result)
