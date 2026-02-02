@@ -110,15 +110,15 @@ class CommentAnalyzer:
             CommentFeatures or None on error
         """
         try:
-            log.debug('Fetching comments for %s (limit=%d)', username, self.COMMENT_LIMIT)
+            log.info('Fetching comments for %s (limit=%d)', username, self.COMMENT_LIMIT)
             redditor = self.reddit.redditor(username)
             comments = list(redditor.comments.new(limit=self.COMMENT_LIMIT))
 
             if not comments:
-                log.debug('No comments found for %s', username)
+                log.info('No comments found for %s', username)
                 return CommentFeatures(analyzed_at=datetime.utcnow().isoformat())
 
-            log.debug('Fetched %d comments for %s', len(comments), username)
+            log.info('Fetched %d comments for %s, computing metrics...', len(comments), username)
 
             # Compute all metrics
             frequency = self._compute_frequency_metrics(comments)
@@ -269,6 +269,7 @@ class CommentAnalyzer:
             # Sample for large comment sets (O(n^2) comparison)
             sample_size = min(200, count)
             sample = bodies[:sample_size]
+            log.debug('Running similarity analysis on %d comments (sampled from %d)', sample_size, count)
 
             similar_pairs = 0
             total_pairs = 0
@@ -285,6 +286,8 @@ class CommentAnalyzer:
                         similar_pairs += 1
 
             similar_ratio = similar_pairs / total_pairs if total_pairs > 0 else 0
+            log.debug('Similarity analysis complete: %d/%d pairs matched (ratio=%.3f)',
+                      similar_pairs, total_pairs, similar_ratio)
 
         except ImportError:
             log.warning('rapidfuzz not installed, skipping similarity analysis')
