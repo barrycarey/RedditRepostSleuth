@@ -495,7 +495,7 @@ def cleanup_old_feature_records(self, keep_per_user: int = 5) -> dict:
     autoretry_for=(Exception,),
     retry_kwargs={'max_retries': 3, 'countdown': 60}
 )
-def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
+def enrich_user_features_tier2(self, username: str, skip_async_scoring: bool = False) -> Optional[dict]:
     """
     Fetch Tier 2 features from Reddit API.
 
@@ -504,6 +504,7 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
 
     Args:
         username: Reddit username to enrich
+        skip_async_scoring: If True, skip queueing async re-scoring (caller will score synchronously)
 
     Returns:
         Dict with Tier 2 features or None on failure
@@ -614,9 +615,12 @@ def enrich_user_features_tier2(self, username: str) -> Optional[dict]:
                 uow.commit()
                 log.info('Updated user_review.content_links_found=True for %s (backwards compat)', username)
 
-        # Queue re-scoring with Tier 2 data (non-blocking)
-        log.info('Queueing Tier 2 re-scoring for %s', username)
-        rescore_user_with_tier2.delay(username)
+        # Queue re-scoring with Tier 2 data (non-blocking) unless caller wants sync scoring
+        if not skip_async_scoring:
+            log.info('Queueing Tier 2 re-scoring for %s', username)
+            rescore_user_with_tier2.delay(username)
+        else:
+            log.info('Skipping async re-scoring for %s (sync scoring will follow)', username)
 
         return tier2_features.to_dict()
 
@@ -1354,6 +1358,110 @@ def scheduled_purge_activity_tracking(self) -> dict:
         raise
 
 
+
+def _score_user_sync(uowm, username: str) -> Optional[dict]:
+    """
+    Score a user synchronously using both Tier 1 and Tier 2 features.
+
+    Used by scan_user_full for synchronous scoring.
+
+    Args:
+        uowm: Unit of work manager
+        username: Reddit username to score
+
+    Returns:
+        Dict with scoring results or None on failure
+    """
+    from redditrepostsleuth.core.services.spam.spam_feature_extractor import SpamFeatureExtractor
+    from redditrepostsleuth.core.services.spam.spam_scorer import SpamScorerWithTier2
+    from redditrepostsleuth.core.db.databasemodels import UserReview
+
+    log.debug('Starting synchronous scoring for %s', username)
+
+    try:
+        # Extract Tier 1 features
+        extractor = SpamFeatureExtractor(uowm)
+        tier1_features = extractor.extract_tier1_features(username)
+
+        if not tier1_features:
+            log.warning('No Tier 1 features for %s, cannot score', username)
+            return None
+
+        # Get Tier 2 features from database
+        with uowm.start() as uow:
+            spam_features = uow.spam_features.get_by_username(username)
+
+            if not spam_features or not spam_features.tier2_enriched_at:
+                log.warning('No Tier 2 data for %s, cannot score', username)
+                return None
+
+            # Build Tier 2 dict from stored features
+            tier2_data = {
+                'account_age_days': spam_features.account_age_days,
+                'total_karma': spam_features.total_karma,
+                'post_karma': spam_features.post_karma,
+                'comment_karma': spam_features.comment_karma,
+                'karma_per_day': spam_features.karma_per_day,
+                'has_verified_email': spam_features.has_verified_email,
+                'is_gold': spam_features.is_gold,
+                'has_custom_avatar': spam_features.has_custom_avatar,
+                'account_suspended': spam_features.account_suspended,
+                'has_adult_profile_links': spam_features.has_adult_profile_links,
+                'has_telegram_links': spam_features.has_telegram_links,
+                'profile_link_sources': spam_features.profile_link_sources,
+                'has_promotional_post_links': spam_features.has_promotional_post_links,
+                'comment_features': spam_features.comment_features,
+                'total_posts': spam_features.total_posts,
+            }
+
+        # Score with both tiers
+        scorer = SpamScorerWithTier2(uowm)
+        result = scorer.score_with_tier2(tier1_features, tier2_data)
+
+        log.info('Sync scoring complete for %s: score=%.3f, risk=%s',
+                 username, result.score, result.risk_level)
+
+        # Update user_review table
+        with uowm.start() as uow:
+            review = uow.user_review.get_by_username(username)
+            if review:
+                review.spam_score = result.score
+                review.spam_score_confidence = result.confidence
+                review.spam_score_updated_at = datetime.utcnow()
+                review.risk_level = result.risk_level
+            else:
+                review = UserReview(
+                    username=username,
+                    spam_score=result.score,
+                    spam_score_confidence=result.confidence,
+                    spam_score_updated_at=datetime.utcnow(),
+                    risk_level=result.risk_level,
+                )
+                uow.user_review.add(review)
+            uow.commit()
+
+        # Update spam_features table
+        with uowm.start() as uow:
+            spam_features = uow.spam_features.get_by_username(username)
+            if spam_features:
+                spam_features.spam_score = result.score
+                spam_features.spam_score_confidence = result.confidence
+                spam_features.computed_at = datetime.utcnow()
+                feature_dict = tier1_features.to_dict()
+                feature_dict['rule_score'] = result.score
+                feature_dict['risk_level'] = result.risk_level
+                feature_dict['top_contributing_factors'] = result.reasons
+                feature_dict['tier2_enhanced'] = True
+                spam_features.feature_data = feature_dict
+            uow.commit()
+
+        return result.to_dict()
+
+    except Exception as e:
+        log.error('Error during sync scoring for %s: %s', username, str(e), exc_info=True)
+        return None
+
+
 # ============================================================================
 # Moderator API Support Tasks
 # ============================================================================
@@ -1369,7 +1477,7 @@ def scheduled_purge_activity_tracking(self) -> dict:
 )
 def scan_user_full(self, username: str) -> Optional[dict]:
     """
-    Perform full user scan (Tier 1 + Tier 2) synchronously.
+    Perform full user scan (Tier 1 + Tier 2 + Scoring) synchronously.
 
     Used by moderator API to trigger a complete scan when a user
     has incomplete data. Returns the final features for the frontend.
@@ -1395,15 +1503,21 @@ def scan_user_full(self, username: str) -> Optional[dict]:
             log.warning('Tier 1 extraction failed for %s (insufficient data)', username)
             return None
 
-        # Step 2: Run Tier 2 enrichment synchronously
+        # Step 2: Run Tier 2 enrichment synchronously (skip async scoring)
         log.info('Running Tier 2 enrichment for %s', username)
-        tier2_result = enrich_user_features_tier2(username)
+        tier2_result = enrich_user_features_tier2(username, skip_async_scoring=True)
 
         if not tier2_result:
             log.warning('Tier 2 enrichment failed for %s', username)
             # Continue anyway - Tier 1 data is still available
 
-        # Step 3: Fetch final features and return via to_dict_for_moderator()
+        # Step 3: Run scoring SYNCHRONOUSLY
+        log.info('Running synchronous scoring for %s', username)
+        score_result = _score_user_sync(self.uowm, username)
+        if score_result:
+            log.info('Scoring complete for %s: score=%.3f', username, score_result.get('score', 0))
+
+        # Step 4: Fetch final features and return via to_dict_for_moderator()
         with self.uowm.start() as uow:
             features = uow.spam_features.get_by_username(username)
             if features:
