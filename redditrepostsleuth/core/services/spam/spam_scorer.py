@@ -698,10 +698,14 @@ class SpamScorerWithTier2:
 
             # Similar comments (fuzzy match) = template spam
             sim_ratio = comment_features.get('similar_comment_ratio', 0)
-            if sim_ratio > 0.15:
+            if sim_ratio > 0.30:
                 score += 0.20
-                reasons.append(f"Many similar comments detected: {sim_ratio:.0%}")
+                reasons.append(f"High similar comment ratio: {sim_ratio:.0%}")
                 log.debug('Signal: high similar comment ratio %.2f (+0.20)', sim_ratio)
+            elif sim_ratio > 0.20:
+                score += 0.12
+                reasons.append(f"Elevated similar comment ratio: {sim_ratio:.0%}")
+                log.debug('Signal: elevated similar comment ratio %.2f (+0.12)', sim_ratio)
 
             # Negative karma comments = poor reception
             neg_ratio = comment_features.get('negative_karma_comment_ratio', 0)
