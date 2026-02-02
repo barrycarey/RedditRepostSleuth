@@ -449,16 +449,89 @@ class TestSpamScorer(TestCase):
 
         self.assertGreater(result.component_scores['supporting_signals'], 0)
 
-    def test__score_user__low_subreddit_diversity(self):
-        """Test that low subreddit diversity triggers score."""
+    def test__score_user__low_subreddit_diversity_legitimate_subs(self):
+        """Test that low subreddit diversity in legitimate subs does NOT trigger penalty.
+
+        A user focused on a niche interest (photographer, gamer, etc.) shouldn't
+        be penalized just for posting to few subreddits.
+        """
         features = self._make_features(
             total_posts_indexed=50,
-            unique_subreddits_posted=2
+            unique_subreddits_posted=2,
+            # No problematic posts - legitimate focused user
+            spam_subreddit_posts=0,
+            karma_farming_sub_posts=0,
+            easy_karma_sub_posts=0,
+            nsfw_post_count=0,
+            adult_platform_post_count=0
         )
         result = self.scorer.score_user(features)
 
-        self.assertTrue(any('diversity' in r.lower() for r in result.reasons))
+        # Should NOT have any diversity-related penalty
+        self.assertFalse(any('diversity' in r.lower() or 'concentrated' in r.lower() for r in result.reasons))
+        # posting_patterns score should only reflect posting frequency, not diversity
+        self.assertEqual(result.component_scores['posting_patterns'], 0)
+
+    def test__score_user__low_subreddit_diversity_problematic_subs(self):
+        """Test that low subreddit diversity in problematic subs DOES trigger penalty.
+
+        A user concentrated in spam/karma-farming subreddits is suspicious.
+        """
+        features = self._make_features(
+            total_posts_indexed=50,
+            unique_subreddits_posted=2,
+            # High ratio of problematic posts (>30%)
+            spam_subreddit_posts=10,
+            karma_farming_sub_posts=10,
+            easy_karma_sub_posts=0
+        )
+        result = self.scorer.score_user(features)
+
+        # Should have a concentration-related penalty
+        self.assertTrue(any('problematic' in r.lower() or 'concentrated' in r.lower() for r in result.reasons))
         self.assertGreater(result.component_scores['posting_patterns'], 0)
+
+    def test__score_user__nsfw_with_adult_links_counted_as_problematic(self):
+        """Test that NSFW posts count as problematic ONLY when user has adult platform links.
+
+        This catches OnlyFans/Fansly spam bots without penalizing legitimate adult creators.
+        """
+        features = self._make_features(
+            total_posts_indexed=50,
+            unique_subreddits_posted=2,
+            spam_subreddit_posts=0,
+            karma_farming_sub_posts=0,
+            easy_karma_sub_posts=0,
+            # Has NSFW posts AND adult platform links -> spam bot pattern
+            nsfw_post_count=25,
+            adult_platform_post_count=10
+        )
+        result = self.scorer.score_user(features)
+
+        # NSFW + adult links + low diversity = should trigger penalty
+        self.assertTrue(any('problematic' in r.lower() or 'concentrated' in r.lower() for r in result.reasons))
+        self.assertGreater(result.component_scores['posting_patterns'], 0)
+
+    def test__score_user__nsfw_without_adult_links_not_penalized(self):
+        """Test that NSFW posts without adult platform links are NOT counted as problematic.
+
+        Legitimate adult content creators should not be penalized for posting NSFW content.
+        """
+        features = self._make_features(
+            total_posts_indexed=50,
+            unique_subreddits_posted=2,
+            spam_subreddit_posts=0,
+            karma_farming_sub_posts=0,
+            easy_karma_sub_posts=0,
+            # Has NSFW posts but NO adult platform links -> legitimate creator
+            nsfw_post_count=40,
+            adult_platform_post_count=0
+        )
+        result = self.scorer.score_user(features)
+
+        # NSFW without adult links + low diversity = NOT suspicious
+        self.assertFalse(any('problematic' in r.lower() or 'concentrated' in r.lower() for r in result.reasons))
+        self.assertEqual(result.component_scores['posting_patterns'], 0)
 
     def test__score_user__component_scores_present(self):
         """Test that all component scores are present in result."""
