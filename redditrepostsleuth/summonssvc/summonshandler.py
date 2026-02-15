@@ -5,7 +5,7 @@ from typing import Tuple, Text, NoReturn, Optional
 
 from praw import Reddit
 from praw.exceptions import APIException
-from prawcore import Forbidden
+from prawcore import Forbidden, ServerError
 from sqlalchemy.exc import InternalError
 
 from redditrepostsleuth.core.config import Config
@@ -397,6 +397,9 @@ class SummonsHandler:
                 raise
         except Forbidden:
             raise
+        except ServerError:
+            log.warning('Reddit server error (500) replying to comment %s', response.summons.comment_id)
+            response.reply_failure_reason = 'SERVER ERROR'
         except Exception:
             log.exception('Problem leaving response', exc_info=True)
             raise

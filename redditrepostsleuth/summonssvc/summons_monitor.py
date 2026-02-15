@@ -4,7 +4,7 @@ from datetime import datetime
 
 from praw import Reddit
 from praw.exceptions import APIException
-from prawcore import ResponseException, TooManyRequests
+from prawcore import ResponseException, TooManyRequests, ServerError
 from sqlalchemy.exc import DataError
 
 from redditrepostsleuth.core.config import Config
@@ -45,7 +45,8 @@ if os.getenv('SENTRY_DNS', None):
     import sentry_sdk
     sentry_sdk.init(
         dsn=os.getenv('SENTRY_DNS'),
-        environment=os.getenv('RUN_ENV', 'dev')
+        environment=os.getenv('RUN_ENV', 'dev'),
+        ignore_errors=[ServerError]
     )
 
 
@@ -78,6 +79,8 @@ def handle_summons(summons: Summons) -> None:
                     log.error('APIException with unknown error code: %s', e.error_type)
             else:
                 log.error('APIException without error_type')
+        except ServerError:
+            log.warning('Reddit server error processing summons %s', summons.id)
         except Exception as e:
             log.exception('Unknown error')
 

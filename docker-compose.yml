@@ -64,35 +64,35 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery beat
 
-    delete_post_svc:
-        restart: unless-stopped
-        build:
-            context: .
-            dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
-        env_file:
-            - .env
-        environment:
-            - RUN_ENV=production
-            - LOG_LEVEL=INFO
-            - QUERY_LIMIT=1000000
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
+    # delete_post_svc:
+    #     restart: unless-stopped
+    #     build:
+    #         context: .
+    #         dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
+    #     env_file:
+    #         - .env
+    #     environment:
+    #         - RUN_ENV=production
+    #         - LOG_LEVEL=INFO
+    #         - QUERY_LIMIT=1000000
+    #         - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
 
-    delete_post_worker:
-        container_name: delete-post-worker
-        restart: unless-stopped
-        user: '1001'
-        build:
-            context: .
-            dockerfile: docker/WorkerDockerFile
-        env_file:
-            - .env
-        environment:
-            - RUN_ENV=production
-            - LOG_LEVEL=INFO
-            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -n deleted_post_worker -c 16
-        volumes:
-            - /opt/imageindex:/opt/imageindex
+    # delete_post_worker:
+    #     container_name: delete-post-worker
+    #     restart: unless-stopped
+    #     user: '1001'
+    #     build:
+    #         context: .
+    #         dockerfile: docker/WorkerDockerFile
+    #     env_file:
+    #         - .env
+    #     environment:
+    #         - RUN_ENV=production
+    #         - LOG_LEVEL=INFO
+    #         - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
+    #     entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -n deleted_post_worker -c 16
+    #     volumes:
+    #         - /opt/imageindex:/opt/imageindex
 
     queue_monitor_svc:
         container_name: queue-monitor-svc

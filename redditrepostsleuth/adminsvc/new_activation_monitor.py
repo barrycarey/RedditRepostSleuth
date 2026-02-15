@@ -5,7 +5,7 @@ from typing import Optional, Text, NoReturn
 from praw import Reddit
 from praw.exceptions import APIException, RedditAPIException
 from praw.models import Subreddit, Message
-from prawcore import TooManyRequests
+from prawcore import TooManyRequests, NotFound
 
 from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import send_modmail_task
 from redditrepostsleuth.core.config import Config
@@ -54,6 +54,9 @@ class NewActivationMonitor:
             return
         except TooManyRequests:
             raise
+        except NotFound:
+            log.warning('Subreddit %s not found (may be banned, private, or deleted)', msg.subreddit.display_name)
+            return
         except Exception as e:
             log.exception('Failed to accept invite for %s', msg.subreddit.display_name, exc_info=True)
             return

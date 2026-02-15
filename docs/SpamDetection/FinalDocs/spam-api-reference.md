@@ -1,7 +1,7 @@
 # Spam Detection API Reference
 
-**Status:** Production Ready (Phase 5.5)
-**Last Updated:** January 29, 2026
+**Status:** Production Ready (Phase 5.5 + Phase 4a Comment Analysis)
+**Last Updated:** February 1, 2026
 
 This document provides complete API reference for the Repost Sleuth Spam Detection System. It includes two primary endpoint groups: moderator voting endpoints for community-assisted training and admin endpoints for system management.
 
@@ -634,7 +634,16 @@ User-Agent: MyClient/1.0
     "username_suspicious_pattern": true,
     "username_pattern_confidence": 0.85,
     "first_post_date": "2025-08-15T10:00:00Z",
-    "last_post_date": "2026-01-27T20:15:00Z"
+    "last_post_date": "2026-01-27T20:15:00Z",
+
+    // Comment Analysis Fields (Phase 4a)
+    "comment_count": 156,
+    "duplicate_comment_ratio": 0.12,
+    "similar_comment_ratio": 0.18,
+    "negative_karma_comment_ratio": 0.05,
+    "comment_to_post_ratio": 0.54,
+    "link_comment_ratio": 0.08,
+    "comment_analysis_at": "2026-01-28T12:30:00Z"
   },
   "user_review": {
     "username": "suspicious_user_1",
@@ -666,6 +675,15 @@ The `spam_features` object now includes selected fields parsed from the internal
 - `subreddit_distribution` - Dictionary mapping subreddit names to post counts (e.g., {"pics": 45, "funny": 12})
 - `username_suspicious_pattern`, `username_pattern_confidence` - Username analysis (pattern details excluded)
 - `first_post_date`, `last_post_date` - Activity timeline
+
+**Comment Analysis Fields (Phase 4a):**
+- `comment_count` - Total comments analyzed
+- `duplicate_comment_ratio` - Ratio of exact duplicate comments
+- `similar_comment_ratio` - Ratio of comments with >80% text similarity
+- `negative_karma_comment_ratio` - Ratio of comments with negative karma
+- `comment_to_post_ratio` - Comment count divided by post count
+- `link_comment_ratio` - Ratio of comments containing links
+- `comment_analysis_at` - ISO 8601 timestamp when comment analysis was performed
 
 **Fields Excluded from Moderator Response:**
 
@@ -1577,6 +1595,15 @@ interface ModeratorSpamFeatures {
   username_pattern_confidence?: number;
   first_post_date?: string | null;  // ISO 8601 timestamp
   last_post_date?: string | null;   // ISO 8601 timestamp
+
+  // Comment Analysis Fields (Phase 4a)
+  comment_count?: number;
+  duplicate_comment_ratio?: number;
+  similar_comment_ratio?: number;
+  negative_karma_comment_ratio?: number;
+  comment_to_post_ratio?: number;
+  link_comment_ratio?: number;
+  comment_analysis_at?: string | null;  // ISO 8601 timestamp
 }
 
 interface ModeratorUserReview {
@@ -1885,7 +1912,16 @@ const mockSpamFeatures: SpamFeatures = {
   mod_vote_count: 3,
   mod_vote_weighted: 130000000,
   mod_vote_updated_at: "2026-01-27T18:20:00Z",
-  mod_vote_consensus: null
+  mod_vote_consensus: null,
+
+  // Comment analysis (Phase 4a)
+  comment_count: 156,
+  duplicate_comment_ratio: 0.12,
+  similar_comment_ratio: 0.18,
+  negative_karma_comment_ratio: 0.05,
+  comment_to_post_ratio: 0.54,
+  link_comment_ratio: 0.08,
+  comment_analysis_at: "2026-01-28T12:30:00Z",
 };
 
 // Mock stats
@@ -2063,7 +2099,7 @@ async function handleVoteError(error: any) {
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** January 29, 2026
+**Document Version:** 1.1
+**Last Updated:** February 1, 2026
 **Author:** Documentation Engineer
 **Status:** Production Ready

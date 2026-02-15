@@ -9,6 +9,7 @@
 - When you finish implementing a plan, create a commit
 - When making any changes involving duplicateimageservice.py, extra thought must be given to unintended impacts.  This is core to the bot.
 - If ou need to connect to the database, use the credentials in claude_db_access.json
+- When I tell you to add/update/remove a todo, do it in todo.md
 
 ## Project Overview
 

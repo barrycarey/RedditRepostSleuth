@@ -2,6 +2,7 @@ celery[redis]==5.3.1
 sqlalchemy==2.0.20
 pymysql==1.1.0
 praw==7.7.1
+prawcore>=2.4,<3  # PRAW 7.x is not compatible with prawcore 3.0+
 requests==2.31.0
 redlock==1.2.0
 influxdb-client==1.37.0
