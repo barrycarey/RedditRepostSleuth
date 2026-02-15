@@ -17,6 +17,14 @@ class SpamFeaturesRepo:
             UserSpamFeatures.username == username
         ).first()
 
+    def get_by_usernames(self, usernames: List[str]) -> List[UserSpamFeatures]:
+        """Batch lookup spam features for multiple usernames."""
+        if not usernames:
+            return []
+        return self.db_session.query(UserSpamFeatures).filter(
+            UserSpamFeatures.username.in_(usernames)
+        ).all()
+
     def get_all(self, limit: int = None) -> List[UserSpamFeatures]:
         query = self.db_session.query(UserSpamFeatures)
         if limit:

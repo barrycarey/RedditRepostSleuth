@@ -51,6 +51,25 @@ def chunk_list(l, n):
         yield l[i:i + n]
 
 
+def classify_spam_risk_level(spam_score: float) -> str:
+    """Classify spam score into risk level.
+
+    Thresholds match SpamScorer._classify_risk():
+    - CRITICAL: >= 0.80
+    - HIGH: >= 0.60
+    - MEDIUM: >= 0.30
+    - LOW: < 0.30
+    """
+    if spam_score >= 0.80:
+        return 'CRITICAL'
+    elif spam_score >= 0.60:
+        return 'HIGH'
+    elif spam_score >= 0.30:
+        return 'MEDIUM'
+    else:
+        return 'LOW'
+
+
 def get_post_type(submission: dict) -> str:
     """
     Take a raw submission dict from Reddit API and try to determine the post type.

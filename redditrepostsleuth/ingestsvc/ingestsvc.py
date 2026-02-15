@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import json
 import os
+import time
 from asyncio import ensure_future, gather, run, TimeoutError, CancelledError
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,6 +11,7 @@ from typing import List, Optional, Union, Generator
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
 from praw import Reddit
+from prawcore.exceptions import TooManyRequests
 
 from redditrepostsleuth.core.celery.tasks.ingest_tasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
@@ -42,6 +44,11 @@ RATE_LIMIT_SLEEP_SECONDS = 10
 ERROR_SLEEP_SECONDS = 2
 TARGET_INGEST_DELAY_SECONDS = 90
 
+# Catch-up configuration - triggers parallel backfill when falling behind
+CATCHUP_THRESHOLD_SECONDS = int(os.getenv('CATCHUP_THRESHOLD_SECONDS', 300))  # 5 minutes
+CATCHUP_CHECK_INTERVAL_BATCHES = int(os.getenv('CATCHUP_CHECK_INTERVAL_BATCHES', 10))
+CATCHUP_MIN_GAP_SIZE = int(os.getenv('CATCHUP_MIN_GAP_SIZE', 500))  # Minimum posts to warrant parallel fetch
+
 config = Config()
 REMOVAL_REASONS_TO_SKIP = ['deleted', 'author', 'reddit', 'copyright_takedown']
 HEADERS = {'User-Agent': 'u/RepostSleuthBot - Submission Ingest (by u/BarryCarey)'}
@@ -54,6 +61,10 @@ class IngestionState:
     request_delay: int
     auth_headers: dict
     last_token_refresh: datetime
+    # Catch-up tracking fields
+    batches_since_catchup_check: int = 0
+    catchup_in_progress: bool = False
+    last_ingest_delay_seconds: float = 0
 
 
 async def fetch_page(url: str, session: ClientSession) -> Optional[dict]:
@@ -239,37 +250,161 @@ def filter_valid_posts(res_data: dict) -> list[dict]:
     return posts
 
 
-def update_request_delay(submissions: list[dict], current_delay: int) -> int:
+def update_request_delay(submissions: list[dict], state: IngestionState) -> int:
     """
     Adjust request delay based on how far behind we are from real-time.
 
     If we're behind target, decrease delay to catch up.
     If we're ahead of target, increase delay to avoid hitting rate limits.
+
+    Also updates state.last_ingest_delay_seconds for catch-up decisions.
     """
     if not submissions:
-        return current_delay
+        return state.request_delay
 
-    ingest_delay = datetime.utcnow() - datetime.utcfromtimestamp(
-        submissions[0]['data']['created_utc'])
-    log.info('Current Delay: %s', ingest_delay)
+    ingest_delay_seconds = calculate_ingest_delay_seconds(submissions)
+    state.last_ingest_delay_seconds = ingest_delay_seconds
+    log.info('Current Delay: %.1f seconds', ingest_delay_seconds)
 
-    if ingest_delay.seconds > TARGET_INGEST_DELAY_SECONDS:
-        new_delay = max(0, current_delay - 1)
+    if ingest_delay_seconds > TARGET_INGEST_DELAY_SECONDS:
+        new_delay = max(0, state.request_delay - 1)
     else:
-        new_delay = current_delay + 1
+        new_delay = state.request_delay + 1
 
     log.info('New Delay: %s', new_delay)
     return new_delay
 
 
-def get_auth_headers(reddit: Reddit) -> dict:
+def calculate_ingest_delay_seconds(submissions: list[dict]) -> float:
+    """
+    Calculate how many seconds behind real-time we are based on newest post timestamp.
+
+    :param submissions: List of Reddit submissions from API response
+    :return: Seconds behind real-time, or 0 if no submissions
+    """
+    if not submissions:
+        return 0
+
+    newest_timestamp = submissions[0]['data']['created_utc']
+    delay = datetime.utcnow() - datetime.utcfromtimestamp(newest_timestamp)
+    return delay.total_seconds()
+
+
+def should_trigger_catchup(state: IngestionState, reddit: Reddit) -> tuple[bool, int, str]:
+    """
+    Determine if catch-up mode should be triggered.
+
+    Checks if:
+    1. We're not already in catch-up mode
+    2. Enough batches have passed since last check
+    3. We're behind the threshold
+    4. The gap is large enough to warrant parallel fetching
+
+    :param state: Current ingestion state
+    :param reddit: PRAW Reddit instance for getting newest post ID
+    :return: Tuple of (should_catchup, gap_size, newest_reddit_id)
+    """
+    if state.catchup_in_progress:
+        return False, 0, ''
+
+    if state.batches_since_catchup_check < CATCHUP_CHECK_INTERVAL_BATCHES:
+        return False, 0, ''
+
+    if state.last_ingest_delay_seconds < CATCHUP_THRESHOLD_SECONDS:
+        return False, 0, ''
+
+    # Get the newest post ID from Reddit to calculate gap
+    try:
+        newest_reddit_id = get_newest_praw_post_id(reddit)
+    except Exception as e:
+        log.warning('Failed to get newest Reddit post ID for catch-up check: %s', e)
+        return False, 0, ''
+
+    # Calculate gap size
+    current_id_int = base36decode(state.newest_id)
+    newest_id_int = base36decode(newest_reddit_id)
+    gap_size = newest_id_int - current_id_int
+
+    if gap_size < CATCHUP_MIN_GAP_SIZE:
+        log.debug('Gap size %d below minimum %d, skipping catch-up', gap_size, CATCHUP_MIN_GAP_SIZE)
+        return False, 0, ''
+
+    return True, gap_size, newest_reddit_id
+
+
+async def run_catchup(state: IngestionState, reddit: Reddit, gap_size: int, newest_reddit_id: str) -> bool:
+    """
+    Execute parallel backfill to catch up to real-time.
+
+    Uses the existing ingest_range() function which handles parallel fetching
+    with 50 concurrent requests.
+
+    :param state: Current ingestion state
+    :param reddit: PRAW Reddit instance
+    :param gap_size: Number of posts to catch up
+    :param newest_reddit_id: Target post ID to catch up to
+    :return: True if catch-up succeeded, False otherwise
+    """
+    log.warning(
+        'Catch-up triggered: delay=%.1fs, gap=%d posts (from %s to %s)',
+        state.last_ingest_delay_seconds, gap_size, state.newest_id, newest_reddit_id
+    )
+
+    state.catchup_in_progress = True
+    start_time = time.time()
+
+    try:
+        # Refresh token before potentially long operation
+        maybe_refresh_token(state, reddit)
+
+        log.info('Starting catch-up: %d posts from %s to %s', gap_size, state.newest_id, newest_reddit_id)
+        await ingest_range(newest_reddit_id, state.newest_id, alt_headers=state.auth_headers)
+
+        elapsed = time.time() - start_time
+        rate = gap_size / elapsed if elapsed > 0 else 0
+        log.info('Catch-up completed: %d posts in %.1f seconds (%.1f posts/sec)', gap_size, elapsed, rate)
+
+        # Update state to new position
+        state.newest_id = newest_reddit_id
+        return True
+
+    except Exception as e:
+        log.error('Catch-up failed: %s', e, exc_info=True)
+        log.info('Resuming sequential ingestion from %s', state.newest_id)
+        return False
+
+    finally:
+        state.catchup_in_progress = False
+        state.batches_since_catchup_check = 0
+
+
+def get_auth_headers(reddit: Reddit, max_retries: int = 3) -> dict:
     """
     Get OAuth headers from PRAW.
 
     Forces PRAW to make a call so we can steal the token.
+    Retries on rate limit (429) up to max_retries times.
+
+    :param reddit: PRAW Reddit instance
+    :param max_retries: Maximum retry attempts on rate limit (default 3)
+    :return: Dict of headers including Authorization
+    :raises TooManyRequests: If rate limit persists after all retries
     """
-    list(reddit.subreddit('all').new(limit=1))
-    return {**HEADERS, **{'Authorization': f'Bearer {reddit.auth._reddit._core._authorizer.access_token}'}}
+    for attempt in range(max_retries + 1):
+        try:
+            list(reddit.subreddit('all').new(limit=1))
+            return {**HEADERS, **{'Authorization': f'Bearer {reddit.auth._reddit._core._authorizer.access_token}'}}
+        except TooManyRequests as e:
+            if attempt < max_retries:
+                retry_after = getattr(e, 'retry_after', RATE_LIMIT_SLEEP_SECONDS) or RATE_LIMIT_SLEEP_SECONDS
+                log.warning(
+                    'Rate limited during auth token refresh (attempt %d/%d), waiting %ds',
+                    attempt + 1, max_retries, retry_after
+                )
+                time.sleep(retry_after)
+            else:
+                log.error('Rate limit persisted after %d retries, re-raising', max_retries)
+                raise
 
 
 def maybe_refresh_token(state: IngestionState, reddit: Reddit) -> None:
@@ -298,6 +433,15 @@ async def run_ingestion_loop(state: IngestionState, reddit: Reddit) -> None:
     """Main loop that continuously fetches and processes new posts."""
     while True:
         maybe_refresh_token(state, reddit)
+
+        # Check if catch-up is needed (every N batches)
+        state.batches_since_catchup_check += 1
+        should_catchup, gap_size, newest_reddit_id = should_trigger_catchup(state, reddit)
+        if should_catchup:
+            await run_catchup(state, reddit, gap_size, newest_reddit_id)
+            # Reset batch counter handled in run_catchup finally block
+            continue
+
         ids_to_get = get_next_ids(state.newest_id, BATCH_SIZE)
 
         try:
@@ -337,7 +481,7 @@ async def run_ingestion_loop(state: IngestionState, reddit: Reddit) -> None:
 
         queue_posts_for_ingest(posts_to_save)
 
-        state.request_delay = update_request_delay(res_data['data']['children'], state.request_delay)
+        state.request_delay = update_request_delay(res_data['data']['children'], state)
         state.newest_id = res_data['data']['children'][-1]['data']['id']
 
         await asyncio.sleep(state.request_delay)
