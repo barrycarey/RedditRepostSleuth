@@ -594,7 +594,7 @@ def get_newest_praw_post_id(reddit: Reddit) -> str:
     This is used to guage if the manual ingest of IDs is falling behind
     :rtype: object
     """
-    newest_submissions = list(reddit.subreddit('all').new(limit=10))[0]
+    newest_submissions = list(reddit.subreddit('AskReddit').new(limit=10))[0]
     return newest_submissions.id
 
 

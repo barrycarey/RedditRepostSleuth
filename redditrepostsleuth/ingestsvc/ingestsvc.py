@@ -392,7 +392,7 @@ def get_auth_headers(reddit: Reddit, max_retries: int = 3) -> dict:
     """
     for attempt in range(max_retries + 1):
         try:
-            list(reddit.subreddit('all').new(limit=1))
+            reddit.user.me()  # Force PRAW to authenticate so we can extract the token
             return {**HEADERS, **{'Authorization': f'Bearer {reddit.auth._reddit._core._authorizer.access_token}'}}
         except TooManyRequests as e:
             if attempt < max_retries:
