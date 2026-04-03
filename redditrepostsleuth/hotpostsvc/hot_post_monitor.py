@@ -50,10 +50,10 @@ class TopPostMonitor:
     def monitor(self):
         while True:
             with self.uowm.start() as uow:
-                submissions = [sub for sub in self.reddit.subreddit('all').top('day')]
-                submissions = submissions + [sub for sub in self.reddit.subreddit('all').rising()]
-                submissions = submissions + [sub for sub in self.reddit.subreddit('all').controversial('day')]
-                submissions = submissions + [sub for sub in self.reddit.subreddit('all').hot()]
+                submissions = [sub for sub in self.reddit.subreddit('popular').top('day')]
+                submissions = submissions + [sub for sub in self.reddit.subreddit('popular').rising()]
+                submissions = submissions + [sub for sub in self.reddit.subreddit('popular').controversial('day')]
+                submissions = submissions + [sub for sub in self.reddit.subreddit('popular').hot()]
                 for sub in submissions:
                     post = uow.posts.get_by_post_id(sub.id)
                     if not post:
