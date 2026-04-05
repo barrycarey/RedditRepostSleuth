@@ -11,6 +11,7 @@ from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
@@ -46,7 +47,7 @@ if os.getenv('SENTRY_DNS', None):
     sentry_sdk.init(
         dsn=os.getenv('SENTRY_DNS'),
         environment=os.getenv('RUN_ENV', 'dev'),
-        ignore_errors=[ServerError]
+        ignore_errors=[ServerError, NoIndexException]
     )
 
 
