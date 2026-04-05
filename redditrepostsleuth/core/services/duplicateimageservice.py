@@ -422,6 +422,9 @@ class DuplicateImageService:
             log.exception('Failed to get meme template from api', exc_info=True)
             return
 
+        if r.status_code == 503:
+            log.warning('Meme index unavailable (503), skipping meme check')
+            return
         if r.status_code != 200:
             log.error('Unexpected Index API status %s. %s', r.status_code, r.text)
             return

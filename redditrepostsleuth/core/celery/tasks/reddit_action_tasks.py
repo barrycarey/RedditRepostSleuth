@@ -61,6 +61,11 @@ def remove_submission_task(self, submission: Submission, removal_reason: str, mo
     except TooManyRequests as e:
         log.warning('Too many requests when removing submission')
         raise e
+    except RedditAPIException as e:
+        if e.error_type == 'USER_DOESNT_EXIST':
+            log.warning('Cannot remove post https://redd.it/%s: user does not exist', submission.id)
+        else:
+            log.exception('Reddit API error removing submission https://redd.it/%s', submission.id, exc_info=True)
     except Exception as e:
         log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
@@ -162,7 +167,7 @@ def lock_comment_task(self, comment: Comment) -> None:
         log.warning('Too many requests when locking comment')
         raise e
     except Forbidden as e:
-        log.warning('Failed to lock comment on r/%s, no permissions', comment.submission.display_name)
+        log.warning('Failed to lock comment on r/%s, no permissions', comment.subreddit.display_name)
     except Exception as e:
         log.exception('Failed to lock comment %s on r/%s', comment.id, comment.subreddit.display_name)
         raise e
@@ -311,5 +316,10 @@ def send_modmail_task(self, subreddit_name: str, message: str, subject: str, sou
     except TooManyRequests as e:
         log.warning('Too many requests when sending modmail')
         raise e
+    except RedditAPIException as e:
+        if e.error_type == 'USER_DOESNT_EXIST':
+            log.warning('Cannot send modmail to r/%s: subreddit/user does not exist', subreddit_name)
+        else:
+            log.exception('Reddit API error sending modmail to %s', subreddit_name)
     except Exception as e:
         log.exception('Failed to send modmail to %s', subreddit_name)
