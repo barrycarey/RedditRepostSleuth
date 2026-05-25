@@ -78,7 +78,7 @@ async def fetch_page(url: str, session: ClientSession) -> Optional[dict]:
     """
     log.debug('Page fetch')
 
-    async with session.get(url, timeout=ClientTimeout(total=10), headers=HEADERS) as resp:
+    async with session.get(url, timeout=ClientTimeout(total=10)) as resp:
         try:
             if resp.status == 200:
                 log.debug('Successful fetch')
@@ -113,7 +113,7 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
     :return: Job with the result status and response data
     """
     try:
-        async with session.get(job.url, timeout=ClientTimeout(total=10), headers=HEADERS) as resp:
+        async with session.get(job.url, timeout=ClientTimeout(total=10)) as resp:
             if resp.status == 200:
                 log.debug('Successful fetch')
                 job.status = JobStatus.SUCCESS
@@ -122,6 +122,9 @@ async def fetch_page_as_job(job: BatchedPostRequestJob, session: ClientSession) 
             elif resp.status == 429:
                 log.warning('Data API Rate Limit')
                 job.status = JobStatus.RATELIMIT
+            elif resp.status == 401:
+                log.warning('Token expired during batch job')
+                job.status = JobStatus.UNAUTHORIZED
             elif resp.status == 500:
                 log.warning('Reddit Server Error for URL: %s', job.url)
                 job.status = JobStatus.ERROR
@@ -167,6 +170,7 @@ async def ingest_sequence(ids: Union[list[int], Generator[int, None, None]], alt
     Take a sequence of post IDs and attempt to ingest them.
 
     Mainly used to catch any missed posts while script is down.
+    Raises RedditTokenExpiredException if token expires mid-operation.
     """
     if isinstance(ids, list):
         def id_gen(list_of_ids):
@@ -195,6 +199,10 @@ async def ingest_sequence(ids: Union[list[int], Generator[int, None, None]], alt
                     log.info('Gathering %s task results', len(tasks))
                     results: list[BatchedPostRequestJob] = await gather(*tasks)
                     tasks = []
+
+                    any_unauthorized = next((x for x in results if x.status == JobStatus.UNAUTHORIZED), None)
+                    if any_unauthorized:
+                        raise RedditTokenExpiredException('Token expired during backfill')
 
                     for j in results:
                         if j.status == JobStatus.SUCCESS:
@@ -354,8 +362,7 @@ async def run_catchup(state: IngestionState, reddit: Reddit, gap_size: int, newe
     start_time = time.time()
 
     try:
-        # Refresh token before potentially long operation
-        maybe_refresh_token(state, reddit)
+        state.auth_headers = get_auth_headers(reddit)
 
         log.info('Starting catch-up: %d posts from %s to %s', gap_size, state.newest_id, newest_reddit_id)
         await ingest_range(newest_reddit_id, state.newest_id, alt_headers=state.auth_headers)
@@ -367,6 +374,12 @@ async def run_catchup(state: IngestionState, reddit: Reddit, gap_size: int, newe
         # Update state to new position
         state.newest_id = newest_reddit_id
         return True
+
+    except RedditTokenExpiredException:
+        log.warning('Token expired during catch-up, refreshing and retrying')
+        state.auth_headers = get_auth_headers(reddit)
+        state.last_token_refresh = datetime.utcnow()
+        return False
 
     except Exception as e:
         log.error('Catch-up failed: %s', e, exc_info=True)
@@ -409,7 +422,7 @@ def get_auth_headers(reddit: Reddit, max_retries: int = 3) -> dict:
 
 def maybe_refresh_token(state: IngestionState, reddit: Reddit) -> None:
     """Refresh OAuth token if it's been too long since last refresh."""
-    if (datetime.utcnow() - state.last_token_refresh).seconds > TOKEN_REFRESH_INTERVAL_SECONDS:
+    if (datetime.utcnow() - state.last_token_refresh).total_seconds() > TOKEN_REFRESH_INTERVAL_SECONDS:
         log.info('Refreshing token')
         state.auth_headers = get_auth_headers(reddit)
         state.last_token_refresh = datetime.utcnow()
@@ -500,8 +513,14 @@ async def main() -> None:
     newest_id = get_newest_praw_post_id(reddit)
     auth_headers = get_auth_headers(reddit)
 
-    # Backfill any missed posts
-    await ingest_range(newest_id, oldest_id, alt_headers=auth_headers)
+    # Backfill any missed posts, retrying on token expiry
+    while True:
+        try:
+            await ingest_range(newest_id, oldest_id, alt_headers=auth_headers)
+            break
+        except RedditTokenExpiredException:
+            log.warning('Token expired during startup backfill, refreshing')
+            auth_headers = get_auth_headers(reddit)
 
     # Initialize state and run main loop
     state = IngestionState(

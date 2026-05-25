@@ -12,6 +12,7 @@ class JobStatus(Enum):
 	PROXYERROR = auto()
 	ERROR = auto()
 	RATELIMIT = auto()
+	UNAUTHORIZED = auto()
 
 @dataclass
 class BatchedPostRequestJob:
