@@ -261,7 +261,8 @@ class SummonsHandler:
                 uow,
                 get_default_text_search_settings(self.config),
                 'summons',
-                filter_function=filter_search_results
+                filter_function=filter_search_results,
+                event_logger=self.event_logger
             )
 
             if not monitored_sub:

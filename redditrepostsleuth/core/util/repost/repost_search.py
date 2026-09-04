@@ -12,6 +12,8 @@ from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofwork import UnitOfWork
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException
+from redditrepostsleuth.core.model.events.index_api_error_event import IndexApiErrorEvent
+from redditrepostsleuth.core.services.eventlogging import EventLogging
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.link_search_settings import TextSearchSettings
@@ -30,20 +32,26 @@ from redditrepostsleuth.core.util.repost_filters import text_distance_filter
 config = Config()
 log = logging.getLogger(__name__)
 
-def get_text_matches(text: str, source: str = 'unknown') -> APISearchResults:
+def get_text_matches(text: str, source: str = 'unknown', event_logger: EventLogging = None) -> APISearchResults:
 
     try:
         res = requests.post(f'{config.index_api}/text', json={'text': text}, headers={'x-source': source})
     except ConnectionError:
         log.error('Failed to connect to Index API')
+        if event_logger:
+            event_logger.save_event(IndexApiErrorEvent(endpoint_type='text', status_code=0, source=source))
         raise NoIndexException('Failed to connect to Index API')
 
     if res.status_code == 503:
         log.warning('Index API returned 503 (indexes loading)')
+        if event_logger:
+            event_logger.save_event(IndexApiErrorEvent(endpoint_type='text', status_code=503, source=source))
         raise NoIndexException('Index API unavailable (503)')
 
     if res.status_code != 200:
         log.error('Unexpected status code %s from Index API', res.status_code)
+        if event_logger:
+            event_logger.save_event(IndexApiErrorEvent(endpoint_type='text', status_code=res.status_code, source=source))
         raise NoIndexException(f'Unexpected status {res.status_code} from Index API')
 
     return APISearchResults(**json.loads(res.text))
@@ -53,12 +61,13 @@ def text_search_by_post(
         uow: UnitOfWork,
         search_settings: TextSearchSettings,
         source: str,
-        filter_function: Callable[[SearchResults], SearchResults] = None
+        filter_function: Callable[[SearchResults], SearchResults] = None,
+        event_logger: EventLogging = None
 
 ) -> Optional[SearchResults]:
 
     search_results = SearchResults(post.url, checked_post=post, search_settings=search_settings)
-    api_results = get_text_matches(post.selftext, source=source)
+    api_results = get_text_matches(post.selftext, source=source, event_logger=event_logger)
     for index_results in api_results.results:
         for match in index_results.matches:
             post = uow.posts.get_by_id(match.id)

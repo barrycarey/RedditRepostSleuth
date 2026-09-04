@@ -13,6 +13,7 @@ from redditrepostsleuth.core.db.databasemodels import Post, MemeTemplate, MemeHa
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.exception import NoIndexException, ImageConversionException
 from redditrepostsleuth.core.model.events.imagesearchevent import ImageSearchEvent
+from redditrepostsleuth.core.model.events.index_api_error_event import IndexApiErrorEvent
 from redditrepostsleuth.core.model.image_index_api_result import APISearchResults
 from redditrepostsleuth.core.model.image_search_settings import ImageSearchSettings
 from redditrepostsleuth.core.model.search.image_search_match import ImageSearchMatch
@@ -284,6 +285,7 @@ class DuplicateImageService:
             r = requests.get(url, params=params, headers={'x-source': source})
         except ConnectionError:
             log.error('Failed to connect to Index API')
+            self.event_logger.save_event(IndexApiErrorEvent(endpoint_type='image', status_code=0, source=source))
             raise NoIndexException('Failed to connect to Index API')
         except Exception as e:
             log.exception('Problem with image index api', exc_info=True)
@@ -291,10 +293,12 @@ class DuplicateImageService:
 
         if r.status_code == 503:
             log.warning('Index API returned 503 (indexes loading)')
+            self.event_logger.save_event(IndexApiErrorEvent(endpoint_type='image', status_code=503, source=source))
             raise NoIndexException('Index API unavailable (503)')
 
         if r.status_code != 200:
             log.error('Unexpected status from index API: %s | %s', r.status_code, r.text)
+            self.event_logger.save_event(IndexApiErrorEvent(endpoint_type='image', status_code=r.status_code, source=source))
             raise NoIndexException(f'Unexpected status {r.status_code}')
 
         res_data = json.loads(r.text)
@@ -420,13 +424,16 @@ class DuplicateImageService:
             r = requests.get(f'{self.config.index_api}/meme', params={'hash': image_hash}, headers={'x-source': source})
         except Exception as e:
             log.exception('Failed to get meme template from api', exc_info=True)
+            self.event_logger.save_event(IndexApiErrorEvent(endpoint_type='meme', status_code=0, source=source))
             return
 
         if r.status_code == 503:
             log.warning('Meme index unavailable (503), skipping meme check')
+            self.event_logger.save_event(IndexApiErrorEvent(endpoint_type='meme', status_code=503, source=source))
             return
         if r.status_code != 200:
             log.error('Unexpected Index API status %s. %s', r.status_code, r.text)
+            self.event_logger.save_event(IndexApiErrorEvent(endpoint_type='meme', status_code=r.status_code, source=source))
             return
 
         results = json.loads(r.text)
