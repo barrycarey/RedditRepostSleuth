@@ -38,7 +38,7 @@ services:
         # profiles: [manual] -- deliberately excluded from `docker compose up -d`,
         # so CI/CD (deploy.sh) never auto-(re)starts it. On 2026-08-25 a daily cron
         # restart of this service refilled its Redis dataset to 99GB and broke
-        # BGSAVE (needs free space >= dataset size), repeatedly filling the host
+        # BGSAVE (needs free space >= datasset size), repeatedly filling the host
         # disk -- see prd-docker-01's root crontab for the disabled job. Start it
         # explicitly and watch Redis memory/disk after any change here:
         #   docker compose --profile manual up -d ingest
@@ -63,6 +63,15 @@ services:
 
     scheduled_task_worker:
         container_name: scheduled_task_worker
+        # profiles: [disabled-for-catchup] -- paused 2026-09-04 for ~1 week while
+        # ingest/ingest_worker/subreddit_update_worker/queue_monitor_svc/
+        # link_repost_worker/image_repost_worker/spam_detection_worker/
+        # spam_detection_tier2_worker work through a backlog. Re-enable by
+        # deleting this `profiles:` block (or `docker compose --profile
+        # disabled-for-catchup up -d scheduled_task_worker` to start it without
+        # editing the file).
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -103,6 +112,9 @@ services:
 
     scheduler:
         container_name: beat_scheduler
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -135,6 +147,9 @@ services:
 
     delete_post_svc:
         container_name: delete-post-svc
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -157,6 +172,9 @@ services:
 
     delete_post_worker:
         container_name: delete-post-worker
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -196,6 +214,9 @@ services:
 
     summons_handler:
         container_name: summons-monitor
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -214,6 +235,9 @@ services:
 
     submonitor_worker:
         container_name: submonitor-worker
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -234,6 +258,9 @@ services:
 
     reddit_actions_worker:
         container_name: reddit-actions-worker
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -314,6 +341,9 @@ services:
 
     only_fans_worker:
         container_name: only-fans-worker
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
@@ -333,6 +363,9 @@ services:
 
     subreddit_config_update_worker:
         container_name: subreddit-config-update-worker
+        # profiles: [disabled-for-catchup] -- see scheduled_task_worker's comment above.
+        profiles:
+            - disabled-for-catchup
         restart: unless-stopped
         user: "1001"
         build:
