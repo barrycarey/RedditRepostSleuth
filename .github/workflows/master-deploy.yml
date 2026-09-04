@@ -1,15 +1,20 @@
 # Auto-deploy on every push to master.
 #
-# Runs on a SELF-HOSTED runner installed on prd-docker-01 itself -- the same box
-# docker-compose deploys to. The deploy job runs deploy.sh --local (no SSH hop: the
-# runner IS the target) directly on the runner host. Same pattern as
+# Two independent jobs, each on its own self-hosted runner installed directly on
+# its deploy target (so deploy.sh --local skips SSH entirely). Same pattern as
 # barrycarey/TotalWellness and barrycarey/TrekFauna's master-deploy.yml on
 # prd-media-01 -- see this repo's docs/ci-runner-setup-linux.md for the one-time
-# runner install.
+# runner install on each host.
 #
-# ingest-svc is deliberately NOT started by this workflow (excluded via a compose
-# profile in docker-compose.yml, after a 2026-08-25 incident where restarting it
-# filled the host disk) -- start/watch it manually.
+# deploy: worker stack (docker-compose.yml) -> prd-docker-01. ingest-svc is
+# deliberately NOT started (excluded via a compose profile, after a 2026-08-25
+# incident where restarting it filled the host disk) -- start/watch it manually.
+#
+# deploy-api: public API (docker-compose-public.yml) -> prd-sleuthfront-01 (DMZ).
+# Independent of `deploy` -- different host, different runner, no shared state --
+# so there's no `needs:` between them and each gets its own concurrency group.
+# Must stay network-compatible with that host's existing swag/dockerproxy setup
+# (outside this repo) -- see the note at the top of docker-compose-public.yml.
 
 name: Deploy master
 
@@ -17,12 +22,6 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
-
-# Queue overlapping runs instead of cancelling them: killing a run midway through
-# `docker compose up --build` can leave the host half-updated.
-concurrency:
-  group: master-deploy
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -33,13 +32,31 @@ defaults:
 
 jobs:
   deploy:
-    name: Deploy (local, on prd-docker-01)
+    name: Deploy worker stack (local, on prd-docker-01)
     runs-on: [self-hosted, Linux, prd-docker-01, redditrepostsleuth]
     timeout-minutes: 30
+    # Queue overlapping runs instead of cancelling them: killing a run midway through
+    # `docker compose up --build` can leave the host half-updated.
+    concurrency:
+      group: master-deploy-worker
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
       - name: Deploy
         # --local: this job runs ON the deploy target, so deploy.sh skips SSH
         # entirely and runs every step directly. See deploy.sh's run() helper.
-        run: bash deploy.sh --local --redeploy
+        run: bash deploy.sh --local --redeploy --target worker
+
+  deploy-api:
+    name: Deploy public API (local, on prd-sleuthfront-01)
+    runs-on: [self-hosted, Linux, prd-sleuthfront-01, redditrepostsleuth-api]
+    timeout-minutes: 30
+    concurrency:
+      group: master-deploy-api
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        run: bash deploy.sh --local --redeploy --target api

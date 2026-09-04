@@ -2,38 +2,42 @@
 # Deploy RedditRepostSleuth to a Docker host, over SSH or directly on the host itself.
 #
 # Usage:
-#   ./deploy.sh                     # ship + build + start (first-time on a host)
-#   ./deploy.sh --redeploy          # same, but explicit that this updates an existing instance
-#   ./deploy.sh --local --redeploy  # run directly on the target (no SSH hop) -- see --local below
-#   ./deploy.sh --host mybox.lan    # override any default
+#   ./deploy.sh                             # worker stack -> prd-docker-01 (default)
+#   ./deploy.sh --target api                # public API -> prd-sleuthfront-01
+#   ./deploy.sh --local --redeploy          # run directly on the target (no SSH hop) -- see --local below
+#   ./deploy.sh --host mybox.lan            # override any default
 #
 # Options:
-#   --host HOST         SSH target host        (default: prd-docker-01.ho.me)
-#   --user USER         SSH user               (default: barry)
-#   --dir  DIR          App directory on host  (default: /home/barry/RedditRepostSleuth)
-#   --redeploy           No behavioral difference from the default currently -- kept for
-#                         parity with the sibling TotalWellness/TrekFauna deploy.sh scripts
-#                         and so a future guard (e.g. around .env) has an obvious flag to key off.
-#   --no-commit-check    Ship working tree instead of git archive HEAD
-#   --local              Run every step directly instead of over SSH -- for when this script
-#                         is invoked ON the deploy target itself (the CI runner installed on
-#                         prd-docker-01). --host/--user are ignored in this mode.
+#   --target worker|api  Which stack to deploy (default: worker):
+#                           worker -> docker-compose.yml, prd-docker-01.ho.me
+#                           api    -> docker-compose-public.yml, prd-sleuthfront-01.ho.me
+#   --host HOST           SSH target host        (default depends on --target, see above)
+#   --user USER           SSH user               (default: barry)
+#   --dir  DIR            App directory on host  (default: /home/barry/RedditRepostSleuth)
+#   --redeploy             No behavioral difference from the default currently -- kept for
+#                           parity with the sibling TotalWellness/TrekFauna deploy.sh scripts
+#                           and so a future guard (e.g. around .env) has an obvious flag to key off.
+#   --no-commit-check      Ship working tree instead of git archive HEAD
+#   --local                Run every step directly instead of over SSH -- for when this script
+#                           is invoked ON the deploy target itself (the CI runner installed on
+#                           that host). --host/--user are ignored in this mode.
 #
 # What this does NOT do:
-#   - Deploy docker-compose-public.yml (the public API). That goes to a separate host in
-#     the DMZ, not prd-docker-01 -- wiring that up is a separate task. This script only
-#     ever touches docker-compose.yml (the worker stack).
-#   - Start ingest-svc. It's excluded from `docker compose up -d` via a compose profile
-#     (see docker-compose.yml) after a 2026-08-25 incident where restarting it refilled
-#     its Redis dataset to 99GB and filled the host disk. Start it manually and watch:
+#   - Start ingest-svc (worker target only). It's excluded from `docker compose up -d` via a
+#     compose profile (see docker-compose.yml) after a 2026-08-25 incident where restarting it
+#     refilled its Redis dataset to 99GB and filled the host disk. Start it manually and watch:
 #       docker compose --profile manual up -d ingest
-#   - Write or touch sleuth_config.json. It holds real DB/Reddit/Redis/InfluxDB
-#     credentials, is gitignored, and must already exist in APP_DIR -- this script
-#     only verifies it's there and fails loudly if not.
+#   - Write or touch sleuth_config.json. It holds real DB/Reddit/Redis/InfluxDB credentials,
+#     is gitignored, and must already exist in APP_DIR on EACH target host separately -- this
+#     script only verifies it's there and fails loudly if not.
+#   - Touch anything outside the target's own compose file. The api target in particular must
+#     stay compatible with prd-sleuthfront-01's existing swag/dockerproxy setup (which lives
+#     outside this repo) -- see the network-naming note at the top of docker-compose-public.yml.
 
 set -euo pipefail
 
-HOST="prd-docker-01.ho.me"
+TARGET_STACK="worker"
+HOST=""
 SSH_USER="barry"
 APP_DIR="/home/barry/RedditRepostSleuth"
 USE_GIT_ARCHIVE=true
@@ -41,15 +45,31 @@ LOCAL=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --host)            HOST="$2";     shift 2 ;;
-    --user)            SSH_USER="$2"; shift 2 ;;
-    --dir)             APP_DIR="$2";  shift 2 ;;
-    --redeploy)         shift ;;
-    --no-commit-check)  USE_GIT_ARCHIVE=false; shift ;;
-    --local)            LOCAL=true;   shift   ;;
+    --target)            TARGET_STACK="$2"; shift 2 ;;
+    --host)               HOST="$2";     shift 2 ;;
+    --user)               SSH_USER="$2"; shift 2 ;;
+    --dir)                APP_DIR="$2";  shift 2 ;;
+    --redeploy)            shift ;;
+    --no-commit-check)     USE_GIT_ARCHIVE=false; shift ;;
+    --local)               LOCAL=true;   shift   ;;
     *) echo "Unknown flag: $1" >&2; exit 1 ;;
   esac
 done
+
+case "$TARGET_STACK" in
+  worker)
+    COMPOSE_FILE="docker-compose.yml"
+    [[ -z "$HOST" ]] && HOST="prd-docker-01.ho.me"
+    ;;
+  api)
+    COMPOSE_FILE="docker-compose-public.yml"
+    [[ -z "$HOST" ]] && HOST="prd-sleuthfront-01.ho.me"
+    ;;
+  *)
+    echo "Unknown --target: $TARGET_STACK (expected 'worker' or 'api')" >&2
+    exit 1
+    ;;
+esac
 
 TARGET="${SSH_USER}@${HOST}"
 
@@ -63,6 +83,8 @@ run() {
     ssh "$TARGET" "$1"
   fi
 }
+
+echo "Deploying target=${TARGET_STACK} (${COMPOSE_FILE}) to ${HOST}:${APP_DIR}"
 
 # ── Step 0: Prerequisites ────────────────────────────────────────────────────
 echo "=== [0/5] Checking prerequisites ==="
@@ -123,21 +145,28 @@ run "echo '.env and sleuth_config.json present'"
 
 # ── Step 3: Build and start ──────────────────────────────────────────────────
 echo ""
-echo "=== [3/4] Building and starting worker stack ==="
-# `docker compose build` (no --profile) silently SKIPS services gated behind a
-# non-default profile (ingest's `manual`, and anything under `disabled-for-catchup`)
-# -- found the hard way when a profile-gated service kept running a 3-month-stale
-# image because no deploy had ever rebuilt it. Pass every profile that exists in
-# this file so every service's image stays current regardless of whether it's
-# currently allowed to auto-start; `up -d` below has no --profile, so it still only
-# ever STARTS the default (non-gated) services.
-run "cd ${APP_DIR} && docker compose --profile manual --profile disabled-for-catchup build 2>&1 | tail -30"
-run "cd ${APP_DIR} && docker compose up -d"
+echo "=== [3/5] Building ${TARGET_STACK} stack ==="
+if [[ "$TARGET_STACK" == "worker" ]]; then
+  # `docker compose build` (no --profile) silently SKIPS services gated behind a
+  # non-default profile (ingest's `manual`, and anything under `disabled-for-catchup`)
+  # -- found the hard way when a profile-gated service kept running a 3-month-stale
+  # image because no deploy had ever rebuilt it. Pass every profile that exists in
+  # this file so every service's image stays current regardless of whether it's
+  # currently allowed to auto-start; `up -d` below has no --profile, so it still only
+  # ever STARTS the default (non-gated) services.
+  run "cd ${APP_DIR} && docker compose -f ${COMPOSE_FILE} --profile manual --profile disabled-for-catchup build 2>&1 | tail -30"
+else
+  run "cd ${APP_DIR} && docker compose -f ${COMPOSE_FILE} build 2>&1 | tail -30"
+fi
 
-# ── Step 4: Verify ───────────────────────────────────────────────────────────
 echo ""
-echo "=== [4/4] Verifying ==="
-run "cd ${APP_DIR} && docker compose ps --format 'table {{.Name}}\t{{.Status}}'"
+echo "=== [4/5] Starting ${TARGET_STACK} stack ==="
+run "cd ${APP_DIR} && docker compose -f ${COMPOSE_FILE} up -d"
+
+# ── Step 5: Verify ───────────────────────────────────────────────────────────
+echo ""
+echo "=== [5/5] Verifying ==="
+run "cd ${APP_DIR} && docker compose -f ${COMPOSE_FILE} ps --format 'table {{.Name}}\t{{.Status}}'"
 
 echo ""
 echo "--- Container health check ---"
@@ -145,9 +174,25 @@ echo "--- Container health check ---"
 # json` -- its shape (single array vs newline-delimited objects) has changed across
 # compose versions, and grepping for the literal "(unhealthy)"/"Restarting" text compose
 # prints is stable regardless.
-run "cd ${APP_DIR} && docker compose ps --format 'table {{.Name}}\t{{.Status}}' > /tmp/repostsleuth-deploy-status.txt; cat /tmp/repostsleuth-deploy-status.txt; if grep -qiE 'unhealthy|restarting' /tmp/repostsleuth-deploy-status.txt; then echo 'ERROR: one or more containers are unhealthy/restarting' >&2; exit 1; else echo 'All services healthy'; fi"
+run "cd ${APP_DIR} && docker compose -f ${COMPOSE_FILE} ps --format 'table {{.Name}}\t{{.Status}}' > /tmp/repostsleuth-deploy-status.txt; cat /tmp/repostsleuth-deploy-status.txt; if grep -qiE 'unhealthy|restarting' /tmp/repostsleuth-deploy-status.txt; then echo 'ERROR: one or more containers are unhealthy/restarting' >&2; exit 1; else echo 'All services healthy'; fi"
+
+if [[ "$TARGET_STACK" == "api" ]]; then
+  echo ""
+  echo "--- HTTP smoke test ---"
+  run "
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      CODE=\$(docker exec api curl -s -o /dev/null -w '%{http_code}' http://localhost:8443/api/health 2>/dev/null)
+      if [ \"\$CODE\" = '200' ]; then break; fi
+      echo \"  Attempt \$i: /api/health returned \$CODE, retrying in 3s...\"
+      sleep 3
+    done
+    docker exec api curl -s -o /dev/null -w 'API health   HTTP %{http_code}\n' http://localhost:8443/api/health
+  "
+fi
 
 echo ""
-echo "=== Deploy complete ==="
-echo "NOTE: ingest-svc was NOT started (excluded via compose profile -- see top of this file)."
-echo "Start it manually once you're ready to watch it: docker compose --profile manual up -d ingest"
+echo "=== Deploy complete (${TARGET_STACK}) ==="
+if [[ "$TARGET_STACK" == "worker" ]]; then
+  echo "NOTE: ingest-svc was NOT started (excluded via compose profile -- see top of this file)."
+  echo "Start it manually once you're ready to watch it: docker compose --profile manual up -d ingest"
+fi

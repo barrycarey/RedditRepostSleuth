@@ -1,4 +1,15 @@
 # Docker Compose for RepostSleuth public API
+#
+# No custom top-level `networks:` block here, deliberately: prd-sleuthfront-01's
+# existing swag/dockerproxy setup (/docker/docker-compose.yml on that host, NOT
+# in this repo) has a hardcoded `external: true` reference to
+# `redditrepostsleuth_default` to reach the `api` container by name -- that's
+# Compose's implicit default network name (`<project>_default`), which only
+# exists if no service here declares a custom `networks:` key. Naming one (e.g.
+# `api`) would produce `redditrepostsleuth_api` instead and break swag's
+# routing to this container. Don't add one without also updating swag's
+# external network reference on that host.
+#
 # Compose V2 - no version field needed
 
 x-logging: &default-logging
@@ -28,8 +39,6 @@ services:
             redis:
                 condition: service_healthy
         logging: *default-logging
-        networks:
-            - api
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8443/api/health"]
             interval: 30s
@@ -44,18 +53,12 @@ services:
         volumes:
             - redis_data:/data
         logging: *default-logging
-        networks:
-            - api
         healthcheck:
             test: ["CMD", "redis-cli", "ping"]
             interval: 30s
             timeout: 10s
             retries: 3
             start_period: 10s
-
-networks:
-    api:
-        driver: bridge
 
 volumes:
     redis_data:
