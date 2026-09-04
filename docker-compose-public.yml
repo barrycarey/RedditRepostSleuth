@@ -21,6 +21,14 @@ services:
             REDIS_PORT: 6379
         restart: unless-stopped
         entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10 --log-level DEBUG
+        ports:
+            # Host-local only: no reverse proxy currently fronts this service on
+            # prd-docker-01 (checked both prd-docker-01 and prd-media-01's swag
+            # configs -- neither has a repostsleuth vhost). This just makes the
+            # container reachable for local health checks/deploy verification.
+            # Public internet exposure (reverse proxy, DNS, TLS) is a separate,
+            # not-yet-done piece of infra -- out of scope here.
+            - "127.0.0.1:8443:8443"
         volumes:
             - /opt/letsencrypt/etc/letsencrypt/live/www.repostsleuth.com:/config/keys
             - /opt/imageuploads:/opt/imageuploads

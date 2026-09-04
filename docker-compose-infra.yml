@@ -1,4 +1,16 @@
-# Docker Compose for RepostSleuth infrastructure services
+# Docker Compose for RepostSleuth CI/CD infrastructure
+#
+# NOTE: Grafana/Loki/Redis/InfluxDB/Telegraf/Promtail are intentionally NOT
+# defined here. prd-docker-01.ho.me already runs a shared instance of all of
+# them (project "config" at /config/docker-compose.yml) on these same ports,
+# and sleuth_config.json already points at that shared instance via its
+# published host ports. Defining them again here would just collide.
+#
+# The GitHub Actions runner also isn't defined here as a container. It's
+# installed as a native systemd service directly on the host instead, matching
+# the pattern already used for barrycarey/TotalWellness and barrycarey/TrekFauna
+# on prd-media-01.ho.me: see docs/ci-runner-setup-linux.md.
+#
 # Compose V2 - no version field needed
 
 x-logging: &default-logging
@@ -20,153 +32,6 @@ services:
       networks:
         - monitoring
 
-    grafana:
-      image: grafana/grafana:11.4.0
-      container_name: grafana
-      restart: unless-stopped
-      ports:
-        - "3000:3000"
-      volumes:
-        - /config/grafana:/var/lib/grafana
-      user: '1001'
-      logging: *default-logging
-      networks:
-        - monitoring
-      healthcheck:
-        test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 30s
-
-    loki:
-      image: grafana/loki:3.3.2
-      container_name: loki
-      restart: unless-stopped
-      ports:
-        - "3100:3100"
-      user: '1001'
-      command: -config.file=/etc/loki/loki-config.yaml
-      volumes:
-        - /config/loki/loki-config.yaml:/etc/loki/loki-config.yaml
-        - /config/loki/data:/loki
-        - /config/loki/wal:/wal
-      logging: *default-logging
-      networks:
-        - monitoring
-      healthcheck:
-        test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ready"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 30s
-
-    redis:
-      image: redis:7.0.11
-      container_name: redis
-      restart: unless-stopped
-      user: '1001'
-      ports:
-        - '6379:6379'
-      volumes:
-        - /config/redis:/data
-      command: redis-server --save 550 1 --maxmemory 40gb
-      logging: *default-logging
-      networks:
-        - monitoring
-      healthcheck:
-        test: ["CMD", "redis-cli", "ping"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 10s
-
-    influxdb:
-      image: influxdb:2.7.11
-      container_name: influxdb
-      restart: unless-stopped
-      user: '1001'
-      ports:
-        - '8086:8086'
-      volumes:
-        - /config/influxdb/data:/var/lib/influxdb2
-        - /config/influxdb/config.yml:/etc/influxdb2/config.yml
-      logging: *default-logging
-      networks:
-        - monitoring
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 30s
-
-    telegraf:
-      image: telegraf-collectd:1.1
-      container_name: telegraf
-      restart: unless-stopped
-      user: '1001'
-      environment:
-        - HOST_ETC=/hostfs/etc
-        - HOST_PROC=/hostfs/proc
-        - HOST_SYS=/hostfs/sys
-        - HOST_VAR=/hostfs/var
-        - HOST_RUN=/hostfs/run
-        - HOST_MOUNT_PREFIX=/hostfs
-      ports:
-        - '8125:8125'
-        - '8092:8092'
-        - '8094:8094'
-        - '25826:25826/udp'
-        - '2003:2003'
-      volumes:
-        - /config/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
-        - /config/telegraf/types.db:/data/types.db
-        - /var/run/docker.sock:/var/run/docker.sock
-        - /:/hostfs:ro
-      logging: *default-logging
-      networks:
-        - monitoring
-
-    promtail:
-      image: grafana/promtail:3.3.2
-      container_name: promtail
-      restart: unless-stopped
-      user: '1001'
-      volumes:
-        - /config/promtail/promtail.yaml:/etc/promtail/promtail.yaml
-        - /config/swag/log/nginx:/logs
-      command: -config.file=/etc/promtail/promtail.yaml
-      logging: *default-logging
-      networks:
-        - monitoring
-
-    # GitHub Actions self-hosted runner (optional - comment out if not using CI/CD)
-    # Get GITHUB_RUNNER_TOKEN from: Repository Settings > Actions > Runners > New self-hosted runner
-    github-runner:
-      image: myoung34/github-runner:latest
-      container_name: github-runner
-      restart: unless-stopped
-      environment:
-        - REPO_URL=https://github.com/barrycarey/RedditRepostSleuth
-        - RUNNER_TOKEN=${GITHUB_RUNNER_TOKEN}
-        - RUNNER_NAME=repostsleuth-runner
-        - RUNNER_WORKDIR=/tmp/runner
-        - LABELS=self-hosted,linux
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-        - runner-work:/tmp/runner
-      security_opt:
-        - label:disable
-      logging: *default-logging
-      networks:
-        - monitoring
-      profiles:
-        - ci  # Only start with: docker compose --profile ci up
-
 networks:
     monitoring:
         driver: bridge
-
-volumes:
-    runner-work:

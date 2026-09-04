@@ -1,0 +1,45 @@
+# Auto-deploy on every push to master.
+#
+# Runs on a SELF-HOSTED runner installed on prd-docker-01 itself -- the same box
+# docker-compose deploys to. The deploy job runs deploy.sh --local (no SSH hop: the
+# runner IS the target) directly on the runner host. Same pattern as
+# barrycarey/TotalWellness and barrycarey/TrekFauna's master-deploy.yml on
+# prd-media-01 -- see this repo's docs/ci-runner-setup-linux.md for the one-time
+# runner install.
+#
+# ingest-svc is deliberately NOT started by this workflow (excluded via a compose
+# profile in docker-compose.yml, after a 2026-08-25 incident where restarting it
+# filled the host disk) -- start/watch it manually.
+
+name: Deploy master
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Queue overlapping runs instead of cancelling them: killing a run midway through
+# `docker compose up --build` can leave the host half-updated.
+concurrency:
+  group: master-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: Deploy (local, on prd-docker-01)
+    runs-on: [self-hosted, Linux, prd-docker-01, redditrepostsleuth]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        # --local: this job runs ON the deploy target, so deploy.sh skips SSH
+        # entirely and runs every step directly. See deploy.sh's run() helper.
+        run: bash deploy.sh --local --redeploy
