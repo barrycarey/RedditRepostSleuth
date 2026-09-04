@@ -109,7 +109,8 @@ def check_for_text_repost_task(self, post: Post) -> None:
                 uow,
                 get_default_text_search_settings(self.config),
                 filter_function=filter_search_results,
-                source='ingest'
+                source='ingest',
+                event_logger=self.event_logger
             )
             log.info('Found %s matching text posts', len(search_results.matches))
     except NoIndexException as e:

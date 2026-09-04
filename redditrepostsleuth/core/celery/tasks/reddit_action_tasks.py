@@ -62,7 +62,7 @@ def remove_submission_task(self, submission: Submission, removal_reason: str, mo
         log.warning('Too many requests when removing submission')
         raise e
     except RedditAPIException as e:
-        if e.error_type == 'USER_DOESNT_EXIST':
+        if any(item.error_type == 'USER_DOESNT_EXIST' for item in e.items):
             log.warning('Cannot remove post https://redd.it/%s: user does not exist', submission.id)
         else:
             log.exception('Reddit API error removing submission https://redd.it/%s', submission.id, exc_info=True)
@@ -106,7 +106,8 @@ def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, not
             )
         )
     except RedditAPIException as e:
-        if e.error_type == 'TOO_LONG':
+        error_types = {item.error_type for item in e.items}
+        if 'TOO_LONG' in error_types:
             log.warning('Ban reason for subreddit %s is %s and should be no longer than 100', subreddit_name, len(ban_reason))
             send_modmail_task.apply_async(
                 (
@@ -115,6 +116,9 @@ def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, not
                     'Error When Banning User'
                 )
             )
+            return
+        if 'USER_DOESNT_EXIST' in error_types:
+            log.warning('Cannot ban user %s on %s: user does not exist', username, subreddit_name)
             return
         raise e
     except Exception as e:
@@ -279,7 +283,7 @@ def leave_comment_task(
         log.warning('Too many requests when removing submission')
         raise e
     except RedditAPIException as e:
-        if e.error_type == 'THREAD_LOCKED':
+        if any(item.error_type in ('THREAD_LOCKED', 'USER_DOESNT_EXIST') for item in e.items):
             return
         raise e
     except Exception as e:
@@ -317,7 +321,7 @@ def send_modmail_task(self, subreddit_name: str, message: str, subject: str, sou
         log.warning('Too many requests when sending modmail')
         raise e
     except RedditAPIException as e:
-        if e.error_type == 'USER_DOESNT_EXIST':
+        if any(item.error_type == 'USER_DOESNT_EXIST' for item in e.items):
             log.warning('Cannot send modmail to r/%s: subreddit/user does not exist', subreddit_name)
         else:
             log.exception('Reddit API error sending modmail to %s', subreddit_name)

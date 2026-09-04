@@ -316,7 +316,8 @@ class MonitoredSubService:
                 uow,
                 get_text_search_settings_for_monitored_sub(monitored_sub),
                 'sub_monitor',
-                filter_function=filter_search_results
+                filter_function=filter_search_results,
+                event_logger=self.event_logger
             )
 
             return search_results
