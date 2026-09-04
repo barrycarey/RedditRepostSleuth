@@ -107,7 +107,13 @@ services:
             - RUN_ENV=production
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-        entrypoint: celery -A redditrepostsleuth.core.celery beat
+        # -s points the schedule db at the mounted volume, both because that's
+        # the point of mounting /opt/repostsleuth-celery in the first place
+        # (persist across container recreation) and because the default
+        # location (cwd, /app) is root-owned and unwritable by this
+        # container's non-root user -- see /opt/repostsleuth-celery's
+        # ownership note in docs/deployment-guide.md.
+        entrypoint: celery -A redditrepostsleuth.core.celery beat -s /opt/repostsleuth-celery/celerybeat-schedule
         logging: *default-logging
         networks:
             - backend

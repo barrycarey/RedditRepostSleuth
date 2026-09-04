@@ -20,6 +20,9 @@
 #                         prd-docker-01). --host/--user are ignored in this mode.
 #
 # What this does NOT do:
+#   - Deploy docker-compose-public.yml (the public API). That goes to a separate host in
+#     the DMZ, not prd-docker-01 -- wiring that up is a separate task. This script only
+#     ever touches docker-compose.yml (the worker stack).
 #   - Start ingest-svc. It's excluded from `docker compose up -d` via a compose profile
 #     (see docker-compose.yml) after a 2026-08-25 incident where restarting it refilled
 #     its Redis dataset to 99GB and filled the host disk. Start it manually and watch:
@@ -120,32 +123,14 @@ run "echo '.env and sleuth_config.json present'"
 
 # ── Step 3: Build and start ──────────────────────────────────────────────────
 echo ""
-echo "=== [3/5] Building and starting worker stack ==="
+echo "=== [3/4] Building and starting worker stack ==="
 run "cd ${APP_DIR} && docker compose build 2>&1 | tail -30"
 run "cd ${APP_DIR} && docker compose up -d"
 
-echo ""
-echo "=== [4/5] Building and starting public API ==="
-run "cd ${APP_DIR} && docker compose -f docker-compose-public.yml build 2>&1 | tail -30"
-run "cd ${APP_DIR} && docker compose -f docker-compose-public.yml up -d"
-
 # ── Step 4: Verify ───────────────────────────────────────────────────────────
 echo ""
-echo "=== [5/5] Verifying ==="
+echo "=== [4/4] Verifying ==="
 run "cd ${APP_DIR} && docker compose ps --format 'table {{.Name}}\t{{.Status}}'"
-run "cd ${APP_DIR} && docker compose -f docker-compose-public.yml ps --format 'table {{.Name}}\t{{.Status}}'"
-
-echo ""
-echo "--- HTTP smoke test (waiting for API to be ready) ---"
-run "
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    CODE=\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8443/api/health 2>/dev/null)
-    if [ \"\$CODE\" = '200' ]; then break; fi
-    echo \"  Attempt \$i: /api/health returned \$CODE, retrying in 3s...\"
-    sleep 3
-  done
-  curl -s -o /dev/null -w 'API health   HTTP %{http_code}\n' http://127.0.0.1:8443/api/health
-"
 
 echo ""
 echo "--- Container health check ---"
@@ -153,7 +138,7 @@ echo "--- Container health check ---"
 # json` -- its shape (single array vs newline-delimited objects) has changed across
 # compose versions, and grepping for the literal "(unhealthy)"/"Restarting" text compose
 # prints is stable regardless.
-run "cd ${APP_DIR} && (docker compose ps --format 'table {{.Name}}\t{{.Status}}'; docker compose -f docker-compose-public.yml ps --format 'table {{.Name}}\t{{.Status}}') > /tmp/repostsleuth-deploy-status.txt; cat /tmp/repostsleuth-deploy-status.txt; if grep -qiE 'unhealthy|restarting' /tmp/repostsleuth-deploy-status.txt; then echo 'ERROR: one or more containers are unhealthy/restarting' >&2; exit 1; else echo 'All services healthy'; fi"
+run "cd ${APP_DIR} && docker compose ps --format 'table {{.Name}}\t{{.Status}}' > /tmp/repostsleuth-deploy-status.txt; cat /tmp/repostsleuth-deploy-status.txt; if grep -qiE 'unhealthy|restarting' /tmp/repostsleuth-deploy-status.txt; then echo 'ERROR: one or more containers are unhealthy/restarting' >&2; exit 1; else echo 'All services healthy'; fi"
 
 echo ""
 echo "=== Deploy complete ==="
