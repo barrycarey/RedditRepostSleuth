@@ -1,0 +1,9 @@
+# Worker dependencies (Celery workers)
+-r base.txt
+celery[redis]==5.3.1
+imagehash==4.3.1
+python-Levenshtein==0.21.1
+distance==0.1.3
+pyjwt==2.8.0
+redgifs==1.9.0
+aiohttp==3.9.0

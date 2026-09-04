@@ -1,4 +1,28 @@
-version: "3.7"
+# Docker Compose for RepostSleuth services
+# Compose V2 - no version field needed
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-worker-healthcheck: &worker-healthcheck
+  healthcheck:
+    test: ["CMD", "celery", "-A", "redditrepostsleuth.core.celery", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
+    interval: 60s
+    timeout: 30s
+    retries: 3
+    start_period: 30s
+
+x-monitor-healthcheck: &monitor-healthcheck
+  healthcheck:
+    test: ["CMD", "pgrep", "-f", "python"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 10s
+
 services:
     ingest:
         container_name: ingest-svc
@@ -6,14 +30,18 @@ services:
         user: "1001"
         build:
             context: .
-            dockerfile: docker/IngestSvcDockerfile
+            dockerfile: docker/Dockerfile.monitor
         environment:
             - db_user=ingest
             - LOG_LEVEL=INFO
             - RUN_ENV=production
         env_file:
             - .env
-        entrypoint: python -u /src/ingestsvc.py
+        entrypoint: python -u /app/redditrepostsleuth/ingestsvc/ingestsvc.py
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *monitor-healthcheck
 
     scheduled_task_worker:
         container_name: scheduled_task_worker
@@ -21,7 +49,7 @@ services:
         user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -30,6 +58,10 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks,redditrepostsleuth.core.celery.tasks.scheduled_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q scheduled_tasks -n scheduled_task_worker --autoscale=15,2
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     subreddit_update_worker:
         container_name: subreddit_update_worker
@@ -37,7 +69,7 @@ services:
         user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -46,13 +78,18 @@ services:
             - LOG_LEVEL=DEBUG
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.maintenance_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q update_subreddit_data -n subreddit_update_worker --autoscale=1,10
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     scheduler:
         container_name: beat_scheduler
         restart: unless-stopped
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         volumes:
             - /opt/repostsleuth-celery:/opt/repostsleuth-celery
         env_file:
@@ -60,75 +97,101 @@ services:
         environment:
             - RUN_ENV=production
             - LOG_LEVEL=INFO
-            - C_FORCE_ROOT=True
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery beat
+        logging: *default-logging
+        networks:
+            - backend
+        healthcheck:
+            test: ["CMD", "pgrep", "-f", "celery"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
 
-    # delete_post_svc:
-    #     restart: unless-stopped
-    #     build:
-    #         context: .
-    #         dockerfile: redditrepostsleuth/workers/delete_post/Dockerfile
-    #     env_file:
-    #         - .env
-    #     environment:
-    #         - RUN_ENV=production
-    #         - LOG_LEVEL=INFO
-    #         - QUERY_LIMIT=1000000
-    #         - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
+    delete_post_svc:
+        container_name: delete-post-svc
+        restart: unless-stopped
+        user: "1001"
+        build:
+            context: .
+            dockerfile: docker/Dockerfile.worker
+        env_file:
+            - .env
+        environment:
+            - RUN_ENV=production
+            - LOG_LEVEL=INFO
+            - QUERY_LIMIT=1000000
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *monitor-healthcheck
 
-    # delete_post_worker:
-    #     container_name: delete-post-worker
-    #     restart: unless-stopped
-    #     user: '1001'
-    #     build:
-    #         context: .
-    #         dockerfile: docker/WorkerDockerFile
-    #     env_file:
-    #         - .env
-    #     environment:
-    #         - RUN_ENV=production
-    #         - LOG_LEVEL=INFO
-    #         - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
-    #     entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -n deleted_post_worker -c 16
-    #     volumes:
-    #         - /opt/imageindex:/opt/imageindex
+    delete_post_worker:
+        container_name: delete-post-worker
+        restart: unless-stopped
+        user: "1001"
+        build:
+            context: .
+            dockerfile: docker/Dockerfile.worker
+        env_file:
+            - .env
+        environment:
+            - RUN_ENV=production
+            - LOG_LEVEL=INFO
+            - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
+        entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_delete -n deleted_post_worker -c 16
+        volumes:
+            - /opt/imageindex:/opt/imageindex
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     queue_monitor_svc:
         container_name: queue-monitor-svc
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/QueueMonitorDockerfile
+            dockerfile: docker/Dockerfile.monitor
         env_file:
             - .env
         environment:
             - RUN_ENV=production
             - LOG_LEVEL=WARN
-        entrypoint: python -u /src/queue_monitor.py
+        entrypoint: python -u /app/redditrepostsleuth/queue_monitor_svc/queue_monitor.py
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *monitor-healthcheck
 
     summons_handler:
         container_name: summons-monitor
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/SummonsHandlerDockerfile
+            dockerfile: docker/Dockerfile.monitor
         env_file:
             - .env
         environment:
             - RUN_ENV=production
             - LOG_LEVEL=WARN
-        entrypoint: python -u /src/summons_monitor.py
+        entrypoint: python -u /app/redditrepostsleuth/summonssvc/summons_monitor.py
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *monitor-healthcheck
 
     submonitor_worker:
         container_name: submonitor-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -137,14 +200,18 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.monitored_sub_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q submonitor -n submonitor_worker --autoscale=10,2
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     reddit_actions_worker:
         container_name: reddit-actions-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -153,14 +220,18 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.reddit_action_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q reddit_actions -n reddit_actions --autoscale=3,2
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     ingest_worker:
-        restart: unless-stopped
         container_name: ingest-worker
-        user: '1001'
+        restart: unless-stopped
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -169,14 +240,18 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.ingest_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q post_ingest -n ingest_worker --autoscale=10,1
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     link_repost_worker:
         container_name: link-repost-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -185,14 +260,18 @@ services:
             - RUN_ENV=production
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.repost_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_link -n repost_link_worker --autoscale=4,1
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     image_repost_worker:
         container_name: image-repost-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -201,14 +280,18 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.repost_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q repost_image -n repost_image_worker --autoscale=14,5
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     only_fans_worker:
         container_name: only-fans-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -216,14 +299,18 @@ services:
             - LOG_LEVEL=WARNING
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q onlyfans_check -n onlyfans_worker --autoscale=10,5
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     subreddit_config_update_worker:
         container_name: subreddit-config-update-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -231,14 +318,18 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.scheduled_tasks,redditrepostsleuth.core.celery.admin_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q batch_delete_searches,subreddit_config_updates,update_wiki_from_database -n subreddit_config_update_worker --autoscale=8,1
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     spam_detection_worker:
         container_name: spam-detection-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -248,14 +339,18 @@ services:
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.spam_detection_tasks
             - CELERY_WORKER_CONCURRENCY=1  # Single worker for rate limiting
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q spam_detection -n spam_detection_worker -c 1 --loglevel=info
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
     spam_detection_tier2_worker:
         container_name: spam-detection-tier2-worker
         restart: unless-stopped
-        user: '1001'
+        user: "1001"
         build:
             context: .
-            dockerfile: docker/WorkerDockerFile
+            dockerfile: docker/Dockerfile.worker
         env_file:
             - .env
         environment:
@@ -264,5 +359,11 @@ services:
             - LOG_LEVEL=INFO
             - CELERY_IMPORTS=redditrepostsleuth.core.celery.tasks.spam_detection_tasks
         entrypoint: celery -A redditrepostsleuth.core.celery worker -Q spam_detection_tier2 -n spam_detection_tier2_worker -c 4 --loglevel=info
+        logging: *default-logging
+        networks:
+            - backend
+        <<: *worker-healthcheck
 
-
+networks:
+    backend:
+        driver: bridge

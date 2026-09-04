@@ -1,0 +1,10 @@
+# Core dependencies shared across all services
+sqlalchemy==2.0.20
+pymysql==1.1.0
+praw==7.7.1
+requests==2.31.0
+redlock==1.2.0
+influxdb-client==1.37.0
+pydantic==1.10.9
+sentry-sdk==1.29.2
+cryptography==41.0.6
