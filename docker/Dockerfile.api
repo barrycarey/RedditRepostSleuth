@@ -1,0 +1,42 @@
+# Multi-stage Dockerfile for Site API
+# Build stage
+FROM python:3.11-bookworm AS builder
+WORKDIR /build
+COPY requirements/base.txt requirements/api.txt ./requirements/
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements/api.txt
+
+# Runtime stage
+FROM python:3.11-slim-bookworm
+
+LABEL maintainer="Barry Carey <mcarey66@gmail.com>"
+
+# Install runtime dependencies for opencv and tesseract
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    tesseract-ocr \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -m appuser
+
+WORKDIR /app
+
+# Install wheels from builder stage
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+# Copy application code
+COPY --chown=appuser:appgroup redditrepostsleuth /app/redditrepostsleuth/
+COPY --chown=appuser:appgroup sleuth_config.json /app/
+
+USER appuser
+
+EXPOSE 8888
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8888/api/health || exit 1
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8888", "--workers", "4", "--threads", "2", "redditrepostsleuth.repostsleuthsiteapi.app:api"]

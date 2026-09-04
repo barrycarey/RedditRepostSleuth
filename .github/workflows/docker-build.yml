@@ -1,0 +1,106 @@
+name: Build Docker Images
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - 'docker/**'
+      - 'redditrepostsleuth/**'
+      - 'requirements/**'
+      - 'sleuth_config.json'
+  workflow_dispatch:  # Manual trigger
+
+env:
+  REGISTRY: localhost:5000
+
+jobs:
+  lint-dockerfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/Dockerfile.worker
+          ignore: DL3008,DL3013  # Ignore version pinning warnings for apt and pip
+
+      - name: Lint API Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/Dockerfile.api
+          ignore: DL3008,DL3013
+
+      - name: Lint Monitor Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/Dockerfile.monitor
+          ignore: DL3008,DL3013
+
+  build-worker:
+    runs-on: self-hosted
+    needs: lint-dockerfiles
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build worker image
+        run: |
+          docker build -f docker/Dockerfile.worker \
+            -t $REGISTRY/repostsleuth/worker:${{ github.sha }} \
+            -t $REGISTRY/repostsleuth/worker:latest .
+
+      - name: Push to local registry
+        run: |
+          docker push $REGISTRY/repostsleuth/worker:${{ github.sha }}
+          docker push $REGISTRY/repostsleuth/worker:latest
+
+      - name: Cleanup old images
+        run: |
+          # Keep only the last 5 images
+          docker image prune -f --filter "until=168h"
+
+  build-api:
+    runs-on: self-hosted
+    needs: lint-dockerfiles
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: |
+          docker build -f docker/Dockerfile.api \
+            -t $REGISTRY/repostsleuth/api:${{ github.sha }} \
+            -t $REGISTRY/repostsleuth/api:latest .
+
+      - name: Push to local registry
+        run: |
+          docker push $REGISTRY/repostsleuth/api:${{ github.sha }}
+          docker push $REGISTRY/repostsleuth/api:latest
+
+  build-monitor:
+    runs-on: self-hosted
+    needs: lint-dockerfiles
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build monitor image
+        run: |
+          docker build -f docker/Dockerfile.monitor \
+            -t $REGISTRY/repostsleuth/monitor:${{ github.sha }} \
+            -t $REGISTRY/repostsleuth/monitor:latest .
+
+      - name: Push to local registry
+        run: |
+          docker push $REGISTRY/repostsleuth/monitor:${{ github.sha }}
+          docker push $REGISTRY/repostsleuth/monitor:latest
+
+  notify-completion:
+    runs-on: self-hosted
+    needs: [build-worker, build-api, build-monitor]
+    if: always()
+    steps:
+      - name: Check build status
+        run: |
+          echo "Build completed!"
+          echo "Worker: ${{ needs.build-worker.result }}"
+          echo "API: ${{ needs.build-api.result }}"
+          echo "Monitor: ${{ needs.build-monitor.result }}"
