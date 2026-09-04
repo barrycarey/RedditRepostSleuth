@@ -4,3 +4,7 @@ celery[redis]==5.3.1
 imagehash==4.3.1
 aiohttp==3.9.0
 redgifs==1.9.1
+# summons_monitor.py imports duplicateimageservice -> repost_helpers, which needs
+# this at import time (was missing here even though worker.txt/api.txt have it,
+# crashing summons_handler with ModuleNotFoundError on every start).
+python-Levenshtein==0.21.1
