@@ -124,7 +124,14 @@ run "echo '.env and sleuth_config.json present'"
 # ── Step 3: Build and start ──────────────────────────────────────────────────
 echo ""
 echo "=== [3/4] Building and starting worker stack ==="
-run "cd ${APP_DIR} && docker compose build 2>&1 | tail -30"
+# `docker compose build` (no --profile) silently SKIPS services gated behind a
+# non-default profile (ingest's `manual`, and anything under `disabled-for-catchup`)
+# -- found the hard way when a profile-gated service kept running a 3-month-stale
+# image because no deploy had ever rebuilt it. Pass every profile that exists in
+# this file so every service's image stays current regardless of whether it's
+# currently allowed to auto-start; `up -d` below has no --profile, so it still only
+# ever STARTS the default (non-gated) services.
+run "cd ${APP_DIR} && docker compose --profile manual --profile disabled-for-catchup build 2>&1 | tail -30"
 run "cd ${APP_DIR} && docker compose up -d"
 
 # ── Step 4: Verify ───────────────────────────────────────────────────────────
