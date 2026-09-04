@@ -26,6 +26,15 @@ x-monitor-healthcheck: &monitor-healthcheck
 services:
     ingest:
         container_name: ingest-svc
+        # profiles: [manual] -- deliberately excluded from `docker compose up -d`,
+        # so CI/CD (deploy.sh) never auto-(re)starts it. On 2026-08-25 a daily cron
+        # restart of this service refilled its Redis dataset to 99GB and broke
+        # BGSAVE (needs free space >= dataset size), repeatedly filling the host
+        # disk -- see prd-docker-01's root crontab for the disabled job. Start it
+        # explicitly and watch Redis memory/disk after any change here:
+        #   docker compose --profile manual up -d ingest
+        profiles:
+            - manual
         restart: unless-stopped
         user: "1001"
         build:
