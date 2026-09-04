@@ -12,6 +12,13 @@ FROM python:3.11-slim-bookworm
 
 LABEL maintainer="Barry Carey <mcarey66@gmail.com>"
 
+# procps provides pgrep, used by HEALTHCHECK below -- not present on the slim
+# base image, so the healthcheck fails with "executable file not found" (not
+# an actual process-down signal) without this.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user
 RUN groupadd -g 1001 appgroup && \
     useradd -u 1001 -g appgroup -m appuser
@@ -25,6 +32,14 @@ RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 # Copy application code
 COPY --chown=appuser:appgroup redditrepostsleuth /app/redditrepostsleuth/
 COPY --chown=appuser:appgroup sleuth_config.json /app/
+
+# docker-compose.yml invokes some of these services as
+# `python /app/redditrepostsleuth/.../foo.py` (an absolute script path), which
+# makes Python put that script's own directory on sys.path instead of /app --
+# so `import redditrepostsleuth...` fails with ModuleNotFoundError even though
+# the package is right there. This makes /app importable regardless of how the
+# entrypoint invokes it.
+ENV PYTHONPATH=/app
 
 USER appuser
 
