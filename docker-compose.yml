@@ -8,8 +8,17 @@ x-logging: &default-logging
     max-file: "3"
 
 x-worker-healthcheck: &worker-healthcheck
+  # No `-d <node>@$$HOSTNAME` target: every worker below registers under its own
+  # `-n` name (deleted_post_worker, image_repost_worker, etc.), never literally
+  # "celery" -- so `-d celery@$$HOSTNAME` could never match any real worker and
+  # this healthcheck failed permanently regardless of actual worker health.
+  # Un-targeted `inspect ping` broadcasts and succeeds if ANY worker on the
+  # shared broker replies, which is coarser (a healthy sibling can mask this
+  # one specific worker being dead) but is a real signal instead of an always-
+  # false one. A future improvement: give each service below its own `-d`
+  # matching its actual `-n` name for per-worker fidelity.
   healthcheck:
-    test: ["CMD", "celery", "-A", "redditrepostsleuth.core.celery", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
+    test: ["CMD", "celery", "-A", "redditrepostsleuth.core.celery", "inspect", "ping"]
     interval: 60s
     timeout: 30s
     retries: 3
@@ -141,7 +150,10 @@ services:
         logging: *default-logging
         networks:
             - backend
-        <<: *monitor-healthcheck
+        # This is a celery worker (Dockerfile.worker's default CMD, no entrypoint
+        # override here), not a long-running script -- monitor-healthcheck's pgrep
+        # needs procps, which isn't in the worker image, so it always failed.
+        <<: *worker-healthcheck
 
     delete_post_worker:
         container_name: delete-post-worker
