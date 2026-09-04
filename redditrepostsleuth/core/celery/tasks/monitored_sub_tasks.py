@@ -53,7 +53,7 @@ class SubMonitorTask(Task):
     base=SubMonitorTask,
     serializer='pickle',
     autoretry_for=(TooManyRequests, RedditAPIException, NoIndexException, RateLimitException),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 10, 'countdown': 60}
 )
 def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     try:
@@ -62,9 +62,11 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
 
         with self.uowm.start() as uow:
             process_monitored_subreddit_submission(post_id, self.monitored_sub_svc, uow)
+    except (TooManyRequests, RedditAPIException, NoIndexException, RateLimitException) as e:
+        log.warning('Retriable error in sub_monitor_check_post: %s', e)
+        raise
     except Exception as e:
         log.exception('General failure')
-        pass
 
 
 @celery.task(
@@ -73,7 +75,7 @@ def sub_monitor_check_post(self, post_id: str, monitored_sub: MonitoredSub):
     serializer='pickle',
     ignore_results=True,
     autoretry_for=(LoadSubredditException,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def process_monitored_sub(self, monitored_sub):
 

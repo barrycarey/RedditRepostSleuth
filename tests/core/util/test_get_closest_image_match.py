@@ -8,9 +8,9 @@ from redditrepostsleuth.core.util.repost.repost_helpers import get_closest_image
 class Test_Repost_Helpers(TestCase):
     def test_get_closest_image_match__return_closest(self):
         matches = []
-        match1 = ImageSearchMatch('test.com', 1, Post(id=1), 3, .077, 32)
-        match2 = ImageSearchMatch('test.com', 1, Post(id=2), 5, .077, 32)
-        match3 = ImageSearchMatch('test.com', 1, Post(id=3), 7, .077, 32)
+        match1 = ImageSearchMatch('test.com', 1, Post(id=1), 12, 256)
+        match2 = ImageSearchMatch('test.com', 1, Post(id=2), 20, 256)
+        match3 = ImageSearchMatch('test.com', 1, Post(id=3), 28, 256)
         matches.append(match1)
         matches.append(match2)
         matches.append(match3)

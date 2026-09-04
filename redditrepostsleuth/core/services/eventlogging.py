@@ -84,9 +84,10 @@ class EventLogging:
             log.error(event.get_influx_event())
             return False
 
-    def write_raw_points(self, points: list[dict]):
+    def write_raw_points(self, points: list[dict], bucket: str = None):
+        write_bucket = bucket or self._config.influx_bucket
         try:
-            self._influx_client.write(bucket=self._config.influx_bucket, record=points)
+            self._influx_client.write(bucket=write_bucket, record=points)
         except Exception as e:
             log.exception('Failed to write to Influx')
 

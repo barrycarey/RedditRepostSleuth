@@ -1,5 +1,7 @@
 import os
 
+from celery.schedules import crontab
+
 from redditrepostsleuth.core.config import Config
 
 config = Config()
@@ -9,7 +11,7 @@ result_backend = broker_url
 task_serializer = 'pickle'
 result_serializer='pickle'
 accept_content = ['pickle', 'json']
-result_expires = 60
+result_expires = 300  # 5 minutes - allows moderators time to poll for scan results
 worker_hijack_root_logger = False
 worker_redirect_stdouts = False
 worker_log_color = None
@@ -33,9 +35,30 @@ task_routes = {
     #'redditrepostsleuth.core.celery.admin_tasks.delete_search_batch': {'queue': 'batch_delete_searches'},
     'redditrepostsleuth.core.celery.tasks.reddit_action_tasks.*': {'queue': 'reddit_actions'},
     'redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data': {'queue': 'update_subreddit_data'},
-    'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit': {'queue': 'update_subreddit_data'}
+    'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit': {'queue': 'update_subreddit_data'},
+    'redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit_batch': {'queue': 'update_subreddit_data'},
+    # Tier 2 spam detection tasks (Reddit API calls) - separate queue for slow tasks
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.enrich_user_features_tier2': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.rescore_user_with_tier2': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.enrich_high_risk_users': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scan_user_full': {'queue': 'spam_detection_tier2'},
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_enrich_high_risk': {'queue': 'spam_detection_tier2'},
+    # Tier 1 spam detection tasks (fast, no API calls)
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.*': {'queue': 'spam_detection'},
 
+}
 
+# Rate limiting for tasks that make Reddit API calls
+task_annotations = {
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.enrich_user_features_tier2': {
+        'rate_limit': '30/m',  # Max 30 enrichments per minute
+    },
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.check_user_suspended_task': {
+        'rate_limit': '20/m',  # Max 20 suspension checks per minute
+    },
+    'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scan_user_for_telegram_links': {
+        'rate_limit': '20/m',  # Max 20 scans per minute
+    },
 }
 
 
@@ -50,7 +73,7 @@ beat_schedule = {
     },
     'check-new-activations': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.check_new_activations_task',
-        'schedule': 60
+        'schedule': 240
     },
     'update-subreddit-ban-list': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_ban_list_task',
@@ -86,7 +109,7 @@ beat_schedule = {
     # },
     'monitored-sub-config-update': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_config_updates_task',
-        'schedule': 3600
+        'schedule': 7200
     },
     # 'update-profile-token': {
     #     'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.update_profile_token_task',
@@ -99,6 +122,24 @@ beat_schedule = {
     'search-history-cleanup': {
         'task': 'redditrepostsleuth.core.celery.tasks.scheduled_tasks.queue_search_history_cleanup',
         'schedule': 3600
+    },
+
+    # Spam detection scheduled tasks
+    'analyze-top-reposters-daily': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_analyze_top_reposters',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 3 AM UTC
+    },
+    'enrich-high-risk-users-daily': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_enrich_high_risk',
+        'schedule': crontab(hour=4, minute=0),  # Daily at 4 AM UTC
+    },
+    'cleanup-old-features-weekly': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_cleanup_features',
+        'schedule': crontab(day_of_week=0, hour=5, minute=0),  # Sunday at 5 AM UTC
+    },
+    'purge-old-activity-tracking-weekly': {
+        'task': 'redditrepostsleuth.core.celery.tasks.spam_detection_tasks.scheduled_purge_activity_tracking',
+        'schedule': crontab(day_of_week=0, hour=6, minute=0),  # Sunday at 6 AM UTC
     },
 
 }

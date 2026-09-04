@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+from sqlalchemy import func
+
 from redditrepostsleuth.core.db.databasemodels import RepostSearch
 
 
@@ -38,6 +40,10 @@ class RepostSearchRepo:
     def get_oldest_search(self) -> RepostSearch:
         return self.db_session.query(RepostSearch).order_by(RepostSearch.id).first()
 
+    def get_newest(self) -> RepostSearch:
+        """Return the most recent repost search by id (correlates with searched_at)."""
+        return self.db_session.query(RepostSearch).order_by(RepostSearch.id.desc()).limit(1).first()
+
     def get_all(self, limit: int = None):
         return self.db_session.query(RepostSearch).limit(limit).all()
 
@@ -57,3 +63,20 @@ class RepostSearchRepo:
 
     def remove(self, item: RepostSearch):
         self.db_session.delete(item)
+
+    def get_count(self, hours: int = None, post_type: int = None):
+        query = self.db_session.query(func.count(RepostSearch.id))
+        if post_type:
+            query = query.filter(RepostSearch.post_type_id == post_type)
+        if hours:
+            query = query.filter(RepostSearch.searched_at > (datetime.now() - timedelta(hours=hours)))
+        r = query.first()
+        return r[0] if r else None
+
+    def get_count_for_date_range(self, start: datetime, end: datetime, post_type: int = None):
+        query = self.db_session.query(func.count(RepostSearch.id))
+        if post_type:
+            query = query.filter(RepostSearch.post_type_id == post_type)
+        query = query.filter(RepostSearch.searched_at >= start, RepostSearch.searched_at < end)
+        r = query.first()
+        return r[0] if r else 0

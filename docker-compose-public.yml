@@ -1,17 +1,61 @@
-version: "3.7"
+# Docker Compose for RepostSleuth public API
+# Compose V2 - no version field needed
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
     api:
         container_name: api
         user: "1001"
         build:
             context: .
-            dockerfile: redditrepostsleuth/repostsleuthsiteapi/Dockerfile
+            dockerfile: docker/Dockerfile.api
         environment:
             LOG_LEVEL: INFO
             db_user: api
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
         restart: unless-stopped
         entrypoint: gunicorn redditrepostsleuth.repostsleuthsiteapi.app --bind 0.0.0.0:8443 --workers 10 --log-level DEBUG
         volumes:
             - /opt/letsencrypt/etc/letsencrypt/live/www.repostsleuth.com:/config/keys
             - /opt/imageuploads:/opt/imageuploads
+        depends_on:
+            redis:
+                condition: service_healthy
+        logging: *default-logging
+        networks:
+            - api
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8443/api/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 30s
 
+    redis:
+        container_name: api-redis
+        image: redis:7-alpine
+        restart: unless-stopped
+        volumes:
+            - redis_data:/data
+        logging: *default-logging
+        networks:
+            - api
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+
+networks:
+    api:
+        driver: bridge
+
+volumes:
+    redis_data:

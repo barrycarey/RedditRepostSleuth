@@ -239,7 +239,7 @@ class MonitoredSubService:
             log.info('Skipping link post')
             return False
 
-        if post.is_crosspost:
+        if post.is_crosspost and not monitored_sub.check_crossposts:
             log.debug('Skipping crosspost')
             return False
 
@@ -316,7 +316,8 @@ class MonitoredSubService:
                 uow,
                 get_text_search_settings_for_monitored_sub(monitored_sub),
                 'sub_monitor',
-                filter_function=filter_search_results
+                filter_function=filter_search_results,
+                event_logger=self.event_logger
             )
 
             return search_results
@@ -340,8 +341,7 @@ class MonitoredSubService:
         :param post: DB Post obj
         :return: None
         """
-        search_settings = get_image_search_settings_for_monitored_sub(monitored_sub,
-                                                                      target_annoy_distance=self.config.default_image_target_annoy_distance)
+        search_settings = get_image_search_settings_for_monitored_sub(monitored_sub)
 
         with self.uowm.start() as uow:
             search_results = image_search_by_post(

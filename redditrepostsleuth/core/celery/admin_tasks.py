@@ -53,7 +53,8 @@ def cleanup_post(post_id: str, uowm) -> None:
             uow.commit()
             log.info('Deleted post %s', post_id)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to cleanup post %s', post_id)
+
 
 @celery.task(bind=True, base=PyMysqlTask)
 def bulk_delete(self, post_ids: list[str]):
@@ -79,7 +80,7 @@ def bulk_delete(self, post_ids: list[str]):
                 res = cur.execute(q, post_ids)
             db_conn.commit()
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to bulk delete %d posts', len(post_ids))
     finally:
         db_conn.close()
 
@@ -111,7 +112,7 @@ def update_subreddit_config_from_database(self, monitored_sub: MonitoredSub, use
     try:
         self.config_updater.update_wiki_config_from_database(monitored_sub, notify=False)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to update subreddit config from database for r/%s', monitored_sub.name)
     self.config_updater.notification_svc.send_notification(
         f'[r/{monitored_sub.name}](https://reddit.com/r/{monitored_sub.name}) config updated on site by [u/{user_data["name"]}](https://reddit.com/u/{user_data["name"]})',
         subject='Config updated on repostsleuth.com'

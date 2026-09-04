@@ -1,6 +1,6 @@
 from typing import List
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import joinedload
@@ -35,8 +35,11 @@ class PostRepository:
     def get_newest(self, limit: int = 500):
         return self.db_session.query(Post).order_by(Post.id.desc()).limit(limit).all()
 
-    def get_newest_by_type(self, post_type_id: int, limit: int = 500, offset: int = None):
-        return self.db_session.query(Post).filter(Post.post_type_id == post_type_id).order_by(Post.id.desc()).limit(limit).offset(offset).all()
+    def get_newest_by_type(self, post_type_id: int, limit: int = 500, offset: int = None, nsfw: bool = None):
+        query = self.db_session.query(Post).filter(Post.post_type_id == post_type_id)
+        if nsfw is not None:
+            query = query.filter(Post.nsfw == nsfw)
+        return query.order_by(Post.id.desc()).limit(limit).offset(offset).all()
 
     def get_oldest_post(self, limit: int = None):
         return self.db_session.query(Post).order_by(Post.created_at).first()
@@ -79,6 +82,18 @@ class PostRepository:
     def get_count(self):
         r = self.db_session.query(func.count(Post.id)).first()
         return r[0] if r else None
+
+    def get_approximate_count(self):
+        """Get approximate row count from MySQL table statistics.
+        
+        This is much faster than COUNT(*) on large tables as it uses
+        the cached statistics from information_schema rather than scanning.
+        """
+        result = self.db_session.execute(
+            text("SELECT TABLE_ROWS FROM information_schema.TABLES "
+                 "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'post'")
+        ).first()
+        return result[0] if result else None
 
     def get_newest_post(self) -> Post:
         return self.db_session.query(Post).order_by(Post.id.desc()).limit(1).first()

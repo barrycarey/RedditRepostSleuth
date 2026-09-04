@@ -1,0 +1,16 @@
+# API dependencies (Site API service)
+-r base.txt
+celery[redis]==5.3.1
+imagehash==4.3.1
+python-Levenshtein==0.21.1
+distance==0.1.3
+falcon==3.1.1
+gunicorn==21.2.0
+waitress==3.0.0
+falcon_cors
+falcon_multipart
+falcon-caching>=1.1.0
+opencv-python
+imutils
+matplotlib
+pytesseract

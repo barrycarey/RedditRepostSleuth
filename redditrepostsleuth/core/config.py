@@ -126,6 +126,28 @@ class Config:
         return self._fetch(key)
 
 
+
+    def _get_bool(self, key: str, default: bool = False) -> bool:
+        """Parse a config value as boolean."""
+        value = getattr(self, key, None)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ('true', '1', 'yes', 'on')
+
+    def _get_int(self, key: str, default: int = 0) -> int:
+        """Parse a config value as integer."""
+        value = getattr(self, key, None)
+        if value is None:
+            return default
+        if isinstance(value, int):
+            return value
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+
     def _initialize_attributes(self):
         attrbs = [
             'redis_host',
@@ -189,7 +211,6 @@ class Config:
             'default_image_target_meme_match',
             'default_image_target_title_match',
             'default_image_meme_filter',
-            'default_image_target_annoy_distance',
             'default_image_max_matches',
             'default_image_same_sub_filter',
             'default_image_dead_matches_filter',
@@ -216,6 +237,16 @@ class Config:
             'default_text_max_days_old_filter',
             'default_text_target_distance',
             'discord_logging_hook',
+            'patreon_access_token',
+            'patreon_campaign_id',
+            'patreon_client_id',
+            'patreon_client_secret',
+            'patreon_refresh_token',
+            # Spam detection feature flags
+            'spam_detection_enabled',
+            'spam_author_tracking_enabled',
+            'spam_detection_shadow_mode',
+            'spam_detection_auto_actions_enabled',
 
         ]
 

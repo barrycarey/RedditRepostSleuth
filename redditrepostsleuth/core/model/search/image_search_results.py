@@ -13,14 +13,14 @@ from redditrepostsleuth.core.util.imagehashing import get_image_hashes
 
 class ImageSearchResults(SearchResults):
     def __init__(self, checked_url: Text, search_settings: ImageSearchSettings, checked_post: Post = None,
-                 search_times: ImageSearchTimes = None):
+                 search_times: ImageSearchTimes = None, target_hash: Text = None):
         super().__init__(checked_url, search_settings, checked_post)
         self.search_times = search_times or ImageSearchTimes()
         self.search_settings = search_settings
         self.checked_url = checked_url
         self.checked_post = checked_post
-        self._target_hash = None
-        if self.checked_post:
+        self._target_hash = target_hash  # Use provided hash if given
+        if not self._target_hash and self.checked_post:
             # TODO: This only ever gives us the first dhash and will cause issues when we support galleries
             self._target_hash = next((post_hash.hash for post_hash in checked_post.hashes if post_hash.hash_type_id == 1), None)
         self.meme_template: Optional[MemeTemplate] = None
@@ -43,11 +43,19 @@ class ImageSearchResults(SearchResults):
 
     @property
     def target_hamming_distance(self):
-        return get_hamming_from_percent(self.search_settings.target_match_percent, len(self.target_hash))
+        """
+        Returns the target hamming distance in bits for filtering matches.
+        Uses bit-level calculation (0-256 for 256-bit/64-char hex hash).
+        """
+        return get_hamming_from_percent(self.search_settings.target_match_percent, len(self.target_hash) * 4)
 
     @property
     def target_meme_hamming_distance(self):
-        return get_hamming_from_percent(self.search_settings.target_meme_match_percent, len(self.meme_hash))
+        """
+        Returns the target meme hamming distance in bits for filtering meme matches.
+        Uses bit-level calculation (0-256 for 256-bit/64-char hex hash).
+        """
+        return get_hamming_from_percent(self.search_settings.target_meme_match_percent, len(self.meme_hash) * 4)
 
     @property
     def report_data(self) -> Optional[Text]:

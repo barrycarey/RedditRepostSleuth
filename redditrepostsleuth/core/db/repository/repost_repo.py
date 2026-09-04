@@ -3,7 +3,7 @@ from typing import List, Text
 from sqlalchemy import func
 from datetime import timedelta, datetime
 
-from redditrepostsleuth.core.db.databasemodels import Repost
+from redditrepostsleuth.core.db.databasemodels import Repost, Subreddit
 from redditrepostsleuth.core.logging import log
 
 
@@ -16,7 +16,7 @@ class RepostRepo:
     def get_all(self, limit: int = None, offset: int = None) -> List[Repost]:
         return self.db_session.query(Repost).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
-    def get_all_by_type(self, post_type_id: int, limit: None, offset: None) -> list[Repost]:
+    def get_all_by_type(self, post_type_id: int, limit: int = None, offset: int = None) -> list[Repost]:
         return self.db_session.query(Repost).filter(Repost.post_type_id == post_type_id).order_by(Repost.id.desc()).offset(offset).limit(limit).all()
 
     def get_by_author(self, author: str) -> List[Repost]:
@@ -52,6 +52,18 @@ class RepostRepo:
             query = query.filter(Repost.detected_at > (datetime.now() - timedelta(hours=hours)))
         return query.first()
 
+    def get_counts_by_subreddits(self, subreddits: List[str]) -> dict[str, int]:
+        """Get total repost counts for multiple subreddits in a single query."""
+        if not subreddits:
+            return {}
+        results = self.db_session.query(
+            Repost.subreddit,
+            func.count(Repost.id).label('count')
+        ).filter(
+            Repost.subreddit.in_(subreddits)
+        ).group_by(Repost.subreddit).all()
+        return {r.subreddit: r.count for r in results}
+
     def add(self, item):
         self.db_session.add(item)
 
@@ -68,3 +80,66 @@ class RepostRepo:
     def remove(self, item: Repost):
         log.debug('Deleting post %s', item.id)
         self.db_session.delete(item)
+
+
+    def get_top_reposters_by_subreddit(self, subreddit: str, limit: int = 10, days: int = None) -> List:
+        """Get top reposters in a subreddit by repost count."""
+        query = self.db_session.query(
+            Repost.author,
+            func.count(Repost.id).label('repost_count'),
+            func.max(Repost.detected_at).label('last_detected')
+        ).filter(
+            Repost.subreddit == subreddit,
+            Repost.author != None,
+            Repost.author != '[deleted]'
+        )
+        if days:
+            query = query.filter(Repost.detected_at > (datetime.now() - timedelta(days=days)))
+        return query.group_by(Repost.author).order_by(func.count(Repost.id).desc()).limit(limit).all()
+
+    def get_top_reposts_by_subreddit(self, subreddit: str, limit: int = 10, days: int = None) -> List:
+        """Get most frequently reposted content in a subreddit."""
+        query = self.db_session.query(
+            Repost.repost_of_id,
+            func.count(Repost.id).label('repost_count')
+        ).filter(
+            Repost.subreddit == subreddit,
+            Repost.repost_of_id != None
+        )
+        if days:
+            query = query.filter(Repost.detected_at > (datetime.now() - timedelta(days=days)))
+        return query.group_by(Repost.repost_of_id).order_by(func.count(Repost.id).desc()).limit(limit).all()
+
+    def get_daily_counts_by_subreddit(self, subreddit: str, days: int = 30) -> List:
+        """Get daily repost counts for trend charts."""
+        oldest = datetime.now() - timedelta(days=days)
+        return self.db_session.query(
+            func.date(Repost.detected_at).label('date'),
+            func.count(Repost.id).label('count')
+        ).filter(
+            Repost.subreddit == subreddit,
+            Repost.detected_at > oldest
+        ).group_by(func.date(Repost.detected_at)).order_by(func.date(Repost.detected_at)).all()
+
+    def get_newest(self) -> Repost:
+        """Return the most recent repost by id (correlates with detected_at)."""
+        return self.db_session.query(Repost).order_by(Repost.id.desc()).limit(1).first()
+
+    def count_reposts_by_author(self, author: str) -> int:
+        """
+        Count reposts posted by the specified author.
+        Uses Repost.author directly (indexed, no join needed).
+        """
+        return self.db_session.query(func.count(Repost.id)).filter(
+            Repost.author == author
+        ).scalar() or 0
+
+    def count_reposts_by_author_since(self, author: str, since: datetime) -> int:
+        """
+        Count reposts posted by the author since a given date.
+        Used to align repost counts with author_activity_tracking timeframe.
+        """
+        return self.db_session.query(func.count(Repost.id)).filter(
+            Repost.author == author,
+            Repost.detected_at >= since
+        ).scalar() or 0

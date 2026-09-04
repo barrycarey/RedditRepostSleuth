@@ -61,9 +61,9 @@ class TestDiscordAgent(TestCase):
         self.assertEqual('Offender', r['fields'][0]['name'])
         self.assertEqual('[View](https://redd.it/abc123)', r['fields'][0]['value'])
         self.assertEqual('Oldest Match', r['fields'][1]['name'])
-        self.assertEqual('[View - 68.75%](https://redd.it/abc123)', r['fields'][1]['value'])
+        self.assertEqual('[View - 84.38%](https://redd.it/abc123)', r['fields'][1]['value'])
         self.assertEqual('Newest Match', r['fields'][2]['name'])
-        self.assertEqual('[View - 68.75%](https://redd.it/123abc)', r['fields'][2]['value'])
+        self.assertEqual('[View - 84.38%](https://redd.it/123abc)', r['fields'][2]['value'])
 
     def test__build_image_repost_attachment_fields_single_match(self):
         agent = DiscordAgent(name='discord', hook='test.com')
@@ -73,7 +73,7 @@ class TestDiscordAgent(TestCase):
         self.assertEqual('Offender', r['fields'][0]['name'])
         self.assertEqual('[View](https://redd.it/abc123)', r['fields'][0]['value'])
         self.assertEqual('Match', r['fields'][1]['name'])
-        self.assertEqual('[View - 68.75%](https://redd.it/abc123)', r['fields'][1]['value'])
+        self.assertEqual('[View - 84.38%](https://redd.it/abc123)', r['fields'][1]['value'])
 
 
     def test__hex_to_int_valid(self):
@@ -95,9 +95,8 @@ class TestDiscordAgent(TestCase):
                 'test.com',
                 1,
                 Post(post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         return search_results
@@ -112,9 +111,8 @@ class TestDiscordAgent(TestCase):
                 'test.com',
                 1,
                 Post(post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         search_results.matches.append(
@@ -122,9 +120,8 @@ class TestDiscordAgent(TestCase):
                 'test.com',
                 1,
                 Post(post_id='123abc', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         return search_results
@@ -132,10 +129,8 @@ class TestDiscordAgent(TestCase):
     def _get_image_search_settings(self):
         return ImageSearchSettings(
             90,
-            .077,
             target_meme_match_percent=50,
             meme_filter=False,
-            max_depth=5000,
             target_title_match=90,
             max_matches=75,
             same_sub=False,

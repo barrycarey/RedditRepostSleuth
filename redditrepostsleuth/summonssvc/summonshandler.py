@@ -5,7 +5,7 @@ from typing import Tuple, Text, NoReturn, Optional
 
 from praw import Reddit
 from praw.exceptions import APIException
-from prawcore import Forbidden
+from prawcore import Forbidden, ServerError
 from sqlalchemy.exc import InternalError
 
 from redditrepostsleuth.core.config import Config
@@ -250,6 +250,9 @@ class SummonsHandler:
         elif summons.post.post_type.name == 'text':
             self.process_text_repost_request(summons, monitored_sub=monitored_sub)
 
+        # Queue spam analysis for the post author (not the requestor)
+        self._queue_spam_analysis(summons.post.author)
+
     def process_text_repost_request(self, summons: Summons, monitored_sub: MonitoredSub = None)  -> None:
         response = SummonsResponse(summons=summons)
         with self.uowm.start() as uow:
@@ -258,7 +261,8 @@ class SummonsHandler:
                 uow,
                 get_default_text_search_settings(self.config),
                 'summons',
-                filter_function=filter_search_results
+                filter_function=filter_search_results,
+                event_logger=self.event_logger
             )
 
             if not monitored_sub:
@@ -294,7 +298,7 @@ class SummonsHandler:
         response = SummonsResponse(summons=summons)
         # TODO - THis doesn't honor monitored sub settings
         search_settings = get_default_image_search_settings(self.config)
-        target_image_match, target_meme_match, target_annoy_distance = self._get_target_distances(
+        target_image_match, target_meme_match = self._get_target_distances(
             monitored_sub
         )
         search_settings.target_match_percent = target_image_match
@@ -325,19 +329,18 @@ class SummonsHandler:
 
         self._send_response(response)
 
-    def _get_target_distances(self, monitored_sub: MonitoredSub) -> Tuple[int, int, float]:
+    def _get_target_distances(self, monitored_sub: MonitoredSub) -> Tuple[int, int]:
         """
         Check if the post we were summoned on is in a monitored sub.  If it is get the target distances for that sub
-        :rtype: Tuple[int,float]
+        :rtype: Tuple[int, int]
         :param monitored_sub: Subreddit name
-        :return: Tuple with target hamming and annoy
+        :return: Tuple with target match percent and meme match percent
         """
         if monitored_sub:
             target_match_percent = monitored_sub.target_image_match
             target_meme_match_percent = monitored_sub.target_image_meme_match
-            target_annoy_distance = monitored_sub.target_annoy
-            return target_match_percent, target_meme_match_percent, target_annoy_distance
-        return self.config.default_image_target_match, self.config.default_image_target_meme_match, self.config.default_image_target_annoy_distance
+            return target_match_percent, target_meme_match_percent
+        return self.config.default_image_target_match, self.config.default_image_target_meme_match
 
 
     def _send_response(self, response: SummonsResponse) -> None:
@@ -395,6 +398,9 @@ class SummonsHandler:
                 raise
         except Forbidden:
             raise
+        except ServerError:
+            log.warning('Reddit server error (500) replying to comment %s', response.summons.comment_id)
+            response.reply_failure_reason = 'SERVER ERROR'
         except Exception:
             log.exception('Problem leaving response', exc_info=True)
             raise
@@ -488,3 +494,32 @@ class SummonsHandler:
         with self.uowm.start() as uow:
             banned = uow.banned_user.get_by_user(requestor)
         return True if banned else False
+
+    def _queue_spam_analysis(self, author: str) -> None:
+        """
+        Queue spam analysis for a post author.
+
+        This is called after processing a repost request to analyze
+        the post's author (not the summons requestor) for spam patterns.
+
+        Args:
+            author: Reddit username of the post author
+        """
+        if not author or author == '[deleted]':
+            log.debug('Skipping spam analysis for invalid author: %s', author)
+            return
+
+        try:
+            # Check if user has been recently analyzed
+            with self.uowm.start() as uow:
+                if uow.spam_features.user_was_recently_analyzed(author, within_days=7):
+                    log.debug('User %s was recently analyzed for spam, skipping', author)
+                    return
+
+            # Queue async spam scoring task (low priority from summons)
+            from redditrepostsleuth.core.celery.tasks.spam_detection_tasks import score_and_flag_user
+            score_and_flag_user.delay(author, update_user_review=True)
+            log.debug('Queued spam analysis for post author %s (via summons)', author)
+        except Exception as e:
+            # Don't let spam analysis failures affect summons processing
+            log.warning('Failed to queue spam analysis for %s: %s', author, str(e))

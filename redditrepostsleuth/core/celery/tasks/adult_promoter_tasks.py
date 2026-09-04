@@ -37,7 +37,7 @@ class AdultPromoterTask(Task):
 
 log = logging.getLogger(__name__)
 
-@celery.task(bind=True, base=AdultPromoterTask, autoretry_for=(UtilApiException,ConnectionError,TooManyRequests), retry_kwards={'max_retries': 3})
+@celery.task(bind=True, base=AdultPromoterTask, autoretry_for=(UtilApiException,ConnectionError,TooManyRequests), retry_kwargs={'max_retries': 3})
 def check_user_comments_for_only_fans(self, username: str) -> None:
     """
     This should be run after the profile check so we don't do any timeframe checking
@@ -75,4 +75,4 @@ def check_user_comments_for_only_fans(self, username: str) -> None:
     except IntegrityError:
         pass
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to check user %s comments for promoter links', username)

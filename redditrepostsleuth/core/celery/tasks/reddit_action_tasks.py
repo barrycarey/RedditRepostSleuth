@@ -32,13 +32,17 @@ class RedditActionTask(Task):
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
-def remove_submission_task(self, submission: Submission, removal_reason: str, mod_note: str = None) -> None:
+def remove_submission_task(self, submission: Submission, removal_reason: str, mod_note: str = None, spam: bool = False) -> None:
     try:
-        removal_reason_id = get_removal_reason_id(removal_reason, submission.subreddit)
-        log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
-        submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
+        if spam:
+            log.info('Attempting to remove post https://redd.it/%s as spam with mod_note: %s', submission.id, mod_note)
+            submission.mod.remove(spam=True, mod_note=mod_note)
+        else:
+            removal_reason_id = get_removal_reason_id(removal_reason, submission.subreddit)
+            log.info('Attempting to remove post https://redd.it/%s with removal ID %s', submission.id, removal_reason_id)
+            submission.mod.remove(reason_id=removal_reason_id, mod_note=mod_note)
         self.event_logger.save_event(
             RedditAdminActionEvent(
                 submission.subreddit.display_name,
@@ -57,6 +61,11 @@ def remove_submission_task(self, submission: Submission, removal_reason: str, mo
     except TooManyRequests as e:
         log.warning('Too many requests when removing submission')
         raise e
+    except RedditAPIException as e:
+        if any(item.error_type == 'USER_DOESNT_EXIST' for item in e.items):
+            log.warning('Cannot remove post https://redd.it/%s: user does not exist', submission.id)
+        else:
+            log.exception('Reddit API error removing submission https://redd.it/%s', submission.id, exc_info=True)
     except Exception as e:
         log.exception('Failed to remove submission https://redd.it/%s', submission.id, exc_info=True)
 
@@ -65,14 +74,14 @@ def remove_submission_task(self, submission: Submission, removal_reason: str, mo
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
-def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, note: str = None) -> None:
+def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, note: str = None, ban_message: str = None) -> None:
     log.info('Banning user %s from %s', username, subreddit_name)
 
     try:
         subreddit = self.reddit.subreddit(subreddit_name)
-        subreddit.banned.add(username, ban_reason=ban_reason, note=note)
+        subreddit.banned.add(username, ban_reason=ban_reason, ban_message=ban_message, note=note)
         self.event_logger.save_event(
             RedditAdminActionEvent(
                 subreddit_name,
@@ -97,7 +106,8 @@ def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, not
             )
         )
     except RedditAPIException as e:
-        if e.error_type == 'TOO_LONG':
+        error_types = {item.error_type for item in e.items}
+        if 'TOO_LONG' in error_types:
             log.warning('Ban reason for subreddit %s is %s and should be no longer than 100', subreddit_name, len(ban_reason))
             send_modmail_task.apply_async(
                 (
@@ -106,6 +116,9 @@ def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, not
                     'Error When Banning User'
                 )
             )
+            return
+        if 'USER_DOESNT_EXIST' in error_types:
+            log.warning('Cannot ban user %s on %s: user does not exist', username, subreddit_name)
             return
         raise e
     except Exception as e:
@@ -116,7 +129,7 @@ def ban_user_task(self, username: str, subreddit_name: str, ban_reason: str, not
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def lock_submission_task(self, submission: Submission) -> None:
     log.info('Locking submission https://redd.it/%s', submission.id)
@@ -142,7 +155,7 @@ def lock_submission_task(self, submission: Submission) -> None:
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def lock_comment_task(self, comment: Comment) -> None:
     log.info('Locking comment https://reddit.com%s', comment.permalink)
@@ -158,17 +171,18 @@ def lock_comment_task(self, comment: Comment) -> None:
         log.warning('Too many requests when locking comment')
         raise e
     except Forbidden as e:
-        log.warning('Failed to lock comment on r/%s, no permissions', comment.submission.display_name)
+        log.warning('Failed to lock comment on r/%s, no permissions', comment.subreddit.display_name)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to lock comment %s on r/%s', comment.id, comment.subreddit.display_name)
         raise e
+
 
 @celery.task(
     bind=True,
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def sticky_comment_task(self, comment: Comment) -> None:
     log.info('Make comment sticky: https://reddit.com%s ', comment.permalink)
@@ -186,15 +200,16 @@ def sticky_comment_task(self, comment: Comment) -> None:
     except Forbidden as e:
         log.warning('Failed to sticky comment on r/%s, no permissions', comment.subreddit.display_name)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to sticky comment %s on r/%s', comment.id, comment.subreddit.display_name)
         raise e
+
 
 @celery.task(
     bind=True,
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def mark_as_oc_task(self, submission: Submission) -> None:
     log.info('Marking submission %s as OC', submission.id)
@@ -219,15 +234,16 @@ def mark_as_oc_task(self, submission: Submission) -> None:
             )
         )
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to mark submission %s as OC on r/%s', submission.id, submission.subreddit.display_name)
         raise e
+
 
 @celery.task(
     bind=True,
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def report_submission_task(self, submission: Submission, report_msg: str) -> None:
     log.info('Reporting submission https://redd.it/%s', submission.id)
@@ -251,7 +267,7 @@ def report_submission_task(self, submission: Submission, report_msg: str) -> Non
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def leave_comment_task(
         self,
@@ -267,7 +283,7 @@ def leave_comment_task(
         log.warning('Too many requests when removing submission')
         raise e
     except RedditAPIException as e:
-        if e.error_type == 'THREAD_LOCKED':
+        if any(item.error_type in ('THREAD_LOCKED', 'USER_DOESNT_EXIST') for item in e.items):
             return
         raise e
     except Exception as e:
@@ -290,7 +306,7 @@ def leave_comment_task(
     ignore_result=True,
     base=RedditActionTask,
     autoretry_for=(TooManyRequests,),
-    retry_kwards={'max_retries': 3}
+    retry_kwargs={'max_retries': 3}
 )
 def send_modmail_task(self, subreddit_name: str, message: str, subject: str, source: str = 'sub_monitor') -> None:
     log.info('Sending modmail to r/%s', subreddit_name)
@@ -304,5 +320,10 @@ def send_modmail_task(self, subreddit_name: str, message: str, subject: str, sou
     except TooManyRequests as e:
         log.warning('Too many requests when sending modmail')
         raise e
+    except RedditAPIException as e:
+        if any(item.error_type == 'USER_DOESNT_EXIST' for item in e.items):
+            log.warning('Cannot send modmail to r/%s: subreddit/user does not exist', subreddit_name)
+        else:
+            log.exception('Reddit API error sending modmail to %s', subreddit_name)
     except Exception as e:
         log.exception('Failed to send modmail to %s', subreddit_name)

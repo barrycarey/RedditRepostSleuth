@@ -1,11 +1,11 @@
 import json
 import logging
-from typing import Text, NoReturn
+from typing import Optional, Text, NoReturn
 
 from praw import Reddit
 from praw.exceptions import APIException, RedditAPIException
 from praw.models import Subreddit, Message
-from prawcore import TooManyRequests
+from prawcore import TooManyRequests, NotFound
 
 from redditrepostsleuth.core.celery.tasks.reddit_action_tasks import send_modmail_task
 from redditrepostsleuth.core.config import Config
@@ -43,15 +43,9 @@ class NewActivationMonitor:
 
 
     def activate_sub(self, msg: Message):
-        # TODO: API Reduction - No need to call Reddit API after seeing int exists in DB
-        try:
-            monitored_sub = self._create_monitored_sub_in_db(msg)
-        except ValueError:
-            return
-        except Exception as e:
-            log.exception('Failed to save new monitored sub', exc_info=True)
-            return
         subreddit = self.reddit.subreddit(msg.subreddit.display_name)
+        
+        # Accept the invite FIRST (before any DB checks)
         try:
             subreddit.mod.accept_invite()
         except APIException as e:
@@ -60,12 +54,58 @@ class NewActivationMonitor:
             return
         except TooManyRequests:
             raise
-        except Exception as e:
-            log.exception('Failed to accept invite', exc_info=True)
+        except NotFound:
+            log.warning('Subreddit %s not found (may be banned, private, or deleted)', msg.subreddit.display_name)
             return
+        except Exception as e:
+            log.exception('Failed to accept invite for %s', msg.subreddit.display_name, exc_info=True)
+            return
+        
+        # Check if sub exists in DB
+        existing = self._get_existing_monitored_sub(msg.subreddit.display_name)
+        
+        if existing:
+            # Re-activation of existing sub
+            self._handle_reactivation(existing, subreddit)
+        else:
+            # New activation
+            self._handle_new_activation(msg, subreddit)
+        
+        # Mark message as read after processing
+        msg.mark_read()
+
+    def _get_existing_monitored_sub(self, subreddit_name: str) -> Optional[MonitoredSub]:
+        """Check if a monitored sub already exists in the database."""
+        with self.uowm.start() as uow:
+            return uow.monitored_sub.get_by_sub(subreddit_name)
+
+    def _handle_reactivation(self, monitored_sub: MonitoredSub, subreddit: Subreddit) -> NoReturn:
+        """Handle re-activation of an existing monitored sub after being re-invited."""
+        log.info('Re-activating monitored sub %s', monitored_sub.name)
+        with self.uowm.start() as uow:
+            sub_to_update = uow.monitored_sub.get_by_sub(monitored_sub.name)
+            sub_to_update.is_mod = True
+            sub_to_update.failed_admin_check_count = 0
+            uow.commit()
+        
+        if self.notification_svc:
+            self.notification_svc.send_notification(
+                f'Re-activated monitored sub r/{monitored_sub.name}',
+                subject='Monitored Sub Re-activated!'
+            )
+
+    def _handle_new_activation(self, msg: Message, subreddit: Subreddit) -> NoReturn:
+        """Handle activation of a new monitored sub."""
+        try:
+            monitored_sub = self._create_monitored_sub_in_db(msg)
+        except Exception as e:
+            log.exception('Failed to save new monitored sub', exc_info=True)
+            return
+        
         if not monitored_sub.activation_notification_sent:
             self._notify_added(subreddit)
         self._create_wiki_page(subreddit)
+        
         if self.notification_svc:
             self.notification_svc.send_notification(
                 f'Added new monitored sub r/{monitored_sub.name}',
@@ -101,10 +141,6 @@ class NewActivationMonitor:
 
     def _create_monitored_sub_in_db(self, msg: Message) -> MonitoredSub:
         with self.uowm.start() as uow:
-            existing = uow.monitored_sub.get_by_sub(msg.subreddit.display_name)
-            if existing:
-                log.debug('Monitored sub %s already exists, skipping activation', msg.subreddit.display_name)
-                raise ValueError(f'Monitored Sub already in database: {msg.subreddit.display_name}')
             monitored_sub = MonitoredSub(**{**DEFAULT_CONFIG_VALUES, **{'name': msg.subreddit.display_name}})
             uow.monitored_sub.add(monitored_sub)
             try:

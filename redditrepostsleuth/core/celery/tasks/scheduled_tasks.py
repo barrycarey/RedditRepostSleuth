@@ -45,8 +45,11 @@ def record_task_status(func):
             log.warning('Task class %s does not have an event logger, cannot record task time', self.__name__)
             return func(self, *args, **kwargs)
 
+        task_start = perf_counter()
+        task_status = 'started'
+        exception_to_raise = None
+
         try:
-            task_start = perf_counter()
             self.event_logger.write_raw_points(
                 get_task_influx_points(
                     func.__name__,
@@ -58,16 +61,27 @@ def record_task_status(func):
             task_status = 'finished'
 
         except Exception as e:
-            log.exception('')
+            log.exception('Scheduled task %s failed', func.__name__)
             task_status = 'failed'
+            exception_to_raise = e
 
-        self.event_logger.write_raw_points(
-            get_task_influx_points(
-                func.__name__,
-                task_status,
-                perf_counter() - task_start,
-            )
-        )
+        finally:
+            # Always record task status, even if an exception occurred
+            try:
+                self.event_logger.write_raw_points(
+                    get_task_influx_points(
+                        func.__name__,
+                        task_status,
+                        perf_counter() - task_start,
+                    )
+                )
+            except Exception as metrics_err:
+                log.warning('Failed to record task metrics for %s: %s', func.__name__, metrics_err)
+
+        # Re-raise the exception AFTER recording metrics
+        if exception_to_raise is not None:
+            raise exception_to_raise
+
     return dec
 
 
@@ -137,9 +151,16 @@ def update_monitored_sub_data_task(self) -> None:
         with self.uowm.start() as uow:
             subs = uow.monitored_sub.get_all()
             for sub in subs:
-                update_monitored_sub_stats_task.apply_async((sub.name,))
+                #update_monitored_sub_stats_task.apply_async((sub.name,))
+                update_monitored_sub_data(
+                    uow,
+                    sub.name,
+                    self.reddit,
+                    self.notification_svc,
+                    self.response_handler
+                )
     except Exception as e:
-        log.exception('Problem with scheduled task')
+        log.exception('Problem with scheduled task update_monitored_sub_data_task')
 
 
 @celery.task(bind=True, base=RedditTask)
@@ -171,7 +192,7 @@ def check_meme_template_potential_votes_task(self):
         log.exception('Problem in scheduled task')
 
 
-@celery.task(bind=True, base=AdminTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
+@celery.task(bind=True, base=AdminTask, autoretry_for=(TooManyRequests,), retry_kwargs={'max_retries': 3})
 @record_task_status
 def check_for_subreddit_config_update_task(self, subreddit_name: str) -> None:
     with self.uowm.start() as uow:
@@ -190,7 +211,8 @@ def check_for_subreddit_config_update_task(self, subreddit_name: str) -> None:
                 monitored_sub.active = False
                 uow.commit()
         except Exception as e:
-            log.exception('')
+            log.exception('Failed to check config update for subreddit %s', subreddit_name)
+
 
 @celery.task(bind=True, base=RedditTask)
 @record_task_status
@@ -220,7 +242,7 @@ def update_daily_stats(self):
     daily_stats = StatsDailyCount()
     try:
         with self.uowm.start() as uow:
-            daily_stats.summons_24 = uow.summons.get_count(hours=24)
+            daily_stats.summons_24h = uow.summons.get_count(hours=24)
             daily_stats.summons_total = uow.summons.get_count()
             daily_stats.comments_24h = uow.bot_comment.get_count(hours=24)
             daily_stats.comments_total = uow.bot_comment.get_count()
@@ -229,6 +251,8 @@ def update_daily_stats(self):
             daily_stats.image_reposts_24h = uow.repost.get_count(hours=24, post_type=2)
             daily_stats.image_reposts_total = uow.repost.get_count(post_type=2)
             daily_stats.monitored_subreddit_count = uow.monitored_sub.get_count()
+            daily_stats.image_searches_24h = uow.repost_search.get_count(hours=24, post_type=2)
+            daily_stats.link_searches_24h = uow.repost_search.get_count(hours=24, post_type=3)
             uow.stat_daily_count.add(daily_stats)
             uow.commit()
             log.info('[Daily Stat Update] Finished')
@@ -266,7 +290,7 @@ def update_daily_top_reposters_task(self):
         log.exception('Unknown task error')
 
 
-@celery.task(bind=True, base=RedditTask, autoretry_for=(TooManyRequests,), retry_kwards={'max_retries': 3})
+@celery.task(bind=True, base=RedditTask, autoretry_for=(TooManyRequests,), retry_kwargs={'max_retries': 3})
 @record_task_status
 def update_monitored_sub_stats_task(self, sub_name: str) -> None:
     try:
@@ -283,7 +307,8 @@ def update_monitored_sub_stats_task(self, sub_name: str) -> None:
     except ServerError as e:
         log.warning('Server error checking %s', sub_name)
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to update monitored sub stats for r/%s', sub_name)
+
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 @record_task_status
@@ -310,7 +335,8 @@ def delete_search_batch(self, ids: list[int]):
             uow.commit()
             log.info('Finished range %s:%s', ids[0], ids[-1])
     except Exception as e:
-        log.exception('')
+        log.exception('Failed to delete search batch (IDs: %s to %s)', ids[0] if ids else 'none', ids[-1] if ids else 'none')
+
 
 @celery.task(bind=True, base=SqlAlchemyTask)
 @record_task_status
@@ -325,7 +351,7 @@ def queue_search_history_cleanup(self):
         for chunk in chunk_list(ids, 5000):
             delete_search_batch.apply_async((chunk,))
 
-@celery.task(bind=True, base=RedditTask, autoretry_for=(UtilApiException,), retry_kwards={'max_retries': 5})
+@celery.task(bind=True, base=RedditTask, autoretry_for=(UtilApiException,), retry_kwargs={'max_retries': 5})
 @record_task_status
 def queue_subreddit_data_updates(self) -> None:
     with self.uowm.start() as uow:

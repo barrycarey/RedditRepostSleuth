@@ -17,3 +17,10 @@ class MonitoredSubConfigChangeRepo:
         return self.db_session.query(MonitoredSubConfigChange).filter(
             MonitoredSubConfigChange.subreddit == subreddit).order_by(MonitoredSubConfigChange.updated_at.desc()).limit(
             limit).offset(offset).all()
+
+
+    def get_by_monitored_sub(self, monitored_sub_id: int, limit: int = None, offset: int = None):
+        """Get config changes for a monitored sub by its ID."""
+        return self.db_session.query(MonitoredSubConfigChange).filter(
+            MonitoredSubConfigChange.monitored_sub_id == monitored_sub_id
+        ).order_by(MonitoredSubConfigChange.updated_at.desc()).limit(limit).offset(offset).all()

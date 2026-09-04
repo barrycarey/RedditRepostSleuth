@@ -61,10 +61,9 @@ def update_proxies(uowm: UnitOfWorkManager) -> None:
         uow.commit()
 
 def update_top_reposts(uow: UnitOfWork, post_type_id: int, day_range: int = None):
-    # reddit.info(reddit_ids_to_lookup):
-    log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
-    range_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY AND post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC LIMIT 100000"
-    all_time_query = "SELECT repost_of_id, COUNT(*) c FROM repost WHERE post_type_id=:posttype GROUP BY repost_of_id HAVING c > 5 ORDER BY c DESC LIMIT 100000"
+    log.info('Getting top reposts for post type %s with range %s', post_type_id, day_range)
+    range_query = "SELECT r.repost_of_id, COUNT(*) c, p.nsfw FROM repost r INNER JOIN post p ON p.id = r.repost_of_id WHERE r.detected_at > NOW() - INTERVAL :days DAY AND r.post_type_id=:posttype GROUP BY r.repost_of_id, p.nsfw HAVING c > 5 ORDER BY c DESC LIMIT 100000"
+    all_time_query = "SELECT r.repost_of_id, COUNT(*) c, p.nsfw FROM repost r INNER JOIN post p ON p.id = r.repost_of_id WHERE r.post_type_id=:posttype GROUP BY r.repost_of_id, p.nsfw HAVING c > 5 ORDER BY c DESC LIMIT 100000"
     if day_range:
         query = range_query
         log.debug('Deleting top reposts for day range %s', day_range)
@@ -78,30 +77,39 @@ def update_top_reposts(uow: UnitOfWork, post_type_id: int, day_range: int = None
 
     uow.commit()
 
-
     log.debug('Executing query for day range %s', day_range)
+    start_time = time.time()
     result = uow.session.execute(text(query), {'posttype': post_type_id, 'days': day_range})
-    log.debug('Finished executing query for day range %s', day_range)
-    for row in result:
+    rows = list(result)  # Materialize to get count
+    query_time = time.time() - start_time
+    log.info('Query returned %d rows in %.2f seconds', len(rows), query_time)
+
+    for i, row in enumerate(rows):
         stat = StatsTopRepost()
         stat.post_id = row[0]
         stat.post_type_id = post_type_id
         stat.day_range = day_range
         stat.repost_count = row[1]
         stat.updated_at = func.utc_timestamp()
-        stat.nsfw = False
+        stat.nsfw = row[2] if row[2] is not None else False
         uow.stat_top_repost.add(stat)
-        uow.commit()
+
+        # Batch commit every 1000 rows to avoid memory issues
+        if (i + 1) % 1000 == 0:
+            uow.commit()
+
+    uow.commit()  # Final commit for remaining rows
+    log.info('Finished inserting %d top reposts in %.2f seconds total', len(rows), time.time() - start_time)
 
 def run_update_top_reposts(uow: UnitOfWork) -> None:
     post_types = [2, 3]
-    day_ranges = [1, 7, 14, 30, None]
+    day_ranges = [1, 7, 14, 30] # Removed None from the list due to performance issues
     for post_type_id in post_types:
         for days in day_ranges:
             update_top_reposts(uow, post_type_id, days)
 
 def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = None) -> None:
-    log.info('Getting top repostors for post type %s with range %s', post_type_id, day_range)
+    log.info('Getting top reposters for post type %s with range %s', post_type_id, day_range)
     range_query = "SELECT author, COUNT(*) c FROM repost WHERE detected_at > NOW() - INTERVAL :days DAY  AND post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC LIMIT 100000"
     all_time_query = "SELECT author, COUNT(*) c FROM repost WHERE post_type_id=:posttype AND author is not NULL AND author!= '[deleted]' GROUP BY author HAVING c > 10 ORDER BY c DESC LIMIT 100000"
     if day_range:
@@ -116,8 +124,14 @@ def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = No
         uow.session.execute(text('DELETE FROM stat_top_reposters WHERE post_type_id=:posttype AND day_range IS NULL'),
                             {'posttype': post_type_id})
     uow.commit()
+
+    start_time = time.time()
     result = uow.session.execute(text(query), {'posttype': post_type_id, 'days': day_range})
-    for row in result:
+    rows = list(result)  # Materialize to get count
+    query_time = time.time() - start_time
+    log.info('Query returned %d rows in %.2f seconds', len(rows), query_time)
+
+    for row in rows:
         if row[0] in EXCLUDE_FROM_TOP_REPOSTERS:
             continue
         stat = StatsTopReposter()
@@ -129,7 +143,7 @@ def update_top_reposters(uow: UnitOfWork, post_type_id: int, day_range: int = No
         uow.stat_top_reposter.add(stat)
     uow.commit()
 
-    log.info('finished')
+    log.info('Finished inserting top reposters in %.2f seconds total', time.time() - start_time)
 
 def run_update_top_reposters(uow: UnitOfWork):
     post_types = [1, 2, 3]
@@ -221,6 +235,7 @@ def update_monitored_sub_data(
             f'[r/{monitored_sub.name}](https://reddit.com/r/{monitored_sub.name}) failed admin check {monitored_sub.failed_admin_check_count} times',
             subject='Removing Monitored Subreddit'
         )
+        log.info('Monitored sub has %s failed mod checks, deleting', monitored_sub.name)
         uow.monitored_sub.remove(monitored_sub)
         uow.commit()
         return
@@ -235,7 +250,7 @@ def update_monitored_sub_data(
         uow.commit()
         return
     except Redirect as e:
-        log.exception('')
+        log.exception('Subreddit %s redirected (possibly renamed or banned)', monitored_sub.name)
 
     monitored_sub.is_private = True if subreddit.subreddit_type == 'private' else False
     monitored_sub.nsfw = True if subreddit.over18 else False

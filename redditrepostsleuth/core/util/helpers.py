@@ -51,6 +51,25 @@ def chunk_list(l, n):
         yield l[i:i + n]
 
 
+def classify_spam_risk_level(spam_score: float) -> str:
+    """Classify spam score into risk level.
+
+    Thresholds match SpamScorer._classify_risk():
+    - CRITICAL: >= 0.80
+    - HIGH: >= 0.60
+    - MEDIUM: >= 0.30
+    - LOW: < 0.30
+    """
+    if spam_score >= 0.80:
+        return 'CRITICAL'
+    elif spam_score >= 0.60:
+        return 'HIGH'
+    elif spam_score >= 0.30:
+        return 'MEDIUM'
+    else:
+        return 'LOW'
+
+
 def get_post_type(submission: dict) -> str:
     """
     Take a raw submission dict from Reddit API and try to determine the post type.
@@ -239,6 +258,20 @@ def get_hamming_from_percent(match_percent: float, hash_length: int) -> float:
     return hash_length - (match_percent / 100) * hash_length
 
 
+def hamming_distance_bits(hex_str1: str, hex_str2: str) -> int:
+    """
+    Calculate true bit-level hamming distance between two hex strings.
+    
+    :param hex_str1: First hex string
+    :param hex_str2: Second hex string
+    :return: Number of differing bits (0-256 for 64-char hex strings)
+    :raises ValueError: If hex strings have different lengths
+    """
+    if len(hex_str1) != len(hex_str2):
+        raise ValueError(f"Hex strings must have equal length")
+    return (int(hex_str1, 16) ^ int(hex_str2, 16)).bit_count()
+
+
 def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
     return ImageSearchSettings(
         config.default_image_target_match,
@@ -252,8 +285,6 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
         meme_filter=config.default_image_meme_filter,
         same_sub=config.default_image_same_sub_filter,
         max_days_old=config.default_image_max_days_old_filter,
-        target_annoy_distance=config.default_image_target_annoy_distance,
-        max_depth=10000,
         max_matches=config.default_image_max_matches
 
     )
@@ -261,21 +292,19 @@ def get_default_image_search_settings(config: Config) -> ImageSearchSettings:
 def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSettings:
     search_settings = ImageSearchSettings(
         req.get_param_as_int('target_match_percent', required=True, default=None) or config.default_image_target_match,
-        config.default_image_target_annoy_distance,
         target_title_match=req.get_param_as_int('target_title_match', required=False,
                              default=None) or config.default_image_target_title_match,
         filter_dead_matches=req.get_param_as_bool('filter_dead_matches', required=False, default=None),
         filter_removed_matches=req.get_param_as_bool('filter_removed_matches', required=False, default=None),
-        only_older_matches=req.get_param_as_bool('only_older_matches', required=False, default=None),
-        filter_same_author=req.get_param_as_bool('filter_same_author', required=False, default=None),
+        only_older_matches=req.get_param_as_bool('only_older', required=False, default=None),
+        filter_same_author=req.get_param_as_bool('filter_author', required=False, default=None),
         filter_crossposts=req.get_param_as_bool('include_crossposts', required=False, default=None),
         target_meme_match_percent=req.get_param_as_int('target_meme_match_percent', required=False,
                              default=None) or config.default_image_target_meme_match,
         meme_filter=req.get_param_as_bool('meme_filter', required=False, default=None),
         same_sub=req.get_param_as_bool('same_sub', required=False, default=None),
-        max_days_old=req.get_param_as_int('max_days_old', required=False,
+        max_days_old=req.get_param_as_int('target_days_old', required=False,
                              default=None) or config.default_link_max_days_old_filter,
-        max_depth=10000
 
     )
 
@@ -302,6 +331,69 @@ def get_image_search_settings_from_request(req, config: Config) -> ImageSearchSe
     if search_settings.same_sub is None:
         search_settings.same_sub = config.default_image_same_sub_filter
 
+
+    return search_settings
+
+
+def _parse_bool(value: str) -> bool | None:
+    """Parse a string boolean value from form data."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    return value.lower() in ('true', '1', 'yes')
+
+def _parse_int(value: str) -> int | None:
+    """Parse a string integer value from form data."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+def get_image_search_settings_from_form_data(form_data: dict, config: Config) -> ImageSearchSettings:
+    """Create ImageSearchSettings from multipart form data dictionary."""
+    target_match = _parse_int(form_data.get('target_match_percent'))
+    if target_match is None:
+        target_match = config.default_image_target_match
+
+    search_settings = ImageSearchSettings(
+        target_match,
+        target_title_match=_parse_int(form_data.get('target_title_match')) or config.default_image_target_title_match,
+        filter_dead_matches=_parse_bool(form_data.get('filter_dead_matches')),
+        filter_removed_matches=_parse_bool(form_data.get('filter_removed_matches')),
+        only_older_matches=_parse_bool(form_data.get('only_older')),
+        filter_same_author=_parse_bool(form_data.get('filter_author')),
+        filter_crossposts=_parse_bool(form_data.get('include_crossposts')),
+        target_meme_match_percent=_parse_int(form_data.get('target_meme_match_percent')) or config.default_image_target_meme_match,
+        meme_filter=_parse_bool(form_data.get('meme_filter')),
+        same_sub=_parse_bool(form_data.get('same_sub')),
+        max_days_old=_parse_int(form_data.get('target_days_old')) or config.default_link_max_days_old_filter,
+    )
+
+    if search_settings.filter_dead_matches is None:
+        search_settings.filter_dead_matches = config.default_image_dead_matches_filter
+
+    if search_settings.filter_removed_matches is None:
+        search_settings.filter_removed_matches = config.default_image_removed_match_filter
+
+    if search_settings.only_older_matches is None:
+        search_settings.only_older_matches = config.default_image_only_older_matches
+
+    if search_settings.filter_same_author is None:
+        search_settings.filter_same_author = config.default_image_same_author_filter
+
+    if search_settings.meme_filter is None:
+        search_settings.meme_filter = config.default_image_meme_filter
+
+    if search_settings.filter_crossposts is None:
+        search_settings.filter_crossposts = config.default_image_crosspost_filter
+    else:
+        search_settings.filter_crossposts = not search_settings.filter_crossposts
+
+    if search_settings.same_sub is None:
+        search_settings.same_sub = config.default_image_same_sub_filter
 
     return search_settings
 
@@ -358,10 +450,9 @@ def get_text_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> T
 
     )
 
-def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, target_annoy_distance: float = 170.0) -> ImageSearchSettings:
+def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub) -> ImageSearchSettings:
     return ImageSearchSettings(
         monitored_sub.target_image_match,
-        target_annoy_distance,
         target_meme_match_percent=monitored_sub.target_image_meme_match,
         meme_filter=monitored_sub.meme_filter,
         target_title_match=monitored_sub.target_title_match if monitored_sub.check_title_similarity else None,
@@ -370,7 +461,6 @@ def get_image_search_settings_for_monitored_sub(monitored_sub: MonitoredSub, tar
         filter_same_author=monitored_sub.filter_same_author,
         filter_crossposts=monitored_sub.filter_crossposts,
         filter_removed_matches=monitored_sub.filter_removed_matches,
-        max_depth=10000,
         max_matches=200
 
     )
@@ -504,7 +594,7 @@ def get_newest_praw_post_id(reddit: Reddit) -> str:
     This is used to guage if the manual ingest of IDs is falling behind
     :rtype: object
     """
-    newest_submissions = list(reddit.subreddit('all').new(limit=10))[0]
+    newest_submissions = list(reddit.subreddit('AskReddit').new(limit=10))[0]
     return newest_submissions.id
 
 

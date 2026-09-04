@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer
-from sqlalchemy.dialects.mysql import TINYINT
+from sqlalchemy import Column, String, DateTime, func, Boolean, Text, ForeignKey, Float, Index, Integer, BigInteger, JSON, UniqueConstraint
+from sqlalchemy.dialects.mysql import TINYINT, MEDIUMTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -29,7 +29,7 @@ class Post(Base):
     perma_link = Column(String(1000, collation='utf8mb4_general_ci'))
     post_type_id = Column(TINYINT(), ForeignKey('post_type.id'))
     author = Column(String(25), nullable=False)
-    selftext = Column(Text(75000, collation='utf8mb4_general_ci'))
+    selftext = Column(MEDIUMTEXT(charset='utf8mb4', collation='utf8mb4_general_ci'))
     created_at = Column(DateTime)
     ingested_at = Column(DateTime, default=func.utc_timestamp())
     subreddit = Column(String(25), nullable=False)
@@ -50,6 +50,11 @@ class Post(Base):
     #post_type = relationship('PostType', lazy='joined')
 
     def to_dict(self):
+        from sqlalchemy.orm.exc import DetachedInstanceError
+        try:
+            hashes = [h.to_dict() for h in self.hashes]
+        except DetachedInstanceError:
+            hashes = []
         return {
             'post_id': self.post_id,
             'url': self.url,
@@ -59,7 +64,7 @@ class Post(Base):
             'created_at': self.created_at.timestamp(),
             'author': self.author,
             'subreddit': self.subreddit,
-            'hashes': [h.to_dict() for h in self.hashes]
+            'hashes': hashes
         }
 
 class PostType(Base):
@@ -263,6 +268,9 @@ class Repost(Base):
         Index('idx_repost_of_date',  'author', 'detected_at',unique=False),
         Index('idx_repost_by_subreddit', 'subreddit', 'post_type_id', 'detected_at', unique=False),
         Index('idx_repost_by_author', 'author', unique=False),
+        # Indexes for scheduled task optimization (update_top_reposts, update_top_reposters)
+        Index('idx_repost_of_id_posttype', 'post_type_id', 'repost_of_id', unique=False),
+        Index('idx_repost_author_stats', 'post_type_id', 'detected_at', 'author', unique=False),
     )
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey('post.id'))
@@ -312,6 +320,7 @@ class MonitoredSub(Base):
     same_sub_only = Column(Boolean, default=False)
     notes = Column(String(250))
     filter_crossposts = Column(Boolean, default=True)
+    check_crossposts = Column(Boolean, default=False)
     filter_same_author = Column(Boolean, default=True)
     sticky_comment = Column(Boolean, default=False)
     remove_repost = Column(Boolean, default=False)
@@ -364,6 +373,14 @@ class MonitoredSub(Base):
     high_volume_reposter_notify_mod_mail = Column(Boolean, default=False)
     high_volume_reposter_removal_reason = Column(String(300))
     high_volume_reposter_ban_reason = Column(String(300))
+    # Spam detection settings
+    spam_detection_enabled = Column(Boolean, default=False)
+    spam_detection_remove_post = Column(Boolean, default=False)
+    spam_detection_ban_user = Column(Boolean, default=False)
+    spam_detection_notify_mod_mail = Column(Boolean, default=False)
+    spam_detection_score_threshold = Column(Float, default=0.8)
+    spam_detection_removal_reason = Column(String(300))
+    spam_detection_ban_reason = Column(String(300))
 
     post_checks = relationship("MonitoredSubChecks", back_populates='monitored_sub', cascade='all, delete', )
     config_revisions = relationship("MonitoredSubConfigRevision", back_populates='monitored_sub', cascade='all, delete')
@@ -382,10 +399,10 @@ class MonitoredSub(Base):
             'report_msg': self.report_msg,
             'requestor': self.requestor,
             'added_at': self.added_at.timestamp() if self.added_at else None,
-            'target_annoy': self.target_annoy,
             'target_days_old': self.target_days_old,
             'same_sub_only': self.same_sub_only,
             'filter_crossposts': self.filter_crossposts,
+            'check_crossposts': self.check_crossposts,
             'filter_same_author': self.filter_same_author,
             'remove_repost': self.remove_repost,
             'removal_reason': self.removal_reason,
@@ -435,9 +452,14 @@ class MonitoredSub(Base):
             'high_volume_reposter_removal_reason': self.high_volume_reposter_removal_reason,
             'high_volume_reposter_ban_reason': self.high_volume_reposter_ban_reason,
             'adult_promoter_removal_reason': self.adult_promoter_removal_reason,
-            'adult_promoter_ban_reason': self.adult_promoter_ban_reason
-
-
+            'adult_promoter_ban_reason': self.adult_promoter_ban_reason,
+            'spam_detection_enabled': self.spam_detection_enabled,
+            'spam_detection_remove_post': self.spam_detection_remove_post,
+            'spam_detection_ban_user': self.spam_detection_ban_user,
+            'spam_detection_notify_mod_mail': self.spam_detection_notify_mod_mail,
+            'spam_detection_score_threshold': self.spam_detection_score_threshold,
+            'spam_detection_removal_reason': self.spam_detection_removal_reason,
+            'spam_detection_ban_reason': self.spam_detection_ban_reason,
         }
 
 
@@ -713,6 +735,8 @@ class StatsDailyCount(Base):
     text_reposts_total = Column(Integer)
     text_reposts_24h = Column(Integer)
     monitored_subreddit_count = Column(Integer)
+    image_searches_24h = Column(Integer)
+    link_searches_24h = Column(Integer)
 
 class StatsTopReposter(Base):
     __tablename__ = 'stat_top_reposters'
@@ -754,24 +778,325 @@ class UserReview(Base):
     __tablename__ = 'user_review'
     __table_args__ = (
         Index('idx_last_checked', 'last_checked'),
+        Index('idx_spam_score', 'spam_score'),
+        Index('idx_risk_level', 'risk_level'),
     )
     username = Column(String(25), nullable=False, primary_key=True, unique=True)
     content_links_found = Column(Boolean, default=False)
     added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
     notes = Column(String(150))
     last_checked = Column(DateTime, default=func.utc_timestamp())
+    # Spam detection columns
+    spam_score = Column(Float, nullable=True)
+    spam_score_confidence = Column(Float, nullable=True)
+    spam_score_updated_at = Column(DateTime, nullable=True)
+    risk_level = Column(String(20), nullable=True)  # low, medium, high, critical
+    is_verified_spam = Column(Boolean, default=False)
+    is_verified_legit = Column(Boolean, default=False)
 
 class Subreddit(Base):
     __tablename__ = 'subreddit'
     __table_args__ = (
         Index('idx_subreddit_name', 'name'),
+        Index('idx_subs_nsfw', 'subscribers', 'nsfw'),
     )
     id = Column(Integer, primary_key=True)
     name = Column(String(25), nullable=False, unique=True)
-    subscribers = Column(Integer, nullable=False, default=0)
-    nsfw = Column(Boolean, nullable=False, default=False)
+    subscribers = Column(Integer, nullable=True, default=0)
+    nsfw = Column(Boolean, nullable=True, default=False)
     added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    created_at = Column(DateTime)
     bot_banned = Column(Boolean, nullable=False, default=False)
     bot_banned_at = Column(DateTime)
     last_ban_check = Column(DateTime)
     last_checked = Column(DateTime)
+    deleted = Column(Boolean, default=False)
+    active_user_count = Column(Integer)
+    is_private = Column(Boolean, default=False)
+
+    banner_image = Column(String(2048), nullable=True)
+    avatar_image = Column(String(2048), nullable=True)
+
+
+class AuthorActivityTracking(Base):
+    """Lightweight author activity for spam detection queries."""
+    __tablename__ = 'author_activity_tracking'
+    __table_args__ = (
+        Index('idx_author_created', 'author', 'created_at'),
+        Index('idx_author_subreddit', 'author', 'subreddit'),
+        Index('idx_created_at', 'created_at'),
+        Index('idx_subreddit', 'subreddit'),
+        Index('idx_author', 'author'),
+    )
+    id = Column(BigInteger, primary_key=True)
+    post_id = Column(String(15), nullable=False, unique=True)
+    author = Column(String(25), nullable=False)
+    subreddit = Column(String(25), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    post_type_id = Column(TINYINT(), nullable=False)
+    is_nsfw = Column(Boolean, default=False)
+    has_adult_link = Column(Boolean, default=False)
+    has_short_link = Column(Boolean, default=False)
+    has_telegram_link = Column(Boolean, default=False)
+    tracked_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+
+
+class UserSpamFeatures(Base):
+    """Computed spam detection features for a user."""
+    __tablename__ = 'user_spam_features'
+    __table_args__ = (
+        Index('idx_spam_score', 'spam_score'),
+        Index('idx_computed_at', 'computed_at'),
+        Index('idx_tier2_enriched_at', 'tier2_enriched_at'),
+        Index('idx_account_suspended', 'account_suspended'),
+    )
+    username = Column(String(25), nullable=False, primary_key=True, unique=True)
+    spam_score = Column(Float, nullable=True)
+    spam_score_confidence = Column(Float, nullable=True)
+    computed_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    # Feature data stored as JSON
+    total_posts = Column(Integer, default=0)
+    nsfw_post_count = Column(Integer, default=0)
+    nsfw_post_ratio = Column(Float, nullable=True)
+    unique_subreddit_count = Column(Integer, default=0)
+    adult_link_count = Column(Integer, default=0)
+    short_link_count = Column(Integer, default=0)
+    spam_subreddit_count = Column(Integer, default=0)
+    avg_posts_per_day = Column(Float, nullable=True)
+    max_posts_per_day = Column(Integer, nullable=True)
+    feature_data = Column(JSON, nullable=True)
+
+    # Tier 2: From single Reddit API call
+    account_age_days = Column(Integer, nullable=True)
+    total_karma = Column(Integer, nullable=True)
+    post_karma = Column(Integer, nullable=True)
+    comment_karma = Column(Integer, nullable=True)
+    karma_per_day = Column(Float, nullable=True)
+    has_verified_email = Column(Boolean, nullable=True)
+    is_gold = Column(Boolean, nullable=True)
+    has_custom_avatar = Column(Boolean, nullable=True)
+    account_suspended = Column(Boolean, default=False)
+
+    # Tier 2: From profile/comment scanning (adult + telegram links)
+    has_adult_profile_links = Column(Boolean, nullable=True)
+    has_telegram_links = Column(Boolean, nullable=True)
+    profile_link_sources = Column(JSON, nullable=True)
+
+    # Tier 2: From post scanning (promotional links like linktree, discord, patreon)
+    has_promotional_post_links = Column(Boolean, nullable=True)
+
+    # Enrichment metadata
+    tier2_enriched_at = Column(DateTime, nullable=True)
+    tier2_enrichment_failed = Column(Boolean, default=False)
+    tier2_failure_reason = Column(String(200), nullable=True)
+
+    # Moderator voting aggregates (Phase 5.5)
+    mod_vote_total = Column(Integer, default=0)       # Sum of all votes (+1/-1)
+    mod_vote_count = Column(Integer, default=0)       # Total votes cast
+    mod_vote_weighted = Column(Float, default=0.0)    # Subscriber-weighted score
+    mod_vote_updated_at = Column(DateTime, nullable=True)
+    mod_vote_consensus = Column(String(20), nullable=True)  # 'spam', 'legit', 'disputed'
+
+    # Comment analysis (Phase 4a) - stored as JSON blob
+    comment_features = Column(JSON, nullable=True)
+    comment_analysis_at = Column(DateTime, nullable=True)
+
+    def to_dict(self) -> dict:
+        """Return full dictionary representation for admin/internal use."""
+        return {
+            'username': self.username,
+            'spam_score': self.spam_score,
+            'spam_score_confidence': self.spam_score_confidence,
+            'computed_at': self.computed_at.isoformat() if self.computed_at else None,
+            'total_posts': self.total_posts,
+            'nsfw_post_count': self.nsfw_post_count,
+            'nsfw_post_ratio': self.nsfw_post_ratio,
+            'unique_subreddit_count': self.unique_subreddit_count,
+            'adult_link_count': self.adult_link_count,
+            'short_link_count': self.short_link_count,
+            'spam_subreddit_count': self.spam_subreddit_count,
+            'avg_posts_per_day': self.avg_posts_per_day,
+            'max_posts_per_day': self.max_posts_per_day,
+            'feature_data': self.feature_data,
+            # Tier 2 fields
+            'account_age_days': self.account_age_days,
+            'total_karma': self.total_karma,
+            'post_karma': self.post_karma,
+            'comment_karma': self.comment_karma,
+            'karma_per_day': self.karma_per_day,
+            'has_verified_email': self.has_verified_email,
+            'is_gold': self.is_gold,
+            'has_custom_avatar': self.has_custom_avatar,
+            'account_suspended': self.account_suspended,
+            'has_adult_profile_links': self.has_adult_profile_links,
+            'has_telegram_links': self.has_telegram_links,
+            'profile_link_sources': self.profile_link_sources,
+            'has_promotional_post_links': self.has_promotional_post_links,
+            # Enrichment metadata
+            'tier2_enriched_at': self.tier2_enriched_at.isoformat() if self.tier2_enriched_at else None,
+            'tier2_enrichment_failed': self.tier2_enrichment_failed,
+            'tier2_failure_reason': self.tier2_failure_reason,
+            # Moderator voting aggregates
+            'mod_vote_total': self.mod_vote_total,
+            'mod_vote_count': self.mod_vote_count,
+            'mod_vote_weighted': self.mod_vote_weighted,
+            'mod_vote_updated_at': self.mod_vote_updated_at.isoformat() if self.mod_vote_updated_at else None,
+            'mod_vote_consensus': self.mod_vote_consensus,
+            # Comment analysis
+            'comment_features': self.comment_features,
+            'comment_analysis_at': self.comment_analysis_at.isoformat() if self.comment_analysis_at else None,
+        }
+
+    def to_dict_for_moderator(self) -> dict:
+        """
+        Return filtered dictionary representation for moderators.
+
+        Excludes sensitive internal fields:
+        - profile_link_sources (detailed link info)
+        - tier2_failure_reason (internal error details)
+        - mod_vote_* (voting aggregates are admin-only)
+        - username_pattern_matches (could help gaming detection)
+
+        Includes selected feature_data fields to help moderators make
+        informed voting decisions on spam users.
+        """
+        result = {
+            'username': self.username,
+            'spam_score': self.spam_score,
+            'spam_score_confidence': self.spam_score_confidence,
+            'computed_at': self.computed_at.isoformat() if self.computed_at else None,
+            'total_posts': self.total_posts,
+            'nsfw_post_count': self.nsfw_post_count,
+            'nsfw_post_ratio': self.nsfw_post_ratio,
+            'unique_subreddit_count': self.unique_subreddit_count,
+            'adult_link_count': self.adult_link_count,
+            'short_link_count': self.short_link_count,
+            'spam_subreddit_count': self.spam_subreddit_count,
+            'avg_posts_per_day': self.avg_posts_per_day,
+            'max_posts_per_day': self.max_posts_per_day,
+            # Tier 2 fields (excluding profile_link_sources)
+            'account_age_days': self.account_age_days,
+            'total_karma': self.total_karma,
+            'post_karma': self.post_karma,
+            'comment_karma': self.comment_karma,
+            'karma_per_day': self.karma_per_day,
+            'has_verified_email': self.has_verified_email,
+            'is_gold': self.is_gold,
+            'has_custom_avatar': self.has_custom_avatar,
+            'account_suspended': self.account_suspended,
+            'has_adult_profile_links': self.has_adult_profile_links,
+            'has_telegram_links': self.has_telegram_links,
+            'has_promotional_post_links': self.has_promotional_post_links,
+            # Enrichment metadata (excluding tier2_failure_reason)
+            'tier2_enriched_at': self.tier2_enriched_at.isoformat() if self.tier2_enriched_at else None,
+            'tier2_enrichment_failed': self.tier2_enrichment_failed,
+        }
+
+        # Add parsed feature_data fields if available
+        if self.feature_data:
+            fd = self.feature_data  # Already a dict from JSON column
+            result.update({
+                # Repost signals
+                'total_reposts_detected': fd.get('total_reposts_detected', 0),
+                'repost_ratio': fd.get('repost_ratio', 0.0),
+                # Platform details
+                'detected_platforms': fd.get('detected_platforms', []),
+                # Posting behavior
+                'subreddit_concentration_hhi': fd.get('subreddit_concentration_hhi', 0.0),
+                'karma_farming_sub_posts': fd.get('karma_farming_sub_posts', 0),
+                'easy_karma_sub_posts': fd.get('easy_karma_sub_posts', 0),
+                'subreddit_distribution': fd.get('subreddit_distribution', {}),
+                'posting_entropy': fd.get('posting_entropy', 0.0),
+                'burst_posting_detected': fd.get('burst_posting_detected', False),
+                'avg_time_between_posts_minutes': fd.get('avg_time_between_posts_minutes', 0.0),
+                # Username analysis (no pattern details)
+                'username_suspicious_pattern': fd.get('username_suspicious_pattern', False),
+                'username_pattern_confidence': fd.get('username_pattern_confidence', 0.0),
+                # Timeline
+                'first_post_date': fd.get('first_post_date'),
+                'last_post_date': fd.get('last_post_date'),
+            })
+
+        # Add comment analysis fields if available
+        if self.comment_features:
+            cf = self.comment_features
+            result.update({
+                'comment_count': cf.get('comment_count', 0),
+                'duplicate_comment_ratio': cf.get('duplicate_comment_ratio', 0.0),
+                'similar_comment_ratio': cf.get('similar_comment_ratio', 0.0),
+                'negative_karma_comment_ratio': cf.get('negative_karma_comment_ratio', 0.0),
+                'comment_to_post_ratio': cf.get('comment_to_post_ratio', 0.0),
+                'link_comment_ratio': cf.get('link_comment_ratio', 0.0),
+                'comment_analysis_at': self.comment_analysis_at.isoformat() if self.comment_analysis_at else None,
+            })
+
+        return result
+
+
+class SpamSubredditList(Base):
+    """Reference table for known spam/karma farm subreddits."""
+    __tablename__ = 'spam_subreddit_list'
+    __table_args__ = (
+        Index('idx_category', 'category'),
+        Index('idx_is_active', 'is_active'),
+    )
+    id = Column(Integer, primary_key=True)
+    subreddit_name = Column(String(25), nullable=False, unique=True)
+    category = Column(String(50), nullable=False)  # karma_farm, spam_network, etc.
+    added_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    added_by = Column(String(50), nullable=True)
+    notes = Column(String(500), nullable=True)
+    is_active = Column(Boolean, default=True)
+
+
+class SpamTrainingLabels(Base):
+    """Labeled data for ML training."""
+    __tablename__ = 'spam_training_labels'
+    __table_args__ = (
+        Index('idx_label', 'label'),
+        Index('idx_labeled_at', 'labeled_at'),
+        Index('idx_label_source', 'label_source'),
+    )
+    id = Column(Integer, primary_key=True)
+    username = Column(String(25), nullable=False)
+    label = Column(String(20), nullable=False)  # spam, not_spam, suspicious
+    confidence = Column(Float, nullable=True)
+    label_source = Column(String(50), nullable=False)  # manual, auto_ban, user_report, etc.
+    labeled_at = Column(DateTime, default=func.utc_timestamp(), nullable=False)
+    labeled_by = Column(String(50), nullable=True)
+    notes = Column(String(500), nullable=True)
+    feature_snapshot = Column(JSON, nullable=True)  # Features at time of labeling
+
+
+class ModeratorSpamVote(Base):
+    """Moderator votes on spam detection results (Phase 5.5)."""
+    __tablename__ = 'moderator_spam_vote'
+    __table_args__ = (
+        Index('idx_mod_vote_target', 'target_username'),
+        Index('idx_mod_vote_moderator', 'moderator_username'),
+        Index('idx_mod_vote_voted_at', 'voted_at'),
+        UniqueConstraint('target_username', 'moderator_username', name='uq_target_moderator'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    target_username = Column(String(25), nullable=False)      # User being voted on
+    moderator_username = Column(String(25), nullable=False)   # Mod casting vote
+    subreddit = Column(String(25), nullable=False)            # Qualifying sub
+    subreddit_subscribers = Column(Integer, nullable=False)   # Subscriber count at vote
+    vote = Column(Integer, nullable=False)                    # +1=spam, -1=not spam
+    notes = Column(String(500), nullable=True)                # Optional explanation
+    voted_at = Column(DateTime, default=func.utc_timestamp())
+    spam_score_at_vote = Column(Float, nullable=True)         # Score snapshot
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'target_username': self.target_username,
+            'moderator_username': self.moderator_username,
+            'subreddit': self.subreddit,
+            'subreddit_subscribers': self.subreddit_subscribers,
+            'vote': self.vote,
+            'notes': self.notes,
+            'voted_at': self.voted_at.timestamp() if self.voted_at else None,
+            'spam_score_at_vote': self.spam_score_at_vote,
+        }

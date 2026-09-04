@@ -33,6 +33,11 @@ from redditrepostsleuth.core.db.repository.summonsrepository import SummonsRepos
 from redditrepostsleuth.core.db.repository.user_report_repo import UserReportRepo
 from redditrepostsleuth.core.db.repository.user_review_repo import UserReviewRepo
 from redditrepostsleuth.core.db.repository.user_whitelist_repo import UserWhitelistRepo
+from redditrepostsleuth.core.db.repository.author_activity_repo import AuthorActivityRepo
+from redditrepostsleuth.core.db.repository.spam_features_repo import SpamFeaturesRepo
+from redditrepostsleuth.core.db.repository.spam_subreddit_repo import SpamSubredditRepo
+from redditrepostsleuth.core.db.repository.spam_training_labels_repo import SpamTrainingLabelsRepo
+from redditrepostsleuth.core.db.repository.moderator_spam_vote_repo import ModeratorSpamVoteRepo
 
 
 class UnitOfWork:
@@ -182,3 +187,23 @@ class UnitOfWork:
     @property
     def subreddit(self) -> SubredditRepo:
         return SubredditRepo(self.session)
+
+    @property
+    def author_activity(self) -> AuthorActivityRepo:
+        return AuthorActivityRepo(self.session)
+
+    @property
+    def spam_features(self) -> SpamFeaturesRepo:
+        return SpamFeaturesRepo(self.session)
+
+    @property
+    def spam_subreddits(self) -> SpamSubredditRepo:
+        return SpamSubredditRepo(self.session)
+
+    @property
+    def spam_training_labels(self) -> SpamTrainingLabelsRepo:
+        return SpamTrainingLabelsRepo(self.session)
+
+    @property
+    def moderator_spam_vote(self) -> ModeratorSpamVoteRepo:
+        return ModeratorSpamVoteRepo(self.session)

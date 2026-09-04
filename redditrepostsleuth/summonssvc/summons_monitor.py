@@ -4,13 +4,14 @@ from datetime import datetime
 
 from praw import Reddit
 from praw.exceptions import APIException
-from prawcore import ResponseException, TooManyRequests
+from prawcore import ResponseException, TooManyRequests, ServerError
 from sqlalchemy.exc import DataError
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import Summons
 from redditrepostsleuth.core.db.db_utils import get_db_engine
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
+from redditrepostsleuth.core.exception import NoIndexException
 from redditrepostsleuth.core.logging import get_configured_logger
 from redditrepostsleuth.core.notification.notification_service import NotificationService
 from redditrepostsleuth.core.services.duplicateimageservice import DuplicateImageService
@@ -45,7 +46,8 @@ if os.getenv('SENTRY_DNS', None):
     import sentry_sdk
     sentry_sdk.init(
         dsn=os.getenv('SENTRY_DNS'),
-        environment=os.getenv('RUN_ENV', 'dev')
+        environment=os.getenv('RUN_ENV', 'dev'),
+        ignore_errors=[ServerError, NoIndexException]
     )
 
 
@@ -78,6 +80,8 @@ def handle_summons(summons: Summons) -> None:
                     log.error('APIException with unknown error code: %s', e.error_type)
             else:
                 log.error('APIException without error_type')
+        except ServerError:
+            log.warning('Reddit server error processing summons %s', summons.id)
         except Exception as e:
             log.exception('Unknown error')
 

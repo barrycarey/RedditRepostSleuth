@@ -13,10 +13,8 @@ from redditrepostsleuth.core.model.search_settings import SearchSettings
 def get_image_search_settings():
     return ImageSearchSettings(
         90,
-        .077,
         target_meme_match_percent=50,
         meme_filter=False,
-        max_depth=5000,
         target_title_match=None,
         max_matches=75,
         same_sub=False,
@@ -61,9 +59,8 @@ def get_image_search_results_one_match():
             'test.com',
             1,
             Post(post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-            10,
-            10,
-            32
+            40,
+            256
         )
     )
     return search_results
@@ -79,9 +76,8 @@ def get_image_search_results_multi_match():
             'test.com',
             1,
             Post(id=1, post_id='1111', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-            10,
-            10,
-            32
+            40,
+            256
         )
     )
     search_results.matches.append(
@@ -89,9 +85,8 @@ def get_image_search_results_multi_match():
             'test.com',
             1,
             Post(id=2, post_id='2222', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-            10,
-            10,
-            32
+            40,
+            256
         )
     )
     search_results.matches.append(
@@ -99,9 +94,8 @@ def get_image_search_results_multi_match():
             'test.com',
             1,
             Post(id=3, post_id='3333', title='some normal title'),
-            10,
-            0.250,
-            32
+            40,
+            256
         )
     )
     return search_results

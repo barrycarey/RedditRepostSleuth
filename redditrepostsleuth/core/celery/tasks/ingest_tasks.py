@@ -44,23 +44,23 @@ class IngestTask(Task):
         self._proxy_manager = ProxyManager(self.uowm, 1000)
         self.domains_to_proxy = []
 
-@celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle')
-def save_subreddit(self, subreddit_name: str):
-    try:
-        with self.uowm.start() as uow:
-            existing = uow.subreddit.get_by_name(subreddit_name)
-            if existing:
-                log.debug('Subreddit %s already exists', subreddit_name)
-                return
-            subreddit = Subreddit(name=subreddit_name)
-            uow.subreddit.add(subreddit)
-            uow.commit()
-            log.debug('Saved Subreddit %s', subreddit_name)
-            celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data', args=[subreddit_name])
-    except Exception as e:
-        log.exception()
+# @celery.task(bind=True, base=IngestTask, ignore_results=True, serializer='pickle')
+# def save_subreddit(self, subreddit_name: str):
+#     try:
+#         with self.uowm.start() as uow:
+#             existing = uow.subreddit.get_by_name(subreddit_name)
+#             if existing:
+#                 log.debug('Subreddit %s already exists', subreddit_name)
+#                 return
+#             subreddit = Subreddit(name=subreddit_name)
+#             uow.subreddit.add(subreddit)
+#             uow.commit()
+#             log.debug('Saved Subreddit %s', subreddit_name)
+#             celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.update_subreddit_data', args=[subreddit_name])
+#     except Exception as e:
+#         log.exception()
 
-@celery.task(bind=True, base=IngestTask, ignore_reseults=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed, HTTPException), retry_kwargs={'max_retries': 10, 'countdown': 300})
+@celery.task(bind=True, base=IngestTask, ignore_results=True, serializer='pickle', autoretry_for=(ConnectionError,ImageConversionException,GalleryNotProcessed, HTTPException), retry_kwargs={'max_retries': 10, 'countdown': 300})
 def save_new_post(self, submission: dict, repost_check: bool = True):
 
     start_time = perf_counter()
@@ -136,6 +136,14 @@ def save_new_post(self, submission: dict, repost_check: bool = True):
             celery.send_task('redditrepostsleuth.core.celery.tasks.repost_tasks.link_repost_check', args=[post])
 
     celery.send_task('redditrepostsleuth.core.celery.tasks.maintenance_tasks.save_subreddit', args=[post.subreddit])
+
+    # Queue author activity tracking for spam detection (decoupled for failure isolation)
+    if self.config._get_bool('spam_author_tracking_enabled', False):
+        from redditrepostsleuth.core.celery.tasks.spam_detection_tasks import track_author_activity
+        track_author_activity.apply_async(
+            args=[post.post_id, post.author, post.subreddit, post.url, post.nsfw, post.post_type_id, post.created_at.isoformat()],
+            queue='spam_detection'
+        )
 
 
 

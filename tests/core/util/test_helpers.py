@@ -18,7 +18,7 @@ from redditrepostsleuth.core.util.helpers import chunk_list, searched_post_str, 
     post_type_from_url, build_msg_values_from_search, build_image_msg_values_from_search, \
     get_image_search_settings_for_monitored_sub, get_default_image_search_settings, build_site_search_url, \
     build_image_report_link, get_default_link_search_settings, batch_check_urls, reddit_post_id_from_url, is_image_url, \
-    base36encode, base36decode, get_next_ids
+    base36encode, base36decode, get_next_ids, hamming_distance_bits
 
 
 class TestHelpers(TestCase):
@@ -69,25 +69,25 @@ class TestHelpers(TestCase):
 
     def test_build_image_msg_values_from_search_correct_match_percent(self):
         search_results = self._get_image_search_results_one_match()
-        search_results.matches[0].hamming_distance = 3
+        search_results.matches[0].hamming_distance = 12
         result = build_image_msg_values_from_search(search_results)
-        self.assertEqual('90.62%', result['newest_percent_match'])
+        self.assertEqual('95.31%', result['newest_percent_match'])
 
     def test_build_msg_values_from_search_key_total(self):
         search_results = self._get_image_search_results_one_match()
         result = build_msg_values_from_search(search_results)
-        self.assertEqual(37, len(result.keys()))
+        self.assertEqual(35, len(result.keys()))
         # TODO - Maybe test return values.  Probably not needed
 
     def test_build_msg_values_from_search_no_match_key_total(self):
         search_results = self._get_image_search_results_no_match()
         result = build_msg_values_from_search(search_results)
-        self.assertEqual(27, len(result.keys()))
+        self.assertEqual(25, len(result.keys()))
 
     def test_build_msg_values_from_search_no_match_custom_key_total(self):
         search_results = self._get_image_search_results_no_match()
         result = build_msg_values_from_search(search_results, test1='test')
-        self.assertEqual(28, len(result.keys()))
+        self.assertEqual(26, len(result.keys()))
 
     def test_build_msg_values_from_search_extra_values(self):
 
@@ -110,7 +110,7 @@ class TestHelpers(TestCase):
             filter_same_author=False,
             filter_crossposts=False
         )
-        r = get_image_search_settings_for_monitored_sub(monitored_sub, target_annoy_distance=170.0)
+        r = get_image_search_settings_for_monitored_sub(monitored_sub)
         self.assertEqual(51, r.target_match_percent)
         self.assertEqual(66, r.target_meme_match_percent)
         self.assertTrue(r.meme_filter)
@@ -134,7 +134,6 @@ class TestHelpers(TestCase):
             default_image_meme_filter=True,
             default_image_same_sub_filter=True,
             default_image_max_days_old_filter=180,
-            default_image_target_annoy_distance=.177,
             default_image_max_matches=250
 
         )
@@ -150,7 +149,6 @@ class TestHelpers(TestCase):
         self.assertTrue(r.meme_filter)
         self.assertTrue(r.same_sub)
         self.assertEqual(180, r.max_days_old)
-        self.assertEqual(.177, r.target_annoy_distance)
         self.assertEqual(250, r.max_matches)
 
     def test_get_default_link_search_settings(self):
@@ -183,12 +181,11 @@ class TestHelpers(TestCase):
     def test_test_build_site_search_url(self):
         search_settings = ImageSearchSettings(
             90,
-            170,
+            target_meme_match_percent=95,
             same_sub=True,
             only_older_matches=True,
             meme_filter=True,
-            filter_dead_matches=True,
-            target_meme_match_percent=95
+            filter_dead_matches=True
         )
         r = build_site_search_url('abc123', search_settings)
         expected = 'https://www.repostsleuth.com/search?postId=abc123&sameSub=true&filterOnlyOlder=true&memeFilter=true&filterDeadMatches=true&targetImageMatch=90&targetImageMemeMatch=95'
@@ -202,7 +199,7 @@ class TestHelpers(TestCase):
 
     def test_build_image_report_link_positive(self):
         search_results = ImageSearchResults('test.com', Mock(), checked_post=Post(post_id='abc123'))
-        search_results.matches.append(ImageSearchMatch('test.com', 123, Mock(), 1, 1, 32))
+        search_results.matches.append(ImageSearchMatch('test.com', 123, Mock(), 4, 256))
         result = build_image_report_link(search_results)
         expected = "*I'm not perfect, but you can help. Report [ [False Positive](https://www.reddit.com/message/compose/?to=RepostSleuthBot&subject=False%20Positive&message={\"post_id\": \"abc123\", \"meme_template\": null}) ]*"
         self.assertEqual(expected, result)
@@ -318,10 +315,8 @@ class TestHelpers(TestCase):
     def _get_image_search_settings(self):
         return ImageSearchSettings(
             90,
-            .077,
             target_meme_match_percent=50,
             meme_filter=False,
-            max_depth=5000,
             target_title_match=None,
             max_matches=75,
             same_sub=False,
@@ -363,9 +358,8 @@ class TestHelpers(TestCase):
                 'test.com',
                 1,
                 Post(post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         return search_results
@@ -380,9 +374,8 @@ class TestHelpers(TestCase):
                 'test.com',
                 1,
                 Post(post_id='abc123', created_at=datetime.strptime('2019-01-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         search_results.matches.append(
@@ -390,9 +383,8 @@ class TestHelpers(TestCase):
                 'test.com',
                 1,
                 Post(post_id='123abc', created_at=datetime.strptime('2019-06-28 05:20:03', '%Y-%m-%d %H:%M:%S')),
-                10,
-                10,
-                32
+                40,
+                256
             )
         )
         return search_results
@@ -453,3 +445,24 @@ class TestHelpers(TestCase):
     def test_get_next_ids_invalid_id(self):
         with self.assertRaises(TypeError):
             get_next_ids(1111, 5)
+
+    def test_hamming_distance_bits_single_bit_difference(self):
+        # 'f' = 1111, 'e' = 1110 -> 1 bit different
+        self.assertEqual(1, hamming_distance_bits('f', 'e'))
+
+    def test_hamming_distance_bits_four_bit_difference(self):
+        # 'f' = 1111, '0' = 0000 -> 4 bits different
+        self.assertEqual(4, hamming_distance_bits('f', '0'))
+
+    def test_hamming_distance_bits_full_hash_all_different(self):
+        # 64 zeros vs 64 f's -> 256 bits different (each hex char contributes 4 bits)
+        self.assertEqual(256, hamming_distance_bits('0' * 64, 'f' * 64))
+
+    def test_hamming_distance_bits_full_hash_identical(self):
+        # Identical hashes -> 0 bits different
+        hash_val = 'a1b2c3d4e5f6' * 5 + 'a1b2'  # 64 chars
+        self.assertEqual(0, hamming_distance_bits(hash_val, hash_val))
+
+    def test_hamming_distance_bits_unequal_length_raises(self):
+        with self.assertRaises(ValueError):
+            hamming_distance_bits('abc', 'ab')

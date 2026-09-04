@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from redditrepostsleuth.core.db.databasemodels import ConfigMessageTemplate
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.util.reddithelpers import get_user_data
-from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import is_site_admin, get_token_from_header
 
 
 class MessageTemplate:
@@ -15,7 +15,7 @@ class MessageTemplate:
         self.uowm = uowm
 
     def on_get(self, req: Request, resp: Response, id: int):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if not is_site_admin(user_data, self.uowm):
             raise HTTPUnauthorized(f'Not authorized to make this request',
@@ -28,7 +28,7 @@ class MessageTemplate:
             resp.body = json.dumps(template.to_dict())
 
     def on_get_all(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if not is_site_admin(user_data, self.uowm):
             raise HTTPUnauthorized(f'Not authorized to make this request',
@@ -38,7 +38,7 @@ class MessageTemplate:
             resp.body = json.dumps([temp.to_dict() for temp in templates])
 
     def on_patch(self, req: Request, resp: Response, id: int):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if not is_site_admin(user_data, self.uowm):
             raise HTTPUnauthorized(f'Not authorized to make this request',
@@ -55,7 +55,7 @@ class MessageTemplate:
 
 
     def on_post(self, req: Request, resp: Response):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         raw = json.load(req.bounded_stream)
         if not is_site_admin(user_data, self.uowm):
@@ -77,7 +77,7 @@ class MessageTemplate:
                 raise HTTPInternalServerError(title='Failed to save message template', description=str(e))
 
     def on_delete(self, req: Request, resp: Response, id: int):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_data = get_user_data(token)
         if not is_site_admin(user_data, self.uowm):
             raise HTTPUnauthorized(f'Not authorized to make this request',

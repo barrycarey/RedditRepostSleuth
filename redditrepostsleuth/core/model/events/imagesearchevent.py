@@ -4,7 +4,7 @@ from redditrepostsleuth.core.model.events.influxevent import InfluxEvent
 from redditrepostsleuth.core.model.image_search_times import ImageSearchTimes
 
 
-class AnnoySearchEvent(InfluxEvent):
+class ImageSearchEvent(InfluxEvent):
     def __init__(
             self,
             search_times: ImageSearchTimes,

@@ -1,13 +1,14 @@
 import json
 import logging
 
-from falcon import Request, Response, HTTPUnauthorized, HTTPNotFound, HTTPBadRequest
+from falcon import Request, Response, HTTPUnauthorized, HTTPNotFound, HTTPBadRequest, HTTPForbidden
 from praw import Reddit
 
 from redditrepostsleuth.core.config import Config
 from redditrepostsleuth.core.db.databasemodels import UserWhitelist
 from redditrepostsleuth.core.db.uow.unitofworkmanager import UnitOfWorkManager
 from redditrepostsleuth.core.util.reddithelpers import is_sub_mod_token
+from redditrepostsleuth.repostsleuthsiteapi.util.helpers import get_token_from_header
 
 log = logging.getLogger(__name__)
 class UserWhitelistEndpoint:
@@ -22,7 +23,7 @@ class UserWhitelistEndpoint:
         self.uowm = uowm
 
     def on_get(self, req: Request, resp: Response, subreddit: str):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'You are not a moderator on {subreddit}',
                                    f'You\'re not a moderator on {subreddit}')
@@ -36,7 +37,7 @@ class UserWhitelistEndpoint:
             resp.body = json.dumps([u.to_dict() for u in monitored_sub.user_whitelist])
 
     def on_post(self, req: Request, resp: Response, subreddit: str):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_json = json.load(req.bounded_stream)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}', f'You\'re not a moderator on {subreddit}')
@@ -69,7 +70,7 @@ class UserWhitelistEndpoint:
             resp.text = json.dumps(user_whitelist.to_dict())
 
     def on_patch(self, req: Request, resp: Response, subreddit: str):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         user_json = json.load(req.bounded_stream)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}',
@@ -97,7 +98,7 @@ class UserWhitelistEndpoint:
             resp.text = json.dumps(existing_whitelist.to_dict())
 
     def on_delete(self, req: Request, resp: Response, subreddit: str):
-        token = req.get_param('token', required=True)
+        token = get_token_from_header(req)
         id_to_delete = req.get_param_as_int('id', required=True)
         if not is_sub_mod_token(token, subreddit, self.config.reddit_useragent):
             raise HTTPUnauthorized(f'Not authorized to make changes to {subreddit}',
@@ -113,6 +114,17 @@ class UserWhitelistEndpoint:
             if not existing_whitelist:
                 raise HTTPNotFound(title=f'Cannot find whitelist with ID {id_to_delete}',
                                    description=f'Cannot find whitelist with ID {id_to_delete}')
+
+            # SECURITY: Verify whitelist belongs to the subreddit the mod is authorized for
+            if existing_whitelist.monitored_sub_id != monitored_sub.id:
+                log.warning(
+                    'IDOR attempt: User tried to delete whitelist %d belonging to sub %d via sub %d',
+                    id_to_delete, existing_whitelist.monitored_sub_id, monitored_sub.id
+                )
+                raise HTTPForbidden(
+                    title='Access Denied',
+                    description='You do not have permission to delete this whitelist entry'
+                )
 
             uow.user_whitelist.remove(existing_whitelist)
             uow.commit()

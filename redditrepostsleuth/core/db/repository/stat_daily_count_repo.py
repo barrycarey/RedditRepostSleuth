@@ -11,7 +11,7 @@ class StatDailyCountRepo:
         self.db_session.add(item)
 
     def get_all(self, limit: int = None) -> List[StatsDailyCount]:
-        return self.db_session.query(StatsDailyCount).order_by(StatsDailyCount.date.desc()).limit(limit).all()
+        return self.db_session.query(StatsDailyCount).order_by(StatsDailyCount.ran_at.desc()).limit(limit).all()
 
     def get_latest(self) -> StatsDailyCount:
         return self.db_session.query(StatsDailyCount).order_by(StatsDailyCount.id.desc()).first()

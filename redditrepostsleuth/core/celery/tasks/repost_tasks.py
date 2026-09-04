@@ -6,10 +6,10 @@ from requests.exceptions import ConnectTimeout
 from sqlalchemy import func
 
 from redditrepostsleuth.core.celery import celery
-from redditrepostsleuth.core.celery.basetasks import AnnoyTask, RedditTask, RepostTask
+from redditrepostsleuth.core.celery.basetasks import ImageSearchTask, RedditTask, RepostTask
 from redditrepostsleuth.core.celery.task_logic.repost_image import repost_watch_notify, check_for_post_watch
 from redditrepostsleuth.core.db.databasemodels import Post, RepostWatch
-from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme, IndexApiException
+from redditrepostsleuth.core.exception import NoIndexException, IngestHighMatchMeme
 from redditrepostsleuth.core.logfilters import ContextFilter
 from redditrepostsleuth.core.logging import log, configure_logger
 from redditrepostsleuth.core.model.search.search_match import SearchMatch
@@ -26,24 +26,24 @@ log = configure_logger(
 )
 
 
-@celery.task(bind=True, base=AnnoyTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError, NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
+@celery.task(bind=True, base=ImageSearchTask, serializer='pickle', ignore_results=True, autoretry_for=(RedLockError, NoIndexException, IngestHighMatchMeme), retry_kwargs={'max_retries': 20, 'countdown': 300})
 def check_image_repost_save(self, post: Post) -> NoReturn:
 
     try:
         r = requests.head(post.url)
         if r.status_code != 200:
             log.info('Skipping image that is deleted %s', post.url)
-            celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
+            #celery.send_task('redditrepostsleuth.core.celery.admin_tasks.delete_post_task', args=[post.post_id])
             return
 
         search_settings = get_default_image_search_settings(self.config)
-        search_settings.max_matches = 75
-        search_results = self.dup_service.check_image(
-            post.url,
-            post=post,
-            search_settings=search_settings,
-            source='ingest'
-        )
+        search_settings.max_matches = 25
+        # search_results = self.dup_service.check_image(
+        #     post.url,
+        #     post=post,
+        #     search_settings=search_settings,
+        #     source='ingest'
+        # )
         with self.uowm.start() as uow:
             search_results = image_search_by_post(
                 post,
@@ -59,12 +59,14 @@ def check_image_repost_save(self, post: Post) -> NoReturn:
                 if watches and self.config.enable_repost_watch:
                     notify_watch.apply_async((watches, post), queue='watch_notify')
 
-    except (RedLockError, NoIndexException, IngestHighMatchMeme):
+    except (RedLockError, NoIndexException, IngestHighMatchMeme) as e:
         raise
     except (ConnectTimeout):
         log.warning('Failed to validate image url at %s', post.url)
+    except TypeError as e:
+        log.warning('Type Error During Search: %s', str(e))
     except Exception as e:
-        log.exception('')
+        log.exception('Unexpected error during image repost check for post %s (URL: %s)', post.post_id, post.url)
 
 
 @celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
@@ -87,10 +89,17 @@ def link_repost_check(self, post):
 
 
     except Exception as e:
-        log.exception('')
+        log.exception('Unexpected error during link repost check for post %s (URL: %s)', post.post_id, post.url)
 
 
-@celery.task(bind=True, base=RepostTask, ignore_results=True, serializer='pickle')
+@celery.task(
+    bind=True,
+    base=RepostTask,
+    ignore_results=True,
+    serializer='pickle',
+    autoretry_for=(NoIndexException,),
+    retry_kwargs={'max_retries': 10, 'countdown': 60}
+)
 def check_for_text_repost_task(self, post: Post) -> None:
     log.debug('Checking post for repost: %s', post.post_id)
     try:
@@ -100,14 +109,15 @@ def check_for_text_repost_task(self, post: Post) -> None:
                 uow,
                 get_default_text_search_settings(self.config),
                 filter_function=filter_search_results,
-                source='ingest'
+                source='ingest',
+                event_logger=self.event_logger
             )
             log.info('Found %s matching text posts', len(search_results.matches))
-    except IndexApiException as e:
-        log.warning(e, exc_info=False)
+    except NoIndexException as e:
+        log.warning('Index unavailable for text repost check: %s', e)
         raise
     except Exception as e:
-        log.exception('Unknown exception during test repost check')
+        log.exception('Unknown exception during text repost check')
 
 
 @celery.task(bind=True, base=RedditTask, ignore_results=True)
