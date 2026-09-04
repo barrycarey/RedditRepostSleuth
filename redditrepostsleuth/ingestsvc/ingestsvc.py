@@ -11,7 +11,7 @@ from typing import List, Optional, Union, Generator
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError, TCPConnector, \
     ServerDisconnectedError, ClientOSError
 from praw import Reddit
-from prawcore.exceptions import TooManyRequests
+from prawcore.exceptions import TooManyRequests, PrawcoreException
 
 from redditrepostsleuth.core.celery.tasks.ingest_tasks import save_new_post, save_new_posts
 from redditrepostsleuth.core.config import Config
@@ -43,6 +43,8 @@ DEFAULT_REQUEST_DELAY = 0
 RATE_LIMIT_SLEEP_SECONDS = 10
 ERROR_SLEEP_SECONDS = 2
 TARGET_INGEST_DELAY_SECONDS = 90
+STARTUP_RETRY_BASE_SECONDS = 30
+STARTUP_RETRY_MAX_SECONDS = 600
 
 # Catch-up configuration - triggers parallel backfill when falling behind
 CATCHUP_THRESHOLD_SECONDS = int(os.getenv('CATCHUP_THRESHOLD_SECONDS', 300))  # 5 minutes
@@ -500,6 +502,33 @@ async def run_ingestion_loop(state: IngestionState, reddit: Reddit) -> None:
         await asyncio.sleep(state.request_delay)
 
 
+async def get_startup_reddit_state(reddit: Reddit) -> tuple:
+    """Fetch the newest post id and initial auth headers needed before the main
+    ingestion loop starts, retrying with exponential backoff on prawcore errors
+    (rate limits, OAuth hiccups) instead of raising.
+
+    This matters specifically because these are the very first Reddit API calls
+    the process makes: if either raises here, main() has nothing to catch it,
+    the whole process crashes, and `restart: unless-stopped` immediately starts
+    a fresh process that hits this exact same unprotected call again -- turning
+    one rate-limit response into a crash loop that hammers Reddit's OAuth
+    endpoint every few seconds and prolongs the rate limit rather than letting
+    it clear.
+    """
+    delay = STARTUP_RETRY_BASE_SECONDS
+    while True:
+        try:
+            newest_id = get_newest_praw_post_id(reddit)
+            auth_headers = get_auth_headers(reddit)
+            return newest_id, auth_headers
+        except PrawcoreException as e:
+            log.warning(
+                'Reddit API error during startup (%s), retrying in %ss', e, delay
+            )
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, STARTUP_RETRY_MAX_SECONDS)
+
+
 async def main() -> None:
     log.info('Starting post ingestor')
     reddit = get_reddit_instance(config)
@@ -510,8 +539,7 @@ async def main() -> None:
         oldest_post = uow.posts.get_newest_post()
         oldest_id = oldest_post.post_id
 
-    newest_id = get_newest_praw_post_id(reddit)
-    auth_headers = get_auth_headers(reddit)
+    newest_id, auth_headers = await get_startup_reddit_state(reddit)
 
     # Backfill any missed posts, retrying on token expiry
     while True:
